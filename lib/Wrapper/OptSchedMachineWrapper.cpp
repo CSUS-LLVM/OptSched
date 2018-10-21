@@ -79,7 +79,7 @@ void LLVMMachineModel::convertMachineModel(
   registerTypes_.clear();
 
   registerInfo = dag.TRI;
-  for (int pSet = 0; pSet < registerInfo->getNumRegPressureSets(); ++pSet) {
+  for (unsigned pSet = 0; pSet < registerInfo->getNumRegPressureSets(); ++pSet) {
     RegTypeInfo regType;
     regType.name = registerInfo->getRegPressureSetName(pSet);
     int pressureLimit = regClassInfo->getRegPressureSetLimit(pSet);

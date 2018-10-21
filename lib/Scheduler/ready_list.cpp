@@ -297,13 +297,12 @@ void ReadyList::UpdatePriorities() {
   assert(prirts_.isDynmc);
 
   SchedInstruction *inst;
-  bool listChanged = false, instChanged = false;
+  bool instChanged = false;
   for (inst = prirtyLst_->GetFrstElmnt(); inst != NULL;
        inst = prirtyLst_->GetNxtElmnt()) {
     unsigned long key = CmputKey_(inst, true, instChanged);
     if (instChanged) {
       prirtyLst_->BoostEntry(keyedEntries_[inst->GetNum()], key);
-      listChanged = true;
     }
   }
 }

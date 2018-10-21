@@ -1,7 +1,7 @@
 #include <iostream>
 #include <iomanip>
 #include <sstream>
-#include "llvm/CodeGen/OptSched/aco.h"
+#include "opt-sched/Scheduler/aco.h"
 #include "opt-sched/Scheduler/data_dep.h"
 #include "opt-sched/Scheduler/ready_list.h"
 #include "opt-sched/Scheduler/register.h"
@@ -11,7 +11,7 @@
 
 namespace opt_sched {
 
-static void PrintInstruction(SchedInstruction *inst);
+//static void PrintInstruction(SchedInstruction *inst);
 void PrintSchedule(InstSchedule *schedule);
 
 double RandDouble(double min, double max) {
@@ -315,6 +315,7 @@ void ACOScheduler::PrintPheremone() {
   std::cerr << std::endl;
 }
 
+/* Not Used
 static void PrintInstruction(SchedInstruction *inst) {
   std::cerr << std::setw(2) << inst->GetNum() << " ";
   std::cerr << std::setw(20) << std::left << inst->GetOpCode();
@@ -338,6 +339,7 @@ static void PrintInstruction(SchedInstruction *inst) {
   }
   std::cerr << std::endl;
 }
+*/
 
 void PrintSchedule(InstSchedule *schedule) {
   std::cerr << schedule->GetSpillCost() << ": ";

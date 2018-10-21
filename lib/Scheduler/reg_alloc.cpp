@@ -150,7 +150,7 @@ int LocalRegAlloc::FindSpillCand_(std::map<int, RegMap> &regMaps,
                                   std::vector<int> &physRegs) {
   int max = INT_MIN;
   int virtRegWithMaxUse = -1;
-  for (int i = 0; i < physRegs.size(); i++) {
+  for (size_t i = 0; i < physRegs.size(); i++) {
     int virtReg = physRegs[i];
     assert(virtReg != -1);
     RegMap &regMap = regMaps[virtReg];
@@ -278,7 +278,7 @@ void LocalRegAlloc::AddLiveIn_(SchedInstruction *artificialEntry) {
 
 void LocalRegAlloc::SpillAll_() {
   for (int regType = 0; regType < numRegTypes_; regType++) {
-    for (int j = 0; j < physRegs_[regType].size(); j++) {
+    for (size_t j = 0; j < physRegs_[regType].size(); j++) {
       int physReg = physRegs_[regType][j];
       if (physReg != -1 && regMaps_[regType][physReg].isDirty)
         numStores_++;

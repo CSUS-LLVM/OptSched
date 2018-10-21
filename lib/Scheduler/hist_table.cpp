@@ -463,7 +463,6 @@ static bool DoesHistoryCostDominate(const int prefixCost, const int totalCost,
     // improvement can beat the best cost found so far. An improvement is
     // defined by how much a cost goes down. The greater the difference in cost,
     // the better the improvement.
-    auto bestCost = en_.GetBestCost();
     auto requiredImprovement = std::max(totalCost - en_.GetBestCost(), 0);
     auto improvementOnHistory = prefixCost - node_.GetCostLwrBound();
 #if defined(IS_DEBUG_COST_HIST_DOM)

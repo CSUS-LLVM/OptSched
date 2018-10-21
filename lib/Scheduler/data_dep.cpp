@@ -1316,13 +1316,13 @@ void DataDepGraph::AddOutputEdges() {
 
 void DataDepGraph::PrintEdgeCntPerLtncyInfo() {
   int totEdgeCnt = 0;
-  /*  Logger::Info("Latency Distribution:");
+    Logger::Info("Latency Distribution:");
     for (int i = 0; i<= MAX_LATENCY_VALUE; i++) {
       if (edgeCntPerLtncy_[i] > 0)
         Logger::Info("Latency %d: %d edges", i, edgeCntPerLtncy_[i]);
       totEdgeCnt += edgeCntPerLtncy_[i];
     }
-    Logger::Info("Total edge count: %d", totEdgeCnt);*/
+    Logger::Info("Total edge count: %d", totEdgeCnt);
 }
 
 InstCount DataDepGraph::GetRltvCrtclPath(SchedInstruction *ref,

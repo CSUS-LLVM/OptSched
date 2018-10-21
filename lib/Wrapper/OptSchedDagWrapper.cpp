@@ -191,7 +191,7 @@ void LLVMDataDepGraph::ConvertLLVMNodes_() {
 
       LATENCY_PRECISION prcsn = ltncyPrcsn_;
       if (prcsn == LTP_PRECISE && maxDagSizeForPrcisLtncy_ > 0 &&
-          llvmNodes_.size() > maxDagSizeForPrcisLtncy_)
+          llvmNodes_.size() > static_cast<size_t>(maxDagSizeForPrcisLtncy_))
         prcsn = LTP_ROUGH; // use rough latencies if DAG is too large
 
       if (prcsn == LTP_PRECISE) { // if precise latency, get the precise latency

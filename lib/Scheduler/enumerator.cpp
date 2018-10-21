@@ -759,17 +759,13 @@ void Enumerator::CreateRootNode_() {
 /*****************************************************************************/
 
 namespace {
-void printVector(const std::vector<InstCount> &v, const char *label) {
-  std::stringstream s;
-  for (auto i : v)
-    s << i << ' ';
-  Logger::Info("%s: %s", label, s.str().c_str());
-}
+
+// TODO: Add unit tests to replace this style of debug code.
+#if defined(IS_DEBUG_SUFFIX_SCHED)
 
 void CheckHistNodeMatches(EnumTreeNode *const node,
                           HistEnumTreeNode *const histNode,
                           const char *loc = "CheckHistNodeMatches") {
-#if defined(IS_DEBUG_SUFFIX_SCHED)
   auto histPrefix = histNode->GetPrefix();
   auto currPrefix = [&]() {
     std::vector<InstCount> prefix;
@@ -795,7 +791,6 @@ void CheckHistNodeMatches(EnumTreeNode *const node,
                   "each other!",
                   loc, histPrefix.size(), currPrefix.size());
   }
-#endif
 }
 
 void PrintSchedule(InstSchedule *const sched,
@@ -808,6 +803,8 @@ void PrintSchedule(InstSchedule *const sched,
   }
   Logger::Log(level, false, "Schedule: %s", s.str().c_str());
 }
+
+#endif // IS_DEBUG_SUFFIX_SCHED
 
 void AppendAndCheckSuffixSchedules(
     HistEnumTreeNode *const matchingHistNodeWithSuffix, SchedRegion *const rgn_,
@@ -1432,6 +1429,14 @@ void SetTotalCostsAndSuffixes(EnumTreeNode *const currentNode,
 // no common instructions. This can be compiled out once the code is working.
 #if defined(IS_DEBUG_SUFFIX_SCHED)
   if (suffixConcatenationEnabled) {
+
+  void printVector(const std::vector<InstCount> &v, const char *label) {
+    std::stringstream s;
+    for (auto i : v)
+    s << i << ' ';
+    Logger::Info("%s: %s", label, s.str().c_str());
+  }
+
     std::vector<InstCount> prefix;
     for (auto n = currentNode; n != nullptr; n = n->GetParent()) {
       if (n->GetInstNum() != SCHD_STALL)
@@ -1481,7 +1486,7 @@ void SetTotalCostsAndSuffixes(EnumTreeNode *const currentNode,
   }
 #endif
 }
-} // namespace
+} // end anonymous namespace
 
 bool Enumerator::BackTrack_() {
   bool fsbl = true;

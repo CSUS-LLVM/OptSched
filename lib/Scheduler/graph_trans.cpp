@@ -19,6 +19,8 @@ GraphTrans::CreateGraphTrans(TRANS_TYPE type, DataDepGraph *dataDepGraph) {
   // Create equivalence detection graph transformation.
   case TT_NSP:
     return std::unique_ptr<GraphTrans>(new StaticNodeSupTrans(dataDepGraph));
+  default:
+    return nullptr;
   }
 }
 
@@ -186,7 +188,7 @@ bool StaticNodeSupTrans::NodeIsSuperior_(SchedInstruction *nodeA,
   // registers.
   Register **usesA;
   Register **usesB;
-  Register **usesC;
+  //Register **usesC;
   int useCntA = nodeA->GetUses(usesA);
   int useCntB = nodeB->GetUses(usesB);
   // Register used by B but not by A.
@@ -200,7 +202,7 @@ bool StaticNodeSupTrans::NodeIsSuperior_(SchedInstruction *nodeA,
   std::fill(lengthenedByB.begin(), lengthenedByB.end(), 0);
   // The total number of live ranges that could be lengthened by
   // scheduling B after A.
-  InstCount totalLengthenedByB = 0;
+  //InstCount totalLengthenedByB = 0;
 
   for (int i = 0; i < useCntB; i++) {
     Register *useB = usesB[i];

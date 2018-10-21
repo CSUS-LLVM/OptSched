@@ -267,8 +267,8 @@ static InstCount ComputeSLILStaticLowerBound(int64_t regTypeCnt_,
     }
 #endif
 
-    for (int j = 0; j < usedInsts.size(); ++j) {
-      for (int k = j + 1; k < usedInsts.size(); ++k) {
+    for (size_t j = 0; j < usedInsts.size(); ++j) {
+      for (size_t k = j + 1; k < usedInsts.size(); ++k) {
         const auto &jReg = usedInsts[j].second;
         const auto &kReg = usedInsts[k].second;
 
@@ -306,8 +306,7 @@ static InstCount ComputeSLILStaticLowerBound(int64_t regTypeCnt_,
 /*****************************************************************************/
 
 InstCount BBWithSpill::CmputCostLwrBound() {
-  InstCount useCnt, spillCostLwrBound = 0;
-  SchedInstruction *inst;
+  InstCount spillCostLwrBound = 0;
 
   if (spillCostFunc_ == SCF_SLIL) {
     spillCostLwrBound =
@@ -443,6 +442,9 @@ void BBWithSpill::CmputCrntSpillCost_() {
     break;
   case SCF_SLIL:
     crntSpillCost_ = slilSpillCost_;
+    break;
+  default:
+    crntSpillCost_ = peakSpillCost_;
     break;
   }
 }
@@ -831,7 +833,7 @@ FUNC_RESULT BBWithSpill::Enumerate_(Milliseconds startTime,
     HandlEnumrtrRslt_(rslt, trgtLngth);
 
     if (bestCost_ == 0 || rslt == RES_ERROR ||
-        lngthDeadline == rgnDeadline && rslt == RES_TIMEOUT)
+        (lngthDeadline == rgnDeadline && rslt == RES_TIMEOUT))
       break;
 
     enumrtr_->Reset();
