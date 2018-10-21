@@ -2895,24 +2895,20 @@ void InstSchedule::Print(std::ostream &out, char const *const label) {
   }
 }
 
-/*
-void InstSchedule::PrintRegPressures() {
-  if (!OPTSCHED_gPrintSpills)
-    return;
-  Logger::Info("OptSched max reg pressures");
+#ifdef IS_DEBUG_PEAK_PRESSURE
+void InstSchedule::PrintRegPressures() const {
+  Logger::Info("OptSched max reg pressures:");
   InstCount i;
-  LLVMMachineModel *llvmModel = static_cast<LLVMMachineModel *>(machMdl_);
   for (i = 0; i < machMdl_->GetRegTypeCnt(); i++) {
-    // if (peakRegPressures_[i] > 0)
-    Logger::Info("OptSchPeakRegPres Index %d Name %s Peak %d Limit %d", i,
-                 llvmModel->GetRegTypeName(i).c_str(), peakRegPressures_[i],
+    Logger::Info("OptSchPeakRegPres Index %s Peak %d Limit %d", i,
+                 peakRegPressures_[i],
                  machMdl_->GetPhysRegCnt(i));
   }
 }
-*/
+#endif
 
 void InstSchedule::PrintInstList(FILE *file, DataDepGraph *dataDepGraph,
-                                 const char *label) {
+                                 const char *label) const {
   fprintf(file, "\n%s Instruction Order:", label);
 
   for (InstCount i = 0; i < crntSlotNum_; i++) {

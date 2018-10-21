@@ -87,16 +87,6 @@ ScheduleDAGOptSched::ScheduleDAGOptSched(llvm::MachineSchedContext *C)
     : llvm::ScheduleDAGMILive(C, llvm::make_unique<llvm::GenericScheduler>(C)),
       context(C), model(nullptr), totalSimulatedSpills(0) {
 
-  // copy valid heuristic names
-  std::strcpy(hurstcNames[(int)LSH_CP], "CP");
-  std::strcpy(hurstcNames[(int)LSH_LUC], "LUC");
-  std::strcpy(hurstcNames[(int)LSH_UC], "UC");
-  std::strcpy(hurstcNames[(int)LSH_NID], "NID");
-  std::strcpy(hurstcNames[(int)LSH_CPR], "CPR");
-  std::strcpy(hurstcNames[(int)LSH_ISO], "ISO");
-  std::strcpy(hurstcNames[(int)LSH_SC], "SC");
-  std::strcpy(hurstcNames[(int)LSH_LS], "LS");
-
   // Find the native paths to the scheduler configuration files.
   getRealCfgPaths();
 
@@ -160,50 +150,23 @@ void ScheduleDAGOptSched::schedule() {
                                 regionName) != std::end(regionList);
   }
 
-  if (!optSchedEnabled) {
-/* (Chris) We still want the register pressure
-   even for the default scheduler */
-#ifdef IS_DEBUG
-    Logger::Info("********** LLVM Scheduling **********\n");
+#ifdef IS_DEBUG_PEAK_PRESSURE
+  SetupLLVMDag();
+  Logger::Info("RP before scheduling");
+  RPTracker.dump();
 #endif
 
-#ifdef IS_DEBUG_PEAK_PRESSURE
-    if (OPTSCHED_gPrintSpills) {
-      SetupLLVMDag();
-      Logger::Info("LLVM max pressure before scheduling for BB %s:%s",
-                   context->MF->getFunction().getName().data(), BB->getName());
-      const std::vector<unsigned> &RegionPressure =
-          RPTracker.getPressure().MaxSetPressure;
-      // Logger::Info("There are %d register pressure sets.",
-      // RegionPressure.size());
-      for (unsigned i = 0, e = RegionPressure.size(); i < e; ++i) {
-        unsigned Limit = RegClassInfo->getRegPressureSetLimit(i);
-        Logger::Info("PeakRegPresBefore Index %d Name %s Peak %d Limit %d", i,
-                     TRI->getRegPressureSetName(i), RegionPressure[i], Limit);
-        // RegionCriticalPSets.push_back(llvm::PressureChange(i));
-      }
-    }
+  if (!optSchedEnabled) {
+#ifdef IS_DEBUG
+    Logger::Info("********** LLVM Scheduling **********\n");
 #endif
 
     ScheduleDAGMILive::schedule();
 
 #ifdef IS_DEBUG_PEAK_PRESSURE
-    // recalculate register pressure
-    if (OPTSCHED_gPrintSpills) {
-      SetupLLVMDag();
-      const std::vector<unsigned> &RegionPressure =
-          RPTracker.getPressure().MaxSetPressure;
-      Logger::Info("LLVM max pressure after scheduling for BB %s:%s",
-                   context->MF->getFunction().getName().data(), BB->getName());
-      // Logger::Info("There are %d register pressure sets.",
-      // RegionPressure.size());
-      for (unsigned i = 0, e = RegionPressure.size(); i < e; ++i) {
-        unsigned Limit = RegClassInfo->getRegPressureSetLimit(i);
-        Logger::Info("PeakRegPresAfter  Index %d Name %s Peak %d Limit %d", i,
-                     TRI->getRegPressureSetName(i), RegionPressure[i], Limit);
-        // RegionCriticalPSets.push_back(llvm::PressureChange(i));
-      }
-    }
+    SetupLLVMDag();
+    Logger::Info("RP after llvm scheduling");
+    RPTracker.dump();
 #endif
     return;
   }
@@ -242,16 +205,16 @@ void ScheduleDAGOptSched::schedule() {
 
     // Update SUnits with the discovered schedule. Re-number SUnits to be in
     // sequential order.
-    for (int i = 0; i < SUnits.size(); i++) {
+    for (size_t i = 0; i < SUnits.size(); i++) {
       // continue if the SUnit is already in the correct place
-      int newNum = ISOSchedule[i];
-      int curNum = SUnits[i].NodeNum;
+      unsigned newNum = ISOSchedule[i];
+      unsigned curNum = SUnits[i].NodeNum;
       if (curNum == newNum) {
         SUnits[i].NodeNum = i;
         continue;
       }
 
-      for (int j = i + 1; j < SUnits.size(); j++) {
+      for (size_t j = i + 1; j < SUnits.size(); j++) {
         if (SUnits[j].NodeNum == newNum) {
 #ifdef IS_DEBUG_ISO
           Logger::Info("Swapping %d with %d for ISO", SUnits[j].NodeNum,
@@ -265,7 +228,7 @@ void ScheduleDAGOptSched::schedule() {
     }
 
     // Update edges.
-    for (int i = 0; i < SUnits.size(); i++) {
+    for (size_t i = 0; i < SUnits.size(); i++) {
       llvm::SUnit *unit = &SUnits[i];
       // Update successor NodeNums.
       for (llvm::SDep &dep : unit->Succs) {
@@ -290,47 +253,17 @@ void ScheduleDAGOptSched::schedule() {
 #ifdef IS_DEBUG
   Logger::Info("********** Opt Scheduling **********");
 #endif
-  // discoverBoundaryLiveness();
-  // build LLVM DAG
-  if (!llvmScheduling) {
-    SetupLLVMDag();
-    // Init topo for fast search for cycles and/or mutations
-    Topo.InitDAGTopologicalSorting();
+  // Build LLVM DAG
+  SetupLLVMDag();
 
-    // apply mutations
-    if (enableMutations) {
-      postprocessDAG();
-    }
+  // Apply llvm DAG post processing.
+  if (enableMutations) {
+    postprocessDAG();
   }
 
   // Ignore empty DAGs
   if (SUnits.empty())
     return;
-
-#ifdef IS_DEBUG_PRINT_DAG
-  Logger::Info("%s", BB->getFullName());
-  for (int i = 0; i < SUnits.size(); i++) {
-    SUnits[i].dumpAll(this);
-  }
-#endif
-
-// Dump max pressure
-#ifdef IS_DEBUG_PEAK_PRESSURE
-  if (OPTSCHED_gPrintSpills) {
-    Logger::Info("LLVM max pressure before scheduling for BB %s:%s",
-                 context->MF->getFunction().getName().data(), BB->getName());
-    const std::vector<unsigned> &RegionPressure =
-        RPTracker.getPressure().MaxSetPressure;
-    // Logger::Info("There are %d register pressure sets.",
-    // RegionPressure.size());
-    for (unsigned i = 0, e = RegionPressure.size(); i < e; ++i) {
-      unsigned Limit = RegClassInfo->getRegPressureSetLimit(i);
-      Logger::Info("PeakRegPresBefore Index %d Name %s Peak %d Limit %d", i,
-                   TRI->getRegPressureSetName(i), RegionPressure[i], Limit);
-      // RegionCriticalPSets.push_back(llvm::PressureChange(i));
-    }
-  }
-#endif
 
   // convert dag
   LLVMDataDepGraph dag(context, this, model.get(), latencyPrecision, BB,
@@ -394,8 +327,8 @@ void ScheduleDAGOptSched::schedule() {
       Logger::Info("OptSched run failed: rslt=%d, sched=%p. Falling back.",
                    rslt, (void *)sched);
 
-      if (!llvmScheduling)
-        fallbackScheduler();
+      // Scheduling with opt-sched failed.
+      fallbackScheduler();
 
     } else {
       Logger::Info("OptSched succeeded.");
@@ -420,60 +353,12 @@ void ScheduleDAGOptSched::schedule() {
             ScheduleNode(unit, cycle);
         }
       }
-
-      // Make sure our RP values match LLVM's
-      // If they do not match, use LLVM's heuristic schedule.
-      /*
-      if (rpMismatch(sched)) {
-        Logger::Info("RP-mismatch falling back!");
-        fallbackScheduler();
-      }
-      */
     } // end OptSched succeeded
   }
 
-#ifdef IS_DEBUG_PRINT_SCHEDULE
-  Logger::Info("Final LLVM schedule:");
-  int slot = 1;
-  for (llvm::MachineBasicBlock::instr_iterator I = BB->instr_begin(),
-                                               E = BB->instr_end();
-       I != E; ++I) {
-
-    llvm::MachineInstr &instr = *I;
-    llvm::SUnit *su = getSUnit(&instr);
-
-    if (su != NULL && !su->isBoundaryNode()) {
-      int nodeNum = su->NodeNum;
-      Logger::Info("%d:%d", slot++, nodeNum);
-    }
-  }
-#endif
-
 #ifdef IS_DEBUG_PEAK_PRESSURE
-  // recalculate register pressure
-  if (OPTSCHED_gPrintSpills) {
-
-    SetupLLVMDag();
-    const std::vector<unsigned> &RegionPressure =
-        RPTracker.getPressure().MaxSetPressure;
-    Logger::Info("LLVM max pressure after scheduling for BB %s:%s",
-                 context->MF->getFunction().getName().data(), BB->getName());
-    // Logger::Info("There are %d register pressure sets.",
-    // RegionPressure.size());
-    for (unsigned i = 0, e = RegionPressure.size(); i < e; ++i) {
-      unsigned Limit = RegClassInfo->getRegPressureSetLimit(i);
-      Logger::Info("PeakRegPresAfter  Index %d Name %s Peak %d Limit %d", i,
-                   TRI->getRegPressureSetName(i), RegionPressure[i], Limit);
-      // RegionCriticalPSets.push_back(llvm::PressureChange(i));
-    }
-  }
-#endif
-
-#ifdef IS_DEBUG_PRINT_DAG
-  Logger::Info("%s", BB->getFullName());
-  for (int i = 0; i < SUnits.size(); i++) {
-    SUnits[i].dumpAll(this);
-  }
+  Logger::Info("Register pressure after");
+  RPTracker.dump();
 #endif
 
   delete region;
@@ -506,27 +391,27 @@ void ScheduleDAGOptSched::fallbackScheduler() {
   // the order of LLVM's heuristic schedule. Otherwise reset
   // the BB to LLVM's original order, the order of the SUnits,
   // then call their scheduler.
-
-  CurrentTop = nextIfDebug(RegionBegin, RegionEnd);
-  CurrentBottom = RegionEnd;
-
-  for (int i = 0; i < SUnits.size(); i++) {
-    llvm::MachineInstr *instr = SUnits[i].getInstr();
-
-    if (CurrentTop == NULL) {
-      Logger::Error("Currenttop is NULL");
-      return;
-    }
-
-    if (&*CurrentTop == instr)
-      CurrentTop = nextIfDebug(++CurrentTop, CurrentBottom);
-    else
-      moveInstruction(instr, CurrentTop);
-  }
-
-  // Only call LLVM scheduler if the heurisitc is not ISO.
   if (!llvmScheduling)
     ScheduleDAGMILive::schedule();
+  // Restore the original llvm schedule that was found earlier.
+  else {
+    CurrentTop = nextIfDebug(RegionBegin, RegionEnd);
+    CurrentBottom = RegionEnd;
+
+    for (size_t i = 0; i < SUnits.size(); i++) {
+      llvm::MachineInstr *instr = SUnits[i].getInstr();
+
+      if (CurrentTop == NULL) {
+        Logger::Error("Currenttop is NULL");
+        return;
+      }
+
+      if (&*CurrentTop == instr)
+        CurrentTop = nextIfDebug(++CurrentTop, CurrentBottom);
+      else
+        moveInstruction(instr, CurrentTop);
+    }
+  }
 }
 
 void ScheduleDAGOptSched::loadOptSchedConfig() {
@@ -667,18 +552,18 @@ LB_ALG ScheduleDAGOptSched::parseLowerBoundAlgorithm() const {
 SchedPriorities
 ScheduleDAGOptSched::parseHeuristic(const std::string &str) const {
   SchedPriorities prirts;
-  int len = str.length();
+  size_t len = str.length();
   char word[HEUR_NAME_MAX_SIZE];
   int wIndx = 0;
   prirts.cnt = 0;
   prirts.isDynmc = false;
-  int i, j;
+  size_t i, j;
 
   for (i = 0; i <= len; i++) {
     char ch = str.c_str()[i];
     if (ch == '_' || ch == 0) { // end of word
       word[wIndx] = 0;
-      for (j = 0; j < HEUR_NAME_CNT; j++) {
+      for (j = 0; j < sizeof(hurstcNames); j++) {
         if (strcmp(word, hurstcNames[j]) == 0) {
           prirts.vctr[prirts.cnt] = (LISTSCHED_HEURISTIC)j;
           if ((LISTSCHED_HEURISTIC)j == LSH_LUC)
@@ -686,7 +571,7 @@ ScheduleDAGOptSched::parseHeuristic(const std::string &str) const {
           break;
         } // end if
       }   // end for j
-      if (j == HEUR_NAME_CNT) {
+      if (j == sizeof(hurstcNames)) {
         Logger::Error("Unrecognized heuristic %s. Defaulted to CP.", word);
         prirts.vctr[prirts.cnt] = LSH_CP;
       }
@@ -746,8 +631,8 @@ bool ScheduleDAGOptSched::rpMismatch(InstSchedule *sched) {
   const std::vector<unsigned> &RegionPressure =
       RPTracker.getPressure().MaxSetPressure;
   // OptSched preak registesr pressure
-  const InstCount *regPressures = nullptr;
-  auto regTypeCount = sched->GetPeakRegPressures(regPressures);
+  const unsigned *regPressures = nullptr;
+  // auto regTypeCount = sched->GetPeakRegPressures(regPressures);
 
   for (unsigned i = 0, e = RegionPressure.size(); i < e; ++i) {
     if (RegionPressure[i] != regPressures[i])
@@ -789,7 +674,7 @@ void ScheduleDAGOptSched::getRealCfgPaths() {
   // If the path to any of the config files are not specified, use the default
   // values.
   if (OptSchedCfgS.empty())
-    (PathCfg + "/sched.ini").toVector(PathCfgS);
+    (PathCfg + DEFAULT_CFGS_FNAME).toVector(PathCfgS);
   else {
     PathCfgS = OptSchedCfgS;
     llvm::SmallString<128> Tmp = PathCfgS;
@@ -797,7 +682,7 @@ void ScheduleDAGOptSched::getRealCfgPaths() {
   }
 
   if (OptSchedCfgHF.empty())
-    (PathCfg + "/hotfuncs.ini").toVector(PathCfgHF);
+    (PathCfg + DEFAULT_CFGHF_FNAME).toVector(PathCfgHF);
   else {
     PathCfgHF = OptSchedCfgHF;
     llvm::SmallString<128> Tmp = PathCfgHF;
@@ -805,7 +690,7 @@ void ScheduleDAGOptSched::getRealCfgPaths() {
   }
 
   if (OptSchedCfgMM.empty())
-    (PathCfg + "/machine_model.cfg").toVector(PathCfgMM);
+    (PathCfg + DEFAULT_CFGMM_FNAME).toVector(PathCfgMM);
   else {
     PathCfgMM = OptSchedCfgMM;
     llvm::SmallString<128> Tmp = PathCfgHF;

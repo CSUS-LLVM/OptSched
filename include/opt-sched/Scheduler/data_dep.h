@@ -700,7 +700,8 @@ public:
   void SetSpillCandidateCount(int cnflctCnt);
 
   void Print(std::ostream &out, char const *const title);
-  void PrintInstList(FILE *file, DataDepGraph *dataDepGraph, const char *title);
+  void PrintInstList(FILE *file, DataDepGraph *dataDepGraph, const char *title) const;
+  void PrintRegPressures() const;
   bool Verify(MachineModel *machMdl, DataDepGraph *dataDepGraph);
   void PrintClassData();
 };

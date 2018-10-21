@@ -27,7 +27,6 @@ ReadyList::ReadyList(DataDepGraph *dataDepGraph, SchedPriorities prirts) {
       break;
 
     case LSH_LUC:
-      prirts_.isDynmc = true;
       keyedEntries_ = new KeyedEntry<SchedInstruction, unsigned long>
           *[dataDepGraph->GetInstCnt()];
       for (int j = 0; j < dataDepGraph->GetInstCnt(); j++) {

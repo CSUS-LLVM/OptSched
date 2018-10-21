@@ -286,16 +286,6 @@ void LLVMDataDepGraph::CountDefs(RegisterFile regFiles[]) {
     // Get all defs for this instruction
     RegisterOperands RegOpers;
     RegOpers.collect(*MI, *schedDag_->TRI, schedDag_->MRI, false, true);
-    for (const RegisterMaskPair &D : RegOpers.Defs) {
-      unsigned resNo = D.RegUnit;
-
-      std::vector<int> regTypes = GetRegisterType_(resNo);
-      for (int regType : regTypes)
-        regDefCounts[regType]++;
-
-      if (addUsedAndNotDefined)
-        defs.insert(resNo);
-    }
 
     // If a register is used but not defined prepare to add def as live-in.
     if (addUsedAndNotDefined) {
@@ -307,6 +297,17 @@ void LLVMDataDepGraph::CountDefs(RegisterFile regFiles[]) {
             regDefCounts[regType]++;
         }
       }
+    }
+
+    // Allocate defs
+    for (const RegisterMaskPair &D : RegOpers.Defs) {
+      unsigned resNo = D.RegUnit;
+      std::vector<int> regTypes = GetRegisterType_(resNo);
+      for (int regType : regTypes)
+        regDefCounts[regType]++;
+
+      if (addUsedAndNotDefined)
+        defs.insert(resNo);
     }
   }
 
