@@ -10,7 +10,7 @@
 #include "opt-sched/Scheduler/utilities.h"
 #include "opt-sched/Scheduler/list_sched.h"
 #include "opt-sched/Scheduler/relaxed_sched.h"
-#include "llvm/CodeGen/OptSched/aco.h"
+#include "opt-sched/Scheduler/aco.h"
 #include <cstdio>
 #include <iostream>
 #include <map>

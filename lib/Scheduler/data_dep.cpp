@@ -3,7 +3,6 @@
 #include <cstdlib>
 #include <iostream>
 
-//#include "llvm/CodeGen/OptSched/OptSchedMachineWrapper.h"
 #include "opt-sched/Scheduler/data_dep.h"
 #include "opt-sched/Scheduler/graph_trans.h"
 #include "opt-sched/Scheduler/machine_model.h"

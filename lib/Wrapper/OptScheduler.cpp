@@ -121,9 +121,6 @@ void ScheduleDAGOptSched::SetupLLVMDag() {
 
   // Build the DAG, and compute current register pressure.
   buildSchedGraph(AA, &RPTracker, &SUPressureDiffs, LIS, ShouldTrackLaneMasks);
-
-  // Initialize top/bottom trackers after computing region pressure.
-  initRegPressure();
 }
 
 // schedule called for each basic block

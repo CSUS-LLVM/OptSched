@@ -254,7 +254,6 @@ void LLVMDataDepGraph::ConvertLLVMNodes_() {
       CreateEdge_(i, leafNum, 0, DEP_OTHER);
   }
   AdjstFileSchedCycles_();
-  PrintEdgeCntPerLtncyInfo();
 }
 
 void LLVMDataDepGraph::CountDefs(RegisterFile regFiles[]) {
@@ -350,7 +349,7 @@ void LLVMDataDepGraph::AddDefsAndUses(RegisterFile regFiles[]) {
 
     // Collect def/use information for this machine instruction
     RegisterOperands RegOpers;
-    RegOpers.collect(*MI, *schedDag_->TRI, schedDag_->MRI, false, true);
+    RegOpers.collect(*MI, *schedDag_->TRI, schedDag_->MRI, true, false);
 
     // add uses
     for (const RegisterMaskPair &U : RegOpers.Uses) {
@@ -383,62 +382,6 @@ void LLVMDataDepGraph::AddDefsAndUses(RegisterFile regFiles[]) {
     }
   }
 
-// (Chris) Debug: Count the number of defs and uses for each register.
-// Ensure that any changes to how opt_sched::Register tracks defs and uses
-// doesn't change these values.
-//
-// Also, make sure that iterating through all the registers gives the same use
-// and def count as iterating through all the instructions.
-#if defined(IS_DEBUG_DEF_USE_COUNT)
-  auto regTypeCount = machMdl_->GetRegTypeCnt();
-  uint64_t defsFromRegs = 0;
-  uint64_t usesFromRegs = 0;
-  for (int i = 0; i < regTypeCount; ++i) {
-    for (int j = 0; j < regFiles[i].GetRegCnt(); ++j) {
-      const auto &myReg = regFiles[i].GetReg(j);
-      if (myReg->GetDefCnt() != myReg->GetSizeOfDefList()) {
-        Logger::Error(
-            "Dag %s: Register Type %d Num %d: New def count %d doesn't match "
-            "old def count %d!",
-            dagID_, i, j, myReg->GetSizeOfDefList(), myReg->GetDefCnt());
-      }
-      if (myReg->GetUseCnt() != myReg->GetSizeOfUseList()) {
-        Logger::Error(
-            "Dag %s: Register Type %d Num %d: New def count %d doesn't match "
-            "old def count %d!",
-            dagID_, i, j, myReg->GetSizeOfUseList(), myReg->GetUseCnt());
-      }
-      defsFromRegs += myReg->GetDefCnt();
-      usesFromRegs += myReg->GetUseCnt();
-    }
-  }
-  uint64_t defsFromInsts = 0ull;
-  uint64_t usesFromInsts = 0ull;
-  for (int k = 0; k < instCnt_; ++k) {
-    const auto &instruction = insts_[k];
-    // Dummy pointer; all that matters here is the length of the uses and defs
-    // arrays for each instruction.
-    Register **dummy;
-    defsFromInsts += instruction->GetDefs(dummy);
-    usesFromInsts += instruction->GetUses(dummy);
-  }
-  bool different = false;
-  if (defsFromInsts != defsFromRegs) {
-    different = true;
-    Logger::Error("Dag %s: Total def count from instructions (%llu) doesn't "
-                  "match total def count from registers (%llu)!",
-                  dagID_, defsFromInsts, defsFromRegs);
-  }
-  if (usesFromInsts != usesFromRegs) {
-    different = true;
-    Logger::Error("Dag %s: Total use count from instructions (%llu) doesn't "
-                  "match total use count from registers (%llu)!",
-                  dagID_, usesFromInsts, usesFromRegs);
-  }
-  if (different) {
-    Logger::Fatal("Encountered fatal error. Exiting.");
-  }
-#endif
 }
 
 void LLVMDataDepGraph::AddUse_(unsigned resNo, InstCount nodeIndex,
@@ -591,9 +534,8 @@ int LLVMDataDepGraph::GetRegisterWeight_(const unsigned resNo) const {
 
 // A register type is an int value that corresponds to a register type in our
 // scheduler.
-// We assign multiple register types to each register class in LLVM to account
-// for all
-// register sets associated with the class.
+// We assign multiple register types to each register from LLVM to account
+// for all register pressure sets associated with the register class for resNo.
 std::vector<int>
 LLVMDataDepGraph::GetRegisterType_(const unsigned resNo) const {
   bool useSimpleTypes =
