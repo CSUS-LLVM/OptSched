@@ -28,8 +28,7 @@ Description:  A wrapper that convert an LLVM ScheduleDAG to an OptSched
 
 #define DEBUG_TYPE "optsched"
 
-namespace opt_sched {
-
+using namespace opt_sched;
 using namespace llvm;
 
 static std::unique_ptr<LLVMRegTypeFilter> createLLVMRegTypeFilter(
@@ -382,6 +381,7 @@ void LLVMDataDepGraph::AddDefsAndUses(RegisterFile regFiles[]) {
     }
   }
 
+  LLVM_DEBUG(dumpRegisters(regFiles));
 }
 
 void LLVMDataDepGraph::AddUse_(unsigned resNo, InstCount nodeIndex,
@@ -603,6 +603,44 @@ bool LLVMDataDepGraph::isLeafNode(const SUnit &unit) {
   return true;
 }
 
+#if !defined(NDEBUG) || defined(LLVM_ENABLE_DUMP)
+LLVM_DUMP_METHOD void LLVMDataDepGraph::dumpRegisters(const RegisterFile regFiles[]) const {
+  auto RegTypeCount = machMdl_->GetRegTypeCnt();
+  dbgs() << "Number of Registers Types " << RegTypeCount << '\n';
+
+  for (int16_t RegTypeNum = 0; RegTypeNum < RegTypeCount; RegTypeNum++) {
+    const auto &RegFile = regFiles[RegTypeNum];
+    // Skip register types that are not used/defined in the region
+    if (RegFile.GetRegCnt() == 0)
+			continue;
+
+    const auto &RegTypeName = machMdl_->GetRegTypeName(RegTypeNum);
+    for (int RegNum = 0; RegNum < RegFile.GetRegCnt(); RegNum++) {
+      const auto *Reg = RegFile.GetReg(RegNum);
+      dbgs() << "Register: " << '%' << Reg->GetNum() << " Type: " << RegTypeName << '/' << RegTypeNum << '\n';
+
+      typedef SmallPtrSet<const SchedInstruction *, 8>::const_iterator const_iterator;
+
+      // Definitions for this register
+      const auto &DefList = Reg->GetDefList();
+      dbgs() << "\t--Defs:";
+      for (const_iterator I = DefList.begin(), E = DefList.end(); I != E; ++I)
+        dbgs() << ' ' << (*I)->GetNodeID() << ':' << (*I)->GetOpCode();
+
+      dbgs() << '\n';
+
+      // Uses for this register
+      const auto &UseList = Reg->GetUseList();
+      dbgs() << "\t--Uses:";
+      for (const_iterator I = UseList.begin(), E = UseList.end(); I != E; ++I)
+        dbgs() << ' ' << (*I)->GetNodeID() << ':' << (*I)->GetOpCode();
+
+      dbgs() << "\n\n";
+    }
+  }
+}
+#endif
+
 LLVMRegTypeFilter::LLVMRegTypeFilter(
     const MachineModel *MM, const llvm::TargetRegisterInfo *TRI,
     const std::vector<unsigned> &RegionPressure, float RegFilterFactor)
@@ -652,5 +690,3 @@ bool LLVMRegTypeFilter::shouldFilter(const char *RegTypeName) const {
 void LLVMRegTypeFilter::setRegFilterFactor(float RegFilterFactor) {
   this->RegFilterFactor = RegFilterFactor;
 }
-
-} // end namespace opt_sched

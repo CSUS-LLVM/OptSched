@@ -486,7 +486,7 @@ bool ScheduleDAGOptSched::isOptSchedEnabled() const {
   } else if (optSchedOption == "NO") {
     return false;
   } else {
-    DEBUG(llvm::dbgs() << "Invalid value for USE_OPT_SCHED" << optSchedOption
+    LLVM_DEBUG(llvm::dbgs() << "Invalid value for USE_OPT_SCHED" << optSchedOption
                        << "Assuming NO.\n");
     return false;
   }
