@@ -279,11 +279,11 @@ void LLVMDataDepGraph::CountDefs(RegisterFile regFiles[]) {
   }
 
   for (std::vector<SUnit>::iterator it = llvmNodes_.begin();
-       it != llvmNodes_.end(); it++) {
+       it != llvmNodes_.end(); ++it) {
     MachineInstr *MI = it->getInstr();
     // Get all defs for this instruction
     RegisterOperands RegOpers;
-    RegOpers.collect(*MI, *schedDag_->TRI, schedDag_->MRI, false, true);
+    RegOpers.collect(*MI, *schedDag_->TRI, schedDag_->MRI, true, false);
 
     // If a register is used but not defined prepare to add def as live-in.
     if (addUsedAndNotDefined) {
@@ -293,6 +293,8 @@ void LLVMDataDepGraph::CountDefs(RegisterFile regFiles[]) {
           std::vector<int> regTypes = GetRegisterType_(resNo);
           for (int regType : regTypes)
             regDefCounts[regType]++;
+
+          defs.insert(resNo);
         }
       }
     }
@@ -606,7 +608,7 @@ bool LLVMDataDepGraph::isLeafNode(const SUnit &unit) {
 #if !defined(NDEBUG) || defined(LLVM_ENABLE_DUMP)
 LLVM_DUMP_METHOD void LLVMDataDepGraph::dumpRegisters(const RegisterFile regFiles[]) const {
   auto RegTypeCount = machMdl_->GetRegTypeCnt();
-  dbgs() << "Number of Registers Types " << RegTypeCount << '\n';
+  dbgs() << "Number of Registers Types: " << RegTypeCount << '\n';
 
   for (int16_t RegTypeNum = 0; RegTypeNum < RegTypeCount; RegTypeNum++) {
     const auto &RegFile = regFiles[RegTypeNum];

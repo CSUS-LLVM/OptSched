@@ -94,7 +94,7 @@ protected:
   void ConvertLLVMNodes_();
   // Returns the register pressure set types of an instruction result.
   std::vector<int> GetRegisterType_(const unsigned resNo) const;
-  // Print register information for the region.
+  /// Dump register def/use information for the region.
   void dumpRegisters(const RegisterFile regFiles[]) const;
 
   // Holds a register live range, mapping a producer to a set of consumers.
