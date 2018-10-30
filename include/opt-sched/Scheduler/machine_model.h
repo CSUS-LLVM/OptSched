@@ -119,7 +119,10 @@ public:
   // instructions).
   InstType GetInstTypeByName(const string &typeName,
                              const string &prevName = "") const;
-
+  // Return the default instruction type
+  InstType getDefaultInstType() const;
+  // Return the default issue type
+  InstType getDefaultIssueType() const;
   // Returns whether the given instruction is a branch.
   bool IsBranch(InstType instTypeCode) const;
   // Returns whether the given instruction is a call.

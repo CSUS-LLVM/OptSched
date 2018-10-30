@@ -55,8 +55,12 @@ LLVMDataDepGraph::LLVMDataDepGraph(
   maxDagSizeForPrcisLtncy_ = maxDagSizeForPrcisLtncy;
   includesNonStandardBlock_ = false;
   includesUnsupported_ = false;
+  includesCall_ = false;
   ShouldFilterRegisterTypes = SchedulerOptions::getInstance().GetBool(
       "FILTER_REGISTERS_TYPES_WITH_LOW_PRP", false);
+  ShouldGenerateMM =
+      SchedulerOptions::getInstance().GetBool("GENERATE_MACHINE_MODEL", false);
+
   includesUnpipelined_ = true;
 
   if (ShouldFilterRegisterTypes)
@@ -78,107 +82,19 @@ LLVMDataDepGraph::LLVMDataDepGraph(
 }
 
 void LLVMDataDepGraph::ConvertLLVMNodes_() {
-  includesCall_ = false;
-
-  InstType instType;
-  std::string instName;
-  std::string opCode;
-  int ltncy;
-
   LLVM_DEBUG(dbgs() << "Building opt_sched DAG");
 
   // Create nodes.
   for (size_t i = 0; i < llvmNodes_.size(); i++) {
     const SUnit &SU = llvmNodes_[i];
+    assert(SU.NodeNum == i && "Nodes must be numbered sequentially!");
 
-    // Make sure this is a real node
-    if (SU.isBoundaryNode() || !SU.isInstr())
-      continue;
-
-    const MachineInstr *instr = SU.getInstr();
-
-    // Make sure nodes are in numbered order.
-    assert(SU.NodeNum == i);
-
-    instName = opCode = schedDag_->TII->getName(instr->getOpcode());
-
-    // Should we try to generate scheduling types for instructions in this
-    // region
-    bool shouldGenerateMM = SchedulerOptions::getInstance().GetBool(
-        "GENERATE_MACHINE_MODEL", false);
-
-    if (shouldGenerateMM) {
-      assert(llvmMachMdl_->getMMGen() &&
-             "Machine Model Generator was not initialized");
-
-      llvmMachMdl_->getMMGen()->generateInstrType(instr);
-    }
-
-    // Search in the machine model for an instType with this OpCode name
-    instType = machMdl_->GetInstTypeByName(instName.c_str());
-
-    // If the machine model does not have instType with this OpCode name, use
-    // the default instType
-    if (instType == INVALID_INST_TYPE) {
-      instName = "Default";
-      instType = machMdl_->GetInstTypeByName("Default");
-    }
-
-    CreateNode_(SU.NodeNum, instName.c_str(), instType, opCode.c_str(),
-                SU.NodeNum, // nodeID
-                SU.NodeNum, // fileSchedOrder
-                SU.NodeNum, // fileSchedCycle
-                0,          // fileInstLwrBound
-                0,          // fileInstUprBound
-                0);         // blkNum
-
-    if (SU.isCall)
-      includesCall_ = true;
-
-  } // end for
+    convertSUnit(SU);
+  }
 
   // Create edges.
-  for (const auto SU : llvmNodes_) {
-    const MachineInstr *instr = SU.getInstr();
-    for (SUnit::const_succ_iterator it = SU.Succs.begin(); it != SU.Succs.end();
-         it++) {
-      // check if the successor is a boundary node
-      if (it->getSUnit()->isBoundaryNode())
-        continue;
-
-      DependenceType depType;
-      switch (it->getKind()) {
-      case SDep::Data:
-        depType = DEP_DATA;
-        break;
-      case SDep::Anti:
-        depType = DEP_ANTI;
-        break;
-      case SDep::Output:
-        depType = DEP_OUTPUT;
-        break;
-      case SDep::Order:
-        depType = treatOrderDepsAsDataDeps_ ? DEP_DATA : DEP_OTHER;
-        break;
-      }
-
-      LATENCY_PRECISION prcsn = ltncyPrcsn_;
-      if (prcsn == LTP_PRECISE && maxDagSizeForPrcisLtncy_ > 0 &&
-          llvmNodes_.size() > static_cast<size_t>(maxDagSizeForPrcisLtncy_))
-        prcsn = LTP_ROUGH; // use rough latencies if DAG is too large
-
-      if (prcsn == LTP_PRECISE) { // get precise latency from the machine model
-        instName = schedDag_->TII->getName(instr->getOpcode());
-        instType = machMdl_->GetInstTypeByName(instName);
-        ltncy = machMdl_->GetLatency(instType, depType);
-
-      } else if (prcsn == LTP_ROUGH) { // use the compiler's rough latency
-        ltncy = it->getLatency();
-      } else
-        ltncy = 1;
-
-      CreateEdge_(SU.NodeNum, it->getSUnit()->NodeNum, ltncy, depType);
-    }
+  for (const auto &SU : llvmNodes_) {
+    convertEdges(SU);
   }
 
   // Add artificial root and leaf nodes and edges.
@@ -254,12 +170,11 @@ void LLVMDataDepGraph::CountDefs(RegisterFile regFiles[]) {
   }
 
   for (int i = 0; i < machMdl_->GetRegTypeCnt(); i++) {
-#ifdef IS_DEBUG_COUNT_DEFS
-    if (regDefCounts[i]) {
-      Logger::Info("Reg Type %s -> %d registers",
-                   llvmMachMdl_->GetRegTypeName(i).c_str(), regDefCounts[i]);
-    }
-#endif
+    if (regDefCounts[i])
+      LLVM_DEBUG(dbgs() << "Reg Type "
+                        << llvmMachMdl_->GetRegTypeName(i).c_str() << "->"
+                        << regDefCounts[i] << "registers");
+
     regFiles[i].SetRegCnt(regDefCounts[i]);
   }
 }
@@ -583,7 +498,7 @@ void LLVMDataDepGraph::dumpRegisters(const RegisterFile regFiles[]) const {
 }
 #endif
 
-void LLVMDataDepGraph::setupRoot() {
+inline void LLVMDataDepGraph::setupRoot() {
   // Create artificial root.
   int rootNum = llvmNodes_.size();
   root_ =
@@ -602,7 +517,7 @@ void LLVMDataDepGraph::setupRoot() {
   }
 }
 
-void LLVMDataDepGraph::setupLeaf() {
+inline void LLVMDataDepGraph::setupLeaf() {
   // Create artificial leaf.
   int leafNum = llvmNodes_.size() + 1;
   CreateNode_(leafNum, "artificial", machMdl_->GetInstTypeByName("artificial"),
@@ -618,6 +533,85 @@ void LLVMDataDepGraph::setupLeaf() {
   for (size_t i = 0; i < llvmNodes_.size(); i++)
     if (insts_[i]->GetScsrCnt() == 0)
       CreateEdge_(i, leafNum, 0, DEP_OTHER);
+}
+
+void LLVMDataDepGraph::convertEdges(const SUnit &SU) {
+  const MachineInstr *instr = SU.getInstr();
+  SUnit::const_succ_iterator I, E;
+  for (I = SU.Succs.begin(), E = SU.Succs.end(); I != E; ++I) {
+    if (I->getSUnit()->isBoundaryNode())
+      continue;
+
+    DependenceType depType;
+    switch (I->getKind()) {
+    case SDep::Data:
+      depType = DEP_DATA;
+      break;
+    case SDep::Anti:
+      depType = DEP_ANTI;
+      break;
+    case SDep::Output:
+      depType = DEP_OUTPUT;
+      break;
+    case SDep::Order:
+      depType = treatOrderDepsAsDataDeps_ ? DEP_DATA : DEP_OTHER;
+      break;
+    }
+
+    LATENCY_PRECISION prcsn = ltncyPrcsn_;
+    if (prcsn == LTP_PRECISE && maxDagSizeForPrcisLtncy_ > 0 &&
+        llvmNodes_.size() > static_cast<size_t>(maxDagSizeForPrcisLtncy_))
+      prcsn = LTP_ROUGH; // use rough latencies if DAG is too large
+
+    int16_t Latency;
+    if (prcsn == LTP_PRECISE) { // get precise latency from the machine model
+      const auto &InstName = schedDag_->TII->getName(instr->getOpcode());
+      const auto &InstType = machMdl_->GetInstTypeByName(InstName);
+      Latency = machMdl_->GetLatency(InstType, depType);
+    } else if (prcsn == LTP_ROUGH) // rough latency = llvm latency
+      Latency = I->getLatency();
+    else
+      Latency = 1;
+
+    CreateEdge_(SU.NodeNum, I->getSUnit()->NodeNum, Latency, depType);
+  }
+}
+
+void LLVMDataDepGraph::convertSUnit(const SUnit &SU) {
+  InstType instType;
+  std::string instName;
+  std::string opCode;
+
+  LLVM_DEBUG(dbgs() << "Building opt_sched DAG");
+
+  if (SU.isBoundaryNode() || !SU.isInstr())
+    return;
+
+  const MachineInstr *MI = SU.getInstr();
+  instName = opCode = schedDag_->TII->getName(MI->getOpcode());
+
+  // Search in the machine model for an instType with this OpCode name
+  instType = machMdl_->GetInstTypeByName(instName.c_str());
+
+  // If the machine model does not have an instruction type with this OpCode
+  // name generate one. Alternatively if not generating types, use a default
+  // type.
+  if (instType == INVALID_INST_TYPE) {
+    if (ShouldGenerateMM) {
+      llvmMachMdl_->getMMGen()->generateInstrType(MI);
+    } else {
+      instName = "Default";
+      instType = machMdl_->getDefaultInstType();
+    }
+  }
+
+  CreateNode_(SU.NodeNum, instName.c_str(), instType, opCode.c_str(),
+              SU.NodeNum, // nodeID
+              SU.NodeNum, // fileSchedOrder
+              SU.NodeNum, // fileSchedCycle
+              0,          // fileInstLwrBound
+              0,          // fileInstUprBound
+              0);         // blkNum
 }
 
 LLVMRegTypeFilter::LLVMRegTypeFilter(

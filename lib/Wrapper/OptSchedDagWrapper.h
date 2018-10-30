@@ -69,6 +69,8 @@ protected:
   // Allow the DAG builder to filter our register types that have low peak
   // pressure.
   bool ShouldFilterRegisterTypes = false;
+  // Should we generate a machine model from LLVM itineraries.
+  bool ShouldGenerateMM = false;
   // Use to ignore non-critical register types.
   std::unique_ptr<LLVMRegTypeFilter> RTFilter;
   // Check is SUnit is a root node
@@ -97,10 +99,14 @@ protected:
   std::vector<int> GetRegisterType_(const unsigned resNo) const;
   /// Dump register def/use information for the region.
   void dumpRegisters(const RegisterFile regFiles[]) const;
-  // Setup artificial root
+  // Setup artificial root.
   void setupRoot();
-  // Setup artificial leaf
+  // Setup artificial leaf.
   void setupLeaf();
+  // Create an optsched graph node and instruction from an llvm::SUnit.
+  void convertSUnit(const llvm::SUnit &SU);
+  // Create edges between optsched graph nodes using SUnit successors.
+  void convertEdges(const llvm::SUnit &SU);
 
   // Holds a register live range, mapping a producer to a set of consumers.
   struct LiveRange {

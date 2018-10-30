@@ -8,13 +8,13 @@ contained in those ini files.
 #ifndef OPTSCHED_MACHINE_MODEL_WRAPPER_H
 #define OPTSCHED_MACHINE_MODEL_WRAPPER_H
 
+#include "opt-sched/Scheduler/machine_model.h"
 #include "llvm/CodeGen/MachineInstr.h"
 #include "llvm/CodeGen/MachineScheduler.h"
-#include "opt-sched/Scheduler/machine_model.h"
 #include "llvm/CodeGen/RegisterClassInfo.h"
 #include "llvm/CodeGen/ScheduleDAGInstrs.h"
-#include "llvm/MC/MCInstrItineraries.h"
 #include "llvm/CodeGen/TargetRegisterInfo.h"
+#include "llvm/MC/MCInstrItineraries.h"
 #include <map>
 
 namespace opt_sched {
@@ -32,7 +32,7 @@ public:
                            const llvm::RegisterClassInfo *regClassInfo);
   // Pointer to register info for target
   const llvm::TargetRegisterInfo *registerInfo;
-  MachineModelGenerator* getMMGen() { return MMGen.get(); }
+  MachineModelGenerator *getMMGen() { return MMGen.get(); }
   ~LLVMMachineModel() = default;
 
 private:
@@ -47,7 +47,7 @@ class MachineModelGenerator {
 public:
   // Generate instruction scheduling type for all instructions in the current
   // DAG that do not already have assigned instruction types.
-  virtual void generateInstrType(const llvm::MachineInstr *instr) = 0;
+  virtual InstType generateInstrType(const llvm::MachineInstr *instr) = 0;
   virtual ~MachineModelGenerator() = default;
 };
 
@@ -60,7 +60,7 @@ public:
   CortexA7MMGenerator(const llvm::ScheduleDAGInstrs *dag, MachineModel *mm);
   // Generate instruction scheduling type for all instructions in the current
   // DAG by using LLVM itineraries.
-  void generateInstrType(const llvm::MachineInstr *instr);
+  InstType generateInstrType(const llvm::MachineInstr *instr);
   virtual ~CortexA7MMGenerator() = default;
 
 private:
@@ -72,9 +72,9 @@ private:
     NPipe = 8,   // 00001000
     NLSPipe = 16 // 00010000
   };
-  const llvm::ScheduleDAGInstrs *dag;
-  MachineModel *mm;
-  const llvm::InstrItineraryData *iid;
+  const llvm::ScheduleDAGInstrs *DAG;
+  MachineModel *MM;
+  const llvm::InstrItineraryData *IID;
 
   // Returns true if a machine instruction should be considered fully pipelined
   // in the machine model.
