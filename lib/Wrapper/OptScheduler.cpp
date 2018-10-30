@@ -15,6 +15,7 @@
 #include "opt-sched/Scheduler/register.h"
 #include "opt-sched/Scheduler/sched_region.h"
 #include "opt-sched/Scheduler/utilities.h"
+#include "llvm/ADT/StringMap.h"
 #include "llvm/CodeGen/MachineRegisterInfo.h"
 #include "llvm/CodeGen/MachineScheduler.h"
 #include "llvm/CodeGen/RegisterClassInfo.h"
@@ -31,6 +32,7 @@
 #define DEBUG_TYPE "optsched"
 
 using namespace opt_sched;
+using namespace llvm;
 
 // hack to print spills
 bool OPTSCHED_gPrintSpills;
@@ -110,21 +112,24 @@ ScheduleDAGOptSched::ScheduleDAGOptSched(llvm::MachineSchedContext *C)
 }
 
 void ScheduleDAGOptSched::SetupLLVMDag() {
-  // build DAG
   // Initialize the register pressure tracker used by buildSchedGraph.
   RPTracker.init(&MF, RegClassInfo, LIS, BB, LiveRegionEnd,
-                 ShouldTrackLaneMasks, /*TrackUntiedDefs=*/true);
+                 /*ShouldTrackLaneMasks=*/true, /*TrackUntiedDefs=*/true);
 
-  // Account for liveness generate by the region boundary.
+  // Account for liveness generate by the region boundary. LiveRegionEnd is
+  // the end of the MBB.
   if (LiveRegionEnd != RegionEnd)
     RPTracker.recede();
 
   // Build the DAG, and compute current register pressure.
-  buildSchedGraph(AA, &RPTracker, &SUPressureDiffs, LIS, ShouldTrackLaneMasks);
+  buildSchedGraph(AA, &RPTracker, nullptr, LIS, /*ShouldTrackLaneMasks=*/true);
 }
 
 // schedule called for each basic block
 void ScheduleDAGOptSched::schedule() {
+  ShouldTrackPressure = true;
+  ShouldTrackLaneMasks = true;
+
   // (Chris) Increment the region number here to get unique dag IDs
   // per scheduling region within a machine function.
   ++regionNum;

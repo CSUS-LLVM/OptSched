@@ -3,21 +3,21 @@ Description:  A wrapper that convert an LLVM ScheduleDAG to an OptSched
               DataDepGraph.
 *******************************************************************************/
 
+#include "OptSchedDagWrapper.h"
+#include "opt-sched/Scheduler/config.h"
+#include "opt-sched/Scheduler/logger.h"
+#include "opt-sched/Scheduler/register.h"
+#include "opt-sched/Scheduler/sched_basic_data.h"
 #include "llvm/CodeGen/ISDOpcodes.h"
 #include "llvm/CodeGen/MachineFunction.h"
 #include "llvm/CodeGen/MachineInstr.h"
 #include "llvm/CodeGen/MachineRegisterInfo.h"
 #include "llvm/CodeGen/MachineScheduler.h"
-#include "OptSchedDagWrapper.h"
-#include "opt-sched/Scheduler/register.h"
-#include "opt-sched/Scheduler/sched_basic_data.h"
-#include "opt-sched/Scheduler/config.h"
-#include "opt-sched/Scheduler/logger.h"
 #include "llvm/CodeGen/RegisterPressure.h"
-#include "llvm/CodeGen/TargetPassConfig.h"
-#include "llvm/IR/Function.h"
 #include "llvm/CodeGen/TargetInstrInfo.h"
 #include "llvm/CodeGen/TargetLowering.h"
+#include "llvm/CodeGen/TargetPassConfig.h"
+#include "llvm/IR/Function.h"
 #include "llvm/Target/TargetMachine.h"
 #include <cstdio>
 #include <map>
@@ -64,8 +64,6 @@ LLVMDataDepGraph::LLVMDataDepGraph(
 
   // The extra 2 are for the artifical root and leaf nodes.
   instCnt_ = nodeCnt_ = llvmNodes_.size() + 2;
-  // TODO(max99x): Find real weight.
-  weight_ = 1.0f;
 
   std::snprintf(dagID_, MAX_NAMESIZE, "%s:%d",
                 context_->MF->getFunction().getName().data(), regionNum);
@@ -82,33 +80,25 @@ LLVMDataDepGraph::LLVMDataDepGraph(
 void LLVMDataDepGraph::ConvertLLVMNodes_() {
   includesCall_ = false;
 
-  std::vector<int> roots;
-  std::vector<int> leaves;
-
   InstType instType;
   std::string instName;
   std::string opCode;
   int ltncy;
 
-#ifdef IS_DEBUG
-  Logger::Info("Building opt_sched DAG out of llvm DAG");
-#endif
+  LLVM_DEBUG(dbgs() << "Building opt_sched DAG");
 
   // Create nodes.
   for (size_t i = 0; i < llvmNodes_.size(); i++) {
+    const SUnit &SU = llvmNodes_[i];
 
-    const SUnit &unit = llvmNodes_[i];
-#ifdef IS_DEBUG_DAG
-    unit.dumpAll(schedDag_);
-#endif
     // Make sure this is a real node
-    if (unit.isBoundaryNode() || !unit.isInstr())
+    if (SU.isBoundaryNode() || !SU.isInstr())
       continue;
 
-    const MachineInstr *instr = unit.getInstr();
+    const MachineInstr *instr = SU.getInstr();
 
     // Make sure nodes are in numbered order.
-    assert(unit.NodeNum == i);
+    assert(SU.NodeNum == i);
 
     instName = opCode = schedDag_->TII->getName(instr->getOpcode());
 
@@ -130,44 +120,28 @@ void LLVMDataDepGraph::ConvertLLVMNodes_() {
     // If the machine model does not have instType with this OpCode name, use
     // the default instType
     if (instType == INVALID_INST_TYPE) {
-#ifdef IS_DEBUG_DAG
-      Logger::Info(
-          "Instruction %s was not found in machine model. Using the default",
-          instName.c_str());
-#endif
       instName = "Default";
       instType = machMdl_->GetInstTypeByName("Default");
     }
 
-    CreateNode_(unit.NodeNum, instName.c_str(), instType, opCode.c_str(),
-                unit.NodeNum, // nodeID
-                unit.NodeNum, // fileSchedOrder
-                unit.NodeNum, // fileSchedCycle
-                0,  // fileInstLwrBound
-                0,  // fileInstUprBound
-                0); // blkNum
-    if (unit.isCall)
+    CreateNode_(SU.NodeNum, instName.c_str(), instType, opCode.c_str(),
+                SU.NodeNum, // nodeID
+                SU.NodeNum, // fileSchedOrder
+                SU.NodeNum, // fileSchedCycle
+                0,          // fileInstLwrBound
+                0,          // fileInstUprBound
+                0);         // blkNum
+
+    if (SU.isCall)
       includesCall_ = true;
-    if (isRootNode(unit)) {
-      roots.push_back(unit.NodeNum);
-#ifdef IS_DEBUG_BUILD_DAG
-      Logger::Info("Pushing root node: %d", unit.NodeNum);
-#endif
-    }
-    if (isLeafNode(unit)) {
-      leaves.push_back(unit.NodeNum);
-#ifdef IS_DEBUG_BUILD_DAG
-      Logger::Info("Pushing leaf node: %d", unit.NodeNum);
-#endif
-    }
-  }
+
+  } // end for
 
   // Create edges.
-  for (size_t i = 0; i < llvmNodes_.size(); i++) {
-    const SUnit &unit = llvmNodes_[i];
-    const MachineInstr *instr = unit.getInstr();
-    for (SUnit::const_succ_iterator it = unit.Succs.begin();
-         it != unit.Succs.end(); it++) {
+  for (const auto SU : llvmNodes_) {
+    const MachineInstr *instr = SU.getInstr();
+    for (SUnit::const_succ_iterator it = SU.Succs.begin(); it != SU.Succs.end();
+         it++) {
       // check if the successor is a boundary node
       if (it->getSUnit()->isBoundaryNode())
         continue;
@@ -193,66 +167,23 @@ void LLVMDataDepGraph::ConvertLLVMNodes_() {
           llvmNodes_.size() > static_cast<size_t>(maxDagSizeForPrcisLtncy_))
         prcsn = LTP_ROUGH; // use rough latencies if DAG is too large
 
-      if (prcsn == LTP_PRECISE) { // if precise latency, get the precise latency
-                                  // from the machine model
+      if (prcsn == LTP_PRECISE) { // get precise latency from the machine model
         instName = schedDag_->TII->getName(instr->getOpcode());
         instType = machMdl_->GetInstTypeByName(instName);
         ltncy = machMdl_->GetLatency(instType, depType);
 
-#ifdef IS_DEBUG_BUILD_DAG
-        Logger::Info("Dep type %d with latency %d from Instruction %s", depType,
-                     ltncy, instName.c_str());
-#endif
       } else if (prcsn == LTP_ROUGH) { // use the compiler's rough latency
         ltncy = it->getLatency();
       } else
         ltncy = 1;
 
-      CreateEdge_(unit.NodeNum, it->getSUnit()->NodeNum, ltncy, depType);
-
-#ifdef IS_DEBUG_BUILD_DAG
-      Logger::Info("Creating an edge from %d to %d. Type is %d, latency = %d",
-                   unit.NodeNum, it->getSUnit()->NodeNum, depType, ltncy);
-#endif
+      CreateEdge_(SU.NodeNum, it->getSUnit()->NodeNum, ltncy, depType);
     }
   }
 
-  // add edges between equivalent instructions
-
-  size_t maxNodeNum = llvmNodes_.size() - 1;
-
-  // Create artificial root.
-  assert(roots.size() > 0 && leaves.size() > 0);
-  int rootNum = ++maxNodeNum;
-  root_ =
-      CreateNode_(rootNum, "artificial",
-                  machMdl_->GetInstTypeByName("artificial"), "__optsched_entry",
-                  rootNum, // nodeID
-                  rootNum, // fileSchedOrder
-                  rootNum, // fileSchedCycle
-                  0,       // fileInstLwrBound
-                  0,       // fileInstUprBound
-                  0);      // blkNum
-  for (size_t i = 0; i < llvmNodes_.size(); i++) {
-    if (insts_[i]->GetPrdcsrCnt() == 0)
-      CreateEdge_(rootNum, i, 0, DEP_OTHER);
-  }
-
-  // Create artificial leaf.
-  int leafNum = ++maxNodeNum;
-  CreateNode_(leafNum, "artificial", machMdl_->GetInstTypeByName("artificial"),
-              "__optsched_exit",
-              leafNum, // nodeID
-              leafNum, // fileSchedOrder
-              leafNum, // fileSchedCycle
-              0,  // fileInstLwrBound
-              0,  // fileInstUprBound
-              0); // blkNum
-  for (size_t i = 0; i < llvmNodes_.size(); i++) {
-    if (insts_[i]->GetScsrCnt() == 0)
-      CreateEdge_(i, leafNum, 0, DEP_OTHER);
-  }
-  AdjstFileSchedCycles_();
+  // Add artificial root and leaf nodes and edges.
+  setupRoot();
+  setupLeaf();
 }
 
 void LLVMDataDepGraph::CountDefs(RegisterFile regFiles[]) {
@@ -360,6 +291,7 @@ void LLVMDataDepGraph::AddDefsAndUses(RegisterFile regFiles[]) {
     // add defs
     for (const RegisterMaskPair &D : RegOpers.Defs) {
       AddDef_(D.RegUnit, startNode->NodeNum, regFiles);
+      dbgs() << schedDag_->TRI->getRegAsmName(D.RegUnit) << "\n";
     }
   }
 
@@ -480,6 +412,7 @@ void LLVMDataDepGraph::AddLiveOutReg_(unsigned resNo, RegisterFile regFiles[]) {
   std::vector<int> regTypes = GetRegisterType_(resNo);
 
   if (addLiveOutAndNotDefined && lastDef_.find(resNo) == lastDef_.end()) {
+    dbgs() << schedDag_->TRI->getRegAsmName(resNo) << "\n";
     AddLiveInReg_(resNo, regFiles);
 #ifdef IS_DEBUG_DEFS_AND_USES
     Logger::Info("Adding register that is live-out-and-not-defined.");
@@ -549,6 +482,9 @@ LLVMDataDepGraph::GetRegisterType_(const unsigned resNo) const {
 
   // If we want to use simple register types return the first PSet.
   if (useSimpleTypes) {
+    if (!PSetI.isValid())
+      return pSetTypes;
+
     const char *pSetName = TRI.getRegPressureSetName(*PSetI);
     bool FilterOutRegType = ShouldFilterRegisterTypes && (*RTFilter)[pSetName];
 
@@ -560,7 +496,8 @@ LLVMDataDepGraph::GetRegisterType_(const unsigned resNo) const {
   } else {
     for (; PSetI.isValid(); ++PSetI) {
       const char *pSetName = TRI.getRegPressureSetName(*PSetI);
-      bool FilterOutRegType = ShouldFilterRegisterTypes && (*RTFilter)[pSetName];
+      bool FilterOutRegType =
+          ShouldFilterRegisterTypes && (*RTFilter)[pSetName];
 
       if (!FilterOutRegType) {
         int type = llvmMachMdl_->GetRegTypeByName(pSetName);
@@ -581,9 +518,9 @@ SUnit *LLVMDataDepGraph::GetSUnit(size_t index) const {
   }
 }
 
-// Check if this is a root sunit
-bool LLVMDataDepGraph::isRootNode(const SUnit &unit) {
-  for (SUnit::const_pred_iterator I = unit.Preds.begin(), E = unit.Preds.end();
+// Check if this is a root SU
+bool LLVMDataDepGraph::isRootNode(const SUnit &SU) {
+  for (SUnit::const_pred_iterator I = SU.Preds.begin(), E = SU.Preds.end();
        I != E; ++I) {
     if (I->getSUnit()->isBoundaryNode())
       continue;
@@ -593,9 +530,9 @@ bool LLVMDataDepGraph::isRootNode(const SUnit &unit) {
   return true;
 }
 
-// Check if this is a leaf sunit
-bool LLVMDataDepGraph::isLeafNode(const SUnit &unit) {
-  for (SUnit::const_succ_iterator I = unit.Succs.begin(), E = unit.Succs.end();
+// Check if this is a leaf SU
+bool LLVMDataDepGraph::isLeafNode(const SUnit &SU) {
+  for (SUnit::const_succ_iterator I = SU.Succs.begin(), E = SU.Succs.end();
        I != E; ++I) {
     if (I->getSUnit()->isBoundaryNode())
       continue;
@@ -606,7 +543,8 @@ bool LLVMDataDepGraph::isLeafNode(const SUnit &unit) {
 }
 
 #if !defined(NDEBUG) || defined(LLVM_ENABLE_DUMP)
-LLVM_DUMP_METHOD void LLVMDataDepGraph::dumpRegisters(const RegisterFile regFiles[]) const {
+LLVM_DUMP_METHOD
+void LLVMDataDepGraph::dumpRegisters(const RegisterFile regFiles[]) const {
   auto RegTypeCount = machMdl_->GetRegTypeCnt();
   dbgs() << "Number of Registers Types: " << RegTypeCount << '\n';
 
@@ -614,14 +552,16 @@ LLVM_DUMP_METHOD void LLVMDataDepGraph::dumpRegisters(const RegisterFile regFile
     const auto &RegFile = regFiles[RegTypeNum];
     // Skip register types that are not used/defined in the region
     if (RegFile.GetRegCnt() == 0)
-			continue;
+      continue;
 
     const auto &RegTypeName = machMdl_->GetRegTypeName(RegTypeNum);
     for (int RegNum = 0; RegNum < RegFile.GetRegCnt(); RegNum++) {
       const auto *Reg = RegFile.GetReg(RegNum);
-      dbgs() << "Register: " << '%' << Reg->GetNum() << " Type: " << RegTypeName << '/' << RegTypeNum << '\n';
+      dbgs() << "Register: " << '%' << Reg->GetNum() << " Type: " << RegTypeName
+             << '/' << RegTypeNum << '\n';
 
-      typedef SmallPtrSet<const SchedInstruction *, 8>::const_iterator const_iterator;
+      typedef SmallPtrSet<const SchedInstruction *, 8>::const_iterator
+          const_iterator;
 
       // Definitions for this register
       const auto &DefList = Reg->GetDefList();
@@ -642,6 +582,43 @@ LLVM_DUMP_METHOD void LLVMDataDepGraph::dumpRegisters(const RegisterFile regFile
   }
 }
 #endif
+
+void LLVMDataDepGraph::setupRoot() {
+  // Create artificial root.
+  int rootNum = llvmNodes_.size();
+  root_ =
+      CreateNode_(rootNum, "artificial",
+                  machMdl_->GetInstTypeByName("artificial"), "__optsched_entry",
+                  rootNum, // nodeID
+                  rootNum, // fileSchedOrder
+                  rootNum, // fileSchedCycle
+                  0,       // fileInstLwrBound
+                  0,       // fileInstUprBound
+                  0);      // blkNum
+  // Add edges between root nodes in graph and optsched artificial root.
+  for (size_t i = 0; i < llvmNodes_.size(); i++) {
+    if (insts_[i]->GetPrdcsrCnt() == 0)
+      CreateEdge_(rootNum, i, 0, DEP_OTHER);
+  }
+}
+
+void LLVMDataDepGraph::setupLeaf() {
+  // Create artificial leaf.
+  int leafNum = llvmNodes_.size() + 1;
+  CreateNode_(leafNum, "artificial", machMdl_->GetInstTypeByName("artificial"),
+              "__optsched_exit",
+              leafNum, // nodeID
+              leafNum, // fileSchedOrder
+              leafNum, // fileSchedCycle
+              0,       // fileInstLwrBound
+              0,       // fileInstUprBound
+              0);      // blkNum
+
+  // Add edges between leaf nodes in graph and optsched artificial leaf.
+  for (size_t i = 0; i < llvmNodes_.size(); i++)
+    if (insts_[i]->GetScsrCnt() == 0)
+      CreateEdge_(i, leafNum, 0, DEP_OTHER);
+}
 
 LLVMRegTypeFilter::LLVMRegTypeFilter(
     const MachineModel *MM, const llvm::TargetRegisterInfo *TRI,

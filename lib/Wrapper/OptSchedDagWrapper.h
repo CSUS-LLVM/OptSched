@@ -6,12 +6,12 @@ Description:  A wrapper that convert an LLVM ScheduleDAG to an OptSched
 #ifndef OPTSCHED_DAG_WRAPPER_H
 #define OPTSCHED_DAG_WRAPPER_H
 
-#include "llvm/CodeGen/MachineScheduler.h"
 #include "OptSchedMachineWrapper.h"
 #include "opt-sched/Scheduler/data_dep.h"
 #include "opt-sched/Scheduler/graph_trans.h"
-#include "llvm/Target/TargetMachine.h"
+#include "llvm/CodeGen/MachineScheduler.h"
 #include "llvm/CodeGen/TargetRegisterInfo.h"
+#include "llvm/Target/TargetMachine.h"
 #include <map>
 #include <vector>
 
@@ -66,7 +66,8 @@ protected:
   const llvm::TargetMachine &target_;
   // Peak register pressure before scheduling calculate by LLVM.
   const std::vector<unsigned> &RegionPressure;
-  // Allow the DAG builder to filter our register types that have low peak pressure.
+  // Allow the DAG builder to filter our register types that have low peak
+  // pressure.
   bool ShouldFilterRegisterTypes = false;
   // Use to ignore non-critical register types.
   std::unique_ptr<LLVMRegTypeFilter> RTFilter;
@@ -96,6 +97,10 @@ protected:
   std::vector<int> GetRegisterType_(const unsigned resNo) const;
   /// Dump register def/use information for the region.
   void dumpRegisters(const RegisterFile regFiles[]) const;
+  // Setup artificial root
+  void setupRoot();
+  // Setup artificial leaf
+  void setupLeaf();
 
   // Holds a register live range, mapping a producer to a set of consumers.
   struct LiveRange {
