@@ -13,7 +13,7 @@ ENDIF ()
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include)
 
 # Add OptSched debug defines eg: SET(OPT_SCHED_DEBUG_FLAGS "-DIS_DEBUG_DEFS_AND_USES -DIS_DEBUG_DEF_USE_COUNT")
-SET(OPT_SCHED_DEBUG_FLAGS "-DIS_DEBUG_DEFS_AND_USES")
+SET(OPT_SCHED_DEBUG_FLAGS "")
 
 # If asserts are enabled opt-sched must be built with "IS_DEBUG".
 SET(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -DIS_DEBUG")

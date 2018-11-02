@@ -39,7 +39,7 @@ static std::unique_ptr<LLVMRegTypeFilter> createLLVMRegTypeFilter(
 }
 
 LLVMDataDepGraph::LLVMDataDepGraph(
-    MachineSchedContext *context, ScheduleDAGMILive *llvmDag,
+    MachineSchedContext *context, ScheduleDAGOptSched *llvmDag,
     LLVMMachineModel *machMdl, LATENCY_PRECISION ltncyPrcsn,
     MachineBasicBlock *BB, GraphTransTypes graphTransTypes,
     const std::vector<unsigned> &RegionPressure, bool treatOrderDepsAsDataDeps,
@@ -82,7 +82,7 @@ LLVMDataDepGraph::LLVMDataDepGraph(
 }
 
 void LLVMDataDepGraph::ConvertLLVMNodes_() {
-  LLVM_DEBUG(dbgs() << "Building opt_sched DAG");
+  LLVM_DEBUG(dbgs() << "Building opt_sched DAG\n");
 
   // Create nodes.
   for (size_t i = 0; i < llvmNodes_.size(); i++) {
@@ -158,6 +158,8 @@ void LLVMDataDepGraph::CountDefs(RegisterFile regFiles[]) {
     }
   }
 
+  countBoundaryLiveness(regDefCounts);
+
   if (addLiveOutAndNotDefined) {
     for (const RegisterMaskPair &O : schedDag_->getRegPressure().LiveOutRegs) {
       unsigned resNo = O.RegUnit;
@@ -173,7 +175,7 @@ void LLVMDataDepGraph::CountDefs(RegisterFile regFiles[]) {
     if (regDefCounts[i])
       LLVM_DEBUG(dbgs() << "Reg Type "
                         << llvmMachMdl_->GetRegTypeName(i).c_str() << "->"
-                        << regDefCounts[i] << "registers");
+                        << regDefCounts[i] << " registers\n");
 
     regFiles[i].SetRegCnt(regDefCounts[i]);
   }
@@ -206,7 +208,6 @@ void LLVMDataDepGraph::AddDefsAndUses(RegisterFile regFiles[]) {
     // add defs
     for (const RegisterMaskPair &D : RegOpers.Defs) {
       AddDef_(D.RegUnit, startNode->NodeNum, regFiles);
-      dbgs() << schedDag_->TRI->getRegAsmName(D.RegUnit) << "\n";
     }
   }
 
@@ -229,6 +230,8 @@ void LLVMDataDepGraph::AddDefsAndUses(RegisterFile regFiles[]) {
       }
     }
   }
+
+  discoverBoundaryLiveness(regFiles);
 
   LLVM_DEBUG(dumpRegisters(regFiles));
 }
@@ -327,7 +330,6 @@ void LLVMDataDepGraph::AddLiveOutReg_(unsigned resNo, RegisterFile regFiles[]) {
   std::vector<int> regTypes = GetRegisterType_(resNo);
 
   if (addLiveOutAndNotDefined && lastDef_.find(resNo) == lastDef_.end()) {
-    dbgs() << schedDag_->TRI->getRegAsmName(resNo) << "\n";
     AddLiveInReg_(resNo, regFiles);
 #ifdef IS_DEBUG_DEFS_AND_USES
     Logger::Info("Adding register that is live-out-and-not-defined.");
@@ -582,8 +584,6 @@ void LLVMDataDepGraph::convertSUnit(const SUnit &SU) {
   std::string instName;
   std::string opCode;
 
-  LLVM_DEBUG(dbgs() << "Building opt_sched DAG");
-
   if (SU.isBoundaryNode() || !SU.isInstr())
     return;
 
@@ -612,6 +612,30 @@ void LLVMDataDepGraph::convertSUnit(const SUnit &SU) {
               0,          // fileInstLwrBound
               0,          // fileInstUprBound
               0);         // blkNum
+}
+
+void LLVMDataDepGraph::discoverBoundaryLiveness(RegisterFile registerFiles[]) {
+  RegisterOperands RegOpers;
+  RegOpers.collect(*schedDag_->getRegionEnd(), *schedDag_->TRI, schedDag_->MRI,
+                   true, false);
+
+  int leafIndex = llvmNodes_.size() + 1;
+  for (auto &U : RegOpers.Uses)
+    AddUse_(U.RegUnit, leafIndex, registerFiles);
+
+  for (auto &D : RegOpers.Defs)
+    AddDef_(D.RegUnit, leafIndex, registerFiles);
+}
+
+void LLVMDataDepGraph::countBoundaryLiveness(std::vector<int> &regDefCounts) {
+  RegisterOperands RegOpers;
+  RegOpers.collect(*schedDag_->getRegionEnd(), *schedDag_->TRI, schedDag_->MRI,
+                   true, false);
+  for (auto &D : RegOpers.Defs) {
+    std::vector<int> regTypes = GetRegisterType_(D.RegUnit);
+    for (int regType : regTypes)
+      regDefCounts[regType]++;
+  }
 }
 
 LLVMRegTypeFilter::LLVMRegTypeFilter(

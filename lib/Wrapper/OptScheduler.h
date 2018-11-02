@@ -184,6 +184,8 @@ public:
   void schedule() override;
   // (Chris) getter for region number
   inline int getRegionNum() const { return regionNum; }
+  // Return the boundary instruction for this region.
+  inline const llvm::MachineInstr *getRegionEnd() { return &*RegionEnd; }
 };
 
 } // namespace opt_sched
