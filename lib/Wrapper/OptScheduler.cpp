@@ -584,7 +584,7 @@ SPILL_COST_FUNCTION ScheduleDAGOptSched::parseSpillCostFunc() const {
   }
 }
 
-bool ScheduleDAGOptSched::shouldPrintSpills() {
+bool ScheduleDAGOptSched::shouldPrintSpills() const {
   std::string printSpills =
       SchedulerOptions::getInstance().GetString("PRINT_SPILL_COUNTS");
   if (printSpills == "YES") {
@@ -631,7 +631,7 @@ void ScheduleDAGOptSched::finalizeSchedule() {
   }
 }
 
-bool ScheduleDAGOptSched::isSimRegAllocEnabled() {
+bool ScheduleDAGOptSched::isSimRegAllocEnabled() const {
   // This will return false if only the list schedule is allocated.
   return (
       OPTSCHED_gPrintSpills &&
@@ -704,12 +704,12 @@ printMaskPairs(const SmallVectorImpl<RegisterMaskPair> &RegPairs,
 }
 
 LLVM_DUMP_METHOD
-void ScheduleDAGOptSched::dumpLLVMRegisters() {
+void ScheduleDAGOptSched::dumpLLVMRegisters() const {
   dbgs() << "LLVM Registers\n";
 
   for (const auto &SU : SUnits) {
     assert(SU.isInstr());
-    MachineInstr *MI = SU.getInstr();
+    const MachineInstr *MI = SU.getInstr();
     dbgs() << "Instr: ";
     dbgs() << "(" << SU.NodeNum << ") " << TII->getName(MI->getOpcode())
            << '\n';
@@ -720,23 +720,26 @@ void ScheduleDAGOptSched::dumpLLVMRegisters() {
     dbgs() << "\t--Defs: " << printMaskPairs(RegOpers.Defs, TRI, MRI);
     dbgs() << '\n';
 
-    dbgs() << "\t--Uses: " << printMaskPairs(RegOpers.Defs, TRI, MRI);
+    dbgs() << "\t--Uses: " << printMaskPairs(RegOpers.Uses, TRI, MRI);
     dbgs() << "\n\n";
   }
 
   // Print registers used/defined by the region boundary
-  MachineInstr *MI = &*RegionEnd;
-  dbgs() << "Instr: ";
-  dbgs() << "(ExitSU) " << TII->getName(MI->getOpcode()) << '\n';
+  const MachineInstr *MI = getRegionEnd();
+  // Make sure EndRegion is not a sentinel value
+  if (MI) {
+    dbgs() << "Instr: ";
+    dbgs() << "(ExitSU) " << TII->getName(MI->getOpcode()) << '\n';
 
-  RegisterOperands RegOpers;
-  RegOpers.collect(*MI, *TRI, MRI, true, false);
+    RegisterOperands RegOpers;
+    RegOpers.collect(*MI, *TRI, MRI, true, false);
 
-  dbgs() << "\t--Defs: " << printMaskPairs(RegOpers.Defs, TRI, MRI);
-  dbgs() << '\n';
+    dbgs() << "\t--Defs: " << printMaskPairs(RegOpers.Defs, TRI, MRI);
+    dbgs() << '\n';
 
-  dbgs() << "\t--Uses: " << printMaskPairs(RegOpers.Defs, TRI, MRI);
-  dbgs() << "\n\n";
+    dbgs() << "\t--Uses: " << printMaskPairs(RegOpers.Uses, TRI, MRI);
+    dbgs() << "\n\n";
+  }
 
   // Print live-in/live-out register
   dbgs() << "Live-In/Live-Out registers:\n";

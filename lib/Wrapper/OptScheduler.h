@@ -159,7 +159,7 @@ private:
   // Get OptSched heuristic setting
   SchedPriorities parseHeuristic(const std::string &str) const;
   // Return true if we should print spill count for the current function
-  bool shouldPrintSpills();
+  bool shouldPrintSpills() const;
   // Add node to llvm schedule
   void ScheduleNode(llvm::SUnit *SU, unsigned CurCycle);
   // Setup dag and calculate register pressue in region
@@ -167,27 +167,31 @@ private:
   // Check for a mismatch between LLVM and OptSched register pressure values.
   bool rpMismatch(InstSchedule *sched);
   // Is simulated register allocation enabled.
-  bool isSimRegAllocEnabled();
+  bool isSimRegAllocEnabled() const;
   // Find the real paths to optsched-cfg files.
   void getRealCfgPaths();
 
 public:
-  ScheduleDAGOptSched(llvm::MachineSchedContext *C);
-  ~ScheduleDAGOptSched() {}
   // System time that the scheduler was created
   static std::chrono::milliseconds startTime;
+
+  ScheduleDAGOptSched(llvm::MachineSchedContext *C);
+  ~ScheduleDAGOptSched() {}
   // The fallback LLVM scheduler
   void fallbackScheduler();
   // Print out total block spills for the function.
   void finalizeSchedule() override;
   // Schedule the current region using the OptScheduler
   void schedule() override;
-  // (Chris) getter for region number
-  inline int getRegionNum() const { return regionNum; }
-  // Return the boundary instruction for this region.
-  inline const llvm::MachineInstr *getRegionEnd() { return &*RegionEnd; }
   // Print info for all LLVM registers that are used or defined in the region.
-  void dumpLLVMRegisters();
+  void dumpLLVMRegisters() const;
+  // Getter for region number
+  inline int getRegionNum() const { return regionNum; }
+  // Return the boundary instruction for this region if it is not a sentinel
+  // value.
+  inline const llvm::MachineInstr *getRegionEnd() const {
+    return (RegionEnd == BB->end() ? nullptr : &*RegionEnd);
+  }
 };
 
 } // namespace opt_sched

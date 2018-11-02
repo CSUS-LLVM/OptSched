@@ -158,7 +158,10 @@ void LLVMDataDepGraph::CountDefs(RegisterFile regFiles[]) {
     }
   }
 
-  countBoundaryLiveness(regDefCounts);
+  // Get region end instruction if it is not a sentinel value
+  const MachineInstr *MI = schedDag_->getRegionEnd();
+  if (MI)
+    countBoundaryLiveness(regDefCounts, defs, addUsedAndNotDefined, MI);
 
   if (addLiveOutAndNotDefined) {
     for (const RegisterMaskPair &O : schedDag_->getRegPressure().LiveOutRegs) {
@@ -212,12 +215,15 @@ void LLVMDataDepGraph::AddDefsAndUses(RegisterFile regFiles[]) {
     }
   }
 
+  // Get region end instruction if it is not a sentinel value
+  const MachineInstr *MI = schedDag_->getRegionEnd();
+  if (MI)
+    discoverBoundaryLiveness(regFiles, MI);
+
   // add live-out registers as uses in artificial leaf instruction
   for (const RegisterMaskPair &O : schedDag_->getRegPressure().LiveOutRegs) {
     AddLiveOutReg_(O.RegUnit, regFiles);
   }
-
-  discoverBoundaryLiveness(regFiles);
 
   // Check for any registers that are not used but are also not in LLVM's
   // live-out set.
@@ -616,10 +622,10 @@ void LLVMDataDepGraph::convertSUnit(const SUnit &SU) {
               0);         // blkNum
 }
 
-void LLVMDataDepGraph::discoverBoundaryLiveness(RegisterFile registerFiles[]) {
+void LLVMDataDepGraph::discoverBoundaryLiveness(RegisterFile registerFiles[],
+                                                const MachineInstr *MI) {
   RegisterOperands RegOpers;
-  RegOpers.collect(*schedDag_->getRegionEnd(), *schedDag_->TRI, schedDag_->MRI,
-                   true, false);
+  RegOpers.collect(*MI, *schedDag_->TRI, schedDag_->MRI, true, false);
 
   int leafIndex = llvmNodes_.size() + 1;
   for (auto &U : RegOpers.Uses)
@@ -629,14 +635,20 @@ void LLVMDataDepGraph::discoverBoundaryLiveness(RegisterFile registerFiles[]) {
     AddDef_(D.RegUnit, leafIndex, registerFiles);
 }
 
-void LLVMDataDepGraph::countBoundaryLiveness(std::vector<int> &regDefCounts) {
+void LLVMDataDepGraph::countBoundaryLiveness(std::vector<int> &RegDefCounts,
+                                             std::set<unsigned> &Defs,
+                                             bool AddUsedAndNotDefined,
+                                             const MachineInstr *MI) {
   RegisterOperands RegOpers;
-  RegOpers.collect(*schedDag_->getRegionEnd(), *schedDag_->TRI, schedDag_->MRI,
-                   true, false);
+  RegOpers.collect(*MI, *schedDag_->TRI, schedDag_->MRI, true, false);
+
   for (auto &D : RegOpers.Defs) {
-    std::vector<int> regTypes = GetRegisterType_(D.RegUnit);
-    for (int regType : regTypes)
-      regDefCounts[regType]++;
+    std::vector<int> RegTypes = GetRegisterType_(D.RegUnit);
+    for (int RegType : RegTypes)
+      RegDefCounts[RegType]++;
+
+    if (AddUsedAndNotDefined)
+      Defs.insert(D.RegUnit);
   }
 }
 
