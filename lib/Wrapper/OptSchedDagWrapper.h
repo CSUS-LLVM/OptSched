@@ -40,6 +40,8 @@ public:
   // Counts the number of definitions and usages for each register and updates
   // instructions to point to the registers they define/use.
   virtual void AddDefsAndUses(RegisterFile regFiles[]);
+  /// Dump Optsched register def/use information for the region.
+  void dumpRegisters(const RegisterFile regFiles[]) const;
 
 protected:
   // A convenience machMdl_ pointer casted to LLVMMachineModel*.
@@ -98,8 +100,6 @@ protected:
   void ConvertLLVMNodes_();
   // Returns the register pressure set types of an instruction result.
   std::vector<int> GetRegisterType_(const unsigned resNo) const;
-  /// Dump register def/use information for the region.
-  void dumpRegisters(const RegisterFile regFiles[]) const;
   // Setup artificial root.
   void setupRoot();
   // Setup artificial leaf.

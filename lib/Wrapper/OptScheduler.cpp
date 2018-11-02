@@ -19,8 +19,10 @@
 #include "llvm/CodeGen/MachineRegisterInfo.h"
 #include "llvm/CodeGen/MachineScheduler.h"
 #include "llvm/CodeGen/RegisterClassInfo.h"
+#include "llvm/CodeGen/RegisterPressure.h"
 #include "llvm/CodeGen/ScheduleDAG.h"
 #include "llvm/CodeGen/ScheduleDAGInstrs.h"
+#include "llvm/CodeGen/TargetInstrInfo.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/FileSystem.h"
@@ -491,8 +493,8 @@ bool ScheduleDAGOptSched::isOptSchedEnabled() const {
   } else if (optSchedOption == "NO") {
     return false;
   } else {
-    LLVM_DEBUG(llvm::dbgs() << "Invalid value for USE_OPT_SCHED" << optSchedOption
-                       << "Assuming NO.\n");
+    LLVM_DEBUG(llvm::dbgs() << "Invalid value for USE_OPT_SCHED"
+                            << optSchedOption << "Assuming NO.\n");
     return false;
   }
 }
@@ -677,3 +679,73 @@ void ScheduleDAGOptSched::getRealCfgPaths() {
   llvm::sys::path::native(PathCfgHF);
   llvm::sys::path::native(PathCfgMM);
 }
+
+#if !defined(NDEBUG) || defined(LLVM_ENABLE_DUMP)
+// Print registers from RegisterMaskPair vector
+static Printable
+printMaskPairs(const SmallVectorImpl<RegisterMaskPair> &RegPairs,
+               const TargetRegisterInfo *TRI, const MachineRegisterInfo &MRI) {
+  return Printable([&RegPairs, TRI, &MRI](raw_ostream &OS) {
+    for (const auto &P : RegPairs) {
+      const TargetRegisterClass *RegClass;
+
+      if (TRI->isPhysicalRegister(P.RegUnit))
+        RegClass = TRI->getMinimalPhysRegClass(P.RegUnit);
+      else if (TRI->isVirtualRegister(P.RegUnit))
+        RegClass = MRI.getRegClass(P.RegUnit);
+      else
+        RegClass = nullptr;
+
+      OS << printReg(P.RegUnit, TRI, 0) << ':'
+         << (RegClass ? TRI->getRegClassName(RegClass) : "noclass");
+      OS << ' ';
+    }
+  });
+}
+
+LLVM_DUMP_METHOD
+void ScheduleDAGOptSched::dumpLLVMRegisters() {
+  dbgs() << "LLVM Registers\n";
+
+  for (const auto &SU : SUnits) {
+    assert(SU.isInstr());
+    MachineInstr *MI = SU.getInstr();
+    dbgs() << "Instr: ";
+    dbgs() << "(" << SU.NodeNum << ") " << TII->getName(MI->getOpcode())
+           << '\n';
+
+    RegisterOperands RegOpers;
+    RegOpers.collect(*MI, *TRI, MRI, true, false);
+
+    dbgs() << "\t--Defs: " << printMaskPairs(RegOpers.Defs, TRI, MRI);
+    dbgs() << '\n';
+
+    dbgs() << "\t--Uses: " << printMaskPairs(RegOpers.Defs, TRI, MRI);
+    dbgs() << "\n\n";
+  }
+
+  // Print registers used/defined by the region boundary
+  MachineInstr *MI = &*RegionEnd;
+  dbgs() << "Instr: ";
+  dbgs() << "(ExitSU) " << TII->getName(MI->getOpcode()) << '\n';
+
+  RegisterOperands RegOpers;
+  RegOpers.collect(*MI, *TRI, MRI, true, false);
+
+  dbgs() << "\t--Defs: " << printMaskPairs(RegOpers.Defs, TRI, MRI);
+  dbgs() << '\n';
+
+  dbgs() << "\t--Uses: " << printMaskPairs(RegOpers.Defs, TRI, MRI);
+  dbgs() << "\n\n";
+
+  // Print live-in/live-out register
+  dbgs() << "Live-In/Live-Out registers:\n";
+  dbgs() << "\t--Live-In: "
+         << printMaskPairs(getRegPressure().LiveInRegs, TRI, MRI);
+  dbgs() << '\n';
+
+  dbgs() << "\t--Live-Out: "
+         << printMaskPairs(getRegPressure().LiveOutRegs, TRI, MRI);
+  dbgs() << "\n\n";
+}
+#endif

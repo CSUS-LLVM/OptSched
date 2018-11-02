@@ -172,10 +172,11 @@ void LLVMDataDepGraph::CountDefs(RegisterFile regFiles[]) {
   }
 
   for (int i = 0; i < machMdl_->GetRegTypeCnt(); i++) {
+#ifndef NDEBUG
     if (regDefCounts[i])
-      LLVM_DEBUG(dbgs() << "Reg Type "
-                        << llvmMachMdl_->GetRegTypeName(i).c_str() << "->"
-                        << regDefCounts[i] << " registers\n");
+      dbgs() << "Reg Type " << llvmMachMdl_->GetRegTypeName(i).c_str() << "->"
+             << regDefCounts[i] << " registers\n";
+#endif
 
     regFiles[i].SetRegCnt(regDefCounts[i]);
   }
@@ -216,6 +217,8 @@ void LLVMDataDepGraph::AddDefsAndUses(RegisterFile regFiles[]) {
     AddLiveOutReg_(O.RegUnit, regFiles);
   }
 
+  discoverBoundaryLiveness(regFiles);
+
   // Check for any registers that are not used but are also not in LLVM's
   // live-out set.
   // Optionally, add these registers as uses in the aritificial leaf node.
@@ -231,8 +234,7 @@ void LLVMDataDepGraph::AddDefsAndUses(RegisterFile regFiles[]) {
     }
   }
 
-  discoverBoundaryLiveness(regFiles);
-
+  LLVM_DEBUG(schedDag_->dumpLLVMRegisters());
   LLVM_DEBUG(dumpRegisters(regFiles));
 }
 
@@ -462,9 +464,9 @@ bool LLVMDataDepGraph::isLeafNode(const SUnit &SU) {
 #if !defined(NDEBUG) || defined(LLVM_ENABLE_DUMP)
 LLVM_DUMP_METHOD
 void LLVMDataDepGraph::dumpRegisters(const RegisterFile regFiles[]) const {
-  auto RegTypeCount = machMdl_->GetRegTypeCnt();
-  dbgs() << "Number of Registers Types: " << RegTypeCount << '\n';
+  dbgs() << "Optsched Regsiters\n";
 
+  auto RegTypeCount = machMdl_->GetRegTypeCnt();
   for (int16_t RegTypeNum = 0; RegTypeNum < RegTypeCount; RegTypeNum++) {
     const auto &RegFile = regFiles[RegTypeNum];
     // Skip register types that are not used/defined in the region
@@ -474,8 +476,8 @@ void LLVMDataDepGraph::dumpRegisters(const RegisterFile regFiles[]) const {
     const auto &RegTypeName = machMdl_->GetRegTypeName(RegTypeNum);
     for (int RegNum = 0; RegNum < RegFile.GetRegCnt(); RegNum++) {
       const auto *Reg = RegFile.GetReg(RegNum);
-      dbgs() << "Register: " << '%' << Reg->GetNum() << " Type: " << RegTypeName
-             << '/' << RegTypeNum << '\n';
+      dbgs() << "Register: " << '%' << Reg->GetNum() << " (" << RegTypeName
+             << '/' << RegTypeNum << ")\n";
 
       typedef SmallPtrSet<const SchedInstruction *, 8>::const_iterator
           const_iterator;
@@ -484,7 +486,7 @@ void LLVMDataDepGraph::dumpRegisters(const RegisterFile regFiles[]) const {
       const auto &DefList = Reg->GetDefList();
       dbgs() << "\t--Defs:";
       for (const_iterator I = DefList.begin(), E = DefList.end(); I != E; ++I)
-        dbgs() << ' ' << (*I)->GetNodeID() << ':' << (*I)->GetOpCode();
+        dbgs() << " (" << (*I)->GetNodeID() << ") " << (*I)->GetOpCode();
 
       dbgs() << '\n';
 
@@ -492,7 +494,7 @@ void LLVMDataDepGraph::dumpRegisters(const RegisterFile regFiles[]) const {
       const auto &UseList = Reg->GetUseList();
       dbgs() << "\t--Uses:";
       for (const_iterator I = UseList.begin(), E = UseList.end(); I != E; ++I)
-        dbgs() << ' ' << (*I)->GetNodeID() << ':' << (*I)->GetOpCode();
+        dbgs() << " (" << (*I)->GetNodeID() << ") " << (*I)->GetOpCode();
 
       dbgs() << "\n\n";
     }

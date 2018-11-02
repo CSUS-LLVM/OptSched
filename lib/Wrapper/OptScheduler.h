@@ -186,6 +186,8 @@ public:
   inline int getRegionNum() const { return regionNum; }
   // Return the boundary instruction for this region.
   inline const llvm::MachineInstr *getRegionEnd() { return &*RegionEnd; }
+  // Print info for all LLVM registers that are used or defined in the region.
+  void dumpLLVMRegisters();
 };
 
 } // namespace opt_sched
