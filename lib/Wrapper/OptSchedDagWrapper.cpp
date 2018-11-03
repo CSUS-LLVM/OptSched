@@ -31,6 +31,12 @@ Description:  A wrapper that convert an LLVM ScheduleDAG to an OptSched
 using namespace opt_sched;
 using namespace llvm;
 
+#ifndef NDEBUG
+static Printable printOptSchedReg(const Register *Reg,
+                                  const std::string &RegTypeName,
+                                  int16_t RegTypeNum);
+#endif
+
 static std::unique_ptr<LLVMRegTypeFilter> createLLVMRegTypeFilter(
     const MachineModel *MM, const llvm::TargetRegisterInfo *TRI,
     const std::vector<unsigned> &RegionPressure, float RegFilterFactor = .7f) {
@@ -241,7 +247,7 @@ void LLVMDataDepGraph::AddDefsAndUses(RegisterFile regFiles[]) {
   }
 
   LLVM_DEBUG(schedDag_->dumpLLVMRegisters());
-  LLVM_DEBUG(dumpRegisters(regFiles));
+  LLVM_DEBUG(dumpOptSchedRegisters(regFiles));
 }
 
 void LLVMDataDepGraph::AddUse_(unsigned resNo, InstCount nodeIndex,
@@ -252,9 +258,9 @@ void LLVMDataDepGraph::AddUse_(unsigned resNo, InstCount nodeIndex,
 
   if (addUsedAndNotDefined && lastDef_.find(resNo) == lastDef_.end()) {
     AddLiveInReg_(resNo, regFiles);
-#ifdef IS_DEBUG_DEFS_AND_USES
-    Logger::Info("Adding register that is used-and-not-defined.");
-#endif
+
+    LLVM_DEBUG(dbgs() << "Adding register that is used-and-not-defined: ");
+    TargetRegisterInfo::dumpReg(resNo, 0, schedDag_->TRI);
   }
 
   std::vector<Register *> regs = lastDef_[resNo];
@@ -262,17 +268,8 @@ void LLVMDataDepGraph::AddUse_(unsigned resNo, InstCount nodeIndex,
     if (!insts_[nodeIndex]->FindUse(reg)) {
       insts_[nodeIndex]->AddUse(reg);
       reg->AddUse(insts_[nodeIndex]);
-#ifdef IS_DEBUG_DEFS_AND_USES
-      Logger::Info("Adding use for OptSched register: type: %lu number: "
-                   "%lu  NodeNum: %lu",
-                   reg->GetType(), reg->GetNum(), nodeIndex);
-#endif
     }
   }
-#ifdef IS_DEBUG_DEFS_AND_USES
-  Logger::Info("Adding use for LLVM register: %lu NodeNum: %lu", resNo,
-               nodeIndex);
-#endif
 }
 
 void LLVMDataDepGraph::AddDef_(unsigned resNo, InstCount nodeIndex,
@@ -286,19 +283,9 @@ void LLVMDataDepGraph::AddDef_(unsigned resNo, InstCount nodeIndex,
     insts_[nodeIndex]->AddDef(reg);
     reg->SetWght(weight);
     reg->AddDef(insts_[nodeIndex]);
-#ifdef IS_DEBUG_DEFS_AND_USES
-    Logger::Info("Adding def for OptSched register: type: %lu number: %lu "
-                 "NodeNum: %lu",
-                 reg->GetType(), reg->GetNum(), nodeIndex);
-#endif
     regs.push_back(reg);
   }
   lastDef_[resNo] = regs;
-
-#ifdef IS_DEBUG_DEFS_AND_USES
-  Logger::Info("Adding def for LLVM register: %lu NodeNum: %lu", resNo,
-               nodeIndex);
-#endif
 }
 
 void LLVMDataDepGraph::AddLiveInReg_(unsigned resNo, RegisterFile regFiles[]) {
@@ -314,19 +301,9 @@ void LLVMDataDepGraph::AddLiveInReg_(unsigned resNo, RegisterFile regFiles[]) {
     reg->SetWght(weight);
     reg->AddDef(insts_[rootIndex]);
     reg->SetIsLiveIn(true);
-#ifdef IS_DEBUG_DEFS_AND_USES
-    Logger::Info("Adding live-in def for OptSched register: type: %lu "
-                 "number: %lu NodeNum: %lu",
-                 reg->GetType(), reg->GetNum(), rootIndex);
-#endif
     regs.push_back(reg);
   }
   lastDef_[resNo] = regs;
-
-#ifdef IS_DEBUG_DEFS_AND_USES
-  Logger::Info("Adding live-in def for LLVM register: %lu NodeNum: %lu", resNo,
-               rootIndex);
-#endif
 }
 
 void LLVMDataDepGraph::AddLiveOutReg_(unsigned resNo, RegisterFile regFiles[]) {
@@ -339,9 +316,9 @@ void LLVMDataDepGraph::AddLiveOutReg_(unsigned resNo, RegisterFile regFiles[]) {
 
   if (addLiveOutAndNotDefined && lastDef_.find(resNo) == lastDef_.end()) {
     AddLiveInReg_(resNo, regFiles);
-#ifdef IS_DEBUG_DEFS_AND_USES
-    Logger::Info("Adding register that is live-out-and-not-defined.");
-#endif
+
+    LLVM_DEBUG(dbgs() << "Adding register that is live-out-and-not-defined: ");
+    TargetRegisterInfo::dumpReg(resNo, 0, schedDag_->TRI);
   }
 
   std::vector<Register *> regs = lastDef_[resNo];
@@ -350,16 +327,7 @@ void LLVMDataDepGraph::AddLiveOutReg_(unsigned resNo, RegisterFile regFiles[]) {
       insts_[leafIndex]->AddUse(reg);
       reg->AddUse(insts_[leafIndex]);
       reg->SetIsLiveOut(true);
-#ifdef IS_DEBUG_DEFS_AND_USES
-      Logger::Info("Adding live-out use for OptSched register: type: %lu "
-                   "number: %lu NodeNum: %lu",
-                   reg->GetType(), reg->GetNum(), leafIndex);
-#endif
     }
-#ifdef IS_DEBUG_DEFS_AND_USES
-    Logger::Info("Adding live-out use for register: %lu NodeNum: %lu", resNo,
-                 leafIndex);
-#endif
   }
 }
 
@@ -371,11 +339,11 @@ void LLVMDataDepGraph::AddDefAndNotUsed_(Register *reg,
     insts_[leafIndex]->AddUse(reg);
     reg->AddUse(insts_[leafIndex]);
     reg->SetIsLiveOut(true);
-#ifdef IS_DEBUG_DEFS_AND_USES
-    Logger::Info("Adding live-out use for OptSched register: type: %lu "
-                 "This register is not in the live-out set from LLVM"
-                 "number: %lu NodeNum: %lu",
-                 reg->GetType(), reg->GetNum(), leafIndex);
+
+#ifndef NDEBUG
+    int16_t Type = reg->GetType();
+    dbgs() << "Adding register that is defined and not used: ";
+    dbgs() << printOptSchedReg(reg, machMdl_->GetRegTypeName(Type), Type);
 #endif
   }
 }
@@ -468,41 +436,50 @@ bool LLVMDataDepGraph::isLeafNode(const SUnit &SU) {
 }
 
 #if !defined(NDEBUG) || defined(LLVM_ENABLE_DUMP)
+static Printable printOptSchedReg(const Register *Reg,
+                                  const std::string &RegTypeName,
+                                  int16_t RegTypeNum) {
+  return Printable([&Reg, &RegTypeName, RegTypeNum](raw_ostream &OS) {
+    OS << "Register: " << '%' << Reg->GetNum() << " (" << RegTypeName << '/'
+       << RegTypeNum << ")\n";
+
+    typedef SmallPtrSet<const SchedInstruction *, 8>::const_iterator
+        const_iterator;
+
+    // Definitions for this register
+    const auto &DefList = Reg->GetDefList();
+    OS << "\t--Defs:";
+    for (const_iterator I = DefList.begin(), E = DefList.end(); I != E; ++I)
+      OS << " (" << (*I)->GetNodeID() << ") " << (*I)->GetOpCode();
+
+    OS << '\n';
+
+    // Uses for this register
+    const auto &UseList = Reg->GetUseList();
+    OS << "\t--Uses:";
+    for (const_iterator I = UseList.begin(), E = UseList.end(); I != E; ++I)
+      OS << " (" << (*I)->GetNodeID() << ") " << (*I)->GetOpCode();
+
+    OS << "\n\n";
+  });
+}
+
 LLVM_DUMP_METHOD
-void LLVMDataDepGraph::dumpRegisters(const RegisterFile regFiles[]) const {
+void LLVMDataDepGraph::dumpOptSchedRegisters(
+    const RegisterFile regFiles[]) const {
   dbgs() << "Optsched Regsiters\n";
 
   auto RegTypeCount = machMdl_->GetRegTypeCnt();
   for (int16_t RegTypeNum = 0; RegTypeNum < RegTypeCount; RegTypeNum++) {
     const auto &RegFile = regFiles[RegTypeNum];
-    // Skip register types that are not used/defined in the region
+    // Skip register types that have no registers in the region
     if (RegFile.GetRegCnt() == 0)
       continue;
 
     const auto &RegTypeName = machMdl_->GetRegTypeName(RegTypeNum);
     for (int RegNum = 0; RegNum < RegFile.GetRegCnt(); RegNum++) {
       const auto *Reg = RegFile.GetReg(RegNum);
-      dbgs() << "Register: " << '%' << Reg->GetNum() << " (" << RegTypeName
-             << '/' << RegTypeNum << ")\n";
-
-      typedef SmallPtrSet<const SchedInstruction *, 8>::const_iterator
-          const_iterator;
-
-      // Definitions for this register
-      const auto &DefList = Reg->GetDefList();
-      dbgs() << "\t--Defs:";
-      for (const_iterator I = DefList.begin(), E = DefList.end(); I != E; ++I)
-        dbgs() << " (" << (*I)->GetNodeID() << ") " << (*I)->GetOpCode();
-
-      dbgs() << '\n';
-
-      // Uses for this register
-      const auto &UseList = Reg->GetUseList();
-      dbgs() << "\t--Uses:";
-      for (const_iterator I = UseList.begin(), E = UseList.end(); I != E; ++I)
-        dbgs() << " (" << (*I)->GetNodeID() << ") " << (*I)->GetOpCode();
-
-      dbgs() << "\n\n";
+      dbgs() << printOptSchedReg(Reg, RegTypeName, RegTypeNum);
     }
   }
 }

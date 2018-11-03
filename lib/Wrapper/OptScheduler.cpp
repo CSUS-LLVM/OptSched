@@ -125,6 +125,9 @@ void ScheduleDAGOptSched::SetupLLVMDag() {
 
   // Build the DAG, and compute current register pressure.
   buildSchedGraph(AA, &RPTracker, nullptr, LIS, /*ShouldTrackLaneMasks=*/true);
+
+  // Finalize live-in
+  RPTracker.closeTop();
 }
 
 // schedule called for each basic block
@@ -259,6 +262,7 @@ void ScheduleDAGOptSched::schedule() {
 #endif
   // Build LLVM DAG
   SetupLLVMDag();
+  getRegPressure().dump(TRI);
 
   // Apply llvm DAG post processing.
   if (enableMutations) {

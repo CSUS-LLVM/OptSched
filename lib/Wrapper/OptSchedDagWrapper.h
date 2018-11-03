@@ -43,7 +43,7 @@ public:
   // instructions to point to the registers they define/use.
   virtual void AddDefsAndUses(RegisterFile regFiles[]);
   /// Dump Optsched register def/use information for the region.
-  void dumpRegisters(const RegisterFile regFiles[]) const;
+  void dumpOptSchedRegisters(const RegisterFile regFiles[]) const;
 
 protected:
   // A convenience machMdl_ pointer casted to LLVMMachineModel*.
