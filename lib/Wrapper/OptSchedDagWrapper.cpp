@@ -88,7 +88,7 @@ LLVMDataDepGraph::LLVMDataDepGraph(
 }
 
 void LLVMDataDepGraph::ConvertLLVMNodes_() {
-  LLVM_DEBUG(dbgs() << "Building opt_sched DAG\n");
+  DEBUG(dbgs() << "Building opt_sched DAG\n");
 
   // Create nodes.
   for (size_t i = 0; i < llvmNodes_.size(); i++) {
@@ -246,8 +246,8 @@ void LLVMDataDepGraph::AddDefsAndUses(RegisterFile regFiles[]) {
     }
   }
 
-  LLVM_DEBUG(schedDag_->dumpLLVMRegisters());
-  LLVM_DEBUG(dumpOptSchedRegisters(regFiles));
+  DEBUG(schedDag_->dumpLLVMRegisters());
+  DEBUG(dumpOptSchedRegisters(regFiles));
 }
 
 void LLVMDataDepGraph::AddUse_(unsigned resNo, InstCount nodeIndex,
@@ -259,7 +259,7 @@ void LLVMDataDepGraph::AddUse_(unsigned resNo, InstCount nodeIndex,
   if (addUsedAndNotDefined && lastDef_.find(resNo) == lastDef_.end()) {
     AddLiveInReg_(resNo, regFiles);
 
-    LLVM_DEBUG(dbgs() << "Adding register that is used-and-not-defined: ");
+    DEBUG(dbgs() << "Adding register that is used-and-not-defined: ");
     TargetRegisterInfo::dumpReg(resNo, 0, schedDag_->TRI);
   }
 
@@ -317,7 +317,7 @@ void LLVMDataDepGraph::AddLiveOutReg_(unsigned resNo, RegisterFile regFiles[]) {
   if (addLiveOutAndNotDefined && lastDef_.find(resNo) == lastDef_.end()) {
     AddLiveInReg_(resNo, regFiles);
 
-    LLVM_DEBUG(dbgs() << "Adding register that is live-out-and-not-defined: ");
+    DEBUG(dbgs() << "Adding register that is live-out-and-not-defined: ");
     TargetRegisterInfo::dumpReg(resNo, 0, schedDag_->TRI);
   }
 

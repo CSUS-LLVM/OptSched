@@ -262,7 +262,6 @@ void ScheduleDAGOptSched::schedule() {
 #endif
   // Build LLVM DAG
   SetupLLVMDag();
-  getRegPressure().dump(TRI);
 
   // Apply llvm DAG post processing.
   if (enableMutations) {
@@ -497,7 +496,7 @@ bool ScheduleDAGOptSched::isOptSchedEnabled() const {
   } else if (optSchedOption == "NO") {
     return false;
   } else {
-    LLVM_DEBUG(llvm::dbgs() << "Invalid value for USE_OPT_SCHED"
+    DEBUG(llvm::dbgs() << "Invalid value for USE_OPT_SCHED"
                             << optSchedOption << "Assuming NO.\n");
     return false;
   }
