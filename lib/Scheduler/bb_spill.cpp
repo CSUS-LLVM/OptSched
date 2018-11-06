@@ -115,8 +115,8 @@ ConstrainedScheduler *BBWithSpill::AllocHeuristicScheduler_() {
 /*****************************************************************************/
 
 FUNC_RESULT BBWithSpill::BuildFromFile() {
-  dataDepGraph_->CountDefs(regFiles_);
-  dataDepGraph_->AddDefsAndUses(regFiles_);
+  dataDepGraph_->countDefs(regFiles_);
+  dataDepGraph_->addDefsAndUses(regFiles_);
 
   for (int i = 0; i < regTypeCnt_; i++) {
     liveRegs_[i].Construct(regFiles_[i].GetRegCnt());

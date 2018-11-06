@@ -279,8 +279,8 @@ public:
   void SetHard(bool isHard);
   bool IsHard() { return isHard_; }
 
-  virtual void CountDefs(RegisterFile regFiles[]) = 0;
-  virtual void AddDefsAndUses(RegisterFile regFiles[]) = 0;
+  virtual void countDefs(RegisterFile regFiles[]) = 0;
+  virtual void addDefsAndUses(RegisterFile regFiles[]) = 0;
 
   int GetEntryInstCnt() { return entryInstCnt_; }
   int GetExitInstCnt() { return exitInstCnt_; }

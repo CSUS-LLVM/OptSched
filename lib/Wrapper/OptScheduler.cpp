@@ -138,6 +138,8 @@ void ScheduleDAGOptSched::schedule() {
   // (Chris) Increment the region number here to get unique dag IDs
   // per scheduling region within a machine function.
   ++regionNum;
+  const std::string regionName = context->MF->getFunction().getName().data() +
+                                   std::string(":") + std::to_string(regionNum);
 
   // (Chris): This option in the sched.ini file will override USE_OPT_SCHED. It
   // will only apply B&B if the region name belongs in the list of specified
@@ -151,8 +153,6 @@ void ScheduleDAGOptSched::schedule() {
   if (scheduleSpecificRegions) {
     const std::list<std::string> regionList =
         schedIni.GetStringList("REGIONS_TO_SCHEDULE");
-    const std::string regionName = context->MF->getFunction().getName().data() +
-                                   std::string(":") + std::to_string(regionNum);
     optSchedEnabled = std::find(std::begin(regionList), std::end(regionList),
                                 regionName) != std::end(regionList);
   }
@@ -164,9 +164,7 @@ void ScheduleDAGOptSched::schedule() {
 #endif
 
   if (!optSchedEnabled) {
-#ifdef IS_DEBUG
-    Logger::Info("********** LLVM Scheduling **********\n");
-#endif
+    LLVM_DEBUG(dbgs() << "********** LLVM Scheduling **********n");
 
     ScheduleDAGMILive::schedule();
 
@@ -257,12 +255,10 @@ void ScheduleDAGOptSched::schedule() {
     }
   }
 
-#ifdef IS_DEBUG
-  Logger::Info("********** Opt Scheduling **********");
-#endif
+  LLVM_DEBUG(dbgs() << "********** Opt Scheduling **********\n");
+
   // Build LLVM DAG
   SetupLLVMDag();
-  getRegPressure().dump(TRI);
 
   // Apply llvm DAG post processing.
   if (enableMutations) {
@@ -274,10 +270,7 @@ void ScheduleDAGOptSched::schedule() {
     return;
 
   // convert dag
-  LLVMDataDepGraph dag(context, this, model.get(), latencyPrecision, BB,
-                       graphTransTypes, RPTracker.getPressure().MaxSetPressure,
-                       treatOrderDepsAsDataDeps, maxDagSizeForLatencyPrecision,
-                       regionNum);
+  LLVMDataDepGraph dag(context, this, model.get(), latencyPrecision, graphTransTypes, regionName);
   // create region
   SchedRegion *region = new BBWithSpill(
       model.get(), &dag, 0, histTableHashBits, lowerBoundAlgorithm,
@@ -309,9 +302,9 @@ void ScheduleDAGOptSched::schedule() {
 
   if (dag.GetInstCnt() < minDagSize || dag.GetInstCnt() > maxDagSize) {
     rslt = RES_FAIL;
-    Logger::Error("Dag skipped due to out-of-range size. DAG size = %d, \
+    LLVM_DEBUG(Logger::Error("Dag skipped due to out-of-range size. DAG size = %d, \
                   valid range is [%d, %d]",
-                  dag.GetInstCnt(), minDagSize, maxDagSize);
+                  dag.GetInstCnt(), minDagSize, maxDagSize));
   } else {
     bool filterByPerp = schedIni.GetBool("FILTER_BY_PERP");
     auto blocksToKeep = [&]() {
@@ -332,14 +325,14 @@ void ScheduleDAGOptSched::schedule() {
         bestSchedLngth, normHurstcCost, hurstcSchedLngth, sched, filterByPerp,
         blocksToKeep);
     if ((!(rslt == RES_SUCCESS || rslt == RES_TIMEOUT) || sched == NULL)) {
-      Logger::Info("OptSched run failed: rslt=%d, sched=%p. Falling back.",
-                   rslt, (void *)sched);
+      LLVM_DEBUG(Logger::Info("OptSched run failed: rslt=%d, sched=%p. Falling back.",
+                   rslt, (void *)sched));
 
       // Scheduling with opt-sched failed.
       fallbackScheduler();
 
     } else {
-      Logger::Info("OptSched succeeded.");
+      LLVM_DEBUG(Logger::Info("OptSched succeeded."));
       // Count simulated spills.
       if (isSimRegAllocEnabled()) {
         totalSimulatedSpills += region->GetSimSpills();
@@ -355,7 +348,7 @@ void ScheduleDAGOptSched::schedule() {
         if (i == SCHD_STALL) {
           ScheduleNode(NULL, cycle);
         } else {
-          llvm::SUnit *unit = dag.GetSUnit(i);
+          llvm::SUnit *unit = &SUnits[i];
 
           if (unit && unit->isInstr())
             ScheduleNode(unit, cycle);
@@ -379,7 +372,7 @@ void ScheduleDAGOptSched::ScheduleNode(llvm::SUnit *SU, unsigned CurCycle) {
   if (SU) {
     llvm::MachineInstr *instr = SU->getInstr();
     if (CurrentTop == NULL) {
-      Logger::Error("Currenttop is NULL");
+      LLVM_DEBUG(Logger::Error("Currenttop is NULL"));
       return;
     }
     if (&*CurrentTop == instr)
@@ -410,7 +403,7 @@ void ScheduleDAGOptSched::fallbackScheduler() {
       llvm::MachineInstr *instr = SUnits[i].getInstr();
 
       if (CurrentTop == NULL) {
-        Logger::Error("Currenttop is NULL");
+        LLVM_DEBUG(Logger::Error("Currenttop is NULL"));
         return;
       }
 
@@ -513,7 +506,7 @@ LATENCY_PRECISION ScheduleDAGOptSched::fetchLatencyPrecision() const {
   } else if (lpName == "UNITY") {
     return LTP_UNITY;
   } else {
-    Logger::Error("Unrecognized latency precision. Defaulted to PRECISE.");
+    LLVM_DEBUG(Logger::Error("Unrecognized latency precision. Defaulted to PRECISE."));
     return LTP_PRECISE;
   }
 }
@@ -525,7 +518,7 @@ LB_ALG ScheduleDAGOptSched::parseLowerBoundAlgorithm() const {
   } else if (LBalg == "LC") {
     return LBA_LC;
   } else {
-    Logger::Error("Unrecognized lower bound technique. Defaulted to Rim-Jain.");
+    LLVM_DEBUG(Logger::Error("Unrecognized lower bound technique. Defaulted to Rim-Jain."));
     return LBA_RJ;
   }
 }
@@ -553,7 +546,7 @@ ScheduleDAGOptSched::parseHeuristic(const std::string &str) const {
         } // end if
       }   // end for j
       if (j == sizeof(hurstcNames)) {
-        Logger::Error("Unrecognized heuristic %s. Defaulted to CP.", word);
+        LLVM_DEBUG(Logger::Error("Unrecognized heuristic %s. Defaulted to CP.", word));
         prirts.vctr[prirts.cnt] = LSH_CP;
       }
       prirts.cnt++;
@@ -583,7 +576,7 @@ SPILL_COST_FUNCTION ScheduleDAGOptSched::parseSpillCostFunc() const {
   } else if (name == "SLIL") {
     return SCF_SLIL;
   } else {
-    Logger::Error("Unrecognized spill cost function. Defaulted to PERP.");
+    LLVM_DEBUG(Logger::Error("Unrecognized spill cost function. Defaulted to PERP."));
     return SCF_PERP;
   }
 }
@@ -599,8 +592,8 @@ bool ScheduleDAGOptSched::shouldPrintSpills() const {
     std::string functionName = context->MF->getFunction().getName();
     return hotFunctions.GetBool(functionName, false);
   } else {
-    Logger::Error("Unknown value for PRINT_SPILL_COUNTS: %s. Assuming NO.",
-                  printSpills.c_str());
+    LLVM_DEBUG(Logger::Error("Unknown value for PRINT_SPILL_COUNTS: %s. Assuming NO.",
+                  printSpills.c_str()));
     return false;
   }
 }
@@ -626,13 +619,13 @@ bool ScheduleDAGOptSched::rpMismatch(InstSchedule *sched) {
 void ScheduleDAGOptSched::finalizeSchedule() {
   llvm::ScheduleDAGMILive::finalizeSchedule();
 
-  if (isSimRegAllocEnabled()) {
-    llvm::dbgs() << "*************************************\n";
-    llvm::dbgs() << "Function: " << MF.getName()
+  LLVM_DEBUG(if (isSimRegAllocEnabled()) {
+    dbgs() << "*************************************\n";
+    dbgs() << "Function: " << MF.getName()
                  << "\nTotal Simulated Spills: " << totalSimulatedSpills
                  << "\n";
-    llvm::dbgs() << "*************************************\n";
-  }
+    dbgs() << "*************************************\n";
+  });
 }
 
 bool ScheduleDAGOptSched::isSimRegAllocEnabled() const {
@@ -700,9 +693,9 @@ printMaskPairs(const SmallVectorImpl<RegisterMaskPair> &RegPairs,
       else
         RegClass = nullptr;
 
-      OS << printReg(P.RegUnit, TRI, 0) << ':'
-         << (RegClass ? TRI->getRegClassName(RegClass) : "noclass");
-      OS << ' ';
+      OS << llvm::printReg(P.RegUnit, TRI, 0) << ':'
+      << llvm::PrintLaneMask(P.LaneMask)
+      << " (" << (RegClass ? TRI->getRegClassName(RegClass) : "noclass") << ") ";
     }
   });
 }

@@ -13,7 +13,6 @@ Description:  A wrapper that convert an LLVM ScheduleDAG to an OptSched
 #include "llvm/CodeGen/MachineInstr.h"
 #include "llvm/CodeGen/MachineScheduler.h"
 #include "llvm/CodeGen/TargetRegisterInfo.h"
-#include "llvm/Target/TargetMachine.h"
 #include <map>
 #include <set>
 #include <vector>
@@ -25,98 +24,109 @@ class ScheduleDAGOptSched;
 
 class LLVMDataDepGraph : public DataDepGraph {
 public:
-  LLVMDataDepGraph(llvm::MachineSchedContext *context, ScheduleDAGOptSched *DAG,
-                   LLVMMachineModel *machMdl, LATENCY_PRECISION ltncyPrcsn,
-                   llvm::MachineBasicBlock *BB, GraphTransTypes graphTransTypes,
-                   const std::vector<unsigned> &RegionPressure,
-                   bool treatOrderDepsAsDataDeps, int maxDagSizeForPrcisLtncy,
-                   int regionNum);
-  ~LLVMDataDepGraph() = default;
+  LLVMDataDepGraph(llvm::MachineSchedContext *Context, ScheduleDAGOptSched *DAG,
+                   LLVMMachineModel *MM, LATENCY_PRECISION LatencyPrecision, GraphTransTypes GraphTransTypes, std::string RegionID);
 
-  // Returns a pointer to the SUnit at a given node index.
-  llvm::SUnit *GetSUnit(size_t index) const;
+  ~LLVMDataDepGraph() = default;
 
   // Counts the maximum number of virtual registers of each type used by the
   // graph.
-  virtual void CountDefs(RegisterFile regFiles[]);
+  void countDefs(RegisterFile RegFiles[]);
+
   // Counts the number of definitions and usages for each register and updates
   // instructions to point to the registers they define/use.
-  virtual void AddDefsAndUses(RegisterFile regFiles[]);
+  void addDefsAndUses(RegisterFile RegFiles[]);
+
   /// Dump Optsched register def/use information for the region.
-  void dumpOptSchedRegisters(const RegisterFile regFiles[]) const;
+  void dumpOptSchedRegisters(const RegisterFile RegFiles[]) const;
 
 protected:
   // A convenience machMdl_ pointer casted to LLVMMachineModel*.
-  LLVMMachineModel *llvmMachMdl_;
-  // The nodes of the LLVM ScheduleDAG.
-  std::vector<llvm::SUnit> &llvmNodes_;
+  LLVMMachineModel *MM;
+
   // The LLVM scheduler root class, used to access environment
   // and target info.
-  llvm::MachineSchedContext *context_;
+  const llvm::MachineSchedContext *Contex;
+
   // The LLVM Schedule DAG.
-  ScheduleDAGOptSched *schedDag_;
+  const ScheduleDAGOptSched *DAG;
+
   // Precision of latency info
-  LATENCY_PRECISION ltncyPrcsn_;
+  LATENCY_PRECISION LatencyPrecision;
+
   // An option to treat data dependencies of type ORDER as data dependencies
-  bool treatOrderDepsAsDataDeps_;
+  bool TreatOrderDepsAsDataDeps;
+
   // The maximum DAG size to be scheduled using precise latency information
-  int maxDagSizeForPrcisLtncy_;
+  int MaxSizeForPreciseLatency;
+
   // The index of the last "assigned" register for each register type.
-  std::vector<int> regIndices_;
+  std::vector<int> RegIndices;
+
   // Count each definition of a virtual register with the same resNo
   // as a seperate register in our model. Each resNo is also associated
   // with multiple pressure sets which are treated as seperate registers
-  std::map<unsigned, std::vector<Register *>> lastDef_;
-  // LLVM object with information about the machine we are targeting
-  const llvm::TargetMachine &target_;
-  // Peak register pressure before scheduling calculate by LLVM.
-  const std::vector<unsigned> &RegionPressure;
+  std::map<unsigned, std::vector<Register *>> LastDef;
+
   // Allow the DAG builder to filter our register types that have low peak
   // pressure.
   bool ShouldFilterRegisterTypes = false;
+
   // Should we generate a machine model from LLVM itineraries.
   bool ShouldGenerateMM = false;
+
   // Use to ignore non-critical register types.
   std::unique_ptr<LLVMRegTypeFilter> RTFilter;
-  // Check is SUnit is a root node
-  bool isRootNode(const llvm::SUnit &unit);
-  // Check is SUnit is a leaf node
-  bool isLeafNode(const llvm::SUnit &unit);
-  // Check if two nodes are equivalent and if we can order them arbitrarily
-  bool nodesAreEquivalent(const llvm::SUnit &srcNode,
-                          const llvm::SUnit &dstNode);
+
+  // Check if two nodes are equivalent so that we can order them arbitrarily
+  bool nodesAreEquivalent(const llvm::SUnit &SrcNode,
+                          const llvm::SUnit &DstNode);
+
   // Get the weight of the regsiter class in LLVM
-  int GetRegisterWeight_(const unsigned resNo) const;
+  int getRegisterWeight(const unsigned ResNo) const;
+
   // Add a live-in register.
-  void AddLiveInReg_(unsigned resNo, RegisterFile regFiles[]);
+  void addLiveInReg(unsigned ResNo, RegisterFile RegFiles[]);
+
   // Add a live-out register.
-  void AddLiveOutReg_(unsigned resNo, RegisterFile regFiles[]);
+  void addLiveOutReg(unsigned ResNo, RegisterFile RegFiles[]);
+
   // Add a Use.
-  void AddUse_(unsigned resNo, InstCount nodeIndex, RegisterFile regFiles[]);
+  void addUse(unsigned ResNo, InstCount NodeIndex, RegisterFile RegFiles[]);
+
   // Add a Def.
-  void AddDef_(unsigned resNo, InstCount nodeIndex, RegisterFile regFiles[]);
+  void addDef(unsigned ResNo, InstCount NodeIndex, RegisterFile RegFiles[]);
+
   // Add registers that are defined-and-not-used.
-  void AddDefAndNotUsed_(Register *reg, RegisterFile regFiles[]);
+  void addDefAndNotUsed(Register *Reg, RegisterFile RegFiles[]);
+
   // Converts the LLVM nodes saved in llvmNodes_ to opt_sched::DataDepGraph.
   // Should be called only once, by the constructor.
-  void ConvertLLVMNodes_();
+  void convertLLVMNodes();
+
   // Returns the register pressure set types of an instruction result.
-  std::vector<int> GetRegisterType_(const unsigned resNo) const;
+  std::vector<int> getRegisterType(unsigned RegUnit) const;
+
   // Setup artificial root.
   void setupRoot();
+
   // Setup artificial leaf.
   void setupLeaf();
+
   // Create an optsched graph node and instruction from an llvm::SUnit.
   void convertSUnit(const llvm::SUnit &SU);
+
   // Create edges between optsched graph nodes using SUnit successors.
   void convertEdges(const llvm::SUnit &SU);
+
   // Count number or registers defined by the region boundary.
-  void countBoundaryLiveness(std::vector<int> &regDefCounts,
+  void countBoundaryLiveness(std::vector<int> &RegDefCounts,
                              std::set<unsigned> &Defs,
                              bool AddUsedAndNotDefined,
                              const llvm::MachineInstr *MI);
+
   // Find liveness info generated by the region boundary.
-  void discoverBoundaryLiveness(RegisterFile regFiles[],
+  void discoverBoundaryLiveness(RegisterFile RegFiles[],
                                 const llvm::MachineInstr *MI);
 
   // Holds a register live range, mapping a producer to a set of consumers.
@@ -128,11 +138,23 @@ protected:
   };
 };
 
-// Disallow certain registers from being visible to the scheduler. Use LLVM's
+// Exclude certain registers from being visible to the scheduler. Use LLVM's
 // register pressure tracker to find the MAX register pressure for each register
 // type (pressure set). If the MAX pressure is below a certain threshold don't
 // track that register.
 class LLVMRegTypeFilter {
+private:
+    const MachineModel *MM;
+    const llvm::TargetRegisterInfo *TRI;
+    const std::vector<unsigned> &RegionPressure;
+    float RegFilterFactor;
+    std::map<const int16_t, bool> RegTypeIDFilteredMap;
+    std::map<const char *, bool> RegTypeNameFilteredMap;
+  
+    // The current implementation of this class filters register by
+    // TRI->getRegPressureSetLimit
+    void FindPSetsToFilter();
+
 public:
   LLVMRegTypeFilter(const MachineModel *MM, const llvm::TargetRegisterInfo *TRI,
                     const std::vector<unsigned> &RegionPressure,
@@ -147,31 +169,23 @@ public:
   // RegFilterFactor is .7, and a random register type has a pressure limit of
   // 10, then we filter out the register types if the MAX pressure for that type
   // is below 7. (10 * .7 = 7)
-  void setRegFilterFactor(const float RegFilterFactor);
+  void setRegFilterFactor(float RegFilterFactor);
+
   // Return true if this register type should be filtered out.
   // Indexed by RegTypeID
-  bool shouldFilter(const int16_t RegTypeID) const;
+  bool shouldFilter(int16_t RegTypeID) const;
+
   // Return true if this register type should be filtered out.
   // Indexed by RegTypeName
   bool shouldFilter(const char *RegTypeName) const;
+
   // Return true if this register type should be filtered out.
   // Indexed by RegTypeID
-  bool operator[](const int16_t RegTypeID) const;
+  bool operator[](int16_t RegTypeID) const;
+
   // Return true if this register type should be filtered out.
   // Indexed by RegTypeName
   bool operator[](const char *RegTypeName) const;
-
-private:
-  const MachineModel *MM;
-  const llvm::TargetRegisterInfo *TRI;
-  const std::vector<unsigned> &RegionPressure;
-  float RegFilterFactor;
-  std::map<const int16_t, bool> RegTypeIDFilteredMap;
-  std::map<const char *, bool> RegTypeNameFilteredMap;
-
-  // The current implementation of this class filters register by
-  // TRI->getRegPressureSetLimit
-  void FindPSetsToFilter();
 };
 
 } // end namespace opt_sched
