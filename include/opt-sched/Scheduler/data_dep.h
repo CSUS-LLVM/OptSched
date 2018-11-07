@@ -12,6 +12,7 @@ Last Update:  Mar. 2011
 #include "opt-sched/Scheduler/sched_basic_data.h"
 #include "opt-sched/Scheduler/buffers.h"
 #include "opt-sched/Scheduler/defines.h"
+#include "opt-sched/Scheduler/OptSchedDDGWrapperBase.h"
 #include <memory>
 
 namespace opt_sched {
@@ -169,7 +170,7 @@ protected:
 // TODO(max): Find out what this really is.
 // The Data Dependence Graph is a sepcial case of a DAG and a special case of
 // a Data Dependence Structure as well
-class DataDepGraph : public DirAcycGraph, public DataDepStruct {
+class DataDepGraph : public llvm::OptSchedDDGWrapperBase, public DirAcycGraph, public DataDepStruct {
 public:
   DataDepGraph(MachineModel *machMdl, LATENCY_PRECISION ltncyPcsn,
                GraphTransTypes graphTransTypes);
@@ -279,8 +280,8 @@ public:
   void SetHard(bool isHard);
   bool IsHard() { return isHard_; }
 
-  virtual void countDefs(RegisterFile regFiles[]) = 0;
-  virtual void addDefsAndUses(RegisterFile regFiles[]) = 0;
+  virtual void countDefs() = 0;
+  virtual void addDefsAndUses() = 0;
 
   int GetEntryInstCnt() { return entryInstCnt_; }
   int GetExitInstCnt() { return exitInstCnt_; }
@@ -291,6 +292,8 @@ public:
   int16_t GetMaxUseCnt() { return maxUseCnt_; }
   int16_t GetRegTypeCnt() { return machMdl_->GetRegTypeCnt(); }
   int GetPhysRegCnt(int16_t regType) { return machMdl_->GetPhysRegCnt(regType); }
+
+  RegisterFile *getRegFiles() { return RegFiles.get(); }
 
 protected:
   // TODO(max): Get rid of this.
@@ -375,6 +378,10 @@ protected:
 
   LATENCY_PRECISION ltncyPrcsn_;
   int edgeCntPerLtncy_[MAX_LATENCY_VALUE + 1];
+
+  // Tracks all registers in the scheduling region. Each RegisterFile
+  // object holds all registers for a given register type.
+  std::unique_ptr<RegisterFile[]> RegFiles;
 
   void AllocArrays_(InstCount instCnt);
   FUNC_RESULT ParseF2Nodes_(SpecsBuffer *specsBuf, MachineModel *machMdl);

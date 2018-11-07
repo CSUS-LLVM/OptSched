@@ -21,9 +21,9 @@ add_llvm_loadable_module(OptSched
   Scheduler/sched_basic_data.cpp
   Scheduler/sched_region.cpp
   Scheduler/stats.cpp
-  Wrapper/OptScheduler.cpp
+  Wrapper/OptimizingScheduler.cpp
   Wrapper/OptSchedMachineWrapper.cpp
-  Wrapper/OptSchedDagWrapper.cpp
+  Wrapper/OptSchedDDGWrapperBasic.cpp
 
   PLUGIN_TOOL
   llc
