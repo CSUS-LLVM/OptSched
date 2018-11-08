@@ -148,7 +148,7 @@ void BBWithSpill::CmputSchedUprBound_() {
 /*****************************************************************************/
 
 static InstCount ComputeSLILStaticLowerBound(int64_t regTypeCnt_,
-                                             const RegisterFile *regFiles_,
+                                             RegisterFile *regFiles_,
                                              DataDepGraph *dataDepGraph_) {
   // (Chris): To calculate a naive lower bound of the SLIL, count all the defs
   // and uses for each register.

@@ -280,9 +280,6 @@ public:
   void SetHard(bool isHard);
   bool IsHard() { return isHard_; }
 
-  virtual void countDefs() = 0;
-  virtual void addDefsAndUses() = 0;
-
   int GetEntryInstCnt() { return entryInstCnt_; }
   int GetExitInstCnt() { return exitInstCnt_; }
 

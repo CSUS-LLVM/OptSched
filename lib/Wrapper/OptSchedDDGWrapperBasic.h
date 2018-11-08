@@ -22,24 +22,28 @@ using namespace opt_sched;
 
 namespace llvm {
 
+namespace opt_sched {
+
 class LLVMRegTypeFilter;
 class ScheduleDAGOptSched;
 
-class LLVMDataDepGraph : public DataDepGraph {
+class OptSchedDDGWrapperBasic : public DataDepGraph {
 public:
-  LLVMDataDepGraph(llvm::MachineSchedContext *Context, ScheduleDAGOptSched *DAG,
-                   LLVMMachineModel *MM, LATENCY_PRECISION LatencyPrecision,
-                   GraphTransTypes GraphTransTypes, const std::string &RegionID);
+  OptSchedDDGWrapperBasic(llvm::MachineSchedContext *Context,
+                          ScheduleDAGOptSched *DAG, LLVMMachineModel *MM,
+                          LATENCY_PRECISION LatencyPrecision,
+                          GraphTransTypes GraphTransTypes,
+                          const std::string &RegionID);
 
-  ~LLVMDataDepGraph() = default;
+  ~OptSchedDDGWrapperBasic() = default;
 
   // Counts the maximum number of virtual registers of each type used by the
   // graph.
-  void countDefs();
+  virtual void countDefs();
 
   // Counts the number of definitions and usages for each register and updates
   // instructions to point to the registers they define/use.
-  void addDefsAndUses();
+  virtual void addDefsAndUses();
 
   /// Dump Optsched register def/use information for the region.
   void dumpOptSchedRegisters() const;
@@ -189,6 +193,8 @@ public:
   // Indexed by RegTypeName
   bool operator[](const char *RegTypeName) const;
 };
+
+} // end namespace opt_sched
 
 } // end namespace llvm
 

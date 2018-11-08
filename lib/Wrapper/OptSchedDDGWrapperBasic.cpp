@@ -30,8 +30,8 @@
 
 #define DEBUG_TYPE "optsched"
 
-using namespace opt_sched;
 using namespace llvm;
+using namespace llvm::opt_sched;
 
 #ifndef NDEBUG
 static Printable printOptSchedReg(const Register *Reg,
@@ -47,12 +47,10 @@ static std::unique_ptr<LLVMRegTypeFilter> createLLVMRegTypeFilter(
       new LLVMRegTypeFilter(MM, TRI, RegionPressure, RegFilterFactor));
 }
 
-LLVMDataDepGraph::LLVMDataDepGraph(MachineSchedContext *Context,
-                                   ScheduleDAGOptSched *DAG,
-                                   LLVMMachineModel *MM,
-                                   LATENCY_PRECISION LatencyPrecision,
-                                   GraphTransTypes GraphTransTypes,
-                                   const std::string &RegionID)
+OptSchedDDGWrapperBasic::OptSchedDDGWrapperBasic(
+    MachineSchedContext *Context, ScheduleDAGOptSched *DAG,
+    LLVMMachineModel *MM, LATENCY_PRECISION LatencyPrecision,
+    GraphTransTypes GraphTransTypes, const std::string &RegionID)
     : DataDepGraph(MM, LatencyPrecision, GraphTransTypes), MM(MM),
       Contex(Context), DAG(DAG), RTFilter(nullptr) {
   dagFileFormat_ = DFF_BB;
@@ -77,7 +75,7 @@ LLVMDataDepGraph::LLVMDataDepGraph(MachineSchedContext *Context,
                                        DAG->getRegPressure().MaxSetPressure);
 }
 
-void LLVMDataDepGraph::convertSUnits() {
+void OptSchedDDGWrapperBasic::convertSUnits() {
   LLVM_DEBUG(dbgs() << "Building opt_sched DAG\n");
   // The extra 2 are for the artifical root and leaf nodes.
   instCnt_ = nodeCnt_ = DAG->SUnits.size() + 2;
@@ -104,7 +102,7 @@ void LLVMDataDepGraph::convertSUnits() {
     Logger::Fatal("DAG Finish_() failed.");
 }
 
-void LLVMDataDepGraph::convertRegFiles() {
+void OptSchedDDGWrapperBasic::convertRegFiles() {
   for (int i = 0; i < MM->GetRegTypeCnt(); i++)
     RegFiles[i].SetRegType(i);
 
@@ -112,7 +110,7 @@ void LLVMDataDepGraph::convertRegFiles() {
   addDefsAndUses();
 }
 
-void LLVMDataDepGraph::countDefs() {
+void OptSchedDDGWrapperBasic::countDefs() {
   std::vector<int> RegDefCounts(MM->GetRegTypeCnt());
   // Track all regs that are defined.
   std::set<unsigned> Defs;
@@ -181,7 +179,7 @@ void LLVMDataDepGraph::countDefs() {
   }
 }
 
-void LLVMDataDepGraph::addDefsAndUses() {
+void OptSchedDDGWrapperBasic::addDefsAndUses() {
   // The index of the last "assigned" register for each register type.
   RegIndices.resize(MM->GetRegTypeCnt());
 
@@ -226,7 +224,7 @@ void LLVMDataDepGraph::addDefsAndUses() {
   LLVM_DEBUG(dumpOptSchedRegisters());
 }
 
-void LLVMDataDepGraph::addUse(unsigned RegUnit, InstCount Index) {
+void OptSchedDDGWrapperBasic::addUse(unsigned RegUnit, InstCount Index) {
   bool addUsedAndNotDefined =
       SchedulerOptions::getInstance().GetBool("ADD_USED_AND_NOT_DEFINED_REGS");
   if (addUsedAndNotDefined && LastDef.find(RegUnit) == LastDef.end()) {
@@ -242,7 +240,7 @@ void LLVMDataDepGraph::addUse(unsigned RegUnit, InstCount Index) {
   }
 }
 
-void LLVMDataDepGraph::addDef(unsigned RegUnit, InstCount Index) {
+void OptSchedDDGWrapperBasic::addDef(unsigned RegUnit, InstCount Index) {
   std::vector<Register *> Regs;
   for (int Type : getRegisterType(RegUnit)) {
     Register *Reg = RegFiles[Type].GetReg(RegIndices[Type]++);
@@ -254,7 +252,7 @@ void LLVMDataDepGraph::addDef(unsigned RegUnit, InstCount Index) {
   LastDef[RegUnit] = Regs;
 }
 
-void LLVMDataDepGraph::addLiveInReg(unsigned RegUnit) {
+void OptSchedDDGWrapperBasic::addLiveInReg(unsigned RegUnit) {
   std::vector<Register *> Regs;
   for (int Type : getRegisterType(RegUnit)) {
     Register *Reg = RegFiles[Type].GetReg(RegIndices[Type]++);
@@ -267,7 +265,7 @@ void LLVMDataDepGraph::addLiveInReg(unsigned RegUnit) {
   LastDef[RegUnit] = Regs;
 }
 
-void LLVMDataDepGraph::addLiveOutReg(unsigned RegUnit) {
+void OptSchedDDGWrapperBasic::addLiveOutReg(unsigned RegUnit) {
   // Should we add live-out registers that have no definition.
   bool AddLiveOutAndNotDefined = SchedulerOptions::getInstance().GetBool(
       "ADD_LIVE_OUT_AND_NOT_DEFINED_REGS");
@@ -286,7 +284,7 @@ void LLVMDataDepGraph::addLiveOutReg(unsigned RegUnit) {
   }
 }
 
-void LLVMDataDepGraph::addDefAndNotUsed(Register *Reg) {
+void OptSchedDDGWrapperBasic::addDefAndNotUsed(Register *Reg) {
   if (!GetLeafInst()->FindUse(Reg)) {
     GetLeafInst()->AddUse(Reg);
     Reg->AddUse(GetLeafInst());
@@ -298,7 +296,7 @@ void LLVMDataDepGraph::addDefAndNotUsed(Register *Reg) {
   }
 }
 
-int LLVMDataDepGraph::getRegisterWeight(unsigned RegUnit) const {
+int OptSchedDDGWrapperBasic::getRegisterWeight(unsigned RegUnit) const {
   bool useSimpleTypes =
       SchedulerOptions::getInstance().GetBool("USE_SIMPLE_REGISTER_TYPES");
   if (useSimpleTypes)
@@ -313,7 +311,8 @@ int LLVMDataDepGraph::getRegisterWeight(unsigned RegUnit) const {
 // scheduler.
 // We assign multiple register types to each register from LLVM to account
 // for all register pressure sets associated with the register class for resNo.
-std::vector<int> LLVMDataDepGraph::getRegisterType(unsigned RegUnit) const {
+std::vector<int>
+OptSchedDDGWrapperBasic::getRegisterType(unsigned RegUnit) const {
   std::vector<int> RegTypes;
   PSetIterator PSetI = DAG->MRI.getPressureSets(RegUnit);
 
@@ -370,7 +369,7 @@ static Printable printOptSchedReg(const Register *Reg,
 }
 
 LLVM_DUMP_METHOD
-void LLVMDataDepGraph::dumpOptSchedRegisters() const {
+void OptSchedDDGWrapperBasic::dumpOptSchedRegisters() const {
   dbgs() << "Optsched Regsiters\n";
 
   auto RegTypeCount = MM->GetRegTypeCnt();
@@ -382,14 +381,14 @@ void LLVMDataDepGraph::dumpOptSchedRegisters() const {
 
     const auto &RegTypeName = MM->GetRegTypeName(RegTypeNum);
     for (int RegNum = 0; RegNum < RegFile.GetRegCnt(); RegNum++) {
-      const auto *Reg = RegFile.GetReg(RegNum);
+      auto *Reg = RegFile.GetReg(RegNum);
       dbgs() << printOptSchedReg(Reg, RegTypeName, RegTypeNum);
     }
   }
 }
 #endif
 
-inline void LLVMDataDepGraph::setupRoot() {
+inline void OptSchedDDGWrapperBasic::setupRoot() {
   // Create artificial root.
   int RootNum = DAG->SUnits.size();
   root_ = CreateNode_(RootNum, "artificial",
@@ -407,7 +406,7 @@ inline void LLVMDataDepGraph::setupRoot() {
       CreateEdge_(RootNum, i, 0, DEP_OTHER);
 }
 
-inline void LLVMDataDepGraph::setupLeaf() {
+inline void OptSchedDDGWrapperBasic::setupLeaf() {
   // Create artificial leaf.
   int LeafNum = DAG->SUnits.size() + 1;
   CreateNode_(LeafNum, "artificial", MM->GetInstTypeByName("artificial"),
@@ -425,7 +424,7 @@ inline void LLVMDataDepGraph::setupLeaf() {
       CreateEdge_(i, LeafNum, 0, DEP_OTHER);
 }
 
-void LLVMDataDepGraph::convertEdges(const SUnit &SU) {
+void OptSchedDDGWrapperBasic::convertEdges(const SUnit &SU) {
   const MachineInstr *instr = SU.getInstr();
   SUnit::const_succ_iterator I, E;
   for (I = SU.Succs.begin(), E = SU.Succs.end(); I != E; ++I) {
@@ -467,7 +466,7 @@ void LLVMDataDepGraph::convertEdges(const SUnit &SU) {
   }
 }
 
-void LLVMDataDepGraph::convertSUnit(const SUnit &SU) {
+void OptSchedDDGWrapperBasic::convertSUnit(const SUnit &SU) {
   InstType InstType;
   std::string InstName;
   if (SU.isBoundaryNode() || !SU.isInstr())
@@ -485,10 +484,8 @@ void LLVMDataDepGraph::convertSUnit(const SUnit &SU) {
   if (InstType == INVALID_INST_TYPE) {
     if (ShouldGenerateMM)
       MM->getMMGen()->generateInstrType(MI);
-    else {
-      InstName = "Default";
+    else
       InstType = MM->getDefaultInstType();
-    }
   }
 
   CreateNode_(SU.NodeNum, InstName.c_str(), InstType, InstName.c_str(),
@@ -500,7 +497,7 @@ void LLVMDataDepGraph::convertSUnit(const SUnit &SU) {
               0);         // blkNum
 }
 
-void LLVMDataDepGraph::discoverBoundaryLiveness(const MachineInstr *MI) {
+void OptSchedDDGWrapperBasic::discoverBoundaryLiveness(const MachineInstr *MI) {
   RegisterOperands RegOpers;
   RegOpers.collect(*MI, *DAG->TRI, DAG->MRI, true, false);
 
@@ -511,10 +508,9 @@ void LLVMDataDepGraph::discoverBoundaryLiveness(const MachineInstr *MI) {
     addDef(D.RegUnit, GetLeafInst()->GetNodeID());
 }
 
-void LLVMDataDepGraph::countBoundaryLiveness(std::vector<int> &RegDefCounts,
-                                             std::set<unsigned> &Defs,
-                                             bool AddUsedAndNotDefined,
-                                             const MachineInstr *MI) {
+void OptSchedDDGWrapperBasic::countBoundaryLiveness(
+    std::vector<int> &RegDefCounts, std::set<unsigned> &Defs,
+    bool AddUsedAndNotDefined, const MachineInstr *MI) {
   RegisterOperands RegOpers;
   RegOpers.collect(*MI, *DAG->TRI, DAG->MRI, true, false);
 

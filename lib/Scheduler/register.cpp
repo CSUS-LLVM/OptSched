@@ -138,71 +138,72 @@ Register::Register(int16_t type, int num, int physicalNumber) {
 }
 
 RegisterFile::RegisterFile() {
-  regCnt_ = 0;
-  regs_ = NULL;
   regType_ = 0;
   physRegCnt_ = 0;
 }
 
-RegisterFile::~RegisterFile() {
-  if (regs_)
-    delete[] regs_;
-}
+RegisterFile::~RegisterFile() {}
 
-int RegisterFile::GetRegCnt() const { return regCnt_; }
+int RegisterFile::GetRegCnt() const { return getCount(); }
 
 int16_t RegisterFile::GetRegType() const { return regType_; }
 
 void RegisterFile::SetRegType(int16_t regType) { regType_ = regType; }
 
 void RegisterFile::ResetCrntUseCnts() {
-  for (int i = 0; i < regCnt_; i++) {
-    regs_[i].ResetCrntUseCnt();
+  for (int i = 0; i < getCount(); i++) {
+    Regs[i].ResetCrntUseCnt();
   }
 }
 
 void RegisterFile::ResetCrntLngths() {
-  for (int i = 0; i < regCnt_; i++) {
-    regs_[i].ResetCrntLngth();
+  for (int i = 0; i < getCount(); i++) {
+    Regs[i].ResetCrntLngth();
   }
 }
 
-void RegisterFile::SetRegCnt(int regCnt) {
-  regCnt_ = regCnt;
-  if (regCnt_ == 0)
-    return;
-  if (regs_)
-    delete[] regs_;
-  regs_ = new Register[regCnt_];
+Register *RegisterFile::getNext() {
+  size_t Index = Regs.size();
+  Regs.resize(Index+1);
+  Regs[Index].SetType(regType_);
+  Regs[Index].SetNum(Index);
 
-  for (int i = 0; i < regCnt_; i++) {
-    regs_[i].SetType(regType_);
-    regs_[i].SetNum(i);
+  return &Regs[Index];
+}
+
+void RegisterFile::SetRegCnt(int regCnt) {
+  if (regCnt == 0)
+    return;
+
+  Regs.resize(regCnt);
+  for (int i = 0; i < getCount(); i++) {
+    Regs[i].SetType(regType_);
+    Regs[i].SetNum(i);
   }
 }
 
 Register *RegisterFile::GetReg(int num) const {
-  if (num >= 0 && num < regCnt_) {
-    return regs_ + num;
+  if (num >= 0 && num < getCount()) {
+    return &Regs[num];
   } else {
     return NULL;
   }
 }
 
 Register *RegisterFile::FindLiveReg(int physNum) const {
-  for (int i = 0; i < regCnt_; i++) {
-    if (regs_[i].GetPhysicalNumber() == physNum && regs_[i].IsLive() == true)
-      return regs_ + i;
+  for (int i = 0; i < getCount(); i++) {
+    if (Regs[i].GetPhysicalNumber() == physNum && Regs[i].IsLive() == true)
+      return &Regs[i];
   }
   return NULL;
 }
 
 int RegisterFile::FindPhysRegCnt() {
   int maxPhysNum = -1;
-  for (int i = 0; i < regCnt_; i++) {
-    if (regs_[i].GetPhysicalNumber() != INVALID_VALUE &&
-        regs_[i].GetPhysicalNumber() > maxPhysNum)
-      maxPhysNum = regs_[i].GetPhysicalNumber();
+  for (int i = 0; i < getCount(); i++) {
+    if (Regs[i].GetPhysicalNumber() != INVALID_VALUE &&
+        Regs[i].GetPhysicalNumber() > maxPhysNum)
+      maxPhysNum = Regs[i].GetPhysicalNumber();
   }
 
   // Assume that physical registers are given sequential numbers
@@ -214,19 +215,19 @@ int RegisterFile::FindPhysRegCnt() {
 int RegisterFile::GetPhysRegCnt() const { return physRegCnt_; }
 
 void RegisterFile::SetupConflicts() {
-  for (int i = 0; i < regCnt_; i++)
-    regs_[i].SetupConflicts(regCnt_);
+  for (int i = 0; i < getCount(); i++)
+    Regs[i].SetupConflicts(getCount());
 }
 
 void RegisterFile::ResetConflicts() {
-  for (int i = 0; i < regCnt_; i++)
-    regs_[i].ResetConflicts();
+  for (int i = 0; i < getCount(); i++)
+    Regs[i].ResetConflicts();
 }
 
 int RegisterFile::GetConflictCnt() {
   int cnflctCnt = 0;
-  for (int i = 0; i < regCnt_; i++) {
-    cnflctCnt += regs_[i].GetConflictCnt();
+  for (int i = 0; i < getCount(); i++) {
+    cnflctCnt += Regs[i].GetConflictCnt();
   }
   return cnflctCnt;
 }
@@ -234,10 +235,10 @@ int RegisterFile::GetConflictCnt() {
 void RegisterFile::AddConflictsWithLiveRegs(int regNum, int liveRegCnt) {
   bool isSpillCnddt = (liveRegCnt + 1) > physRegCnt_;
   int conflictCnt = 0;
-  for (int i = 0; i < regCnt_; i++) {
-    if (i != regNum && regs_[i].IsLive() == true) {
-      regs_[i].AddConflict(regNum, isSpillCnddt);
-      regs_[regNum].AddConflict(i, isSpillCnddt);
+  for (int i = 0; i < getCount(); i++) {
+    if (i != regNum && Regs[i].IsLive() == true) {
+      Regs[i].AddConflict(regNum, isSpillCnddt);
+      Regs[regNum].AddConflict(i, isSpillCnddt);
       conflictCnt++;
     }
     if (conflictCnt == liveRegCnt)
