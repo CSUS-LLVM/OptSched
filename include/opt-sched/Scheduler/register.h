@@ -149,8 +149,8 @@ public:
   // The number of registers in this register file.
   int getCount() const { return static_cast<int>(Regs.size()); }
   // Increase the size of the register file by one and
-  // return the created register.
-  Register *getNext();
+  // return the RegNum of the created register.
+  unsigned getNext();
 
 private:
   int16_t regType_;

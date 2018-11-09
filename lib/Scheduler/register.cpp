@@ -162,13 +162,13 @@ void RegisterFile::ResetCrntLngths() {
   }
 }
 
-Register *RegisterFile::getNext() {
-  size_t Index = Regs.size();
-  Regs.resize(Index+1);
-  Regs[Index].SetType(regType_);
-  Regs[Index].SetNum(Index);
+unsigned RegisterFile::getNext() {
+  size_t RegNum = Regs.size();
+  Regs.resize(RegNum+1);
+  Regs[RegNum].SetType(regType_);
+  Regs[RegNum].SetNum(RegNum);
 
-  return &Regs[Index];
+  return RegNum;
 }
 
 void RegisterFile::SetRegCnt(int regCnt) {
