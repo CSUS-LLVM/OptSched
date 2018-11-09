@@ -276,18 +276,21 @@ void OptSchedDDGWrapperBasic::addLiveOutReg(unsigned RegUnit) {
     LLVM_DEBUG(TargetRegisterInfo::dumpReg(RegUnit, 0, DAG->TRI));
   }
 
+  auto LeafInstr = insts_[DAG->SUnits.size() + 1];
   std::vector<Register *> Regs = LastDef[RegUnit];
   for (Register *Reg : Regs) {
-    GetLeafInst()->AddUse(Reg);
-    Reg->AddUse(GetLeafInst());
+    LeafInstr->AddUse(Reg);
+    Reg->AddUse(LeafInstr);
     Reg->SetIsLiveOut(true);
   }
 }
 
 void OptSchedDDGWrapperBasic::addDefAndNotUsed(Register *Reg) {
-  if (!GetLeafInst()->FindUse(Reg)) {
-    GetLeafInst()->AddUse(Reg);
-    Reg->AddUse(GetLeafInst());
+  int LeafIndex = DAG->SUnits.size() + 1;
+  auto LeafInstr = insts_[LeafIndex];
+  if (!LeafInstr->FindUse(Reg)) {
+    LeafInstr->AddUse(Reg);
+    Reg->AddUse(LeafInstr);
     Reg->SetIsLiveOut(true);
 
     LLVM_DEBUG(dbgs() << "Adding register that is defined and not used: ");
@@ -343,7 +346,7 @@ OptSchedDDGWrapperBasic::getRegisterType(unsigned RegUnit) const {
 static Printable printOptSchedReg(const Register *Reg,
                                   const std::string &RegTypeName,
                                   int16_t RegTypeNum) {
-  return Printable([&Reg, &RegTypeName, RegTypeNum](raw_ostream &OS) {
+  return Printable([Reg, &RegTypeName, RegTypeNum](raw_ostream &OS) {
     OS << "Register: " << '%' << Reg->GetNum() << " (" << RegTypeName << '/'
        << RegTypeNum << ")\n";
 
@@ -498,14 +501,15 @@ void OptSchedDDGWrapperBasic::convertSUnit(const SUnit &SU) {
 }
 
 void OptSchedDDGWrapperBasic::discoverBoundaryLiveness(const MachineInstr *MI) {
+  int LeafIndex = DAG->SUnits.size() + 1;
   RegisterOperands RegOpers;
   RegOpers.collect(*MI, *DAG->TRI, DAG->MRI, true, false);
 
   for (auto &U : RegOpers.Uses)
-    addUse(U.RegUnit, GetLeafInst()->GetNodeID());
+    addUse(U.RegUnit, LeafIndex);
 
   for (auto &D : RegOpers.Defs)
-    addDef(D.RegUnit, GetLeafInst()->GetNodeID());
+    addDef(D.RegUnit, LeafIndex);
 }
 
 void OptSchedDDGWrapperBasic::countBoundaryLiveness(
