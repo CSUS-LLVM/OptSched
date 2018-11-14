@@ -165,11 +165,10 @@ void RegisterFile::ResetCrntLngths() {
 
 Register *RegisterFile::getNext() {
   size_t RegNum = Regs.size();
-  std::unique_ptr<Register> Reg = llvm::make_unique<Register>();
+  auto Reg = llvm::make_unique<Register>();
+  Reg->SetType(regType_);
+  Reg->SetNum(RegNum);
   Regs.push_back(std::move(Reg));
-  Regs[RegNum]->SetType(regType_);
-  Regs[RegNum]->SetNum(RegNum);
-
   return Regs[RegNum].get();
 }
 
@@ -179,10 +178,10 @@ void RegisterFile::SetRegCnt(int regCnt) {
 
   Regs.resize(regCnt);
   for (int i = 0; i < getCount(); i++) {
-    std::unique_ptr<Register> Reg = llvm::make_unique<Register>();
+    auto Reg = llvm::make_unique<Register>();
+    Reg->SetType(regType_);
+    Reg->SetNum(i);
     Regs[i] = std::move(Reg);
-    Regs[i]->SetType(regType_);
-    Regs[i]->SetNum(i);
   }
 }
 

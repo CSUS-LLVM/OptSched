@@ -150,7 +150,8 @@ unsigned OptSchedDDGWrapperGCN::getRegKind(unsigned Reg) const {
 }
 
 void OptSchedDDGWrapperGCN::convertRegFiles() {
-  GCNDownwardRPTracker T(*LIS);
+  for (int i = 0; i < MM->GetRegTypeCnt(); i++)
+        RegFiles[i].SetRegType(i);
 
   // Add live-in subregs
   for (const auto &MaskPair :
