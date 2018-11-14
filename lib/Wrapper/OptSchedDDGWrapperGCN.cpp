@@ -195,8 +195,8 @@ void OptSchedDDGWrapperGCN::addSubRegDefs(SchedInstruction *Instr, unsigned Reg,
   unsigned Lane = 0;
   for (auto &ResNo : SubRegs) {
     if ((LiveMask.getLane(Lane) & LiveMask).any()) {
-      ResNo = RF.getNext();
-      Register *Reg = RF.GetReg(ResNo);
+      Register *Reg = RF.getNext();
+      ResNo = Reg->GetNum();
       Instr->AddDef(Reg);
       // Weight should always be one since we are only tracking VGPR32 and
       // SGPR32

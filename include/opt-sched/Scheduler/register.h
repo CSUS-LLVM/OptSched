@@ -13,6 +13,7 @@ Last Update:  Jun. 2017
 #include "opt-sched/Scheduler/sched_basic_data.h"
 #include "opt-sched/Scheduler/bit_vector.h"
 #include "opt-sched/Scheduler/defines.h"
+#include <memory>
 
 using namespace llvm;
 
@@ -150,13 +151,13 @@ public:
   int getCount() const { return static_cast<int>(Regs.size()); }
   // Increase the size of the register file by one and
   // return the RegNum of the created register.
-  unsigned getNext();
+  Register *getNext();
 
 private:
   int16_t regType_;
   int regCnt_;
   int physRegCnt_;
-  mutable SmallVector<Register, 8> Regs;
+  mutable SmallVector<std::unique_ptr<Register>, 8> Regs;
 };
 
 } // end namespace opt_sched
