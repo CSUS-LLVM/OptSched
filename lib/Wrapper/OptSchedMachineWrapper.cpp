@@ -74,6 +74,25 @@ void LLVMMachineModel::convertMachineModel(
                     mdlName_.c_str());
   }
 
+  // Clear The registerTypes list to read registers limits from the LLVM machine
+  // model
+  registerTypes_.clear();
+
+  registerInfo = dag.TRI;
+  for (unsigned pSet = 0; pSet < registerInfo->getNumRegPressureSets();
+       ++pSet) {
+    RegTypeInfo regType;
+    regType.name = registerInfo->getRegPressureSetName(pSet);
+    int pressureLimit = regClassInfo->getRegPressureSetLimit(pSet);
+    // set registers with 0 limit to 1 to support flags and special cases
+    if (pressureLimit > 0)
+      regType.count = pressureLimit;
+    else
+      regType.count = 1;
+
+    registerTypes_.push_back(regType);
+  }
+
   InstTypeInfo instType;
 
   instType.name = "Default";
@@ -93,36 +112,6 @@ void LLVMMachineModel::convertMachineModel(
   instType.sprtd = true;
   instType.blksCycle = false;
   instTypes_.push_back(instType);
-
-  // Clear The registerTypes list to read registers limits from the LLVM machine
-  // model
-  registerTypes_.clear();
-
-  if (mdlName_ == "amdgcn") {
-    RegTypeInfo SGPR32;
-    SGPR32.name = "SGPR32";
-    SGPR32.count = 80;
-    registerTypes_.push_back(SGPR32);
-
-    RegTypeInfo VGPR32;
-    VGPR32.name = "VGPR32";
-    VGPR32.count = 24;
-    registerTypes_.push_back(VGPR32);
-  } else {
-    registerInfo = dag.TRI;
-    for (unsigned pSet = 0; pSet < registerInfo->getNumRegPressureSets();
-         ++pSet) {
-      RegTypeInfo regType;
-      regType.name = registerInfo->getRegPressureSetName(pSet);
-      int pressureLimit = regClassInfo->getRegPressureSetLimit(pSet);
-      // set registers with 0 limit to 1 to support flags and special cases
-      if (pressureLimit > 0)
-        regType.count = pressureLimit;
-      else
-        regType.count = 1;
-      registerTypes_.push_back(regType);
-    }
-  }
 }
 
 CortexA7MMGenerator::CortexA7MMGenerator(const llvm::ScheduleDAGInstrs *dag,

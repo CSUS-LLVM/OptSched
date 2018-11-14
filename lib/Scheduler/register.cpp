@@ -1,5 +1,4 @@
 #include "opt-sched/Scheduler/register.h"
-#include "llvm/ADT/STLExtras.h"
 
 namespace opt_sched {
 
@@ -153,24 +152,23 @@ void RegisterFile::SetRegType(int16_t regType) { regType_ = regType; }
 
 void RegisterFile::ResetCrntUseCnts() {
   for (int i = 0; i < getCount(); i++) {
-    Regs[i]->ResetCrntUseCnt();
+    Regs[i].ResetCrntUseCnt();
   }
 }
 
 void RegisterFile::ResetCrntLngths() {
   for (int i = 0; i < getCount(); i++) {
-    Regs[i]->ResetCrntLngth();
+    Regs[i].ResetCrntLngth();
   }
 }
 
-Register *RegisterFile::getNext() {
+unsigned RegisterFile::getNext() {
   size_t RegNum = Regs.size();
-  std::unique_ptr<Register> Reg = llvm::make_unique<Register>();
-  Regs.push_back(std::move(Reg));
-  Regs[RegNum]->SetType(regType_);
-  Regs[RegNum]->SetNum(RegNum);
+  Regs.resize(RegNum+1);
+  Regs[RegNum].SetType(regType_);
+  Regs[RegNum].SetNum(RegNum);
 
-  return Regs[RegNum].get();
+  return RegNum;
 }
 
 void RegisterFile::SetRegCnt(int regCnt) {
@@ -179,16 +177,14 @@ void RegisterFile::SetRegCnt(int regCnt) {
 
   Regs.resize(regCnt);
   for (int i = 0; i < getCount(); i++) {
-    std::unique_ptr<Register> Reg = llvm::make_unique<Register>();
-    Regs[i] = std::move(Reg);
-    Regs[i]->SetType(regType_);
-    Regs[i]->SetNum(i);
+    Regs[i].SetType(regType_);
+    Regs[i].SetNum(i);
   }
 }
 
 Register *RegisterFile::GetReg(int num) const {
   if (num >= 0 && num < getCount()) {
-    return Regs[num].get();
+    return &Regs[num];
   } else {
     return NULL;
   }
@@ -196,8 +192,8 @@ Register *RegisterFile::GetReg(int num) const {
 
 Register *RegisterFile::FindLiveReg(int physNum) const {
   for (int i = 0; i < getCount(); i++) {
-    if (Regs[i]->GetPhysicalNumber() == physNum && Regs[i]->IsLive() == true)
-      return Regs[i].get();
+    if (Regs[i].GetPhysicalNumber() == physNum && Regs[i].IsLive() == true)
+      return &Regs[i];
   }
   return NULL;
 }
@@ -205,9 +201,9 @@ Register *RegisterFile::FindLiveReg(int physNum) const {
 int RegisterFile::FindPhysRegCnt() {
   int maxPhysNum = -1;
   for (int i = 0; i < getCount(); i++) {
-    if (Regs[i]->GetPhysicalNumber() != INVALID_VALUE &&
-        Regs[i]->GetPhysicalNumber() > maxPhysNum)
-      maxPhysNum = Regs[i]->GetPhysicalNumber();
+    if (Regs[i].GetPhysicalNumber() != INVALID_VALUE &&
+        Regs[i].GetPhysicalNumber() > maxPhysNum)
+      maxPhysNum = Regs[i].GetPhysicalNumber();
   }
 
   // Assume that physical registers are given sequential numbers
@@ -220,18 +216,18 @@ int RegisterFile::GetPhysRegCnt() const { return physRegCnt_; }
 
 void RegisterFile::SetupConflicts() {
   for (int i = 0; i < getCount(); i++)
-    Regs[i]->SetupConflicts(getCount());
+    Regs[i].SetupConflicts(getCount());
 }
 
 void RegisterFile::ResetConflicts() {
   for (int i = 0; i < getCount(); i++)
-    Regs[i]->ResetConflicts();
+    Regs[i].ResetConflicts();
 }
 
 int RegisterFile::GetConflictCnt() {
   int cnflctCnt = 0;
   for (int i = 0; i < getCount(); i++) {
-    cnflctCnt += Regs[i]->GetConflictCnt();
+    cnflctCnt += Regs[i].GetConflictCnt();
   }
   return cnflctCnt;
 }
@@ -240,9 +236,9 @@ void RegisterFile::AddConflictsWithLiveRegs(int regNum, int liveRegCnt) {
   bool isSpillCnddt = (liveRegCnt + 1) > physRegCnt_;
   int conflictCnt = 0;
   for (int i = 0; i < getCount(); i++) {
-    if (i != regNum && Regs[i]->IsLive() == true) {
-      Regs[i]->AddConflict(regNum, isSpillCnddt);
-      Regs[regNum]->AddConflict(i, isSpillCnddt);
+    if (i != regNum && Regs[i].IsLive() == true) {
+      Regs[i].AddConflict(regNum, isSpillCnddt);
+      Regs[regNum].AddConflict(i, isSpillCnddt);
       conflictCnt++;
     }
     if (conflictCnt == liveRegCnt)
