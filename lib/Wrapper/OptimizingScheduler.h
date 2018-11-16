@@ -15,15 +15,24 @@
 #include "opt-sched/Scheduler/graph_trans.h"
 #include "opt-sched/Scheduler/sched_region.h"
 #include "llvm/CodeGen/MachineScheduler.h"
+#include "llvm/Support/Debug.h"
 #include <chrono>
 #include <memory>
 #include <vector>
+
+// If using an LLVM version before release 7 redefine LLVM_DEBUG for
+// compatibility
+#ifndef LLVM_DEBUG
+#define LLVM_DEBUG DEBUG
+#endif
 
 using namespace opt_sched;
 
 namespace llvm {
 
 namespace opt_sched {
+
+class LLVMMachineModel;
 
 // derive from the default scheduler so it is easy to fallback to it
 // when it is needed. This object is created for each function the

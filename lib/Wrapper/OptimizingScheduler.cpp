@@ -26,6 +26,7 @@
 #include "llvm/CodeGen/TargetInstrInfo.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
+#include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Support/raw_ostream.h"
@@ -45,6 +46,9 @@ static constexpr const char *hurstcNames[] = {"CP",  "LUC", "UC", "NID",
                                               "CPR", "ISO", "SC", "LS"};
 // Max size for heuristic name.
 static constexpr int HEUR_NAME_MAX_SIZE = 10;
+
+// Default path to the the configuration directory for opt-sched.
+static constexpr const char *DEFAULT_CFG_DIR = "~/.optsched-cfg/";
 
 // Default path to the scheduler options configuration file for opt-sched.
 static constexpr const char *DEFAULT_CFGS_FNAME = "/sched.ini";
@@ -69,7 +73,7 @@ static cl::opt<std::string> OptSchedCfg(
     "optsched-cfg", cl::Hidden,
     cl::desc(
         "Path to the directory containing configuration files for opt-sched."),
-    cl::init("~/.optsched-cfg/"));
+    cl::init(DEFAULT_CFG_DIR));
 
 static cl::opt<std::string> OptSchedCfgS(
     "optsched-cfg-sched", cl::Hidden,
@@ -85,6 +89,24 @@ static cl::opt<std::string> OptSchedCfgMM(
     cl::desc("Path to the machine model specification file for opt-sched."));
 
 namespace {
+
+void getRealCfgPathCL(SmallString<128> &Path) {
+  SmallString<128> Tmp = Path;
+  auto EC = sys::fs::real_path(Tmp, Path, true);
+  if (EC)
+    llvm::report_fatal_error(EC.message() + ": " + Tmp, false);
+}
+
+void reportCfgDirPathError(std::error_code EC, llvm::StringRef OptSchedCfg) {
+  if (OptSchedCfg == DEFAULT_CFG_DIR)
+    llvm::report_fatal_error(EC.message() +
+                                 ": Error searching for the OptSched config "
+                                 "directory in the default location: " +
+                                 DEFAULT_CFG_DIR,
+                             false);
+  else
+    llvm::report_fatal_error(EC.message() + ": " + OptSchedCfg, false);
+}
 
 // If this iterator is a debug value, increment until reaching the End or a
 // non-debug instruction. static function copied from
@@ -693,7 +715,9 @@ bool ScheduleDAGOptSched::isSimRegAllocEnabled() const {
 void ScheduleDAGOptSched::getRealCfgPaths() {
   // Find full path to OptSchedCfg directory.
   SmallString<128> PathCfg;
-  sys::fs::real_path(OptSchedCfg, PathCfg, true);
+  auto EC = sys::fs::real_path(OptSchedCfg, PathCfg, true);
+  if (EC)
+    reportCfgDirPathError(EC, OptSchedCfg);
 
   // If the path to any of the config files are not specified, use the default
   // values.
@@ -701,24 +725,21 @@ void ScheduleDAGOptSched::getRealCfgPaths() {
     (PathCfg + DEFAULT_CFGS_FNAME).toVector(PathCfgS);
   else {
     PathCfgS = OptSchedCfgS;
-    SmallString<128> Tmp = PathCfgS;
-    sys::fs::real_path(Tmp, PathCfgS, true);
+    getRealCfgPathCL(PathCfgS);
   }
 
   if (OptSchedCfgHF.empty())
     (PathCfg + DEFAULT_CFGHF_FNAME).toVector(PathCfgHF);
   else {
     PathCfgHF = OptSchedCfgHF;
-    SmallString<128> Tmp = PathCfgHF;
-    sys::fs::real_path(Tmp, PathCfgHF, true);
+    getRealCfgPathCL(PathCfgHF);
   }
 
   if (OptSchedCfgMM.empty())
     (PathCfg + DEFAULT_CFGMM_FNAME).toVector(PathCfgMM);
   else {
     PathCfgMM = OptSchedCfgMM;
-    SmallString<128> Tmp = PathCfgHF;
-    sys::fs::real_path(Tmp, PathCfgMM, true);
+    getRealCfgPathCL(PathCfgMM);
   }
 
   // Convert full paths to native fromat.

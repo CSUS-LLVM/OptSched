@@ -26,6 +26,7 @@ namespace opt_sched {
 
 class LLVMRegTypeFilter;
 class ScheduleDAGOptSched;
+class LLVMMachineModel;
 
 class OptSchedDDGWrapperBasic : public DataDepGraph {
 public:
