@@ -2902,7 +2902,7 @@ void InstSchedule::PrintRegPressures() const {
   Logger::Info("OptSched max reg pressures:");
   InstCount i;
   for (i = 0; i < machMdl_->GetRegTypeCnt(); i++) {
-    Logger::Info("OptSchPeakRegPres Index %s Peak %d Limit %d", i,
+    Logger::Info("OptSchPeakRegPres Index %d Peak %d Limit %d", i,
                  peakRegPressures_[i],
                  machMdl_->GetPhysRegCnt(i));
   }
