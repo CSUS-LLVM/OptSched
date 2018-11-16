@@ -439,14 +439,21 @@ void ScheduleDAGOptSched::ScheduleNode(SUnit *SU, unsigned CurCycle) {
 #endif
   if (SU) {
     MachineInstr *instr = SU->getInstr();
-    if (CurrentTop == NULL) {
-      LLVM_DEBUG(Logger::Error("Currenttop is NULL"));
-      return;
-    }
+    // Reset read - undef flags and update them later.
+    for (auto &Op : instr->operands())
+      if (Op.isReg() && Op.isDef())
+        Op.setIsUndef(false);
+
     if (&*CurrentTop == instr)
       CurrentTop = nextIfDebug(++CurrentTop, CurrentBottom);
     else
       moveInstruction(instr, CurrentTop);
+
+    RegisterOperands RegOpers;
+    RegOpers.collect(*instr, *TRI, MRI, true, false);
+    // Adjust liveness and add missing dead+read-undef flags.
+    auto SlotIdx = LIS->getInstructionIndex(*instr).getRegSlot();
+    RegOpers.adjustLaneLiveness(*LIS, MRI, SlotIdx, instr);
   } else {
 #ifdef IS_DEBUG_CONVERT_LLVM
     Logger::Info("Stall");
