@@ -60,7 +60,7 @@ void LLVMMachineModel::convertMachineModel(
 
   mdlName_ = target.getTarget().getName();
 
-  DEBUG(dbgs() << "Machine model: " << mdlName_.c_str());
+  LLVM_DEBUG(dbgs() << "Machine model: " << mdlName_.c_str());
 
   // Should we try to generate a machine model using LLVM itineraries.
   shouldGenerateMM =
@@ -166,7 +166,7 @@ InstType CortexA7MMGenerator::generateInstrType(const MachineInstr *instr) {
   if (InstType != INVALID_INST_TYPE)
     return InstType;
   else {
-    DEBUG(dbgs() << "Generating instr type for " << instrName.c_str());
+    LLVM_DEBUG(dbgs() << "Generating instr type for " << instrName.c_str());
 
     SUnit *SU = DAG->getSUnit(const_cast<MachineInstr *>(instr));
     const MCInstrDesc *instDesc = DAG->getInstrDesc(SU);
@@ -186,7 +186,7 @@ InstType CortexA7MMGenerator::generateInstrType(const MachineInstr *instr) {
     InstTypeI.sprtd = true;
     InstTypeI.blksCycle = false; // TODO: Find a more precise value for this.
 
-    DEBUG(dumpInstType(InstTypeI, MM));
+    LLVM_DEBUG(dumpInstType(InstTypeI, MM));
 
     // Add the new instruction type
     MM->AddInstType(InstTypeI);
