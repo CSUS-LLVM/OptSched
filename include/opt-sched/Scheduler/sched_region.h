@@ -70,8 +70,6 @@ public:
   // External abstract functions.
 
   // TODO(max): Document.
-  virtual FUNC_RESULT BuildFromFile() = 0;
-  // TODO(max): Document.
   virtual int CmputCostLwrBound() = 0;
   // TODO(max): Document.
   virtual InstCount UpdtOptmlSched(InstSchedule *crntSched,

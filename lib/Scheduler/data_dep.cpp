@@ -11,6 +11,7 @@
 #include "opt-sched/Scheduler/stats.h"
 #include "opt-sched/Scheduler/relaxed_sched.h"
 #include "llvm/Support/Debug.h"
+#include "llvm/ADT/STLExtras.h"
 
 // only print pressure if enabled by sched.ini
 extern bool OPTSCHED_gPrintSpills;
@@ -204,6 +205,8 @@ DataDepGraph::DataDepGraph(MachineModel *machMdl, LATENCY_PRECISION ltncyPrcsn,
 
   entryInstCnt_ = 0;
   exitInstCnt_ = 0;
+
+  RegFiles = llvm::make_unique<RegisterFile[]>(machMdl_->GetRegTypeCnt());
 }
 
 DataDepGraph::~DataDepGraph() {

@@ -117,8 +117,6 @@ public:
               int maxSpillCost);
   ~BBWithSpill();
 
-  FUNC_RESULT BuildFromFile();
-
   int CmputCostLwrBound();
 
   InstCount UpdtOptmlSched(InstSchedule *crntSched,

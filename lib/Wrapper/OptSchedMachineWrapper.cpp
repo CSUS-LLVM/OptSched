@@ -18,8 +18,8 @@ Description:  A wrapper that convert an LLVM target to an OptSched MachineModel.
 
 #define DEBUG_TYPE "optsched"
 
-using namespace opt_sched;
 using namespace llvm;
+using namespace llvm::opt_sched;
 
 namespace {
 
@@ -60,7 +60,7 @@ void LLVMMachineModel::convertMachineModel(
 
   mdlName_ = target.getTarget().getName();
 
-  LLVM_DEBUG(dbgs() << "Machine model: " << mdlName_.c_str());
+  LLVM_DEBUG(dbgs() << "Machine model: " << mdlName_.c_str() << '\n');
 
   // Should we try to generate a machine model using LLVM itineraries.
   shouldGenerateMM =

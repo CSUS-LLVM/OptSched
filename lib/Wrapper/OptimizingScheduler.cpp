@@ -1,12 +1,13 @@
-//===- OptScheduler.cpp - Implement the opt scheduler -===//
+//===- OptimizingScheduler.cpp - The optimizing scheduler -----------------===//
 //
-// Integrates an alternative scheduler into LLVM which
-// implements a branch and bound scheduling algorithm.
+// Implements a combinatorial scheduling algorithm.
 //
-//===-------------------------------------------------===//
-#include "OptScheduler.h"
-#include "OptSchedDagWrapper.h"
+//===----------------------------------------------------------------------===//
+#include "OptimizingScheduler.h"
+#include "OptSchedDDGWrapperBasic.h"
+#include "OptSchedDDGWrapperGCN.h"
 #include "OptSchedMachineWrapper.h"
+#include "opt-sched/Scheduler/OptSchedDDGWrapperBase.h"
 #include "opt-sched/Scheduler/bb_spill.h"
 #include "opt-sched/Scheduler/config.h"
 #include "opt-sched/Scheduler/data_dep.h"
@@ -25,6 +26,7 @@
 #include "llvm/CodeGen/TargetInstrInfo.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
+#include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Support/raw_ostream.h"
@@ -33,51 +35,84 @@
 
 #define DEBUG_TYPE "optsched"
 
-using namespace opt_sched;
 using namespace llvm;
+using namespace llvm::opt_sched;
 
 // hack to print spills
 bool OPTSCHED_gPrintSpills;
 
+// An array of possible OptSched heuristic names
+static constexpr const char *hurstcNames[] = {"CP",  "LUC", "UC", "NID",
+                                              "CPR", "ISO", "SC", "LS"};
+// Max size for heuristic name.
+static constexpr int HEUR_NAME_MAX_SIZE = 10;
+
+// Default path to the the configuration directory for opt-sched.
+static constexpr const char *DEFAULT_CFG_DIR = "~/.optsched-cfg/";
+
+// Default path to the scheduler options configuration file for opt-sched.
+static constexpr const char *DEFAULT_CFGS_FNAME = "/sched.ini";
+
+// Default path to the list of hot functions to schedule using opt-sched.
+static constexpr const char *DEFAULT_CFGHF_FNAME = "/hotfuncs.ini";
+
+// Default path to the machine model specification file for opt-sched.
+static constexpr const char *DEFAULT_CFGMM_FNAME = "/machine_model.cfg";
+
 // Create OptSched ScheduleDAG.
-static llvm::ScheduleDAGInstrs *createOptSched(llvm::MachineSchedContext *C) {
-  return new opt_sched::ScheduleDAGOptSched(C);
+static ScheduleDAGInstrs *createOptSched(MachineSchedContext *C) {
+  return new ScheduleDAGOptSched(C);
 }
 
 // Register the machine scheduler.
-static llvm::MachineSchedRegistry
+static MachineSchedRegistry
     OptSchedRegistry("optsched", "Use the OptSched scheduler.", createOptSched);
 
 // Command line options for opt-sched.
-static llvm::cl::opt<std::string> OptSchedCfg(
-    "optsched-cfg", llvm::cl::Hidden,
-    llvm::cl::desc(
+static cl::opt<std::string> OptSchedCfg(
+    "optsched-cfg", cl::Hidden,
+    cl::desc(
         "Path to the directory containing configuration files for opt-sched."),
-    llvm::cl::init("~/.optsched-cfg/"));
+    cl::init(DEFAULT_CFG_DIR));
 
-static llvm::cl::opt<std::string> OptSchedCfgS(
-    "optsched-cfg-sched", llvm::cl::Hidden,
-    llvm::cl::desc(
+static cl::opt<std::string> OptSchedCfgS(
+    "optsched-cfg-sched", cl::Hidden,
+    cl::desc(
         "Path to the scheduler options configuration file for opt-sched."));
 
-static llvm::cl::opt<std::string> OptSchedCfgHF(
-    "optsched-cfg-hotfuncs", llvm::cl::Hidden,
-    llvm::cl::desc(
-        "Path to the list of hot functions to schedule using opt-sched."));
+static cl::opt<std::string> OptSchedCfgHF(
+    "optsched-cfg-hotfuncs", cl::Hidden,
+    cl::desc("Path to the list of hot functions to schedule using opt-sched."));
 
-static llvm::cl::opt<std::string> OptSchedCfgMM(
-    "optsched-cfg-machine-model", llvm::cl::Hidden,
-    llvm::cl::desc(
-        "Path to the machine model specification file for opt-sched."));
+static cl::opt<std::string> OptSchedCfgMM(
+    "optsched-cfg-machine-model", cl::Hidden,
+    cl::desc("Path to the machine model specification file for opt-sched."));
 
 namespace {
+
+void getRealCfgPathCL(SmallString<128> &Path) {
+  SmallString<128> Tmp = Path;
+  auto EC = sys::fs::real_path(Tmp, Path, true);
+  if (EC)
+    llvm::report_fatal_error(EC.message() + ": " + Tmp, false);
+}
+
+void reportCfgDirPathError(std::error_code EC, llvm::StringRef OptSchedCfg) {
+  if (OptSchedCfg == DEFAULT_CFG_DIR)
+    llvm::report_fatal_error(EC.message() +
+                                 ": Error searching for the OptSched config "
+                                 "directory in the default location: " +
+                                 DEFAULT_CFG_DIR,
+                             false);
+  else
+    llvm::report_fatal_error(EC.message() + ": " + OptSchedCfg, false);
+}
 
 // If this iterator is a debug value, increment until reaching the End or a
 // non-debug instruction. static function copied from
 // llvm/CodeGen/MachineScheduler.cpp
-llvm::MachineBasicBlock::iterator
-nextIfDebug(llvm::MachineBasicBlock::iterator I,
-            llvm::MachineBasicBlock::const_iterator End) {
+MachineBasicBlock::iterator nextIfDebug(MachineBasicBlock::iterator I,
+                                        MachineBasicBlock::const_iterator End) {
   for (; I != End; ++I) {
     if (!I->isDebugValue())
       break;
@@ -85,11 +120,31 @@ nextIfDebug(llvm::MachineBasicBlock::iterator I,
   return I;
 }
 
+// Create a basic, target independent DDG wrapper
+std::unique_ptr<OptSchedDDGWrapperBase>
+createBasicDDGWrapper(MachineSchedContext *Context, ScheduleDAGOptSched *DAG,
+                      LLVMMachineModel *MM, LATENCY_PRECISION LatencyPrecision,
+                      GraphTransTypes GraphTransTypes,
+                      const std::string &RegionID) {
+  return make_unique<OptSchedDDGWrapperBasic>(
+      Context, DAG, MM, LatencyPrecision, GraphTransTypes, RegionID);
+}
+
+// Create a GCN DDG wrapper
+std::unique_ptr<OptSchedDDGWrapperBase>
+createGCNDDGWrapper(MachineSchedContext *Context, ScheduleDAGOptSched *DAG,
+                    LLVMMachineModel *MM, LATENCY_PRECISION LatencyPrecision,
+                    GraphTransTypes GraphTransTypes,
+                    const std::string &RegionID) {
+  return make_unique<OptSchedDDGWrapperGCN>(Context, DAG, MM, LatencyPrecision,
+                                            GraphTransTypes, RegionID);
+}
+
 } // end anonymous namespace
 
-ScheduleDAGOptSched::ScheduleDAGOptSched(llvm::MachineSchedContext *C)
-    : llvm::ScheduleDAGMILive(C, llvm::make_unique<llvm::GenericScheduler>(C)),
-      context(C), model(nullptr), totalSimulatedSpills(0) {
+ScheduleDAGOptSched::ScheduleDAGOptSched(MachineSchedContext *C)
+    : ScheduleDAGMILive(C, make_unique<GenericScheduler>(C)), context(C),
+      model(nullptr), totalSimulatedSpills(0) {
 
   // Find the native paths to the scheduler configuration files.
   getRealCfgPaths();
@@ -103,10 +158,10 @@ ScheduleDAGOptSched::ScheduleDAGOptSched(llvm::MachineSchedContext *C)
   hotFunctions.Load(PathCfgHF.c_str());
 
   // load machine model file
-  model = llvm::make_unique<LLVMMachineModel>(PathCfgMM.c_str());
+  model = make_unique<LLVMMachineModel>(PathCfgMM.c_str());
 
   // Convert machine model
-  model->convertMachineModel(static_cast<llvm::ScheduleDAGInstrs &>(*this),
+  model->convertMachineModel(static_cast<ScheduleDAGInstrs &>(*this),
                              RegClassInfo);
 
   // Load config files for the OptScheduler
@@ -138,6 +193,8 @@ void ScheduleDAGOptSched::schedule() {
   // (Chris) Increment the region number here to get unique dag IDs
   // per scheduling region within a machine function.
   ++regionNum;
+  const std::string RegionName = context->MF->getFunction().getName().data() +
+                                 std::string(":") + std::to_string(regionNum);
 
   // (Chris): This option in the sched.ini file will override USE_OPT_SCHED. It
   // will only apply B&B if the region name belongs in the list of specified
@@ -151,10 +208,8 @@ void ScheduleDAGOptSched::schedule() {
   if (scheduleSpecificRegions) {
     const std::list<std::string> regionList =
         schedIni.GetStringList("REGIONS_TO_SCHEDULE");
-    const std::string regionName = context->MF->getFunction().getName().data() +
-                                   std::string(":") + std::to_string(regionNum);
     optSchedEnabled = std::find(std::begin(regionList), std::end(regionList),
-                                regionName) != std::end(regionList);
+                                RegionName) != std::end(regionList);
   }
 
 #ifdef IS_DEBUG_PEAK_PRESSURE
@@ -164,9 +219,7 @@ void ScheduleDAGOptSched::schedule() {
 #endif
 
   if (!optSchedEnabled) {
-#ifdef IS_DEBUG
-    Logger::Info("********** LLVM Scheduling **********\n");
-#endif
+    LLVM_DEBUG(dbgs() << "********** LLVM Scheduling **********n");
 
     ScheduleDAGMILive::schedule();
 
@@ -192,12 +245,12 @@ void ScheduleDAGOptSched::schedule() {
 
     // Find the schedule generated by LLVM which is stored in MMB.
     int counter = 0;
-    for (llvm::MachineBasicBlock::instr_iterator I = BB->instr_begin(),
-                                                 E = BB->instr_end();
+    for (MachineBasicBlock::instr_iterator I = BB->instr_begin(),
+                                           E = BB->instr_end();
          I != E; ++I) {
 
-      llvm::MachineInstr &instr = *I;
-      llvm::SUnit *su = getSUnit(&instr);
+      MachineInstr &instr = *I;
+      SUnit *su = getSUnit(&instr);
 
       if (su != NULL && !su->isBoundaryNode()) {
         int nodeNum = su->NodeNum;
@@ -236,10 +289,10 @@ void ScheduleDAGOptSched::schedule() {
 
     // Update edges.
     for (size_t i = 0; i < SUnits.size(); i++) {
-      llvm::SUnit *unit = &SUnits[i];
+      SUnit *unit = &SUnits[i];
       // Update successor NodeNums.
-      for (llvm::SDep &dep : unit->Succs) {
-        llvm::SUnit *succ = dep.getSUnit();
+      for (SDep &dep : unit->Succs) {
+        SUnit *succ = dep.getSUnit();
         // check if the successor is a boundary node
         if (succ->isBoundaryNode())
           continue;
@@ -247,8 +300,8 @@ void ScheduleDAGOptSched::schedule() {
       }
 
       // Update predecessor NodeNums.
-      for (llvm::SDep &dep : unit->Preds) {
-        llvm::SUnit *pred = dep.getSUnit();
+      for (SDep &dep : unit->Preds) {
+        SUnit *pred = dep.getSUnit();
         // check if the predecessor is a boundary node
         if (pred->isBoundaryNode())
           continue;
@@ -257,36 +310,38 @@ void ScheduleDAGOptSched::schedule() {
     }
   }
 
-#ifdef IS_DEBUG
-  Logger::Info("********** Opt Scheduling **********");
-#endif
+  LLVM_DEBUG(dbgs() << "********** Opt Scheduling **********\n");
+
   // Build LLVM DAG
   SetupLLVMDag();
-  getRegPressure().dump(TRI);
 
   // Apply llvm DAG post processing.
-  if (enableMutations) {
+  if (enableMutations)
     postprocessDAG();
-  }
 
   // Ignore empty DAGs
   if (SUnits.empty())
     return;
 
-  // convert dag
-  LLVMDataDepGraph dag(context, this, model.get(), latencyPrecision, BB,
-                       graphTransTypes, RPTracker.getPressure().MaxSetPressure,
-                       treatOrderDepsAsDataDeps, maxDagSizeForLatencyPrecision,
-                       regionNum);
+  // Convert graph
+  std::unique_ptr<OptSchedDDGWrapperBase> DDG;
+  if (TM.getTargetTriple().getArch() == Triple::ArchType::amdgcn)
+    DDG = createGCNDDGWrapper(context, this, model.get(), latencyPrecision,
+                              graphTransTypes, RegionName);
+  else
+    DDG = createBasicDDGWrapper(context, this, model.get(), latencyPrecision,
+                                graphTransTypes, RegionName);
+
+  DDG->convertSUnits();
+  DDG->convertRegFiles();
+
   // create region
   SchedRegion *region = new BBWithSpill(
-      model.get(), &dag, 0, histTableHashBits, lowerBoundAlgorithm,
-      heuristicPriorities, enumPriorities, verifySchedule, prune,
-      schedForRPOnly, enumerateStalls, spillCostFactor, spillCostFunction,
-      checkSpillCostSum, checkConflicts, fixLiveIn, fixLiveOut, maxSpillCost);
-
-  // count defs, add defs and uses
-  region->BuildFromFile();
+      model.get(), static_cast<DataDepGraph *>(DDG.get()), 0, histTableHashBits,
+      lowerBoundAlgorithm, heuristicPriorities, enumPriorities, verifySchedule,
+      prune, schedForRPOnly, enumerateStalls, spillCostFactor,
+      spillCostFunction, checkSpillCostSum, checkConflicts, fixLiveIn,
+      fixLiveOut, maxSpillCost);
 
   // Schedule
   bool isEasy;
@@ -300,18 +355,19 @@ void ScheduleDAGOptSched::schedule() {
   if (isTimeoutPerInstruction) {
     // Re-calculate timeout values if timeout setting is per instruction
     // becuase we want a unique value per DAG size
-    regionTimeout = schedIni.GetInt("REGION_TIMEOUT") * dag.GetInstCnt();
-    lengthTimeout = schedIni.GetInt("LENGTH_TIMEOUT") * dag.GetInstCnt();
+    regionTimeout = schedIni.GetInt("REGION_TIMEOUT") * SUnits.size();
+    lengthTimeout = schedIni.GetInt("LENGTH_TIMEOUT") * SUnits.size();
   }
 
   // Setup time before scheduling
   Utilities::startTime = std::chrono::high_resolution_clock::now();
 
-  if (dag.GetInstCnt() < minDagSize || dag.GetInstCnt() > maxDagSize) {
+  if (SUnits.size() < minDagSize || SUnits.size() > maxDagSize) {
     rslt = RES_FAIL;
-    Logger::Error("Dag skipped due to out-of-range size. DAG size = %d, \
+    LLVM_DEBUG(
+        Logger::Error("Dag skipped due to out-of-range size. DAG size = %d, \
                   valid range is [%d, %d]",
-                  dag.GetInstCnt(), minDagSize, maxDagSize);
+                      SUnits.size(), minDagSize, maxDagSize));
   } else {
     bool filterByPerp = schedIni.GetBool("FILTER_BY_PERP");
     auto blocksToKeep = [&]() {
@@ -332,14 +388,15 @@ void ScheduleDAGOptSched::schedule() {
         bestSchedLngth, normHurstcCost, hurstcSchedLngth, sched, filterByPerp,
         blocksToKeep);
     if ((!(rslt == RES_SUCCESS || rslt == RES_TIMEOUT) || sched == NULL)) {
-      Logger::Info("OptSched run failed: rslt=%d, sched=%p. Falling back.",
-                   rslt, (void *)sched);
+      LLVM_DEBUG(
+          Logger::Info("OptSched run failed: rslt=%d, sched=%p. Falling back.",
+                       rslt, (void *)sched));
 
       // Scheduling with opt-sched failed.
       fallbackScheduler();
 
     } else {
-      Logger::Info("OptSched succeeded.");
+      LLVM_DEBUG(Logger::Info("OptSched succeeded."));
       // Count simulated spills.
       if (isSimRegAllocEnabled()) {
         totalSimulatedSpills += region->GetSimSpills();
@@ -352,10 +409,14 @@ void ScheduleDAGOptSched::schedule() {
       InstCount cycle, slot;
       for (InstCount i = sched->GetFrstInst(cycle, slot); i != INVALID_VALUE;
            i = sched->GetNxtInst(cycle, slot)) {
+        // Skip artificial instrs.
+        if (i > static_cast<int>(SUnits.size()) - 1)
+          continue;
+
         if (i == SCHD_STALL) {
           ScheduleNode(NULL, cycle);
         } else {
-          llvm::SUnit *unit = dag.GetSUnit(i);
+          SUnit *unit = &SUnits[i];
 
           if (unit && unit->isInstr())
             ScheduleNode(unit, cycle);
@@ -372,14 +433,14 @@ void ScheduleDAGOptSched::schedule() {
   delete region;
 }
 
-void ScheduleDAGOptSched::ScheduleNode(llvm::SUnit *SU, unsigned CurCycle) {
+void ScheduleDAGOptSched::ScheduleNode(SUnit *SU, unsigned CurCycle) {
 #ifdef IS_DEBUG_CONVERT_LLVM
   Logger::Info("*** Scheduling [%lu]: ", CurCycle);
 #endif
   if (SU) {
-    llvm::MachineInstr *instr = SU->getInstr();
+    MachineInstr *instr = SU->getInstr();
     if (CurrentTop == NULL) {
-      Logger::Error("Currenttop is NULL");
+      LLVM_DEBUG(Logger::Error("Currenttop is NULL"));
       return;
     }
     if (&*CurrentTop == instr)
@@ -407,10 +468,10 @@ void ScheduleDAGOptSched::fallbackScheduler() {
     CurrentBottom = RegionEnd;
 
     for (size_t i = 0; i < SUnits.size(); i++) {
-      llvm::MachineInstr *instr = SUnits[i].getInstr();
+      MachineInstr *instr = SUnits[i].getInstr();
 
       if (CurrentTop == NULL) {
-        Logger::Error("Currenttop is NULL");
+        LLVM_DEBUG(Logger::Error("Currenttop is NULL"));
         return;
       }
 
@@ -497,8 +558,8 @@ bool ScheduleDAGOptSched::isOptSchedEnabled() const {
   } else if (optSchedOption == "NO") {
     return false;
   } else {
-    LLVM_DEBUG(llvm::dbgs() << "Invalid value for USE_OPT_SCHED"
-                            << optSchedOption << "Assuming NO.\n");
+    LLVM_DEBUG(dbgs() << "Invalid value for USE_OPT_SCHED" << optSchedOption
+                      << "Assuming NO.\n");
     return false;
   }
 }
@@ -513,7 +574,8 @@ LATENCY_PRECISION ScheduleDAGOptSched::fetchLatencyPrecision() const {
   } else if (lpName == "UNITY") {
     return LTP_UNITY;
   } else {
-    Logger::Error("Unrecognized latency precision. Defaulted to PRECISE.");
+    LLVM_DEBUG(
+        Logger::Error("Unrecognized latency precision. Defaulted to PRECISE."));
     return LTP_PRECISE;
   }
 }
@@ -525,7 +587,8 @@ LB_ALG ScheduleDAGOptSched::parseLowerBoundAlgorithm() const {
   } else if (LBalg == "LC") {
     return LBA_LC;
   } else {
-    Logger::Error("Unrecognized lower bound technique. Defaulted to Rim-Jain.");
+    LLVM_DEBUG(Logger::Error(
+        "Unrecognized lower bound technique. Defaulted to Rim-Jain."));
     return LBA_RJ;
   }
 }
@@ -553,7 +616,8 @@ ScheduleDAGOptSched::parseHeuristic(const std::string &str) const {
         } // end if
       }   // end for j
       if (j == sizeof(hurstcNames)) {
-        Logger::Error("Unrecognized heuristic %s. Defaulted to CP.", word);
+        LLVM_DEBUG(
+            Logger::Error("Unrecognized heuristic %s. Defaulted to CP.", word));
         prirts.vctr[prirts.cnt] = LSH_CP;
       }
       prirts.cnt++;
@@ -583,7 +647,8 @@ SPILL_COST_FUNCTION ScheduleDAGOptSched::parseSpillCostFunc() const {
   } else if (name == "SLIL") {
     return SCF_SLIL;
   } else {
-    Logger::Error("Unrecognized spill cost function. Defaulted to PERP.");
+    LLVM_DEBUG(
+        Logger::Error("Unrecognized spill cost function. Defaulted to PERP."));
     return SCF_PERP;
   }
 }
@@ -599,8 +664,9 @@ bool ScheduleDAGOptSched::shouldPrintSpills() const {
     std::string functionName = context->MF->getFunction().getName();
     return hotFunctions.GetBool(functionName, false);
   } else {
-    Logger::Error("Unknown value for PRINT_SPILL_COUNTS: %s. Assuming NO.",
-                  printSpills.c_str());
+    LLVM_DEBUG(
+        Logger::Error("Unknown value for PRINT_SPILL_COUNTS: %s. Assuming NO.",
+                      printSpills.c_str()));
     return false;
   }
 }
@@ -624,15 +690,14 @@ bool ScheduleDAGOptSched::rpMismatch(InstSchedule *sched) {
 }
 
 void ScheduleDAGOptSched::finalizeSchedule() {
-  llvm::ScheduleDAGMILive::finalizeSchedule();
+  ScheduleDAGMILive::finalizeSchedule();
 
-  if (isSimRegAllocEnabled()) {
-    llvm::dbgs() << "*************************************\n";
-    llvm::dbgs() << "Function: " << MF.getName()
-                 << "\nTotal Simulated Spills: " << totalSimulatedSpills
-                 << "\n";
-    llvm::dbgs() << "*************************************\n";
-  }
+  LLVM_DEBUG(if (isSimRegAllocEnabled()) {
+    dbgs() << "*************************************\n";
+    dbgs() << "Function: " << MF.getName()
+           << "\nTotal Simulated Spills: " << totalSimulatedSpills << "\n";
+    dbgs() << "*************************************\n";
+  });
 }
 
 bool ScheduleDAGOptSched::isSimRegAllocEnabled() const {
@@ -649,8 +714,10 @@ bool ScheduleDAGOptSched::isSimRegAllocEnabled() const {
 
 void ScheduleDAGOptSched::getRealCfgPaths() {
   // Find full path to OptSchedCfg directory.
-  llvm::SmallString<128> PathCfg;
-  llvm::sys::fs::real_path(OptSchedCfg, PathCfg, true);
+  SmallString<128> PathCfg;
+  auto EC = sys::fs::real_path(OptSchedCfg, PathCfg, true);
+  if (EC)
+    reportCfgDirPathError(EC, OptSchedCfg);
 
   // If the path to any of the config files are not specified, use the default
   // values.
@@ -658,30 +725,27 @@ void ScheduleDAGOptSched::getRealCfgPaths() {
     (PathCfg + DEFAULT_CFGS_FNAME).toVector(PathCfgS);
   else {
     PathCfgS = OptSchedCfgS;
-    llvm::SmallString<128> Tmp = PathCfgS;
-    llvm::sys::fs::real_path(Tmp, PathCfgS, true);
+    getRealCfgPathCL(PathCfgS);
   }
 
   if (OptSchedCfgHF.empty())
     (PathCfg + DEFAULT_CFGHF_FNAME).toVector(PathCfgHF);
   else {
     PathCfgHF = OptSchedCfgHF;
-    llvm::SmallString<128> Tmp = PathCfgHF;
-    llvm::sys::fs::real_path(Tmp, PathCfgHF, true);
+    getRealCfgPathCL(PathCfgHF);
   }
 
   if (OptSchedCfgMM.empty())
     (PathCfg + DEFAULT_CFGMM_FNAME).toVector(PathCfgMM);
   else {
     PathCfgMM = OptSchedCfgMM;
-    llvm::SmallString<128> Tmp = PathCfgHF;
-    llvm::sys::fs::real_path(Tmp, PathCfgMM, true);
+    getRealCfgPathCL(PathCfgMM);
   }
 
   // Convert full paths to native fromat.
-  llvm::sys::path::native(PathCfgS);
-  llvm::sys::path::native(PathCfgHF);
-  llvm::sys::path::native(PathCfgMM);
+  sys::path::native(PathCfgS);
+  sys::path::native(PathCfgHF);
+  sys::path::native(PathCfgMM);
 }
 
 #if !defined(NDEBUG) || defined(LLVM_ENABLE_DUMP)
@@ -700,9 +764,9 @@ printMaskPairs(const SmallVectorImpl<RegisterMaskPair> &RegPairs,
       else
         RegClass = nullptr;
 
-      OS << printReg(P.RegUnit, TRI, 0) << ':'
-         << (RegClass ? TRI->getRegClassName(RegClass) : "noclass");
-      OS << ' ';
+      OS << printReg(P.RegUnit, TRI, 0) << ':' << PrintLaneMask(P.LaneMask)
+         << " (" << (RegClass ? TRI->getRegClassName(RegClass) : "noclass")
+         << ") ";
     }
   });
 }

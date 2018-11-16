@@ -9,9 +9,12 @@ Last Update:  Jun. 2017
 #define OPTSCHED_BASIC_REGISTER_H
 
 #include "llvm/ADT/SmallPtrSet.h"
+#include "llvm/ADT/SmallVector.h"
 #include "opt-sched/Scheduler/sched_basic_data.h"
 #include "opt-sched/Scheduler/bit_vector.h"
 #include "opt-sched/Scheduler/defines.h"
+
+using namespace llvm;
 
 namespace opt_sched {
 
@@ -21,7 +24,7 @@ class Register {
 public:
   Register(int16_t type = 0, int num = 0, int physicalNumber = INVALID_VALUE);
 
-  using InstSetType = llvm::SmallPtrSet<const SchedInstruction *, 8>;
+  using InstSetType = SmallPtrSet<const SchedInstruction *, 8>;
 
   int16_t GetType() const;
   void SetType(int16_t type);
@@ -143,11 +146,17 @@ public:
   void AddConflictsWithLiveRegs(int regNum, int liveRegCnt);
   int GetConflictCnt();
 
+  // The number of registers in this register file.
+  int getCount() const { return static_cast<int>(Regs.size()); }
+  // Increase the size of the register file by one and
+  // return the RegNum of the created register.
+  unsigned getNext();
+
 private:
   int16_t regType_;
   int regCnt_;
   int physRegCnt_;
-  Register *regs_;
+  mutable SmallVector<Register, 8> Regs;
 };
 
 } // end namespace opt_sched

@@ -36,8 +36,6 @@ BBWithSpill::BBWithSpill(MachineModel *machMdl, DataDepGraph *dataDepGraph,
                          bool fixLiveout, int maxSpillCost)
     : SchedRegion(machMdl, dataDepGraph, rgnNum, sigHashSize, lbAlg,
                   hurstcPrirts, enumPrirts, vrfySched, prune) {
-  int16_t i;
-
   costLwrBound_ = 0;
   enumrtr_ = NULL;
   optmlSpillCost_ = INVALID_VALUE;
@@ -63,16 +61,12 @@ BBWithSpill::BBWithSpill(MachineModel *machMdl, DataDepGraph *dataDepGraph,
     needTrnstvClsr_ = true;
 
   regTypeCnt_ = machMdl->GetRegTypeCnt();
-  regFiles_ = new RegisterFile[regTypeCnt_];
+  regFiles_ = dataDepGraph->getRegFiles();
   liveRegs_ = new WeightedBitVector[regTypeCnt_];
   livePhysRegs_ = new WeightedBitVector[regTypeCnt_];
   spillCosts_ = new InstCount[dataDepGraph_->GetInstCnt()];
   peakRegPressures_ = new InstCount[regTypeCnt_];
   sumOfLiveIntervalLengths_.resize(regTypeCnt_, 0);
-
-  for (i = 0; i < regTypeCnt_; i++) {
-    regFiles_[i].SetRegType(i);
-  }
 
   entryInstCnt_ = 0;
   exitInstCnt_ = 0;
@@ -87,7 +81,6 @@ BBWithSpill::~BBWithSpill() {
     delete enumrtr_;
   }
 
-  delete[] regFiles_;
   delete[] liveRegs_;
   delete[] livePhysRegs_;
   delete[] spillCosts_;
@@ -111,20 +104,6 @@ ConstrainedScheduler *BBWithSpill::AllocHeuristicScheduler_() {
     return new ACOScheduler(dataDepGraph_, machMdl_, abslutSchedUprBound_, hurstcPrirts_);
   else
     return new ListScheduler(dataDepGraph_, machMdl_, abslutSchedUprBound_, hurstcPrirts_);
-}
-/*****************************************************************************/
-
-FUNC_RESULT BBWithSpill::BuildFromFile() {
-  dataDepGraph_->CountDefs(regFiles_);
-  dataDepGraph_->AddDefsAndUses(regFiles_);
-
-  for (int i = 0; i < regTypeCnt_; i++) {
-    liveRegs_[i].Construct(regFiles_[i].GetRegCnt());
-  }
-
-  // dataDepGraph_->LogGraph();
-
-  return RES_SUCCESS;
 }
 /*****************************************************************************/
 
@@ -169,7 +148,7 @@ void BBWithSpill::CmputSchedUprBound_() {
 /*****************************************************************************/
 
 static InstCount ComputeSLILStaticLowerBound(int64_t regTypeCnt_,
-                                             const RegisterFile *regFiles_,
+                                             RegisterFile *regFiles_,
                                              DataDepGraph *dataDepGraph_) {
   // (Chris): To calculate a naive lower bound of the SLIL, count all the defs
   // and uses for each register.
@@ -896,6 +875,10 @@ InstCount BBWithSpill::UpdtOptmlSched(InstSchedule *crntSched,
 /*****************************************************************************/
 
 void BBWithSpill::SetupForSchdulng_() {
+  for (int i = 0; i < regTypeCnt_; i++) {
+    liveRegs_[i].Construct(regFiles_[i].GetRegCnt());
+  }
+
   SetupPhysRegs_();
 
   entryInstCnt_ = dataDepGraph_->GetEntryInstCnt();
