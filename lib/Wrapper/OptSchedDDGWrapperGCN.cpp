@@ -45,9 +45,8 @@ LaneBitmask getDefRegMask(const MachineOperand &MO,
   // tracking it isn't set correctly yet. This works correctly however since
   // use mask has been tracked before using LIS.
   return MO.getSubReg() == 0
-             ? MRI.getMaxLaneMaskForVReg(MO.getReg())
-             : MRI.getTargetRegisterInfo()->getSubRegIndexLaneMask(
-                   MO.getSubReg());
+    ? MRI.getMaxLaneMaskForVReg(MO.getReg())
+    : MRI.getTargetRegisterInfo()->getSubRegIndexLaneMask(MO.getSubReg());
 }
 
 // Copied from Target/AMDGPU/GCNRegPressure.cpp
@@ -133,9 +132,8 @@ collectLiveSubRegsAtInstr(const MachineInstr *MI, const LiveIntervals *LIS,
     if (!LIS->hasInterval(Reg))
       continue;
     auto LiveMask = getLiveLaneMask(Reg, SI, *LIS, MRI);
-    if (LiveMask.any()) {
+    if (LiveMask.any())
       Res.emplace_back(Reg, LiveMask);
-    }
   }
   return Res;
 }
@@ -151,18 +149,19 @@ unsigned OptSchedDDGWrapperGCN::getRegKind(unsigned Reg) const {
 
 void OptSchedDDGWrapperGCN::convertRegFiles() {
   for (int i = 0; i < MM->GetRegTypeCnt(); i++)
-        RegFiles[i].SetRegType(i);
+    RegFiles[i].SetRegType(i);
 
   // Add live-in subregs
   for (const auto &MaskPair :
        collectLiveSubRegsAtInstr(SUnits[0].getInstr(), LIS, MRI, false))
-    addSubRegDefs(GetRootInst(), MaskPair.RegUnit, MaskPair.LaneMask);
+    addSubRegDefs(GetRootInst(), MaskPair.RegUnit, MaskPair.LaneMask, true);
 
   for (const auto &SU : SUnits) {
     const MachineInstr *MI = SU.getInstr();
     for (const auto &MaskPair : collectVirtualRegUses(*MI, *LIS, MRI))
       addSubRegUses(GetInstByIndx(SU.NodeNum), MaskPair.RegUnit,
                     MaskPair.LaneMask);
+
     for (const auto &MaskPair : collectVirtualRegDefs(*MI, *LIS, MRI))
       addSubRegDefs(GetInstByIndx(SU.NodeNum), MaskPair.RegUnit,
                     MaskPair.LaneMask);
@@ -170,11 +169,13 @@ void OptSchedDDGWrapperGCN::convertRegFiles() {
 
   // Add live-out subregs
   for (const auto &MaskPair : collectLiveSubRegsAtInstr(
-           SUnits[SUnits.size() - 1].getInstr(), LIS, MRI, true))
-    addSubRegUses(GetLeafInst(), MaskPair.RegUnit, MaskPair.LaneMask);
+                                SUnits[SUnits.size() - 1].getInstr(),
+                                LIS, MRI, true))
+    addSubRegUses(GetLeafInst(), MaskPair.RegUnit, MaskPair.LaneMask,
+                  /*LiveOut=*/true);
 
   // TODO: Count defined-and-not-used registers as live-out uses to avoid assert
-  // errors in OptSched. Fix this by correctly tracking subreg dead-defs
+  // errors in OptSched.
   for (int16_t i = 0; i < MM->GetRegTypeCnt(); i++)
     for (int j = 0; j < RegFiles[i].GetRegCnt(); j++) {
       Register *Reg = RegFiles[i].GetReg(j);
@@ -187,7 +188,8 @@ void OptSchedDDGWrapperGCN::convertRegFiles() {
 }
 
 void OptSchedDDGWrapperGCN::addSubRegDefs(SchedInstruction *Instr, unsigned Reg,
-                                          const LaneBitmask &LiveMask) {
+                                          const LaneBitmask &LiveMask,
+                                          bool LiveIn) {
   if (RegionRegs[Reg] == nullptr)
     RegionRegs[Reg] = createSubRegSet(Reg, MRI, getRegKind(Reg));
 
@@ -203,13 +205,15 @@ void OptSchedDDGWrapperGCN::addSubRegDefs(SchedInstruction *Instr, unsigned Reg,
       // SGPR32
       Reg->SetWght(1);
       Reg->AddDef(Instr);
+      Reg->SetIsLiveIn(LiveIn);
     }
     Lane++;
   }
 }
 
 void OptSchedDDGWrapperGCN::addSubRegUses(SchedInstruction *Instr, unsigned Reg,
-                                          const LaneBitmask &LiveMask) {
+                                          const LaneBitmask &LiveMask,
+                                          bool LiveOut) {
   SubRegSet &SubRegs = *RegionRegs[Reg].get();
   RegisterFile &RF = RegFiles[SubRegs.Type];
   unsigned Lane = 0;
@@ -218,6 +222,7 @@ void OptSchedDDGWrapperGCN::addSubRegUses(SchedInstruction *Instr, unsigned Reg,
       Register *Reg = RF.GetReg(ResNo);
       Instr->AddUse(Reg);
       Reg->AddUse(Instr);
+      Reg->SetIsLiveOut(LiveOut);
     }
     Lane++;
   }

@@ -22,10 +22,10 @@ private:
   // Index subreg lanes to OptSched register numbers. Even though we can't map
   // a LaneBitmask index to a specific sub-register, we can still accurately
   // model the correct number of live subregs using lane mask interference.
-  SmallVector<unsigned, LaneBitmask::BitWidth> OptSchedRegMap;
+  SmallVector<unsigned, 8> OptSchedRegMap;
 
 public:
-  using iterator = SmallVector<unsigned, LaneBitmask::BitWidth>::iterator;
+  using iterator = SmallVector<unsigned, 8>::iterator;
   // The max number of subregs for this virtual register.
   unsigned Size;
   // OptSched register type
@@ -42,24 +42,31 @@ public:
 
 class OptSchedDDGWrapperGCN : public OptSchedDDGWrapperBasic {
 private:
-  enum SubRegKind { SGPR32, VGPR32, TOTAL_KINDS };
+  // FIXME: Track VGPR/SGPR tuples or refactor Scheduler to use LLVM/GCN RP tracker.
+  enum SubRegKind {
+    SGPR32,
+    VGPR32,
+    TOTAL_KINDS
+  };
 
   // Map sub-registers in LLVM to a list of live subreg lanes for that register.
   // Each live lane represents either a VGPR32 or SGPR32. In our model each live
   // subreg lane is identified by a separate OptSched register.
   using RegsMap = DenseMap<unsigned, std::unique_ptr<SubRegSet>>;
   RegsMap RegionRegs;
-
   const std::vector<llvm::SUnit> &SUnits;
   const llvm::LiveIntervals *LIS;
   const llvm::MachineRegisterInfo &MRI;
 
   unsigned getRegKind(unsigned Reg) const;
+
   void addLiveSubRegsAtInstr(const MachineInstr *MI, bool After);
+
   void addSubRegDefs(SchedInstruction *Instr, unsigned Reg,
-                     const LaneBitmask &LiveMask);
+                     const LaneBitmask &LiveMask, bool LiveIn = false);
+
   void addSubRegUses(SchedInstruction *Instr, unsigned Reg,
-                     const LaneBitmask &LiveMask);
+                     const LaneBitmask &LiveMask, bool LiveOut = false);
 
 public:
   OptSchedDDGWrapperGCN(llvm::MachineSchedContext *Context,

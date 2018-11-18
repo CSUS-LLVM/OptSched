@@ -8,6 +8,7 @@
 #define LLVM_OPT_SCHED_DDG_WRAPPER_BASE_H
 
 namespace llvm {
+namespace opt_sched {
 
 class OptSchedDDGWrapperBase {
 public:
@@ -18,6 +19,7 @@ public:
   virtual void convertRegFiles() = 0;
 };
 
+} // namespace opt_sched
 } // namespace llvm
 
 #endif // LLVM_OPT_SCHED_DDG_WRAPPER_BASE_H

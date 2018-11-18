@@ -170,7 +170,7 @@ protected:
 // TODO(max): Find out what this really is.
 // The Data Dependence Graph is a sepcial case of a DAG and a special case of
 // a Data Dependence Structure as well
-class DataDepGraph : public llvm::OptSchedDDGWrapperBase, public DirAcycGraph, public DataDepStruct {
+class DataDepGraph : public llvm::opt_sched::OptSchedDDGWrapperBase, public DirAcycGraph, public DataDepStruct {
 public:
   DataDepGraph(MachineModel *machMdl, LATENCY_PRECISION ltncyPcsn,
                GraphTransTypes graphTransTypes);
