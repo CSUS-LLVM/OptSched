@@ -32,7 +32,7 @@ namespace llvm {
 
 namespace opt_sched {
 
-class LLVMMachineModel;
+class OptSchedMachineModel;
 
 // derive from the default scheduler so it is easy to fallback to it
 // when it is needed. This object is created for each function the
@@ -53,7 +53,7 @@ private:
   MachineSchedContext *context;
   // Wrapper object for converting LLVM information about target machine
   // into the OptSched machine model
-  std::unique_ptr<LLVMMachineModel> model;
+  std::unique_ptr<OptSchedMachineModel> model;
   // A list of functions that are indicated as candidates for the
   // OptScheduler
   Config hotFunctions;

@@ -26,12 +26,12 @@ namespace opt_sched {
 
 class LLVMRegTypeFilter;
 class ScheduleDAGOptSched;
-class LLVMMachineModel;
+class OptSchedMachineModel;
 
 class OptSchedDDGWrapperBasic : public DataDepGraph {
 public:
   OptSchedDDGWrapperBasic(llvm::MachineSchedContext *Context,
-                          ScheduleDAGOptSched *DAG, LLVMMachineModel *MM,
+                          ScheduleDAGOptSched *DAG, OptSchedMachineModel *MM,
                           LATENCY_PRECISION LatencyPrecision,
                           GraphTransTypes GraphTransTypes,
                           const std::string &RegionID);
@@ -53,8 +53,8 @@ public:
   void convertRegFiles() override;
 
 protected:
-  // A convenience machMdl_ pointer casted to LLVMMachineModel*.
-  LLVMMachineModel *MM;
+  // A convenience machMdl_ pointer casted to OptSchedMachineModel*.
+  OptSchedMachineModel *MM;
 
   // The LLVM scheduler root class, used to access environment
   // and target info.

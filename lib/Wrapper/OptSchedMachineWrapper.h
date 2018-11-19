@@ -27,10 +27,10 @@ namespace opt_sched {
 class MachineModelGenerator;
 
 // A wrapper for the OptSched MachineModel
-class LLVMMachineModel : public MachineModel {
+class OptSchedMachineModel : public MachineModel {
 public:
   // Use a config file to initialize the machine model.
-  LLVMMachineModel(const char *configFile);
+  OptSchedMachineModel(const char *configFile);
   // Convert information about the target machine into the
   // optimal scheduler machine model
   void convertMachineModel(const llvm::ScheduleDAGInstrs &dag,
@@ -38,7 +38,7 @@ public:
   // Pointer to register info for target
   const llvm::TargetRegisterInfo *registerInfo;
   MachineModelGenerator *getMMGen() { return MMGen.get(); }
-  ~LLVMMachineModel() = default;
+  ~OptSchedMachineModel() = default;
 
 private:
   // Should a machine model be generated.

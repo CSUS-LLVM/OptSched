@@ -123,7 +123,7 @@ MachineBasicBlock::iterator nextIfDebug(MachineBasicBlock::iterator I,
 // Create a basic, target independent DDG wrapper
 std::unique_ptr<OptSchedDDGWrapperBase>
 createBasicDDGWrapper(MachineSchedContext *Context, ScheduleDAGOptSched *DAG,
-                      LLVMMachineModel *MM, LATENCY_PRECISION LatencyPrecision,
+                      OptSchedMachineModel *MM, LATENCY_PRECISION LatencyPrecision,
                       GraphTransTypes GraphTransTypes,
                       const std::string &RegionID) {
   return make_unique<OptSchedDDGWrapperBasic>(
@@ -133,7 +133,7 @@ createBasicDDGWrapper(MachineSchedContext *Context, ScheduleDAGOptSched *DAG,
 // Create a GCN DDG wrapper
 std::unique_ptr<OptSchedDDGWrapperBase>
 createGCNDDGWrapper(MachineSchedContext *Context, ScheduleDAGOptSched *DAG,
-                    LLVMMachineModel *MM, LATENCY_PRECISION LatencyPrecision,
+                    OptSchedMachineModel *MM, LATENCY_PRECISION LatencyPrecision,
                     GraphTransTypes GraphTransTypes,
                     const std::string &RegionID) {
   return make_unique<OptSchedDDGWrapperGCN>(Context, DAG, MM, LatencyPrecision,
@@ -158,7 +158,7 @@ ScheduleDAGOptSched::ScheduleDAGOptSched(MachineSchedContext *C)
   hotFunctions.Load(PathCfgHF.c_str());
 
   // load machine model file
-  model = make_unique<LLVMMachineModel>(PathCfgMM.c_str());
+  model = make_unique<OptSchedMachineModel>(PathCfgMM.c_str());
 
   // Convert machine model
   model->convertMachineModel(static_cast<ScheduleDAGInstrs &>(*this),

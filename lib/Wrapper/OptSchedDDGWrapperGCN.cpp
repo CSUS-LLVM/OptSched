@@ -19,7 +19,7 @@ using namespace llvm::opt_sched;
 
 OptSchedDDGWrapperGCN::OptSchedDDGWrapperGCN(MachineSchedContext *Context,
                                              ScheduleDAGOptSched *DAG,
-                                             LLVMMachineModel *MM,
+                                             OptSchedMachineModel *MM,
                                              LATENCY_PRECISION LatencyPrecision,
                                              GraphTransTypes GraphTransTypes,
                                              const std::string &RegionID)

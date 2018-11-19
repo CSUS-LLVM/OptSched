@@ -50,11 +50,11 @@ createCortexA7MMGenerator(const llvm::ScheduleDAGInstrs *dag,
 
 } // end anonymous namespace
 
-LLVMMachineModel::LLVMMachineModel(const char *configFile)
+OptSchedMachineModel::OptSchedMachineModel(const char *configFile)
     : MachineModel(configFile), registerInfo(nullptr), shouldGenerateMM(false),
       MMGen(nullptr) {}
 
-void LLVMMachineModel::convertMachineModel(
+void OptSchedMachineModel::convertMachineModel(
     const ScheduleDAGInstrs &dag, const RegisterClassInfo *regClassInfo) {
   const TargetMachine &target = dag.TM;
 

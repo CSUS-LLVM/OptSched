@@ -70,7 +70,7 @@ private:
 
 public:
   OptSchedDDGWrapperGCN(llvm::MachineSchedContext *Context,
-                        ScheduleDAGOptSched *DAG, LLVMMachineModel *MM,
+                        ScheduleDAGOptSched *DAG, OptSchedMachineModel *MM,
                         LATENCY_PRECISION LatencyPrecision,
                         GraphTransTypes GraphTransTypes,
                         const std::string &RegionID);
