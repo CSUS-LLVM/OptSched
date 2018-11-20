@@ -1,4 +1,4 @@
-//===- OptSched.h - Interface for building an OptSched DDG ------*- C++-*--===//
+//===- OptSchedDDGWrapperBase.h - Interface for DDG wrapper -----*- C++-*--===//
 //
 // Convert an LLVM ScheduleDAG into an OptSched DDG.
 //

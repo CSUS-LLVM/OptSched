@@ -7,6 +7,7 @@
 #include "OptSchedDDGWrapperBasic.h"
 #include "OptSchedDDGWrapperGCN.h"
 #include "OptSchedMachineWrapper.h"
+#include "opt-sched/Scheduler/OptSchedTarget.h"
 #include "opt-sched/Scheduler/OptSchedDDGWrapperBase.h"
 #include "opt-sched/Scheduler/bb_spill.h"
 #include "opt-sched/Scheduler/config.h"
@@ -87,6 +88,15 @@ static cl::opt<std::string> OptSchedCfgHF(
 static cl::opt<std::string> OptSchedCfgMM(
     "optsched-cfg-machine-model", cl::Hidden,
     cl::desc("Path to the machine model specification file for opt-sched."));
+
+namespace llvm {
+namespace opt_sched {
+
+std::unique_ptr<OptSchedTarget>
+createOptSchedGenericTarget(OptSchedMachineModel *MM);
+
+}
+}
 
 namespace {
 
@@ -315,13 +325,12 @@ void ScheduleDAGOptSched::schedule() {
   // Build LLVM DAG
   SetupLLVMDag();
 
+  auto OptSchedTarget = createOptSchedGenericTarget(model.get());
+  OptSchedTarget->initRegion();
+
   // Apply llvm DAG post processing.
   if (enableMutations)
     postprocessDAG();
-
-  // Ignore empty DAGs
-  if (SUnits.empty())
-    return;
 
   // Convert graph
   std::unique_ptr<OptSchedDDGWrapperBase> DDG;
@@ -424,6 +433,8 @@ void ScheduleDAGOptSched::schedule() {
       }
     } // end OptSched succeeded
   }
+
+  OptSchedTarget->finalizeRegion();
 
 #ifdef IS_DEBUG_PEAK_PRESSURE
   Logger::Info("Register pressure after");
