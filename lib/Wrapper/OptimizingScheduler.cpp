@@ -67,7 +67,7 @@ static ScheduleDAGInstrs *createOptSched(MachineSchedContext *C) {
 
 // Register the machine scheduler.
 static MachineSchedRegistry
-    OptSchedRegistry("optsched", "Use the OptSched scheduler.", createOptSched);
+    OptSchedMIRegistry("optsched", "Use the OptSched scheduler.", createOptSched);
 
 // Command line options for opt-sched.
 static cl::opt<std::string> OptSchedCfg(
@@ -89,14 +89,8 @@ static cl::opt<std::string> OptSchedCfgMM(
     "optsched-cfg-machine-model", cl::Hidden,
     cl::desc("Path to the machine model specification file for opt-sched."));
 
-namespace llvm {
-namespace opt_sched {
-
-std::unique_ptr<OptSchedTarget>
-createOptSchedGenericTarget(OptSchedMachineModel *MM);
-
-}
-}
+OptSchedRegistry<OptSchedTargetRegistry::OptSchedTargetFactory>
+    OptSchedTargetRegistry::Registry;
 
 namespace {
 
@@ -325,7 +319,14 @@ void ScheduleDAGOptSched::schedule() {
   // Build LLVM DAG
   SetupLLVMDag();
 
-  auto OptSchedTarget = createOptSchedGenericTarget(model.get());
+  auto TargetFactory =
+    OptSchedTargetRegistry::Registry.getFactoryWithName(model->GetModelName());
+
+  if (!TargetFactory)
+    TargetFactory =
+      OptSchedTargetRegistry::Registry.getFactoryWithName("generic");
+
+  auto OptSchedTarget = TargetFactory(model.get());
   OptSchedTarget->initRegion();
 
   // Apply llvm DAG post processing.
