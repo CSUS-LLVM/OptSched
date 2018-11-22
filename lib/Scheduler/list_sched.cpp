@@ -5,7 +5,7 @@
 #include "opt-sched/Scheduler/stats.h"
 #include "opt-sched/Scheduler/sched_region.h"
 
-namespace opt_sched {
+using namespace llvm::opt_sched;
 
 ListScheduler::ListScheduler(DataDepGraph *dataDepGraph, MachineModel *machMdl,
                              InstCount schedUprBound, SchedPriorities prirts)
@@ -52,8 +52,8 @@ FUNC_RESULT ListScheduler::FindSchedule(InstSchedule *sched, SchedRegion *rgn) {
 
 #ifdef IS_DEBUG_MODEL
     Logger::Info("Legality checks made: %d", lgltyChkCnt);
-    Stats::legalListSchedulerInstructionHits++;
-    Stats::illegalListSchedulerInstructionHits += (lgltyChkCnt - 1);
+    stats::legalListSchedulerInstructionHits++;
+    stats::illegalListSchedulerInstructionHits += (lgltyChkCnt - 1);
 #endif
 
     InstCount instNum;
@@ -119,5 +119,3 @@ void ListScheduler::UpdtRdyLst_(InstCount cycleNum, int slotNum) {
     lst2->Reset();
   }
 }
-
-} // end namespace opt_sched

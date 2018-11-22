@@ -16,7 +16,7 @@
 // only print pressure if enabled by sched.ini
 extern bool OPTSCHED_gPrintSpills;
 
-namespace opt_sched {
+using namespace llvm::opt_sched;
 
 // The maximum number of blocks allowed in a trace.
 const int MAX_TRACE_BLOCKS = 100;
@@ -630,7 +630,7 @@ FUNC_RESULT DataDepGraph::ParseF2Nodes_(SpecsBuffer *buf,
                 fileSchedCycle, fileInstLwrBound, fileInstUprBound, blkNum);
 
     instCntPerType_[instType]++;
-    Stats::instructionTypeCounts.Increment(
+    stats::instructionTypeCounts.Increment(
         machMdl->GetInstTypeNameByCode(instType));
   }
 
@@ -888,9 +888,9 @@ void DataDepGraph::CreateEdge(SchedInstruction *frmNode,
   assert(nodes_[toNodeNum] != NULL);
 
 #ifdef IS_DEBUG_LATENCIES
-  Stats::dependenceTypeLatencies.Add(GetDependenceTypeName(depType), ltncy);
+  stats::dependenceTypeLatencies.Add(GetDependenceTypeName(depType), ltncy);
   if (depType == DEP_DATA) {
-    Stats::instructionTypeLatencies.Add(
+    stats::instructionTypeLatencies.Add(
         machMdl_->GetInstTypeNameByCode(frmNode->GetInstType()), ltncy);
   }
 #endif
@@ -940,10 +940,10 @@ void DataDepGraph::CreateEdge_(InstCount frmNodeNum, InstCount toNodeNum,
   GraphNode *toNode = nodes_[toNodeNum];
 
 #ifdef IS_DEBUG_LATENCIES
-  Stats::dependenceTypeLatencies.Add(GetDependenceTypeName(depType), ltncy);
+  stats::dependenceTypeLatencies.Add(GetDependenceTypeName(depType), ltncy);
   if (depType == DEP_DATA) {
     InstType inst = ((SchedInstruction *)frmNode)->GetInstType();
-    Stats::instructionTypeLatencies.Add(machMdl_->GetInstTypeNameByCode(inst),
+    stats::instructionTypeLatencies.Add(machMdl_->GetInstTypeNameByCode(inst),
                                         ltncy);
   }
 #endif
@@ -3390,5 +3390,3 @@ InstCount DataDepGraph::GetRealInstCnt() { return realInstCnt_; }
 InstCount DataDepGraph::GetCodeSize() { return realInstCnt_ - 2; }
 
 void DataDepGraph::SetHard(bool isHard) { isHard_ = isHard; }
-
-} // end namespace opt_sched

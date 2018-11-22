@@ -1,7 +1,7 @@
 #include "opt-sched/Scheduler/register.h"
 #include "llvm/ADT/STLExtras.h"
 
-namespace opt_sched {
+using namespace llvm::opt_sched;
 
 int16_t Register::GetType() const { return type_; }
 
@@ -248,5 +248,3 @@ void RegisterFile::AddConflictsWithLiveRegs(int regNum, int liveRegCnt) {
       break;
   }
 }
-
-} // end namespace opt_sched

@@ -14,8 +14,10 @@
 #include "opt-sched/Scheduler/data_dep.h"
 #include "opt-sched/Scheduler/graph_trans.h"
 #include "opt-sched/Scheduler/sched_region.h"
+#include "opt-sched/Scheduler/OptSchedTarget.h"
 #include "llvm/CodeGen/MachineScheduler.h"
 #include "llvm/Support/Debug.h"
+#include "llvm/ADT/SmallString.h"
 #include <chrono>
 #include <memory>
 #include <vector>
@@ -26,13 +28,10 @@
 #define LLVM_DEBUG DEBUG
 #endif
 
-using namespace opt_sched;
+using namespace llvm;
 
 namespace llvm {
-
 namespace opt_sched {
-
-class OptSchedMachineModel;
 
 // derive from the default scheduler so it is easy to fallback to it
 // when it is needed. This object is created for each function the
@@ -51,9 +50,10 @@ private:
   int regionNum = 0;
   // Current machine scheduler context
   MachineSchedContext *context;
-  // Wrapper object for converting LLVM information about target machine
+  // The OptSched target machine.
+  std::unique_ptr<OptSchedTarget> OST;
   // into the OptSched machine model
-  std::unique_ptr<OptSchedMachineModel> model;
+  std::unique_ptr<OptSchedMachineModel> MM;
   // A list of functions that are indicated as candidates for the
   // OptScheduler
   Config hotFunctions;
@@ -196,7 +196,6 @@ public:
 };
 
 } // namespace opt_sched
-
 } // namespace llvm
 
 #endif // LLVM_OPTIMIZING_SCHEDULER_H

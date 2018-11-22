@@ -17,6 +17,7 @@ Last Update:  Jun. 2017
 
 using namespace llvm;
 
+namespace llvm {
 namespace opt_sched {
 
 // Represents a a single register of a certain type and tracks the number of
@@ -160,6 +161,7 @@ private:
   mutable SmallVector<std::unique_ptr<Register>, 8> Regs;
 };
 
-} // end namespace opt_sched
+} // namespace opt_sched
+} // namespace llvm
 
 #endif

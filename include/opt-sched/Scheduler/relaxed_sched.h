@@ -12,6 +12,7 @@ Last Update:  Mar. 2011
 #include "opt-sched/Scheduler/gen_sched.h"
 #include "opt-sched/Scheduler/hash_table.h"
 
+namespace llvm {
 namespace opt_sched {
 
 enum RLXD_SCHED_TYPE { RST_STTC, RST_DYNMC, RST_SUBDYNMC };
@@ -325,6 +326,7 @@ void RJ_RelaxedScheduler::Initialize(bool setPrirtyLst) {
 }
 /*****************************************************************************/
 
-} // end namespace opt_sched
+} // namespace opt_sched
+} // namespace llvm
 
 #endif

@@ -8,19 +8,31 @@
 #ifndef LLVM_OPT_SCHED_TARGET_H
 #define LLVM_OPT_SCHED_TARGET_H
 
+
 #include "opt-sched/Scheduler/machine_model.h"
+#include "opt-sched/Scheduler/OptSchedDDGWrapperBase.h"
+#include "llvm/CodeGen/MachineScheduler.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/SmallVector.h"
 
 namespace llvm {
 namespace opt_sched {
 
+class OptSchedMachineModel;
+class ScheduleDAGOptSched;
+
 class OptSchedTarget {
 public:
-  ::opt_sched::MachineModel *MM;
-
-  OptSchedTarget(::opt_sched::MachineModel *MM_) : MM(MM_) {}
   virtual ~OptSchedTarget() = default;
+
+  virtual std::unique_ptr<OptSchedMachineModel>
+  createMachineModel(const char *configFile) = 0;
+
+  virtual std::unique_ptr<OptSchedDDGWrapperBase>
+  createDDGWrapper(MachineSchedContext *Context, ScheduleDAGOptSched *DAG,
+                   OptSchedMachineModel *MM, LATENCY_PRECISION LatencyPrecision,
+                   GraphTransTypes GraphTransTypes,
+                   const std::string &RegionID) = 0;
 
   virtual void initRegion() = 0;
   virtual void finalizeRegion() = 0;
@@ -78,9 +90,9 @@ public:
 
 class OptSchedTargetRegistry
   : public OptSchedRegistryNode<
-    std::unique_ptr<OptSchedTarget> (*)(::opt_sched::MachineModel *)> {
+    std::unique_ptr<OptSchedTarget> (*)()> {
 public:
-  using OptSchedTargetFactory = std::unique_ptr<OptSchedTarget> (*)(::opt_sched::MachineModel *);
+  using OptSchedTargetFactory = std::unique_ptr<OptSchedTarget> (*)();
   static OptSchedRegistry<OptSchedTargetFactory> Registry;
 
   OptSchedTargetRegistry(llvm::StringRef Name_, OptSchedTargetFactory Factory_)

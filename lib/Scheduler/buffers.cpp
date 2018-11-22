@@ -6,7 +6,7 @@
 #include <fcntl.h>
 #include <unistd.h>
 
-namespace opt_sched {
+using namespace llvm::opt_sched;
 
 #ifdef WIN32
 #include <io.h>
@@ -582,5 +582,3 @@ FUNC_RESULT SpecsBuffer::checkTitle(char const *const title) {
 }
 
 SpecsBuffer::SpecsBuffer() { nxtLineType = NXT_DATA; }
-
-} // end namespace opt_sched

@@ -21,7 +21,7 @@
 
 extern bool OPTSCHED_gPrintSpills;
 
-namespace opt_sched {
+using namespace llvm::opt_sched;
 
 // The denominator used when calculating cost weight.
 static const int COST_WGHT_BASE = 10000;
@@ -753,17 +753,17 @@ void BBWithSpill::UnschdulInst(SchedInstruction *inst, InstCount cycleNum,
 void BBWithSpill::FinishHurstc_() {
 
 #ifdef IS_DEBUG_BBSPILL_COST
-  Stats::traceCostLowerBound.Record(costLwrBound_);
-  Stats::traceHeuristicCost.Record(hurstcCost_);
-  Stats::traceHeuristicScheduleLength.Record(hurstcSchedLngth_);
+  stats::traceCostLowerBound.Record(costLwrBound_);
+  stats::traceHeuristicCost.Record(hurstcCost_);
+  stats::traceHeuristicScheduleLength.Record(hurstcSchedLngth_);
 #endif
 }
 /*****************************************************************************/
 
 void BBWithSpill::FinishOptml_() {
 #ifdef IS_DEBUG_BBSPILL_COST
-  Stats::traceOptimalCost.Record(bestCost_);
-  Stats::traceOptimalScheduleLength.Record(bestSchedLngth_);
+  stats::traceOptimalCost.Record(bestCost_);
+  stats::traceOptimalScheduleLength.Record(bestSchedLngth_);
 #endif
 }
 /*****************************************************************************/
@@ -826,9 +826,9 @@ FUNC_RESULT BBWithSpill::Enumerate_(Milliseconds startTime,
   }
 
 #ifdef IS_DEBUG_ITERS
-  Stats::iterations.Record(iterCnt);
-  Stats::enumerations.Record(enumrtr_->GetSearchCnt());
-  Stats::lengths.Record(iterCnt);
+  stats::iterations.Record(iterCnt);
+  stats::enumerations.Record(enumrtr_->GetSearchCnt());
+  stats::lengths.Record(iterCnt);
 #endif
 
   // Failure to find a feasible sched. in the last iteration is still
@@ -1043,5 +1043,3 @@ void BBWithSpill::CmputCnflcts_(InstSchedule *sched) {
   }
   sched->SetConflictCount(cnflctCnt);
 }
-
-} // end namespace opt_sched

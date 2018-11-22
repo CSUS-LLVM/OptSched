@@ -15,6 +15,7 @@ Last Update:  Apr. 2011
 #include <set>
 #include <vector>
 
+namespace llvm {
 namespace opt_sched {
 
 class LengthCostEnumerator;
@@ -137,6 +138,7 @@ protected:
   }
 };
 
-} // end namespace opt_sched
+} // namespace opt_sched
+} // namespace llvm
 
 #endif

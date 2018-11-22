@@ -9,7 +9,7 @@
 #include "opt-sched/Scheduler/config.h"
 #include "opt-sched/Scheduler/random.h"
 
-namespace opt_sched {
+using namespace llvm::opt_sched;
 
 //static void PrintInstruction(SchedInstruction *inst);
 void PrintSchedule(InstSchedule *schedule);
@@ -351,6 +351,4 @@ void PrintSchedule(InstSchedule *schedule) {
   }
   std::cerr << std::endl;
   schedule->ResetInstIter();
-}
-
 }

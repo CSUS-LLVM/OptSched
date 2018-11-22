@@ -12,6 +12,7 @@ Last Update:  Sept. 2013
 
 #include "opt-sched/Scheduler/gen_sched.h"
 
+namespace llvm {
 namespace opt_sched {
 
 class ListScheduler : public ConstrainedScheduler {
@@ -32,6 +33,7 @@ private:
   void UpdtRdyLst_(InstCount cycleNum, int slotNum);
 };
 
-} // end namespace opt_sched
+} // namespace opt_sched
+} // namespace llvm
 
 #endif

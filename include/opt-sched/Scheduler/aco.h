@@ -5,6 +5,7 @@
 
 #include "opt-sched/Scheduler/gen_sched.h"
 
+namespace llvm {
 namespace opt_sched {
 
 typedef double pheremone_t;
@@ -37,6 +38,7 @@ private:
   std::vector<double> scores(std::vector<Choice> ready, SchedInstruction *last);
 };
 
-}
+} // namespace opt_sched
+} // namespace llvm
 
 #endif

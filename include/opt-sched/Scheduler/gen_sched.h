@@ -20,6 +20,7 @@ Last Update:  Mar. 2011
 #include "opt-sched/Scheduler/defines.h"
 #include "opt-sched/Scheduler/lnkd_lst.h"
 
+namespace llvm {
 namespace opt_sched {
 
 // A cycle window reserved by an unpipelined instruction.
@@ -207,6 +208,7 @@ protected:
   virtual void UpdtRdyLst_(InstCount cycleNum, int slotNum) = 0;
 };
 
-} // end namespace opt_sched
+} // namespace opt_sched
+} // namespace llvm
 
 #endif

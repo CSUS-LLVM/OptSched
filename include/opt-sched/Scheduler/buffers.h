@@ -14,6 +14,7 @@ Last Update:  Mar. 2011
 
 #include "opt-sched/Scheduler/defines.h"
 
+namespace llvm {
 namespace opt_sched {
 
 const int INBUF_MAX_PIECES_PERLINE = 30;
@@ -114,6 +115,7 @@ protected:
                       int endPiece, char *target, int &totLngth);
 };
 
-} // end namespace opt_sched
+} // namespace opt_sched
+} // namespace llvm
 
 #endif

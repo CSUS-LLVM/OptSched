@@ -17,6 +17,7 @@ Last Update:  Jun. 2017
 #include <iostream>
 #include <vector>
 
+namespace llvm {
 namespace opt_sched {
 
 const int MAX_MEMBLOCK_SIZE = 10000;
@@ -1026,6 +1027,7 @@ inline void EnumTreeNodeAlloc::Free(EnumTreeNode *node) {
 }
 /****************************************************************************/
 
-} // end namespace opt_sched
+} // namespace opt_sched
+} // namespace llvm
 
 #endif

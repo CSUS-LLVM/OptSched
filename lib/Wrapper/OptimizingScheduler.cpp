@@ -98,8 +98,7 @@ void getRealCfgPathCL(SmallString<128> &Path) {
   SmallString<128> Tmp = Path;
   auto EC = sys::fs::real_path(Tmp, Path, true);
   if (EC)
-    llvm::report_fatal_error(EC.message() + ": " + Tmp, false);
-}
+    llvm::report_fatal_error(EC.message() + ": " + Tmp, false); }
 
 void reportCfgDirPathError(std::error_code EC, llvm::StringRef OptSchedCfg) {
   if (OptSchedCfg == DEFAULT_CFG_DIR)
@@ -124,16 +123,6 @@ MachineBasicBlock::iterator nextIfDebug(MachineBasicBlock::iterator I,
   return I;
 }
 
-// Create a basic, target independent DDG wrapper
-std::unique_ptr<OptSchedDDGWrapperBase>
-createBasicDDGWrapper(MachineSchedContext *Context, ScheduleDAGOptSched *DAG,
-                      OptSchedMachineModel *MM, LATENCY_PRECISION LatencyPrecision,
-                      GraphTransTypes GraphTransTypes,
-                      const std::string &RegionID) {
-  return make_unique<OptSchedDDGWrapperBasic>(
-      Context, DAG, MM, LatencyPrecision, GraphTransTypes, RegionID);
-}
-
 // Create a GCN DDG wrapper
 std::unique_ptr<OptSchedDDGWrapperBase>
 createGCNDDGWrapper(MachineSchedContext *Context, ScheduleDAGOptSched *DAG,
@@ -148,7 +137,7 @@ createGCNDDGWrapper(MachineSchedContext *Context, ScheduleDAGOptSched *DAG,
 
 ScheduleDAGOptSched::ScheduleDAGOptSched(MachineSchedContext *C)
     : ScheduleDAGMILive(C, make_unique<GenericScheduler>(C)), context(C),
-      model(nullptr), totalSimulatedSpills(0) {
+      totalSimulatedSpills(0) {
 
   // Find the native paths to the scheduler configuration files.
   getRealCfgPaths();
@@ -161,15 +150,22 @@ ScheduleDAGOptSched::ScheduleDAGOptSched(MachineSchedContext *C)
   // load hot functions ini file
   hotFunctions.Load(PathCfgHF.c_str());
 
-  // load machine model file
-  model = make_unique<OptSchedMachineModel>(PathCfgMM.c_str());
-
-  // Convert machine model
-  model->convertMachineModel(static_cast<ScheduleDAGInstrs &>(*this),
-                             RegClassInfo);
-
   // Load config files for the OptScheduler
   loadOptSchedConfig();
+
+  StringRef ArchName = TM.getTargetTriple().getArchName();
+	auto TargetFactory =
+      OptSchedTargetRegistry::Registry.getFactoryWithName(ArchName);
+
+    if (!TargetFactory)
+      TargetFactory =
+        OptSchedTargetRegistry::Registry.getFactoryWithName("generic");
+
+
+  OST = TargetFactory();
+  MM = OST->createMachineModel(PathCfgMM.c_str());
+  MM->convertMachineModel(static_cast<ScheduleDAGInstrs &>(*this),
+                          RegClassInfo);
 }
 
 void ScheduleDAGOptSched::SetupLLVMDag() {
@@ -319,15 +315,7 @@ void ScheduleDAGOptSched::schedule() {
   // Build LLVM DAG
   SetupLLVMDag();
 
-  auto TargetFactory =
-    OptSchedTargetRegistry::Registry.getFactoryWithName(model->GetModelName());
-
-  if (!TargetFactory)
-    TargetFactory =
-      OptSchedTargetRegistry::Registry.getFactoryWithName("generic");
-
-  auto OptSchedTarget = TargetFactory(model.get());
-  OptSchedTarget->initRegion();
+  OST->initRegion();
 
   // Apply llvm DAG post processing.
   if (enableMutations)
@@ -336,10 +324,10 @@ void ScheduleDAGOptSched::schedule() {
   // Convert graph
   std::unique_ptr<OptSchedDDGWrapperBase> DDG;
   if (TM.getTargetTriple().getArch() == Triple::ArchType::amdgcn)
-    DDG = createGCNDDGWrapper(context, this, model.get(), latencyPrecision,
+    DDG = createGCNDDGWrapper(context, this, MM.get(), latencyPrecision,
                               graphTransTypes, RegionName);
   else
-    DDG = createBasicDDGWrapper(context, this, model.get(), latencyPrecision,
+    DDG = OST->createDDGWrapper(context, this, MM.get(), latencyPrecision,
                                 graphTransTypes, RegionName);
 
   DDG->convertSUnits();
@@ -347,7 +335,7 @@ void ScheduleDAGOptSched::schedule() {
 
   // create region
   SchedRegion *region = new BBWithSpill(
-      model.get(), static_cast<DataDepGraph *>(DDG.get()), 0, histTableHashBits,
+      MM.get(), static_cast<DataDepGraph *>(DDG.get()), 0, histTableHashBits,
       lowerBoundAlgorithm, heuristicPriorities, enumPriorities, verifySchedule,
       prune, schedForRPOnly, enumerateStalls, spillCostFactor,
       spillCostFunction, checkSpillCostSum, checkConflicts, fixLiveIn,
@@ -435,7 +423,7 @@ void ScheduleDAGOptSched::schedule() {
     } // end OptSched succeeded
   }
 
-  OptSchedTarget->finalizeRegion();
+  OST->finalizeRegion();
 
 #ifdef IS_DEBUG_PEAK_PRESSURE
   Logger::Info("Register pressure after");

@@ -11,6 +11,7 @@ Last Update:  Mar. 2011
 
 #include "opt-sched/Scheduler/defines.h"
 
+namespace llvm {
 namespace opt_sched {
 
 namespace RandomGen {
@@ -27,6 +28,7 @@ uint64_t GetRand64();
 void GetRandBits(uint16_t bitCnt, unsigned char *dest);
 }
 
-} // end namespace opt_sched
+} // namespace opt_sched
+} // namespace llvm
 
 #endif

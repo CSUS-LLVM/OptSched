@@ -3,19 +3,32 @@
 // Implements a generic target stub.
 //
 //===----------------------------------------------------------------------===//
+#include "OptSchedMachineWrapper.h"
 #include "opt-sched/Scheduler/machine_model.h"
 #include "opt-sched/Scheduler/OptSchedTarget.h"
 #include "llvm/ADT/STLExtras.h"
 #include <memory>
 
+using namespace llvm;
 using namespace llvm::opt_sched;
 
 namespace {
 
 class OptSchedGenericTarget : public OptSchedTarget {
 public:
-  OptSchedGenericTarget(::opt_sched::MachineModel *MM)
-    : OptSchedTarget(MM) {}
+  std::unique_ptr<OptSchedMachineModel>
+  createMachineModel(const char *ConfigPath) override {
+    return llvm::make_unique<OptSchedMachineModel>(ConfigPath);
+  }
+
+  std::unique_ptr<OptSchedDDGWrapperBase>
+  createDDGWrapper(llvm::MachineSchedContext *Context, ScheduleDAGOptSched *DAG,
+                   OptSchedMachineModel *MM, LATENCY_PRECISION LatencyPrecision,
+                   GraphTransTypes GraphTransTypes,
+                   const std::string &RegionID) override {
+		return llvm::make_unique<OptSchedDDGWrapperBasic>(
+      Context, DAG, MM, LatencyPrecision, GraphTransTypes, RegionID);
+  }
 
   void initRegion() override {}
   void finalizeRegion() override {}
@@ -27,8 +40,8 @@ namespace llvm {
 namespace opt_sched {
 
 std::unique_ptr<OptSchedTarget>
-createOptSchedGenericTarget(::opt_sched::MachineModel *MM) {
-  return llvm::make_unique<OptSchedGenericTarget>(MM);
+createOptSchedGenericTarget() {
+  return llvm::make_unique<OptSchedGenericTarget>();
 }
 
 OptSchedTargetRegistry

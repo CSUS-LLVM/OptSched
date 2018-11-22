@@ -4,7 +4,7 @@
 #include "opt-sched/Scheduler/logger.h"
 #include <list>
 
-namespace opt_sched {
+using namespace llvm::opt_sched;
 
 GraphTrans::GraphTrans(DataDepGraph *dataDepGraph) {
   assert(dataDepGraph != NULL);
@@ -338,5 +338,3 @@ void StaticNodeSupTrans::nodeMultiPass_(std::list<std::pair<SchedInstruction *, 
 }
 
 GraphTransFlags GraphTrans::GRAPHTRANSFLAGS;
-
-} // end namespace opt_sched

@@ -18,12 +18,13 @@ Last Update:  Mar. 2011
 #include <set>
 #include <string>
 
-namespace opt_sched {
-
 using std::ostream;
 using std::string;
 
-namespace Stats {
+namespace llvm {
+namespace opt_sched {
+namespace stats {
+
 // An abstract base class for statistical records.
 class Stat {
 public:
@@ -32,12 +33,12 @@ public:
   virtual ~Stat() {}
   // Shortcut for printing the stat to a stream.
   friend std::ostream &operator<<(std::ostream &out, const Stat &stat);
+  // Prints the stat to a stream.
+  virtual void Print(std::ostream &out) const = 0;
 
 protected:
   // The human-friendly name of the stat.
   const string name_;
-  // Prints the stat to a stream.
-  virtual void Print(std::ostream &out) const = 0;
 };
 
 // A simple single-value numerical record. Holds only one value at a time.
@@ -375,8 +376,9 @@ extern IndexedIntSetStat dependenceTypeLatencies;
 
 extern IntStat legalListSchedulerInstructionHits;
 extern IntStat illegalListSchedulerInstructionHits;
-}
 
-} // end namespace opt_sched
+} // namespce stats
+} // namespace opt_sched
+} // namespace llvm
 
 #endif

@@ -14,6 +14,7 @@ Last Update:  Mar. 2011
 #include "opt-sched/Scheduler/logger.h"
 #include <cstring>
 
+namespace llvm {
 namespace opt_sched {
 
 // A container class for the object to be stored in a linked list.
@@ -688,6 +689,7 @@ void PriorityList<T, K>::InsrtEntry_(KeyedEntry<T, K> *entry,
   LinkedList<T>::elmntCnt_++;
 }
 
-} // end namespace opt_sched
+} // namespace opt_sched
+} // namespace llvm
 
 #endif

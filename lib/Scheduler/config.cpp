@@ -3,7 +3,7 @@
 #include <fstream>
 #include <sstream>
 
-namespace opt_sched {
+using namespace llvm::opt_sched;
 
 using std::istringstream;
 
@@ -150,5 +150,3 @@ SchedulerOptions& SchedulerOptions::getInstance() {
   static SchedulerOptions instance; // The instance will always be destroyed.
   return instance;
 }
-
-} // end namespace opt_sched

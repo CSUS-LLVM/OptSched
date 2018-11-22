@@ -15,6 +15,7 @@ Last Update:  June. 2017
 #include <list>
 #include <memory>
 
+namespace llvm {
 namespace opt_sched {
 
 // Types of graph transformations.
@@ -109,6 +110,7 @@ private:
 inline StaticNodeSupTrans::StaticNodeSupTrans(DataDepGraph *dataDepGraph)
     : GraphTrans(dataDepGraph) {}
 
-} // end namespace opt_sched
+} // namespace opt_sched
+} // namespace llvm
 
 #endif

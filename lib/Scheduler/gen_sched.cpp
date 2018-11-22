@@ -5,7 +5,7 @@
 #include "opt-sched/Scheduler/logger.h"
 #include "opt-sched/Scheduler/sched_region.h"
 
-namespace opt_sched {
+using namespace llvm::opt_sched;
 
 InstScheduler::InstScheduler(DataDepStruct *dataDepGraph, MachineModel *machMdl,
                              InstCount schedUprBound) {
@@ -325,5 +325,3 @@ void ConstrainedScheduler::UpdtSlotAvlblty_(SchedInstruction *inst) {
   assert(avlblSlotsInCrntCycle_[issuType] > 0);
   avlblSlotsInCrntCycle_[issuType]--;
 }
-
-} // end namespace opt_sched

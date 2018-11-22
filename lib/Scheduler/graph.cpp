@@ -5,7 +5,7 @@
 #include "opt-sched/Scheduler/logger.h"
 #include <cstdio>
 
-namespace opt_sched {
+using namespace llvm::opt_sched;
 
 GraphNode::GraphNode(UDT_GNODES num, UDT_GNODES maxNodeCnt) {
   num_ = num;
@@ -427,5 +427,3 @@ void DirAcycGraph::LogGraph() {
     nodes_[i]->LogScsrLst();
   }
 }
-
-} // end namespace opt_sched

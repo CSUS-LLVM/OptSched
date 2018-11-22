@@ -18,6 +18,7 @@ Last Update:  Mar. 2011
 #include <map>
 #include <string>
 
+namespace llvm {
 namespace opt_sched {
 
 using std::string;
@@ -61,6 +62,7 @@ private:
 };
 
 
-} // end namespace opt_sched
+} // namespace opt_sched
+} // namespace llvm
 
 #endif

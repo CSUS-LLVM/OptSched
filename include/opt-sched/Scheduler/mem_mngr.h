@@ -14,6 +14,7 @@ Last Update:  Mar. 2011
 #include "opt-sched/Scheduler/logger.h"
 #include <cstring>
 
+namespace llvm {
 namespace opt_sched {
 
 template <class T> class MemAlloc {
@@ -152,6 +153,7 @@ template <class T> inline void MemAlloc<T>::FreeObject(T *obj) {
   availableObjects_.InsrtElmnt(obj);
 }
 
-} // end namespace opt_sched
+} // namespace opt_sched
+} // namespace llvm
 
 #endif

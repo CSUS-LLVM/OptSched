@@ -2,9 +2,8 @@
 #include <iomanip>
 #include <limits>
 
-namespace opt_sched {
+using namespace llvm::opt_sched::stats;
 
-namespace Stats {
 ostream &operator<<(ostream &out, const Stat &stat) {
   stat.Print(out);
   return out;
@@ -118,6 +117,10 @@ template <class T> void IndexedNumericStat<T>::Print(std::ostream &out) const {
     }
   }
 }
+
+namespace llvm {
+namespace opt_sched {
+namespace stats {
 
 // Make sure we explicitly instantiate the allowed template parameters.
 template class DistributionStat<int64_t>;
@@ -246,6 +249,7 @@ IntStat
     legalListSchedulerInstructionHits("Legal list scheduler instruction hits");
 IntStat illegalListSchedulerInstructionHits(
     "Illegal list scheduler instruction hits");
-}
 
-} // end namespace opt_sched
+} // namespace stats
+} // namespace opt_sched
+} // namespace llvm

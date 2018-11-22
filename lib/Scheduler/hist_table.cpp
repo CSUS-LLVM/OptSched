@@ -4,7 +4,7 @@
 #include "opt-sched/Scheduler/utilities.h"
 #include <algorithm>
 
-namespace opt_sched {
+using namespace llvm::opt_sched;
 
 HistEnumTreeNode::HistEnumTreeNode() { rsrvSlots_ = NULL; }
 
@@ -193,7 +193,7 @@ bool HistEnumTreeNode::DoesDominate_(EnumTreeNode *node,
 
 #ifdef IS_DEBUG_SPD
   if (thisTime < othrTime)
-    Stats::subsetMatches++;
+    stats::subsetMatches++;
 #endif
 
   if (othrCrntCycleBlkd != crntCycleBlkd_)
@@ -271,7 +271,7 @@ bool HistEnumTreeNode::DoesDominate_(EnumTreeNode *node,
 
   // If this node is an absolute dominant that dominates any matching node.
   if (isAbslutDmnnt)
-    Stats::absoluteDominationHits++;
+    stats::absoluteDominationHits++;
 
   // PrntPartialSched(enumrtr);
   return true;
@@ -590,5 +590,3 @@ void HistEnumTreeNode::ReplaceParent(HistEnumTreeNode *newParent) {
   time_ = newParent->time_ + 1;
   prevNode_ = newParent;
 }
-
-} // end namespace opt_sched

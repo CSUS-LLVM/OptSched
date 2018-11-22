@@ -2,7 +2,7 @@
 #include "opt-sched/Scheduler/register.h"
 #include "opt-sched/Scheduler/stats.h"
 
-namespace opt_sched {
+using namespace llvm::opt_sched;
 
 SchedInstruction::SchedInstruction(InstCount num, const string &name,
                                    InstType instType, const string &opCode,
@@ -84,20 +84,20 @@ void SchedInstruction::SetupForSchdulng(InstCount instCnt, bool isCP_FromScsr,
 bool SchedInstruction::UseFileBounds() {
   bool match = true;
 #ifdef IS_DEBUG_BOUNDS
-  Stats::totalInstructions++;
+  stats::totalInstructions++;
 
   if (frwrdLwrBound_ == fileLwrBound_) {
-    Stats::instructionsWithEqualLB++;
+    stats::instructionsWithEqualLB++;
   }
 
   if (fileLwrBound_ > frwrdLwrBound_) {
-    Stats::instructionsWithTighterFileLB++;
-    Stats::cyclesTightenedForTighterFileLB += fileLwrBound_ - frwrdLwrBound_;
+    stats::instructionsWithTighterFileLB++;
+    stats::cyclesTightenedForTighterFileLB += fileLwrBound_ - frwrdLwrBound_;
   }
 
   if (frwrdLwrBound_ > fileLwrBound_) {
-    Stats::instructionsWithTighterRelaxedLB++;
-    Stats::cyclesTightenedForTighterRelaxedLB += frwrdLwrBound_ - fileLwrBound_;
+    stats::instructionsWithTighterRelaxedLB++;
+    stats::cyclesTightenedForTighterRelaxedLB += frwrdLwrBound_ - fileLwrBound_;
   }
 
   if (frwrdLwrBound_ != fileLwrBound_) {
@@ -107,17 +107,17 @@ bool SchedInstruction::UseFileBounds() {
   }
 
   if (bkwrdLwrBound_ == fileUprBound_) {
-    Stats::instructionsWithEqualUB++;
+    stats::instructionsWithEqualUB++;
   }
 
   if (fileUprBound_ > bkwrdLwrBound_) {
-    Stats::instructionsWithTighterFileUB++;
-    Stats::cyclesTightenedForTighterFileUB += fileUprBound_ - bkwrdLwrBound_;
+    stats::instructionsWithTighterFileUB++;
+    stats::cyclesTightenedForTighterFileUB += fileUprBound_ - bkwrdLwrBound_;
   }
 
   if (bkwrdLwrBound_ > fileUprBound_) {
-    Stats::instructionsWithTighterRelaxedUB++;
-    Stats::cyclesTightenedForTighterRelaxedUB += bkwrdLwrBound_ - fileUprBound_;
+    stats::instructionsWithTighterRelaxedUB++;
+    stats::cyclesTightenedForTighterRelaxedUB += bkwrdLwrBound_ - fileUprBound_;
   }
 
   if (bkwrdLwrBound_ != fileUprBound_) {
@@ -968,5 +968,3 @@ void SchedRange::SetLwrBound(DIRECTION dir, InstCount bound) {
 bool SchedRange::IsTightnd(DIRECTION dir) const {
   return (dir == DIR_FRWRD) ? isFrwrdTightnd_ : isBkwrdTightnd_;
 }
-
-} // end namespace opt_sched

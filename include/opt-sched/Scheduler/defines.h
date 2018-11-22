@@ -16,6 +16,7 @@ Last Update:  Mar. 2011
 #include <cassert>
 #include <stdint.h>
 
+namespace llvm {
 namespace opt_sched {
 
 // The standard time unit.
@@ -42,6 +43,7 @@ enum FUNC_RESULT {
   RES_TIMEOUT = 3
 };
 
-} // end namespace opt_sched
+} // namespace opt_sched
+} // namespace llvm
 
 #endif

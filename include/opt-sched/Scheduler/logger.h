@@ -12,6 +12,7 @@ Last Update:  Mar. 2011
 #include "opt-sched/Scheduler/defines.h"
 #include <iostream>
 
+namespace llvm {
 namespace opt_sched {
 
 namespace Logger {
@@ -53,6 +54,7 @@ void Info(const char *format_string, ...);
 void Summary(const char *format_string, ...);
 }
 
-} // end namespace opt_sched
+} // namespace opt_sched
+} // namespace llvm
 
 #endif

@@ -19,6 +19,7 @@ Last Update:  Mar. 2011
 #include <memory>
 #include <vector>
 
+namespace llvm {
 namespace opt_sched {
 
 class EnumTreeNode;
@@ -124,6 +125,7 @@ protected:
   virtual void Init_();
 };
 
-} // end namespace opt_sched
+} // namespace opt_sched
+} // namespace llvm
 
 #endif

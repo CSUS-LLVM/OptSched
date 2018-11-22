@@ -17,6 +17,7 @@ Last Update:  Sept. 2013
 #include "opt-sched/Scheduler/lnkd_lst.h"
 #include <cstdio>
 
+namespace llvm {
 namespace opt_sched {
 
 // A priority list of instruction that are ready to schedule at a given point
@@ -129,6 +130,7 @@ private:
                               unsigned long maxVal);
 };
 
-} // end namespace opt_sched
+} // namespace opt_sched
+} // namespace llvm
 
 #endif

@@ -10,7 +10,7 @@
 #include <memory>
 #include <sstream>
 
-namespace opt_sched {
+using namespace llvm::opt_sched;
 
 EnumTreeNode::EnumTreeNode() {
   isCnstrctd_ = false;
@@ -344,7 +344,7 @@ bool EnumTreeNode::WasSprirNodeExmnd(SchedInstruction *cnddtInst) {
         assert(!cnddtInst->IsScsrEquvlnt(inst));
 #ifdef IS_DEBUG_NODEDOM
         if (inst->IsScsrDmntd(cnddtInst)) {
-          Stats::negativeNodeDominationHits++;
+          stats::negativeNodeDominationHits++;
         }
 #endif
 #endif
@@ -510,7 +510,7 @@ Enumerator::Enumerator(DataDepGraph *dataDepGraph, MachineModel *machMdl,
   }
 
   histTableInitTime = Utilities::GetProcessorTime() - histTableInitTime;
-  Stats::historyTableInitializationTime.Record(histTableInitTime);
+  stats::historyTableInitializationTime.Record(histTableInitTime);
 
   tightndLst_ = NULL;
   bkwrdTightndLst_ = NULL;
@@ -992,7 +992,7 @@ FUNC_RESULT Enumerator::FindFeasibleSchedule_(InstSchedule *sched,
 
 #ifdef IS_DEBUG_NODES
   uint64_t crntNodeCnt = exmndNodeCnt_ - prevNodeCnt;
-  Stats::nodesPerLength.Record(crntNodeCnt);
+  stats::nodesPerLength.Record(crntNodeCnt);
 #endif
 
   if (isTimeout)
@@ -1023,7 +1023,7 @@ bool Enumerator::FindNxtFsblBrnch_(EnumTreeNode *&newNode) {
   // Warning! That will reset the instruction iterator!
   // rdyLst_->Print(Logger::GetLogStream());
 
-  Stats::maxReadyListSize.SetMax(rdyInstCnt);
+  stats::maxReadyListSize.SetMax(rdyInstCnt);
 #endif
 
   if (crntBrnchNum == 0 && schedForRPOnly_)
@@ -1042,7 +1042,7 @@ bool Enumerator::FindNxtFsblBrnch_(EnumTreeNode *&newNode) {
 
       if (isEmptyNode || crntNode_->GetLegalInstCnt() == 0 || enumStall) {
 #ifdef IS_DEBUG_INFSBLTY_TESTS
-        Stats::stalls++;
+        stats::stalls++;
 #endif
       } else {
         crntNode_->NewBranchExmnd(inst, false, false, false, false, DIR_FRWRD,
@@ -1070,14 +1070,14 @@ bool Enumerator::FindNxtFsblBrnch_(EnumTreeNode *&newNode) {
     exmndNodeCnt_++;
 
 #ifdef IS_DEBUG_INFSBLTY_TESTS
-    Stats::feasibilityTests++;
+    stats::feasibilityTests++;
 #endif
     isNodeDmntd = isRlxInfsbl = false;
     isLngthFsbl = true;
 
     if (ProbeBranch_(inst, newNode, isNodeDmntd, isRlxInfsbl, isLngthFsbl)) {
 #ifdef IS_DEBUG_INFSBLTY_TESTS
-      Stats::feasibilityHits++;
+      stats::feasibilityHits++;
 #endif
       return true;
     } else {
@@ -1118,14 +1118,14 @@ bool Enumerator::ProbeBranch_(SchedInstruction *inst, EnumTreeNode *&newNode,
   if (inst != NULL) {
     if (inst->GetCrntLwrBound(DIR_FRWRD) > crntCycleNum_) {
 #ifdef IS_DEBUG_INFSBLTY_TESTS
-      Stats::forwardLBInfeasibilityHits++;
+      stats::forwardLBInfeasibilityHits++;
 #endif
       return false;
     }
 
     if (inst->GetCrntDeadline() < crntCycleNum_) {
 #ifdef IS_DEBUG_INFSBLTY_TESTS
-      Stats::backwardLBInfeasibilityHits++;
+      stats::backwardLBInfeasibilityHits++;
 #endif
       return false;
     }
@@ -1149,7 +1149,7 @@ bool Enumerator::ProbeBranch_(SchedInstruction *inst, EnumTreeNode *&newNode,
     if (inst != NULL)
       if (crntNode_->WasSprirNodeExmnd(inst)) {
 #ifdef IS_DEBUG_INFSBLTY_TESTS
-        Stats::nodeSuperiorityInfeasibilityHits++;
+        stats::nodeSuperiorityInfeasibilityHits++;
 #endif
         isNodeDmntd = true;
         return false;
@@ -1167,7 +1167,7 @@ bool Enumerator::ProbeBranch_(SchedInstruction *inst, EnumTreeNode *&newNode,
 
   if (!fsbl) {
 #ifdef IS_DEBUG_INFSBLTY_TESTS
-    Stats::slotCountInfeasibilityHits++;
+    stats::slotCountInfeasibilityHits++;
 #endif
     return false;
   }
@@ -1177,7 +1177,7 @@ bool Enumerator::ProbeBranch_(SchedInstruction *inst, EnumTreeNode *&newNode,
 
   if (fsbl == false) {
 #ifdef IS_DEBUG_INFSBLTY_TESTS
-    Stats::rangeTighteningInfeasibilityHits++;
+    stats::rangeTighteningInfeasibilityHits++;
 #endif
     return false;
   }
@@ -1194,7 +1194,7 @@ bool Enumerator::ProbeBranch_(SchedInstruction *inst, EnumTreeNode *&newNode,
     if (isEarlySubProbDom_)
       if (WasDmnntSubProbExmnd_(inst, newNode)) {
 #ifdef IS_DEBUG_INFSBLTY_TESTS
-        Stats::historyDominationInfeasibilityHits++;
+        stats::historyDominationInfeasibilityHits++;
 #endif
         return false;
       }
@@ -1207,7 +1207,7 @@ bool Enumerator::ProbeBranch_(SchedInstruction *inst, EnumTreeNode *&newNode,
 
     if (fsbl == false) {
 #ifdef IS_DEBUG_INFSBLTY_TESTS
-      Stats::relaxedSchedulingInfeasibilityHits++;
+      stats::relaxedSchedulingInfeasibilityHits++;
 #endif
       isRlxInfsbl = true;
 
@@ -1560,12 +1560,12 @@ bool Enumerator::BackTrack_() {
 bool Enumerator::WasDmnntSubProbExmnd_(SchedInstruction *,
                                        EnumTreeNode *&newNode) {
 #ifdef IS_DEBUG_SPD
-  Stats::signatureDominationTests++;
+  stats::signatureDominationTests++;
 #endif
   HistEnumTreeNode *exNode;
   int listSize = exmndSubProbs_->GetListSize(newNode->GetSig());
   int trvrsdListSize = 0;
-  Stats::historyListSize.Record(listSize);
+  stats::historyListSize.Record(listSize);
   mostRecentMatchingHistNode_ = nullptr;
   bool mostRecentMatchWasSet = false;
 
@@ -1573,7 +1573,7 @@ bool Enumerator::WasDmnntSubProbExmnd_(SchedInstruction *,
        exNode = exmndSubProbs_->GetPrevMatch()) {
     trvrsdListSize++;
 #ifdef IS_DEBUG_SPD
-    Stats::signatureMatches++;
+    stats::signatureMatches++;
 #endif
 
     if (exNode->DoesMatch(newNode, this)) {
@@ -1596,22 +1596,22 @@ bool Enumerator::WasDmnntSubProbExmnd_(SchedInstruction *,
         nodeAlctr_->Free(newNode);
         newNode = NULL;
 #ifdef IS_DEBUG_SPD
-        Stats::positiveDominationHits++;
-        Stats::traversedHistoryListSize.Record(trvrsdListSize);
-        Stats::historyDominationPosition.Record(trvrsdListSize);
-        Stats::historyDominationPositionToListSize.Record(
+        stats::positiveDominationHits++;
+        stats::traversedHistoryListSize.Record(trvrsdListSize);
+        stats::historyDominationPosition.Record(trvrsdListSize);
+        stats::historyDominationPositionToListSize.Record(
             (trvrsdListSize * 100) / listSize);
 #endif
         return true;
       } else {
 #ifdef IS_DEBUG_SPD
-        Stats::signatureAliases++;
+        stats::signatureAliases++;
 #endif
       }
     }
   }
 
-  Stats::traversedHistoryListSize.Record(trvrsdListSize);
+  stats::traversedHistoryListSize.Record(trvrsdListSize);
   return false;
 }
 /****************************************************************************/
@@ -1897,7 +1897,7 @@ void Enumerator::PrintLog_() {
   Logger::Info("Total nodes examined: %lld\n", GetNodeCnt());
   Logger::Info("History table includes %d entries.\n",
                exmndSubProbs_->GetEntryCnt());
-  Logger::GetLogStream() << Stats::historyEntriesPerIteration;
+  Logger::GetLogStream() << stats::historyEntriesPerIteration;
   Logger::Info("--------------------------------------------------\n");
 }
 /*****************************************************************************/
@@ -2085,10 +2085,10 @@ FUNC_RESULT LengthCostEnumerator::FindFeasibleSchedule(InstSchedule *sched,
   FUNC_RESULT rslt = FindFeasibleSchedule_(sched, trgtLngth, deadline);
 
 #ifdef IS_DEBUG_TRACE_ENUM
-  Stats::costChecksPerLength.Record(costChkCnt_);
-  Stats::costPruningsPerLength.Record(costPruneCnt_);
-  Stats::feasibleSchedulesPerLength.Record(fsblSchedCnt_);
-  Stats::improvementsPerLength.Record(imprvmntCnt_);
+  stats::costChecksPerLength.Record(costChkCnt_);
+  stats::costPruningsPerLength.Record(costPruneCnt_);
+  stats::feasibleSchedulesPerLength.Record(fsblSchedCnt_);
+  stats::improvementsPerLength.Record(imprvmntCnt_);
 #endif
 
   return rslt;
@@ -2148,7 +2148,7 @@ bool LengthCostEnumerator::ProbeBranch_(SchedInstruction *inst,
 #endif
 
 #ifdef IS_DEBUG_INFSBLTY_TESTS
-      Stats::historyDominationInfeasibilityHits++;
+      stats::historyDominationInfeasibilityHits++;
 #endif
       rgn_->UnschdulInst(inst, crntCycleNum_, crntSlotNum_, parent);
 
@@ -2265,5 +2265,3 @@ void LengthCostEnumerator::FreeHistNode_(HistEnumTreeNode *histNode) {
   histNodeAlctr_->FreeObject((CostHistEnumTreeNode *)histNode);
 }
 /*****************************************************************************/
-
-} // end namespace opt_sched

@@ -18,6 +18,7 @@ Last Update:  Mar. 2011
 #include "opt-sched/Scheduler/defines.h"
 #include <vector>
 
+namespace llvm {
 namespace opt_sched {
 
 using std::string;
@@ -192,6 +193,7 @@ protected:
   vector<IssueTypeInfo> issueTypes_;
 };
 
-} // end namespace opt_sched
+} // namespace opt_sched
+} // namespace llvm
 
 #endif

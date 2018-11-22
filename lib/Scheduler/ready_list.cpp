@@ -3,7 +3,7 @@
 #include "opt-sched/Scheduler/logger.h"
 #include "opt-sched/Scheduler/utilities.h"
 
-namespace opt_sched {
+using namespace llvm::opt_sched;
 
 ReadyList::ReadyList(DataDepGraph *dataDepGraph, SchedPriorities prirts) {
   prirts_ = prirts;
@@ -326,5 +326,3 @@ void ReadyList::AddPrirtyToKey_(unsigned long &key, int16_t &keySize,
 unsigned long ReadyList::MaxPriority() {
   return maxPriority_;
 }
-
-} // end namespace opt_sched

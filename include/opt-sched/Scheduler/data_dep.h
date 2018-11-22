@@ -15,6 +15,7 @@ Last Update:  Mar. 2011
 #include "opt-sched/Scheduler/OptSchedDDGWrapperBase.h"
 #include <memory>
 
+namespace llvm {
 namespace opt_sched {
 
 // The algorithm to use for determining the lower bound.
@@ -711,5 +712,7 @@ public:
 };
 /*****************************************************************************/
 
-} // end namespace opt_sched
+} // namespace opt_sched
+} // namespace llvm
+
 #endif

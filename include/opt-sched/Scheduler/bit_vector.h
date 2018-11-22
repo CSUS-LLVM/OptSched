@@ -13,6 +13,7 @@ Last Update:  Mar. 2011
 #include <cstring>
 #include <memory>
 
+namespace llvm {
 namespace opt_sched {
 
 class BitVector {
@@ -270,6 +271,7 @@ void BitVector::Print(FILE* file) {
 }
 */
 
-} // end namespace opt_sched
+} // namespace opt_sched
+} // namespace llvm
 
 #endif

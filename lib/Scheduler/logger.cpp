@@ -8,7 +8,7 @@
 // For GetProcessorTime().
 #include "opt-sched/Scheduler/utilities.h"
 
-namespace opt_sched {
+using namespace llvm::opt_sched;
 
 // An ugly macro to simplify repeated vararg-insertion.
 #define VPRINT(buf, frmt)                                                      \
@@ -116,5 +116,3 @@ void Logger::Summary(const char *format_string, ...) {
   VPRINT(message_buffer, format_string);
   Output(Logger::SUMMARY, false, message_buffer);
 }
-
-} // end namespace opt_sched

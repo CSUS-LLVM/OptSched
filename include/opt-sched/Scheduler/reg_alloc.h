@@ -16,6 +16,7 @@ Last Update:  Oct. 2017
 #include <stack>
 #include <vector>
 
+namespace llvm {
 namespace opt_sched {
 
 using namespace std;
@@ -76,5 +77,7 @@ private:
   void SpillAll_();
 };
 
-} // end namespace opt_sched
+} // namespace opt_sched
+} // namespace llvm
+
 #endif

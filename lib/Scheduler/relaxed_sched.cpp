@@ -3,7 +3,7 @@
 #include "opt-sched/Scheduler/utilities.h"
 #include <algorithm>
 
-namespace opt_sched {
+using namespace llvm::opt_sched;
 
 RelaxedScheduler::RelaxedScheduler(DataDepStruct *dataDepGraph,
                                    MachineModel *machMdl,
@@ -1142,5 +1142,3 @@ void LPP_RelaxedScheduler::RestoreLwrBounds_(DIRECTION dir) {
   }
 }
 /*****************************************************************************/
-
-} // end namespace opt_sched

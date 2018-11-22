@@ -15,6 +15,7 @@ Last Update:  Mar. 2011
 #include <cstring>
 #include <limits>
 
+namespace llvm {
 namespace opt_sched {
 
 typedef unsigned int UDT_HASHVAL;
@@ -944,6 +945,7 @@ FUNC_RESULT StrHashTable<T>::InsertElement(const char *name, T *elmnt) {
   return RES_SUCCESS;
 }
 
-} // end namespace opt_sched
+} // namespace opt_sched
+} // namespace llvm
 
 #endif

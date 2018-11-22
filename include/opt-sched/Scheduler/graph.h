@@ -13,6 +13,7 @@ Last Update:  Mar. 2011
 #include "opt-sched/Scheduler/defines.h"
 #include "opt-sched/Scheduler/lnkd_lst.h"
 
+namespace llvm {
 namespace opt_sched {
 
 // The type of edge labels.
@@ -479,6 +480,7 @@ inline DIRECTION DirAcycGraph::ReverseDirection(DIRECTION dir) {
   return dir == DIR_FRWRD ? DIR_BKWRD : DIR_FRWRD;
 }
 
-} // end namespace opt_sched
+} // namespace opt_sched
+} // namespace llvm
 
 #endif

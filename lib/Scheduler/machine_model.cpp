@@ -6,7 +6,7 @@
 #include "opt-sched/Scheduler/logger.h"
 #include <iomanip>
 
-namespace opt_sched {
+using namespace llvm::opt_sched;
 
 MachineModel::MachineModel(const string &modelFile) {
   SpecsBuffer buf;
@@ -217,5 +217,3 @@ int MachineModel::GetIssueRate() const { return issueRate_; }
 int16_t MachineModel::GetRegTypeCnt() const {
   return (int16_t)registerTypes_.size();
 }
-
-} // end namespace opt_sched

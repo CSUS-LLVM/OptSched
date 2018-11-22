@@ -16,7 +16,7 @@
 
 extern bool OPTSCHED_gPrintSpills;
 
-namespace opt_sched {
+using namespace llvm::opt_sched;
 
 SchedRegion::SchedRegion(MachineModel *machMdl, DataDepGraph *dataDepGraph,
                          long rgnNum, int16_t sigHashSize, LB_ALG lbAlg,
@@ -94,7 +94,7 @@ FUNC_RESULT SchedRegion::FindOptimalSchedule(
                dataDepGraph_->GetDagID(), dataDepGraph_->GetInstCnt(),
                dataDepGraph_->GetMaxLtncy());
 
-  Stats::problemSize.Record(dataDepGraph_->GetInstCnt());
+  stats::problemSize.Record(dataDepGraph_->GetInstCnt());
 
   // Setup graph transformations
   dataDepGraph_->InitGraphTrans();
@@ -153,7 +153,7 @@ FUNC_RESULT SchedRegion::FindOptimalSchedule(
   }
 
   hurstcTime = Utilities::GetProcessorTime() - hurstcStart;
-  Stats::heuristicTime.Record(hurstcTime);
+  stats::heuristicTime.Record(hurstcTime);
   if (hurstcTime > 0)
     Logger::Info("Heuristic_Time %d", hurstcTime);
 
@@ -192,7 +192,7 @@ FUNC_RESULT SchedRegion::FindOptimalSchedule(
   hurstcCost_ = lstSched->GetCost();
   isLstOptml = CmputUprBounds_(lstSched, useFileBounds);
   boundTime = Utilities::GetProcessorTime() - boundStart;
-  Stats::boundComputationTime.Record(boundTime);
+  stats::boundComputationTime.Record(boundTime);
 
   FinishHurstc_();
 
@@ -267,7 +267,7 @@ FUNC_RESULT SchedRegion::FindOptimalSchedule(
 
     if (hurstcTime > 0) {
       enumTime /= hurstcTime;
-      Stats::enumerationToHeuristicTimeRatio.Record(enumTime);
+      stats::enumerationToHeuristicTimeRatio.Record(enumTime);
     }
 
     if (bestCost_ < hurstcCost_) {
@@ -313,7 +313,7 @@ FUNC_RESULT SchedRegion::FindOptimalSchedule(
   }
 
   enumTime = Utilities::GetProcessorTime() - enumStart;
-  Stats::enumerationTime.Record(enumTime);
+  stats::enumerationTime.Record(enumTime);
 
   Milliseconds vrfyStart = Utilities::GetProcessorTime();
 
@@ -321,12 +321,12 @@ FUNC_RESULT SchedRegion::FindOptimalSchedule(
     bool isValidSchdul = bestSched->Verify(machMdl_, dataDepGraph_);
 
     if (isValidSchdul == false) {
-      Stats::invalidSchedules++;
+      stats::invalidSchedules++;
     }
   }
 
   vrfyTime = Utilities::GetProcessorTime() - vrfyStart;
-  Stats::verificationTime.Record(vrfyTime);
+  stats::verificationTime.Record(vrfyTime);
 
   InstCount finalLwrBound = costLwrBound_;
   InstCount finalUprBound = costLwrBound_ + bestCost_;
@@ -467,8 +467,8 @@ FUNC_RESULT SchedRegion::Optimize_(Milliseconds startTime,
 #ifdef IS_DEBUG_NODES
   Logger::Info("Examined %lld nodes.", enumrtr->GetNodeCnt());
 #endif
-  Stats::nodeCount.Record(enumrtr->GetNodeCnt());
-  Stats::solutionTime.Record(solnTime);
+  stats::nodeCount.Record(enumrtr->GetNodeCnt());
+  stats::solutionTime.Record(solnTime);
 
   InstCount imprvmnt = initCost - bestCost_;
   if (rslt == RES_SUCCESS) {
@@ -476,8 +476,8 @@ FUNC_RESULT SchedRegion::Optimize_(Milliseconds startTime,
                  "length=%d, spill cost = %d, tot cost = %d, cost imp=%d.",
                  solnTime, bestSchedLngth_, bestSched_->GetSpillCost(),
                  bestCost_, imprvmnt);
-    Stats::solvedProblemSize.Record(dataDepGraph_->GetInstCnt());
-    Stats::solutionTimeForSolvedProblems.Record(solnTime);
+    stats::solvedProblemSize.Record(dataDepGraph_->GetInstCnt());
+    stats::solutionTimeForSolvedProblems.Record(solnTime);
   } else {
     if (rslt == RES_TIMEOUT) {
       Logger::Info("DAG timed out with "
@@ -485,7 +485,7 @@ FUNC_RESULT SchedRegion::Optimize_(Milliseconds startTime,
                    bestSchedLngth_, bestSched_->GetSpillCost(), bestCost_,
                    imprvmnt);
     }
-    Stats::unsolvedProblemSize.Record(dataDepGraph_->GetInstCnt());
+    stats::unsolvedProblemSize.Record(dataDepGraph_->GetInstCnt());
   }
 
   return rslt;
@@ -648,5 +648,3 @@ void SchedRegion::RegAlloc_(InstSchedule *&bestSched, InstSchedule *&lstSched) {
 #endif
     }
 }
-
-} // end namespace opt_sched

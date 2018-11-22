@@ -17,6 +17,7 @@ Last Update:  Sept. 2013
 #include "opt-sched/Scheduler/hash_table.h"
 #include <iostream>
 
+namespace llvm {
 namespace opt_sched {
 
 using std::string;
@@ -680,6 +681,7 @@ protected:
   void InitVars_();
 };
 
-} // end namespace opt_sched
+} // namespace opt_sched
+} // namespace llvm
 
 #endif

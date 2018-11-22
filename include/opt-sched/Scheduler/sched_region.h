@@ -17,6 +17,7 @@ Last Update:  Apr. 2011
 // For Enumerator, LengthCostEnumerator, EnumTreeNode and Pruning.
 #include "opt-sched/Scheduler/enumerator.h"
 
+namespace llvm {
 namespace opt_sched {
 
 // How to compare cost.
@@ -214,6 +215,7 @@ protected:
   virtual const std::vector<int> &GetSLIL_() const = 0;
 };
 
-} // end namespace opt_sched
+} // namespace opt_sched
+} // namespace llvm
 
 #endif

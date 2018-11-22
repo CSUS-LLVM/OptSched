@@ -6,7 +6,7 @@
 #include <climits>
 #include <utility>
 
-namespace opt_sched {
+using namespace llvm::opt_sched;
 
 LocalRegAlloc::LocalRegAlloc(InstSchedule *instSchedule,
                              DataDepGraph *dataDepGraph) {
@@ -294,5 +294,3 @@ void LocalRegAlloc::PrintSpillInfo(const char *dagName) {
 }
 
 int LocalRegAlloc::GetCost() { return numLoads_ + numStores_; }
-
-} // end namespace opt_sched

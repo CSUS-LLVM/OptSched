@@ -18,10 +18,9 @@ contained in those ini files.
 #include "llvm/MC/MCInstrItineraries.h"
 #include <map>
 
-using namespace opt_sched;
+using namespace llvm;
 
 namespace llvm {
-
 namespace opt_sched {
 
 class MachineModelGenerator;
@@ -89,7 +88,6 @@ private:
 };
 
 } // end namespace opt_sched
-
 } // namespace llvm
 
 #endif

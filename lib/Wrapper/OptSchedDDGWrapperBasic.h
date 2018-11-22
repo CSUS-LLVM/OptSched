@@ -18,10 +18,9 @@
 #include <set>
 #include <vector>
 
-using namespace opt_sched;
+using namespace llvm;
 
 namespace llvm {
-
 namespace opt_sched {
 
 class LLVMRegTypeFilter;
@@ -196,7 +195,6 @@ public:
 };
 
 } // end namespace opt_sched
-
 } // end namespace llvm
 
 #endif // LLVM_OPT_SCHED_DDG_WRAPPER_BASIC_H

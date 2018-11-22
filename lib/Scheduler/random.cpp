@@ -3,7 +3,7 @@
 #include <algorithm>
 #include <cstring>
 
-namespace opt_sched {
+using namespace llvm::opt_sched;
 
 // Magic numbers used in the generator formula.
 static const uint32_t A = 0x2faf071d; // 8 * (10 ** 8 - 29) + 5
@@ -103,5 +103,3 @@ void RandomGen::GetRandBits(uint16_t bitCnt, unsigned char *dest) {
     bytesNeeded -= bytesConsumed;
   }
 }
-
-} // end namespace opt_sched

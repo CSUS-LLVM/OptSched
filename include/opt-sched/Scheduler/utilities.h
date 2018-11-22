@@ -11,6 +11,7 @@ Last Update:  Mar. 2017
 #include "opt-sched/Scheduler/defines.h"
 #include <chrono>
 
+namespace llvm {
 namespace opt_sched {
 
 namespace Utilities {
@@ -40,6 +41,7 @@ inline Milliseconds Utilities::GetProcessorTime() {
   return elapsed.count();
 }
 
-} // end namespace opt_sched
+} // namespace opt_sched
+} // namespace llvm
 
 #endif
