@@ -105,7 +105,7 @@ int16_t MachineModel::GetRegTypeByName(char const *const regTypeName) const {
       break;
     }
   }
-  assert(Type != INVALID_VALUE && "No instruction type with that name in machine model");
+  assert(Type != INVALID_VALUE && "No register type with that name in machine model");
   return Type;
 }
 

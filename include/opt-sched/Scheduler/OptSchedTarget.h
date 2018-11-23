@@ -8,12 +8,12 @@
 #ifndef LLVM_OPT_SCHED_TARGET_H
 #define LLVM_OPT_SCHED_TARGET_H
 
-
-#include "opt-sched/Scheduler/machine_model.h"
 #include "opt-sched/Scheduler/OptSchedDDGWrapperBase.h"
-#include "llvm/CodeGen/MachineScheduler.h"
+#include "opt-sched/Scheduler/data_dep.h"
+#include "opt-sched/Scheduler/machine_model.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/SmallVector.h"
+#include "llvm/CodeGen/MachineScheduler.h"
 
 namespace llvm {
 namespace opt_sched {
@@ -34,23 +34,22 @@ public:
                    GraphTransTypes GraphTransTypes,
                    const std::string &RegionID) = 0;
 
-  virtual void initRegion() = 0;
-  virtual void finalizeRegion() = 0;
+  virtual void initRegion(const MachineSchedContext *Context,
+                          const MachineModel *MM) = 0;
+  virtual void finalizeRegion(const InstSchedule *Schedule) = 0;
 };
 
-template <typename FactoryT>
-class OptSchedRegistryNode {
+template <typename FactoryT> class OptSchedRegistryNode {
 public:
   llvm::SmallString<16> Name;
   FactoryT Factory;
   OptSchedRegistryNode *Next;
 
   OptSchedRegistryNode(llvm::StringRef Name_, FactoryT Factory_)
-    : Name(Name_), Factory(Factory_) {}
+      : Name(Name_), Factory(Factory_) {}
 };
 
-template <typename FactoryT>
-class OptSchedRegistry {
+template <typename FactoryT> class OptSchedRegistry {
 private:
   OptSchedRegistryNode<FactoryT> *List = nullptr;
   OptSchedRegistryNode<FactoryT> *Default = nullptr;
@@ -89,14 +88,13 @@ public:
 };
 
 class OptSchedTargetRegistry
-  : public OptSchedRegistryNode<
-    std::unique_ptr<OptSchedTarget> (*)()> {
+    : public OptSchedRegistryNode<std::unique_ptr<OptSchedTarget> (*)()> {
 public:
   using OptSchedTargetFactory = std::unique_ptr<OptSchedTarget> (*)();
   static OptSchedRegistry<OptSchedTargetFactory> Registry;
 
   OptSchedTargetRegistry(llvm::StringRef Name_, OptSchedTargetFactory Factory_)
-                       : OptSchedRegistryNode(Name_, Factory_) {
+      : OptSchedRegistryNode(Name_, Factory_) {
     Registry.add(this);
   }
 };

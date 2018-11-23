@@ -4,8 +4,8 @@
 //
 //===----------------------------------------------------------------------===//
 #include "OptSchedMachineWrapper.h"
-#include "opt-sched/Scheduler/machine_model.h"
 #include "opt-sched/Scheduler/OptSchedTarget.h"
+#include "opt-sched/Scheduler/machine_model.h"
 #include "llvm/ADT/STLExtras.h"
 #include <memory>
 
@@ -26,12 +26,13 @@ public:
                    OptSchedMachineModel *MM, LATENCY_PRECISION LatencyPrecision,
                    GraphTransTypes GraphTransTypes,
                    const std::string &RegionID) override {
-		return llvm::make_unique<OptSchedDDGWrapperBasic>(
-      Context, DAG, MM, LatencyPrecision, GraphTransTypes, RegionID);
+    return llvm::make_unique<OptSchedDDGWrapperBasic>(
+        Context, DAG, MM, LatencyPrecision, GraphTransTypes, RegionID);
   }
 
-  void initRegion() override {}
-  void finalizeRegion() override {}
+  void initRegion(const llvm::MachineSchedContext *Context,
+                  const MachineModel *MM) override {}
+  void finalizeRegion(const InstSchedule *Schedule) override {}
 };
 
 } // end anonymous namespace
@@ -39,8 +40,7 @@ public:
 namespace llvm {
 namespace opt_sched {
 
-std::unique_ptr<OptSchedTarget>
-createOptSchedGenericTarget() {
+std::unique_ptr<OptSchedTarget> createOptSchedGenericTarget() {
   return llvm::make_unique<OptSchedGenericTarget>();
 }
 

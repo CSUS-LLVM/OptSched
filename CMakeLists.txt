@@ -52,7 +52,7 @@ SET(OPT_SCHED_SRCS Scheduler/aco.cpp
 SET(OPT_SCHED_INCLUDE_DIRS ${CMAKE_CURRENT_SOURCE_DIR}/include)
 
 # Only build and include AMDGPU functionality if it is being targeted.
-IF ("ADGPU" IN_LIST LLVM_TARGETS_TO_BUILD)
+IF ("AMDGPU" IN_LIST LLVM_TARGETS_TO_BUILD)
 	SET (OPT_SCHED_SRCS ${OPT_SCHED_SRCS} Wrapper/AMDGPU/OptSchedGCNTarget.cpp
 																				Wrapper/AMDGPU/OptSchedDDGWrapperGCN.cpp)
 

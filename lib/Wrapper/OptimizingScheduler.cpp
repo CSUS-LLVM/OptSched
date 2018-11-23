@@ -305,7 +305,7 @@ void ScheduleDAGOptSched::schedule() {
   // Build LLVM DAG
   SetupLLVMDag();
 
-  OST->initRegion();
+  OST->initRegion(context, MM.get());
 
   // Apply llvm DAG post processing.
   if (enableMutations)
@@ -408,7 +408,7 @@ void ScheduleDAGOptSched::schedule() {
     } // end OptSched succeeded
   }
 
-  OST->finalizeRegion();
+  OST->finalizeRegion(sched);
 
 #ifdef IS_DEBUG_PEAK_PRESSURE
   Logger::Info("Register pressure after");
