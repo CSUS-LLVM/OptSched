@@ -5,8 +5,8 @@
 //===----------------------------------------------------------------------===//
 
 #include "GCNRegPressure.h"
-#include "OptSchedDDGWrapperBasic.h"
-#include "OptimizingScheduler.h"
+#include "Wrapper/OptSchedDDGWrapperBasic.h"
+#include "Wrapper/OptimizingScheduler.h"
 #include "opt-sched/Scheduler/sched_basic_data.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/CodeGen/LiveIntervals.h"

@@ -5,7 +5,6 @@
 //===----------------------------------------------------------------------===//
 #include "OptimizingScheduler.h"
 #include "OptSchedDDGWrapperBasic.h"
-#include "OptSchedDDGWrapperGCN.h"
 #include "OptSchedMachineWrapper.h"
 #include "opt-sched/Scheduler/OptSchedTarget.h"
 #include "opt-sched/Scheduler/OptSchedDDGWrapperBase.h"
@@ -17,6 +16,7 @@
 #include "opt-sched/Scheduler/register.h"
 #include "opt-sched/Scheduler/sched_region.h"
 #include "opt-sched/Scheduler/utilities.h"
+#include "llvm/CodeGen/LiveIntervals.h"
 #include "llvm/ADT/StringMap.h"
 #include "llvm/CodeGen/MachineRegisterInfo.h"
 #include "llvm/CodeGen/MachineScheduler.h"
@@ -103,9 +103,9 @@ void getRealCfgPathCL(SmallString<128> &Path) {
 void reportCfgDirPathError(std::error_code EC, llvm::StringRef OptSchedCfg) {
   if (OptSchedCfg == DEFAULT_CFG_DIR)
     llvm::report_fatal_error(EC.message() +
-                                 ": Error searching for the OptSched config "
-                                 "directory in the default location: " +
-                                 DEFAULT_CFG_DIR,
+                             ": Error searching for the OptSched config "
+                             "directory in the default location: " +
+                             DEFAULT_CFG_DIR,
                              false);
   else
     llvm::report_fatal_error(EC.message() + ": " + OptSchedCfg, false);
@@ -121,16 +121,6 @@ MachineBasicBlock::iterator nextIfDebug(MachineBasicBlock::iterator I,
       break;
   }
   return I;
-}
-
-// Create a GCN DDG wrapper
-std::unique_ptr<OptSchedDDGWrapperBase>
-createGCNDDGWrapper(MachineSchedContext *Context, ScheduleDAGOptSched *DAG,
-                    OptSchedMachineModel *MM, LATENCY_PRECISION LatencyPrecision,
-                    GraphTransTypes GraphTransTypes,
-                    const std::string &RegionID) {
-  return make_unique<OptSchedDDGWrapperGCN>(Context, DAG, MM, LatencyPrecision,
-                                            GraphTransTypes, RegionID);
 }
 
 } // end anonymous namespace
@@ -194,7 +184,7 @@ void ScheduleDAGOptSched::schedule() {
   // per scheduling region within a machine function.
   ++regionNum;
   const std::string RegionName = context->MF->getFunction().getName().data() +
-                                 std::string(":") + std::to_string(regionNum);
+                                  std::string(":") + std::to_string(regionNum);
 
   // (Chris): This option in the sched.ini file will override USE_OPT_SCHED. It
   // will only apply B&B if the region name belongs in the list of specified
@@ -322,13 +312,8 @@ void ScheduleDAGOptSched::schedule() {
     postprocessDAG();
 
   // Convert graph
-  std::unique_ptr<OptSchedDDGWrapperBase> DDG;
-  if (TM.getTargetTriple().getArch() == Triple::ArchType::amdgcn)
-    DDG = createGCNDDGWrapper(context, this, MM.get(), latencyPrecision,
-                              graphTransTypes, RegionName);
-  else
-    DDG = OST->createDDGWrapper(context, this, MM.get(), latencyPrecision,
-                                graphTransTypes, RegionName);
+  auto DDG = OST->createDDGWrapper(context, this, MM.get(), latencyPrecision,
+                                   graphTransTypes, RegionName);
 
   DDG->convertSUnits();
   DDG->convertRegFiles();
