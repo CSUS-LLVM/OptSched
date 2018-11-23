@@ -66,7 +66,6 @@ void OptSchedGCNTarget::dumpOccupancyInfo(const InstSchedule *Schedule) const {
 
   dbgs() << "Estimated Max Occupancy After Scheduling: "
          << std::min(std::min(MaxOccSGPR, MaxOccVGPR), MaxOccLDS) << "\n";
-  ;
   dbgs() << "Max Occ with LDS: " << MaxOccLDS << "\n";
   dbgs() << "Max Occ with Num SGPRs: " << MaxOccSGPR << "\n";
   dbgs() << "Max Occ with Num VGPRs: " << MaxOccVGPR << "\n";

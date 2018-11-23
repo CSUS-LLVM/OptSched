@@ -1171,7 +1171,6 @@ void DataDepGraph::CmputCrtclPathsFrmRcrsvPrdcsr_(SchedInstruction *ref) {
   LinkedList<GraphNode> *rcrsvScsrLst = ref->GetRcrsvNghbrLst(DIR_FRWRD);
   SchedInstruction *inst = GetLeafInst();
   GraphNode *node;
-  InstCount cp = 0;
 
   assert(rcrsvScsrLst != NULL);
 
@@ -1179,21 +1178,21 @@ void DataDepGraph::CmputCrtclPathsFrmRcrsvPrdcsr_(SchedInstruction *ref) {
   for (node = rcrsvScsrLst->GetLastElmnt(); node != NULL;
        node = rcrsvScsrLst->GetPrevElmnt()) {
     inst = (SchedInstruction *)node;
-    cp = inst->CmputCrtclPathFrmRcrsvPrdcsr(ref);
+    inst->CmputCrtclPathFrmRcrsvPrdcsr(ref);
   }
 
   assert(inst == GetLeafInst()); // the last instruction must be the leaf
 
   // The forward CP of the root relative to this entry must be
   // equal to the backward CP of the entry relative to the leaf
-  assert(cp == ref->GetCrtclPath(DIR_BKWRD));
+  assert(inst->CmputCrtclPathFrmRcrsvPrdcsr(ref) ==
+         ref->GetCrtclPath(DIR_BKWRD));
 }
 
 void DataDepGraph::CmputCrtclPathsFrmRcrsvScsr_(SchedInstruction *ref) {
   LinkedList<GraphNode> *rcrsvPrdcsrLst = ref->GetRcrsvNghbrLst(DIR_BKWRD);
   SchedInstruction *inst = GetRootInst();
   GraphNode *node;
-  InstCount cp = 0;
 
   assert(rcrsvPrdcsrLst != NULL);
 
@@ -1201,14 +1200,15 @@ void DataDepGraph::CmputCrtclPathsFrmRcrsvScsr_(SchedInstruction *ref) {
   for (node = rcrsvPrdcsrLst->GetLastElmnt(); node != NULL;
        node = rcrsvPrdcsrLst->GetPrevElmnt()) {
     inst = (SchedInstruction *)node;
-    cp = inst->CmputCrtclPathFrmRcrsvScsr(ref);
+    inst->CmputCrtclPathFrmRcrsvScsr(ref);
   }
 
   assert(inst == GetRootInst()); // the last instruction must be the root
 
   // The backward CP of the root relative to this exit must be
   // equal to the forward CP of th exit relative to the root
-  assert(cp == ref->GetCrtclPath(DIR_FRWRD));
+  assert(inst->CmputCrtclPathFrmRcrsvScsr(ref) ==
+         ref->GetCrtclPath(DIR_FRWRD));
 }
 
 void DataDepGraph::PrintLwrBounds(DIRECTION dir, std::ostream &out,
