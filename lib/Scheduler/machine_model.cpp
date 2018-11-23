@@ -5,6 +5,7 @@
 #include "opt-sched/Scheduler/buffers.h"
 #include "opt-sched/Scheduler/logger.h"
 #include <iomanip>
+#include <cassert>
 
 using namespace llvm::opt_sched;
 
@@ -97,13 +98,15 @@ InstType MachineModel::GetInstTypeByName(const string &typeName,
 }
 
 int16_t MachineModel::GetRegTypeByName(char const *const regTypeName) const {
+  int16_t Type = INVALID_VALUE;
   for (size_t i = 0; i < registerTypes_.size(); i++) {
     if (regTypeName == registerTypes_[i].name) {
-      return (int16_t)i;
+      Type = (int16_t)i;
+      break;
     }
   }
-
-  return INVALID_VALUE;
+  assert(Type != INVALID_VALUE && "No instruction type with that name in machine model");
+  return Type;
 }
 
 IssueType
