@@ -559,11 +559,11 @@ bool ScheduleDAGOptSched::isOptSchedEnabled() const {
 LATENCY_PRECISION ScheduleDAGOptSched::fetchLatencyPrecision() const {
   std::string lpName =
       SchedulerOptions::getInstance().GetString("LATENCY_PRECISION");
-  if (lpName == "PRECISE") {
+  if (lpName == "FILE" || lpName == "PRECISE") {
     return LTP_PRECISE;
-  } else if (lpName == "ROUGH") {
+  } else if (lpName == "LLVM" || lpName == "ROUGH") {
     return LTP_ROUGH;
-  } else if (lpName == "UNITY") {
+  } else if (lpName == "UNIT" || lpName == "UNITY") {
     return LTP_UNITY;
   } else {
     LLVM_DEBUG(
@@ -638,6 +638,8 @@ SPILL_COST_FUNCTION ScheduleDAGOptSched::parseSpillCostFunc() const {
     return SCF_PEAK_PLUS_AVG;
   } else if (name == "SLIL") {
     return SCF_SLIL;
+  } else if (name == "OCC") {
+    return SCF_OCC;
   } else {
     LLVM_DEBUG(
         Logger::Error("Unrecognized spill cost function. Defaulted to PERP."));
