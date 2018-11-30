@@ -9,12 +9,15 @@ IF (NOT CMAKE_BUILD_TYPE)
   message(FATAL_ERROR "Must set cmake build type.")
 ENDIF ()
 
+IF (${PACKAGE_VERSION} VERSION_LESS "7.0")
+  add_definitions("-DLLVM_DEBUG=DEBUG")
+ENDIF()
+
 # Add OptSched debug defines eg: SET(OPT_SCHED_DEBUG_FLAGS "-DIS_DEBUG_DEFS_AND_USES -DIS_DEBUG_DEF_USE_COUNT")
 SET(OPT_SCHED_DEBUG_FLAGS "")
 
 # If asserts are enabled opt-sched must be built with "IS_DEBUG".
 SET(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -DIS_DEBUG")
-
 SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OPT_SCHED_DEBUG_FLAGS}")
 
 IF (CMAKE_BUILD_TYPE EQUAL "DEBUG")
@@ -53,9 +56,13 @@ SET(OPT_SCHED_INCLUDE_DIRS ${CMAKE_CURRENT_SOURCE_DIR}/include)
 
 # Only build and include AMDGPU functionality if it is being targeted.
 IF ("AMDGPU" IN_LIST LLVM_TARGETS_TO_BUILD)
-	SET (OPT_SCHED_SRCS ${OPT_SCHED_SRCS} Wrapper/AMDGPU/OptSchedGCNTarget.cpp
-																				Wrapper/AMDGPU/OptSchedDDGWrapperGCN.cpp)
+  IF (${PACKAGE_VERSION} VERSION_LESS "7.0")
+    message(FATAL_ERROR "Targeting AMDGPU with OptSched requires LLVM version >=7.0")
+  ENDIF()
 
+  SET (OPT_SCHED_TARGET_DEPS "AMDGPUCommonTableGen")
+	SET (OPT_SCHED_SRCS ${OPT_SCHED_SRCS} Wrapper/AMDGPU/OptSchedGCNTarget.cpp
+                                        Wrapper/AMDGPU/OptSchedDDGWrapperGCN.cpp)
   SET (OPT_SCHED_INCLUDE_DIRS ${OPT_SCHED_INCLUDE_DIRS} ${CMAKE_CURRENT_SOURCE_DIR}/lib
                               ${LLVM_MAIN_SRC_DIR}/lib/Target/AMDGPU
                               ${CMAKE_CURRENT_BINARY_DIR}/../../lib/Target/AMDGPU)

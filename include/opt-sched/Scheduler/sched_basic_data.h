@@ -78,6 +78,8 @@ enum SPILL_COST_FUNCTION {
   SCF_SLIL,
   // Run a register allocator and count the spills
   SCF_SPILLS,
+  // Occupancy cost function. (AMDGPU)
+  SCF_OCC
 };
 
 // The type of instruction signatures, used by the enumerator's history table to

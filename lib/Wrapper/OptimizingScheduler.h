@@ -22,12 +22,6 @@
 #include <memory>
 #include <vector>
 
-// If using an LLVM version before release 7 redefine LLVM_DEBUG for
-// compatibility
-#ifndef LLVM_DEBUG
-#define LLVM_DEBUG DEBUG
-#endif
-
 using namespace llvm;
 
 namespace llvm {

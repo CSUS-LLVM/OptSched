@@ -4,4 +4,4 @@ add_llvm_loadable_module(OptSched
   llc
   )
 
-add_dependencies(OptSched intrinsics_gen)
+add_dependencies(OptSched intrinsics_gen ${OPT_SCHED_TARGET_DEPS})
