@@ -26,7 +26,7 @@ using namespace llvm::opt_sched;
 // The denominator used when calculating cost weight.
 static const int COST_WGHT_BASE = 10000;
 
-BBWithSpill::BBWithSpill(MachineModel *machMdl, DataDepGraph *dataDepGraph,
+BBWithSpill::BBWithSpill(const OptSchedTarget *OST_, DataDepGraph *dataDepGraph,
                          long rgnNum, int16_t sigHashSize, LB_ALG lbAlg,
                          SchedPriorities hurstcPrirts,
                          SchedPriorities enumPrirts, bool vrfySched,
@@ -34,8 +34,8 @@ BBWithSpill::BBWithSpill(MachineModel *machMdl, DataDepGraph *dataDepGraph,
                          int spillCostFactor, SPILL_COST_FUNCTION spillCostFunc,
                          bool chkSpillCostSum, bool chkCnflcts, bool fixLivein,
                          bool fixLiveout, int maxSpillCost)
-    : SchedRegion(machMdl, dataDepGraph, rgnNum, sigHashSize, lbAlg,
-                  hurstcPrirts, enumPrirts, vrfySched, prune) {
+    : SchedRegion(OST_->MM, dataDepGraph, rgnNum, sigHashSize, lbAlg,
+                  hurstcPrirts, enumPrirts, vrfySched, prune), OST(OST_) {
   costLwrBound_ = 0;
   enumrtr_ = NULL;
   optmlSpillCost_ = INVALID_VALUE;
@@ -49,8 +49,7 @@ BBWithSpill::BBWithSpill(MachineModel *machMdl, DataDepGraph *dataDepGraph,
   enblStallEnum_ = enblStallEnum;
   spillCostFactor_ = spillCostFactor;
   schedCostFactor_ = COST_WGHT_BASE;
-  spillCostFunc_ = spillCostFunc;
-  chkSpillCostSum_ = chkSpillCostSum;
+  spillCostFunc_ = spillCostFunc; chkSpillCostSum_ = chkSpillCostSum;
   chkCnflcts_ = chkCnflcts;
   fixLivein_ = fixLivein;
   fixLiveout_ = fixLiveout;
@@ -60,7 +59,7 @@ BBWithSpill::BBWithSpill(MachineModel *machMdl, DataDepGraph *dataDepGraph,
   if (fixLivein_ || fixLiveout_)
     needTrnstvClsr_ = true;
 
-  regTypeCnt_ = machMdl->GetRegTypeCnt();
+  regTypeCnt_ = OST->MM->GetRegTypeCnt();
   regFiles_ = dataDepGraph->getRegFiles();
   liveRegs_ = new WeightedBitVector[regTypeCnt_];
   livePhysRegs_ = new WeightedBitVector[regTypeCnt_];
@@ -421,6 +420,9 @@ void BBWithSpill::CmputCrntSpillCost_() {
     break;
   case SCF_SLIL:
     crntSpillCost_ = slilSpillCost_;
+    break;
+  case SCF_TARGET:
+    crntSpillCost_ = OST->getCost(peakRegPressures_);
     break;
   default:
     crntSpillCost_ = peakSpillCost_;

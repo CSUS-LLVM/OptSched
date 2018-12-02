@@ -11,6 +11,7 @@
 #include "opt-sched/Scheduler/OptSchedDDGWrapperBase.h"
 #include "opt-sched/Scheduler/data_dep.h"
 #include "opt-sched/Scheduler/machine_model.h"
+#include "opt-sched/Scheduler/defines.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/CodeGen/MachineScheduler.h"
@@ -23,6 +24,8 @@ class ScheduleDAGOptSched;
 
 class OptSchedTarget {
 public:
+  MachineModel *MM;
+
   virtual ~OptSchedTarget() = default;
 
   virtual std::unique_ptr<OptSchedMachineModel>
@@ -35,8 +38,10 @@ public:
                    const std::string &RegionID) = 0;
 
   virtual void initRegion(const MachineSchedContext *Context,
-                          const MachineModel *MM) = 0;
+                          MachineModel *MM) = 0;
   virtual void finalizeRegion(const InstSchedule *Schedule) = 0;
+  // Get target specific cost from peak register pressure (e.g. occupancy for AMDGPU)
+  virtual InstCount getCost(InstCount *PRP) const = 0;
 };
 
 template <typename FactoryT> class OptSchedRegistryNode {

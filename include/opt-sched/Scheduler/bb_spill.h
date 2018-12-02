@@ -11,6 +11,7 @@ Last Update:  Apr. 2011
 
 #include "opt-sched/Scheduler/defines.h"
 #include "opt-sched/Scheduler/sched_region.h"
+#include "opt-sched/Scheduler/OptSchedTarget.h"
 #include <map>
 #include <set>
 #include <vector>
@@ -30,6 +31,9 @@ private:
 
   InstCount crntSpillCost_;
   InstCount optmlSpillCost_;
+
+  // The target machine
+  const OptSchedTarget *OST;
 
   bool enblStallEnum_;
   int spillCostFactor_;
@@ -109,7 +113,7 @@ private:
   void CmputCnflcts_(InstSchedule *sched);
 
 public:
-  BBWithSpill(MachineModel *machMdl, DataDepGraph *dataDepGraph, long rgnNum,
+  BBWithSpill(const OptSchedTarget *OST_, DataDepGraph *dataDepGraph, long rgnNum,
               int16_t sigHashSize, LB_ALG lbAlg, SchedPriorities hurstcPrirts,
               SchedPriorities enumPrirts, bool vrfySched, Pruning prune,
               bool schedForRPOnly, bool enblStallEnum, int spillCostFactor,

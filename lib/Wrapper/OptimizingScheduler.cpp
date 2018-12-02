@@ -320,7 +320,7 @@ void ScheduleDAGOptSched::schedule() {
 
   // create region
   SchedRegion *region = new BBWithSpill(
-      MM.get(), static_cast<DataDepGraph *>(DDG.get()), 0, histTableHashBits,
+      OST.get(), static_cast<DataDepGraph *>(DDG.get()), 0, histTableHashBits,
       lowerBoundAlgorithm, heuristicPriorities, enumPriorities, verifySchedule,
       prune, schedForRPOnly, enumerateStalls, spillCostFactor,
       spillCostFunction, checkSpillCostSum, checkConflicts, fixLiveIn,
@@ -638,8 +638,8 @@ SPILL_COST_FUNCTION ScheduleDAGOptSched::parseSpillCostFunc() const {
     return SCF_PEAK_PLUS_AVG;
   } else if (name == "SLIL") {
     return SCF_SLIL;
-  } else if (name == "OCC") {
-    return SCF_OCC;
+  } else if (name == "OCC" || name == "Target") {
+    return SCF_TARGET;
   } else {
     LLVM_DEBUG(
         Logger::Error("Unrecognized spill cost function. Defaulted to PERP."));

@@ -6,6 +6,7 @@
 #include "OptSchedMachineWrapper.h"
 #include "opt-sched/Scheduler/OptSchedTarget.h"
 #include "opt-sched/Scheduler/machine_model.h"
+#include "opt-sched/Scheduler/defines.h"
 #include "llvm/ADT/STLExtras.h"
 #include <memory>
 
@@ -31,11 +32,20 @@ public:
   }
 
   void initRegion(const llvm::MachineSchedContext *Context,
-                  const MachineModel *MM) override {}
+                  MachineModel *MM) override {}
   void finalizeRegion(const InstSchedule *Schedule) override {}
+  // For generic target find total PRP.
+  InstCount getCost(InstCount *PRP) const override;
 };
 
 } // end anonymous namespace
+
+InstCount OptSchedGenericTarget::getCost(InstCount *PRP) const {
+  InstCount TotalPRP = 0;
+  for (int16_t T = 0; T < MM->GetRegTypeCnt(); ++T)
+    TotalPRP += PRP[T];
+  return TotalPRP;
+}
 
 namespace llvm {
 namespace opt_sched {

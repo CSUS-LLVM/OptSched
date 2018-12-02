@@ -6,6 +6,7 @@
 #include "OptSchedDDGWrapperGCN.h"
 #include "Wrapper/OptSchedMachineWrapper.h"
 #include "opt-sched/Scheduler/OptSchedTarget.h"
+#include "opt-sched/Scheduler/defines.h"
 #include "opt-sched/Scheduler/machine_model.h"
 #include "llvm/ADT/STLExtras.h"
 #include <memory>
@@ -29,20 +30,23 @@ public:
                    OptSchedMachineModel *MM, LATENCY_PRECISION LatencyPrecision,
                    GraphTransTypes GraphTransTypes,
                    const std::string &RegionID) override {
-
     return llvm::make_unique<OptSchedDDGWrapperGCN>(
         Context, DAG, MM, LatencyPrecision, GraphTransTypes, RegionID);
   }
 
   void initRegion(const llvm::MachineSchedContext *Context,
-                  const MachineModel *MM_) override;
+                  MachineModel *MM_) override;
   void finalizeRegion(const InstSchedule *Schedule) override;
+  // Returns occupancy cost with number of VGPRs and SGPRs from PRP for
+  // a partial or complete schedule.
+  InstCount getCost(InstCount *PRP) const override;
 
   void dumpOccupancyInfo(const InstSchedule *Schedule) const;
 
 private:
   const llvm::MachineFunction *MF;
-  const MachineModel *MM;
+  // Max occupancy with local memory size;
+  unsigned MaxOccLDS;
 };
 
 std::unique_ptr<OptSchedTarget> createOptSchedGCNTarget() {
@@ -73,13 +77,33 @@ void OptSchedGCNTarget::dumpOccupancyInfo(const InstSchedule *Schedule) const {
 #endif
 
 void OptSchedGCNTarget::initRegion(const llvm::MachineSchedContext *Context,
-                                   const MachineModel *MM_) {
+                                   MachineModel *MM_) {
   MF = Context->MF;
   MM = MM_;
+  auto &ST = MF->getSubtarget<GCNSubtarget>();
+  MaxOccLDS = ST.getOccupancyWithLocalMemSize(*MF);
 }
 
 void OptSchedGCNTarget::finalizeRegion(const InstSchedule *Schedule) {
   LLVM_DEBUG(dumpOccupancyInfo(Schedule));
+}
+
+InstCount OptSchedGCNTarget::getCost(InstCount *PRP) const {
+  // FIXME: It's bad to asssume that the reg types for SGPR32/VGPR32 are
+  // fixed, but we avoid doing an expensive string compare here with
+  // GetRegTypeByName since updating the cost happens so often. We should
+  // replace OptSched register types completely with PSets to fix both issues.
+  auto &ST = MF->getSubtarget<GCNSubtarget>();
+
+  unsigned SGPR32Count = PRP[OptSchedDDGWrapperGCN::SGPR32];
+  auto MaxOccSGPR = ST.getOccupancyWithNumSGPRs(SGPR32Count);
+
+  unsigned VGPR32Count = PRP[OptSchedDDGWrapperGCN::VGPR32];
+  auto MaxOccVGPR = ST.getOccupancyWithNumVGPRs(VGPR32Count);
+
+  auto MaxOcc = std::min(std::min(MaxOccSGPR, MaxOccVGPR), MaxOccLDS);
+  // 10 occupancy is cost 0, 2 occupancy is cost 8 ect.
+  return static_cast<InstCount>(10 - MaxOcc);
 }
 
 namespace llvm {
