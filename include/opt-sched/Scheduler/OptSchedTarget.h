@@ -62,7 +62,7 @@ public:
 
   FactoryT getFactoryWithName(llvm::StringRef Name) {
     FactoryT Factory = nullptr;
-    for (auto I = List; I; I = List->Next)
+    for (auto I = List; I; I = I->Next)
       if (I->Name == Name) {
         Factory = I->Factory;
         break;
@@ -72,7 +72,7 @@ public:
 
   void setDefault(llvm::StringRef Name) {
     OptSchedRegistryNode<FactoryT> Node = nullptr;
-    for (auto I = List; I; I = List->Next)
+    for (auto I = List; I; I = I->Next)
       if (I->Name == Name) {
         Node = I;
         break;
