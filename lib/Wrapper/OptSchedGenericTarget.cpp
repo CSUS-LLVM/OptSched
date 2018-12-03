@@ -35,12 +35,13 @@ public:
                   MachineModel *MM) override {}
   void finalizeRegion(const InstSchedule *Schedule) override {}
   // For generic target find total PRP.
-  InstCount getCost(InstCount *PRP) const override;
+  InstCount getCost(const llvm::SmallVectorImpl<unsigned> &PRP) const override;
 };
 
 } // end anonymous namespace
 
-InstCount OptSchedGenericTarget::getCost(InstCount *PRP) const {
+InstCount OptSchedGenericTarget::getCost(
+    const llvm::SmallVectorImpl<unsigned> &PRP) const {
   InstCount TotalPRP = 0;
   for (int16_t T = 0; T < MM->GetRegTypeCnt(); ++T)
     TotalPRP += PRP[T];

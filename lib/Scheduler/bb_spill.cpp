@@ -65,6 +65,7 @@ BBWithSpill::BBWithSpill(const OptSchedTarget *OST_, DataDepGraph *dataDepGraph,
   livePhysRegs_ = new WeightedBitVector[regTypeCnt_];
   spillCosts_ = new InstCount[dataDepGraph_->GetInstCnt()];
   peakRegPressures_ = new InstCount[regTypeCnt_];
+  RegPressures.resize(regTypeCnt_);
   sumOfLiveIntervalLengths_.resize(regTypeCnt_, 0);
 
   entryInstCnt_ = 0;
@@ -342,6 +343,7 @@ void BBWithSpill::InitForCostCmputtn_() {
     if (chkCnflcts_)
       regFiles_[i].ResetConflicts();
     peakRegPressures_[i] = 0;
+    RegPressures[i] = 0;
   }
 
   for (i = 0; i < dataDepGraph_->GetInstCnt(); i++)
@@ -408,6 +410,7 @@ void BBWithSpill::CmputCrntSpillCost_() {
   switch (spillCostFunc_) {
   case SCF_PERP:
   case SCF_PRP:
+  case SCF_TARGET:
   case SCF_PEAK_PER_TYPE:
     crntSpillCost_ = peakSpillCost_;
     break;
@@ -420,9 +423,6 @@ void BBWithSpill::CmputCrntSpillCost_() {
     break;
   case SCF_SLIL:
     crntSpillCost_ = slilSpillCost_;
-    break;
-  case SCF_TARGET:
-    crntSpillCost_ = OST->getCost(peakRegPressures_);
     break;
   default:
     crntSpillCost_ = peakSpillCost_;
@@ -534,8 +534,12 @@ void BBWithSpill::UpdateSpillInfoForSchdul_(SchedInstruction *inst,
   }
 #endif
 
+
   for (int16_t i = 0; i < regTypeCnt_; i++) {
     liveRegs = liveRegs_[i].GetWghtedCnt();
+    // Set current RP for register type "i"
+    RegPressures[i] = liveRegs;
+    // Update peak RP for register type "i"
     if (liveRegs > peakRegPressures_[i])
       peakRegPressures_[i] = liveRegs;
 
@@ -566,15 +570,16 @@ void BBWithSpill::UpdateSpillInfoForSchdul_(SchedInstruction *inst,
     if (excessRegs > 0) {
       newSpillCost += excessRegs;
     }
+
+    // FIXME: Can this be taken out of this loop?
     if (spillCostFunc_ == SCF_SLIL) {
       slilSpillCost_ = std::accumulate(sumOfLiveIntervalLengths_.begin(),
                                        sumOfLiveIntervalLengths_.end(), 0);
     }
-
-    // if (trackLiveRangeLngths_) {
-
-    // }
   }
+
+  if (spillCostFunc_ == SCF_TARGET)
+    newSpillCost = OST->getCost(RegPressures);
 
 #ifdef IS_DEBUG_SLIL_CORRECT
   if (OPTSCHED_gPrintSpills) {

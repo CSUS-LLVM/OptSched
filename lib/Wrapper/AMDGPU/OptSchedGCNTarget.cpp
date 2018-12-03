@@ -39,7 +39,7 @@ public:
   void finalizeRegion(const InstSchedule *Schedule) override;
   // Returns occupancy cost with number of VGPRs and SGPRs from PRP for
   // a partial or complete schedule.
-  InstCount getCost(InstCount *PRP) const override;
+  InstCount getCost(const llvm::SmallVectorImpl<unsigned> &PRP) const override;
 
   void dumpOccupancyInfo(const InstSchedule *Schedule) const;
 
@@ -88,7 +88,8 @@ void OptSchedGCNTarget::finalizeRegion(const InstSchedule *Schedule) {
   LLVM_DEBUG(dumpOccupancyInfo(Schedule));
 }
 
-InstCount OptSchedGCNTarget::getCost(InstCount *PRP) const {
+InstCount
+OptSchedGCNTarget::getCost(const llvm::SmallVectorImpl<unsigned> &PRP) const {
   // FIXME: It's bad to asssume that the reg types for SGPR32/VGPR32 are
   // fixed, but we avoid doing an expensive string compare here with
   // GetRegTypeByName since updating the cost happens so often. We should

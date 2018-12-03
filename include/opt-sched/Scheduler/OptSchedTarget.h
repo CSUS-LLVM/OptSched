@@ -41,7 +41,7 @@ public:
                           MachineModel *MM) = 0;
   virtual void finalizeRegion(const InstSchedule *Schedule) = 0;
   // Get target specific cost from peak register pressure (e.g. occupancy for AMDGPU)
-  virtual InstCount getCost(InstCount *PRP) const = 0;
+  virtual InstCount getCost(const llvm::SmallVectorImpl<unsigned> &PRP) const = 0;
 };
 
 template <typename FactoryT> class OptSchedRegistryNode {

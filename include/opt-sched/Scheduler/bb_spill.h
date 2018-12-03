@@ -12,6 +12,7 @@ Last Update:  Apr. 2011
 #include "opt-sched/Scheduler/defines.h"
 #include "opt-sched/Scheduler/sched_region.h"
 #include "opt-sched/Scheduler/OptSchedTarget.h"
+#include "llvm/ADT/SmallVector.h"
 #include <map>
 #include <set>
 #include <vector>
@@ -72,6 +73,8 @@ private:
   bool fixLiveout_;
 
   InstCount *spillCosts_;
+  // Current register pressure for each register type.
+  SmallVector<unsigned, 8> RegPressures;
   InstCount *peakRegPressures_;
   InstCount crntStepNum_;
   InstCount peakSpillCost_;
