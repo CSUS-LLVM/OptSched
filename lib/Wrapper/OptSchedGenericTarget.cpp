@@ -31,8 +31,10 @@ public:
         Context, DAG, MM, LatencyPrecision, GraphTransTypes, RegionID);
   }
 
-  void initRegion(const llvm::MachineSchedContext *Context,
-                  MachineModel *MM) override {}
+  void initRegion(const llvm::MachineSchedContext *Context_,
+                  MachineModel *MM_) override {
+    MM = MM_;
+  }
   void finalizeRegion(const InstSchedule *Schedule) override {}
   // For generic target find total PRP.
   InstCount getCost(const llvm::SmallVectorImpl<unsigned> &PRP) const override;
