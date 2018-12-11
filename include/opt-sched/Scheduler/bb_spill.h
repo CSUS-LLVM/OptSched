@@ -74,7 +74,7 @@ private:
 
   InstCount *spillCosts_;
   // Current register pressure for each register type.
-  SmallVector<unsigned, 8> RegPressures;
+  SmallVector<unsigned, 8> regPressures_;
   InstCount *peakRegPressures_;
   InstCount crntStepNum_;
   InstCount peakSpillCost_;

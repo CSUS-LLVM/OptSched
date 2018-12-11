@@ -40,6 +40,11 @@ public:
   virtual void initRegion(const MachineSchedContext *Context,
                           MachineModel *MM) = 0;
   virtual void finalizeRegion(const InstSchedule *Schedule) = 0;
+  // FIXME: This is a shortcut to doing the proper thing and creating a RP class that
+  // targets can overrride. It’s hard to justify spending the extra time when we
+  // will be refactoring RP tracking in general if we do a rewrite to fully
+  // integrate the scheduler in LLVM.
+  //
   // Get target specific cost from peak register pressure (e.g. occupancy for AMDGPU)
   virtual InstCount getCost(const llvm::SmallVectorImpl<unsigned> &PRP) const = 0;
 };
