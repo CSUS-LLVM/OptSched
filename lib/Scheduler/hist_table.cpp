@@ -447,8 +447,6 @@ static bool doesHistorySLILCostDominate(InstCount OtherPrefixCost,
                                         InstCount HistPrefixCost,
                                         InstCount HistTotalCost,
                                         LengthCostEnumerator *LCE) {
-  if (OtherPrefixCost >= HistPrefixCost)
-    return true;
   auto RequiredImprovement = std::max(HistTotalCost - LCE->GetBestCost(), 0);
   auto ImprovementOnHistory = HistPrefixCost - OtherPrefixCost;
   return ImprovementOnHistory <= RequiredImprovement;
@@ -458,43 +456,48 @@ static bool doesHistorySLILCostDominate(InstCount OtherPrefixCost,
 // depend on the prefix cost. We can prune the Other node if the max of the
 // prefix and the history total cost is not better than the best cost schedule.
 static bool doesHistoryPeakCostDominate(InstCount OtherPrefixCost,
-                                        InstCount HistPrefixCost,
                                         InstCount HistTotalCost,
                                         LengthCostEnumerator *LCE) {
-  if (OtherPrefixCost >= HistPrefixCost)
-    return true;
   return LCE->GetBestCost() <= std::max(OtherPrefixCost, HistTotalCost);
 }
 
+// Should we prune the other node based on RP cost.
 bool CostHistEnumTreeNode::ChkCostDmntnForBBSpill_(EnumTreeNode *Node,
                                                    Enumerator *E) {
-  bool RES = true;
   if (time_ > Node->GetTime())
     return false;
 
+  // If the other node's prefix cost is higher than or equal to the history
+  // prefix cost the other node is pruned.
   assert(costInfoSet_);
-  LengthCostEnumerator *LCE = static_cast<LengthCostEnumerator *>(E);
-  SPILL_COST_FUNCTION SpillCostFunc = LCE->GetSpillCostFunc();
+  bool ShouldPrune;
+  if (Node->GetCostLwrBound() >= partialCost_)
+    ShouldPrune = true;
+  else {
+    ShouldPrune = false;
+    LengthCostEnumerator *LCE = static_cast<LengthCostEnumerator *>(E);
+    SPILL_COST_FUNCTION SpillCostFunc = LCE->GetSpillCostFunc();
 
-  if (SpillCostFunc == SCF_TARGET || SpillCostFunc == SCF_PRP ||
-      SpillCostFunc == SCF_PERP)
-    RES = doesHistoryPeakCostDominate(Node->GetCostLwrBound(), partialCost_,
-                                      totalCost_, LCE);
+    // We cannot prune based on prefix cost, but check for more aggressive
+    // pruning conditions that are specific to the current cost function.
+    if (SpillCostFunc == SCF_TARGET || SpillCostFunc == SCF_PRP ||
+        SpillCostFunc == SCF_PERP)
+      ShouldPrune = doesHistoryPeakCostDominate(Node->GetCostLwrBound(),
+                                                totalCost_, LCE);
 
-  else if (SpillCostFunc == SCF_SLIL)
-    RES = doesHistorySLILCostDominate(Node->GetCostLwrBound(), partialCost_,
-                                      totalCost_, LCE);
-  else
-    RES = cost_ <= Node->GetCost();
+    else if (SpillCostFunc == SCF_SLIL)
+      ShouldPrune = doesHistorySLILCostDominate(Node->GetCostLwrBound(),
+                                                partialCost_, totalCost_, LCE);
 
-  // If the cost function is peak plus avg, make sure that the fraction lost
-  // by integer divsion does not lead to false domination.
-  if (SpillCostFunc == SCF_PEAK_PLUS_AVG && cost_ == Node->GetCost()) {
-    InstCount instCnt = E->GetTotInstCnt();
-    RES = spillCostSum_ % instCnt >= Node->GetSpillCostSum() % instCnt;
+    // If the cost function is peak plus avg, make sure that the fraction lost
+    // by integer divsion does not lead to false domination.
+    else if (SpillCostFunc == SCF_PEAK_PLUS_AVG && cost_ == Node->GetCost()) {
+      InstCount instCnt = E->GetTotInstCnt();
+      ShouldPrune =
+          spillCostSum_ % instCnt >= Node->GetSpillCostSum() % instCnt;
+    }
   }
-
-  return RES;
+  return ShouldPrune;
 }
 
 void CostHistEnumTreeNode::SetCostInfo(EnumTreeNode *node, bool, Enumerator *) {
