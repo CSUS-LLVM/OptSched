@@ -54,12 +54,20 @@ SET(OPT_SCHED_SRCS Scheduler/aco.cpp
 
 SET(OPT_SCHED_INCLUDE_DIRS ${CMAKE_CURRENT_SOURCE_DIR}/include)
 
-# Only build and include AMDGPU functionality if it is being targeted.
-IF ("AMDGPU" IN_LIST LLVM_TARGETS_TO_BUILD)
-  IF (${PACKAGE_VERSION} VERSION_LESS "7.0")
-    message(FATAL_ERROR "Targeting AMDGPU with OptSched requires LLVM version >=7.0")
-  ENDIF()
+function(check_if_AMDGPU_supported)
+	IF (("AMDGPU" IN_LIST LLVM_TARGETS_TO_BUILD) AND (${PACKAGE_VERSION} VERSION_LESS "7.0"))
+		message(WARNING "OptSched requries LLVM version >= 7.0 to build the AMDGPU scheduler.")
+    LIST(REMOVE_ITEM LLVM_TARGETS_TO_BUILD "AMDGPU")
+		SET(AMDGPU_SUPPORTED False PARENT_SCOPE)
 
+  ELSE ()
+    SET(AMDGPU_SUPPORTED True PARENT_SCOPE)
+	ENDIF ()
+endfunction(check_if_AMDGPU_supported)
+
+# Only build and include AMDGPU functionality if it is being targeted.
+check_if_AMDGPU_supported()
+IF (${AMDGPU_SUPPORTED})
   SET (OPT_SCHED_TARGET_DEPS "AMDGPUCommonTableGen")
 	SET (OPT_SCHED_SRCS ${OPT_SCHED_SRCS} Wrapper/AMDGPU/OptSchedGCNTarget.cpp
                                         Wrapper/AMDGPU/OptSchedDDGWrapperGCN.cpp)
