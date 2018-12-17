@@ -96,10 +96,10 @@ OptSchedGCNTarget::getCost(const llvm::SmallVectorImpl<unsigned> &PRP) const {
   // replace OptSched register types completely with PSets to fix both issues.
   auto &ST = MF->getSubtarget<GCNSubtarget>();
 
-  unsigned SGPR32Count = PRP[OptSchedDDGWrapperGCN::SGPR32];
+  unsigned SGPR32Count = PRP[OptSchedDDGWrapperGCN::SGPR32] + 3;
   auto MaxOccSGPR = ST.getOccupancyWithNumSGPRs(SGPR32Count);
 
-  unsigned VGPR32Count = PRP[OptSchedDDGWrapperGCN::VGPR32];
+  unsigned VGPR32Count = PRP[OptSchedDDGWrapperGCN::VGPR32] + 3;
   auto MaxOccVGPR = ST.getOccupancyWithNumVGPRs(VGPR32Count);
 
   auto MaxOcc = std::min(std::min(MaxOccSGPR, MaxOccVGPR), MaxOccLDS);
