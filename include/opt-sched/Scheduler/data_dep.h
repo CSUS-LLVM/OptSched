@@ -679,11 +679,11 @@ public:
   InstCount GetSchedCycle(SchedInstruction *inst);
 
   void SetCost(InstCount cost);
-  InstCount GetCost();
+  InstCount GetCost() const;
   void SetExecCost(InstCount cost);
-  InstCount GetExecCost();
+  InstCount GetExecCost() const;
   void SetSpillCost(InstCount cost);
-  InstCount GetSpillCost();
+  InstCount GetSpillCost() const;
 
   void ResetInstIter();
   InstCount GetFrstInst(InstCount &cycleNum, InstCount &slotNum);

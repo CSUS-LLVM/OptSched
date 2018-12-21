@@ -1,16 +1,16 @@
 #include "opt-sched/Scheduler/bb_spill.h"
+#include "opt-sched/Scheduler/aco.h"
+#include "opt-sched/Scheduler/config.h"
 #include "opt-sched/Scheduler/data_dep.h"
-#include "opt-sched/Scheduler/register.h"
-#include "opt-sched/Scheduler/reg_alloc.h"
 #include "opt-sched/Scheduler/enumerator.h"
+#include "opt-sched/Scheduler/list_sched.h"
 #include "opt-sched/Scheduler/logger.h"
 #include "opt-sched/Scheduler/random.h"
-#include "opt-sched/Scheduler/config.h"
+#include "opt-sched/Scheduler/reg_alloc.h"
+#include "opt-sched/Scheduler/register.h"
+#include "opt-sched/Scheduler/relaxed_sched.h"
 #include "opt-sched/Scheduler/stats.h"
 #include "opt-sched/Scheduler/utilities.h"
-#include "opt-sched/Scheduler/list_sched.h"
-#include "opt-sched/Scheduler/relaxed_sched.h"
-#include "opt-sched/Scheduler/aco.h"
 #include <cstdio>
 #include <iostream>
 #include <map>
@@ -18,6 +18,7 @@
 #include <set>
 #include <sstream>
 #include <utility>
+#include <algorithm>
 
 extern bool OPTSCHED_gPrintSpills;
 
@@ -26,7 +27,7 @@ using namespace llvm::opt_sched;
 // The denominator used when calculating cost weight.
 static const int COST_WGHT_BASE = 10000;
 
-BBWithSpill::BBWithSpill(MachineModel *machMdl, DataDepGraph *dataDepGraph,
+BBWithSpill::BBWithSpill(const OptSchedTarget *OST_, DataDepGraph *dataDepGraph,
                          long rgnNum, int16_t sigHashSize, LB_ALG lbAlg,
                          SchedPriorities hurstcPrirts,
                          SchedPriorities enumPrirts, bool vrfySched,
@@ -34,8 +35,9 @@ BBWithSpill::BBWithSpill(MachineModel *machMdl, DataDepGraph *dataDepGraph,
                          int spillCostFactor, SPILL_COST_FUNCTION spillCostFunc,
                          bool chkSpillCostSum, bool chkCnflcts, bool fixLivein,
                          bool fixLiveout, int maxSpillCost)
-    : SchedRegion(machMdl, dataDepGraph, rgnNum, sigHashSize, lbAlg,
-                  hurstcPrirts, enumPrirts, vrfySched, prune) {
+    : SchedRegion(OST_->MM, dataDepGraph, rgnNum, sigHashSize, lbAlg,
+                  hurstcPrirts, enumPrirts, vrfySched, prune),
+      OST(OST_) {
   costLwrBound_ = 0;
   enumrtr_ = NULL;
   optmlSpillCost_ = INVALID_VALUE;
@@ -60,12 +62,13 @@ BBWithSpill::BBWithSpill(MachineModel *machMdl, DataDepGraph *dataDepGraph,
   if (fixLivein_ || fixLiveout_)
     needTrnstvClsr_ = true;
 
-  regTypeCnt_ = machMdl->GetRegTypeCnt();
+  regTypeCnt_ = OST->MM->GetRegTypeCnt();
   regFiles_ = dataDepGraph->getRegFiles();
   liveRegs_ = new WeightedBitVector[regTypeCnt_];
   livePhysRegs_ = new WeightedBitVector[regTypeCnt_];
   spillCosts_ = new InstCount[dataDepGraph_->GetInstCnt()];
   peakRegPressures_ = new InstCount[regTypeCnt_];
+  regPressures_.resize(regTypeCnt_);
   sumOfLiveIntervalLengths_.resize(regTypeCnt_, 0);
 
   entryInstCnt_ = 0;
@@ -101,9 +104,11 @@ bool BBWithSpill::EnableEnum_() {
 ConstrainedScheduler *BBWithSpill::AllocHeuristicScheduler_() {
   Config &schedIni = SchedulerOptions::getInstance();
   if (schedIni.GetBool("USE_ACO", false))
-    return new ACOScheduler(dataDepGraph_, machMdl_, abslutSchedUprBound_, hurstcPrirts_);
+    return new ACOScheduler(dataDepGraph_, machMdl_, abslutSchedUprBound_,
+                            hurstcPrirts_);
   else
-    return new ListScheduler(dataDepGraph_, machMdl_, abslutSchedUprBound_, hurstcPrirts_);
+    return new ListScheduler(dataDepGraph_, machMdl_, abslutSchedUprBound_,
+                             hurstcPrirts_);
 }
 /*****************************************************************************/
 
@@ -343,6 +348,7 @@ void BBWithSpill::InitForCostCmputtn_() {
     if (chkCnflcts_)
       regFiles_[i].ResetConflicts();
     peakRegPressures_[i] = 0;
+    regPressures_[i] = 0;
   }
 
   for (i = 0; i < dataDepGraph_->GetInstCnt(); i++)
@@ -410,6 +416,7 @@ void BBWithSpill::CmputCrntSpillCost_() {
   case SCF_PERP:
   case SCF_PRP:
   case SCF_PEAK_PER_TYPE:
+  case SCF_TARGET:
     crntSpillCost_ = peakSpillCost_;
     break;
   case SCF_SUM:
@@ -436,7 +443,7 @@ void BBWithSpill::UpdateSpillInfoForSchdul_(SchedInstruction *inst,
   Register **defs, **uses;
   Register *def, *use;
   int excessRegs, liveRegs;
-  InstCount newSpillCost;
+  InstCount newSpillCost, targetSpillCost;
 
   defCnt = inst->GetDefs(defs);
   useCnt = inst->GetUses(uses);
@@ -534,6 +541,9 @@ void BBWithSpill::UpdateSpillInfoForSchdul_(SchedInstruction *inst,
 
   for (int16_t i = 0; i < regTypeCnt_; i++) {
     liveRegs = liveRegs_[i].GetWghtedCnt();
+    // Set current RP for register type "i"
+    regPressures_[i] = liveRegs;
+    // Update peak RP for register type "i"
     if (liveRegs > peakRegPressures_[i])
       peakRegPressures_[i] = liveRegs;
 
@@ -550,38 +560,43 @@ void BBWithSpill::UpdateSpillInfoForSchdul_(SchedInstruction *inst,
       }
     }
 
-#ifdef IS_DEBUG_REG_PRESSURE
-    Logger::Info("Reg type %d has %d live regs", i, liveRegs);
-#endif
-
-    if (spillCostFunc_ == SCF_PEAK_PER_TYPE)
-      excessRegs = peakRegPressures_[i] - machMdl_->GetPhysRegCnt(i);
-    else if (spillCostFunc_ == SCF_PRP)
-      excessRegs = liveRegs;
-    else
-      excessRegs = liveRegs - machMdl_->GetPhysRegCnt(i);
-
-    if (excessRegs > 0) {
-      newSpillCost += excessRegs;
-    }
+    // FIXME: Can this be taken out of this loop?
     if (spillCostFunc_ == SCF_SLIL) {
       slilSpillCost_ = std::accumulate(sumOfLiveIntervalLengths_.begin(),
                                        sumOfLiveIntervalLengths_.end(), 0);
     }
+  }
 
-    // if (trackLiveRangeLngths_) {
+  if (spillCostFunc_ == SCF_TARGET) {
+    newSpillCost = OST->getCost(regPressures_);
 
-    // }
+  } else if (spillCostFunc_ == SCF_SLIL) {
+    slilSpillCost_ = std::accumulate(sumOfLiveIntervalLengths_.begin(),
+                                     sumOfLiveIntervalLengths_.end(), 0);
+
+  } else if (spillCostFunc_ == SCF_PRP) {
+    newSpillCost =
+        std::accumulate(regPressures_.begin(), regPressures_.end(), 0);
+
+  } else if (spillCostFunc_ == SCF_PEAK_PER_TYPE) {
+    for (int i = 0; i < regTypeCnt_; i++)
+      newSpillCost += std::max(0, peakRegPressures_[i] - machMdl_->GetPhysRegCnt(i));
+
+  } else {
+    // Default is PERP (Some SCF like SUM rely on PERP being the default here)
+    int i = 0;
+    std::for_each(regPressures_.begin(), regPressures_.end(),
+        [&](InstCount RP) { newSpillCost += std::max(0, RP - machMdl_->GetPhysRegCnt(i++)); });
   }
 
 #ifdef IS_DEBUG_SLIL_CORRECT
   if (OPTSCHED_gPrintSpills) {
-    Logger::Info(
-        "Printing live range lengths for instruction AFTER calculation.");
-    for (int j = 0; j < sumOfLiveIntervalLengths_.size(); j++) {
-      Logger::Info("SLIL for regType %d is currently %d", j,
-                   sumOfLiveIntervalLengths_[j]);
-    }
+      Logger::Info(
+          "Printing live range lengths for instruction AFTER calculation.");
+      for (int j = 0; j < sumOfLiveIntervalLengths_.size(); j++) {
+        Logger::Info("SLIL for regType %d is currently %d", j,
+                     sumOfLiveIntervalLengths_[j]);
+      }
   }
 #endif
 
@@ -593,8 +608,9 @@ void BBWithSpill::UpdateSpillInfoForSchdul_(SchedInstruction *inst,
 #endif
 
   totSpillCost_ += newSpillCost;
-  if (newSpillCost > peakSpillCost_)
-    peakSpillCost_ = newSpillCost;
+
+  peakSpillCost_ = std::max(peakSpillCost_, newSpillCost);
+
   CmputCrntSpillCost_();
 
   schduldInstCnt_++;
@@ -910,6 +926,8 @@ bool BBWithSpill::ChkCostFsblty(InstCount trgtLngth, EnumTreeNode *node) {
 
   fsbl = dynmcCostLwrBound < bestCost_;
 
+  // FIXME: RP tracking should be limited to the current SCF. We need RP
+  // tracking interface.
   if (fsbl) {
     node->SetCost(crntCost);
     node->SetCostLwrBound(dynmcCostLwrBound);

@@ -4,15 +4,15 @@
 //
 //===----------------------------------------------------------------------===//
 
+#ifndef LLVM_OPT_SCHED_DDG_WRAPPER_GCN_H
+#define LLVM_OPT_SCHED_DDG_WRAPPER_GCN_H
+
 #include "GCNRegPressure.h"
 #include "Wrapper/OptSchedDDGWrapperBasic.h"
 #include "Wrapper/OptimizingScheduler.h"
 #include "opt-sched/Scheduler/sched_basic_data.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/CodeGen/LiveIntervals.h"
-
-#ifndef LLVM_OPT_SCHED_DDG_WRAPPER_GCN_H
-#define LLVM_OPT_SCHED_DDG_WRAPPER_GCN_H
 
 namespace llvm {
 namespace opt_sched {
@@ -42,13 +42,6 @@ public:
 
 class OptSchedDDGWrapperGCN : public OptSchedDDGWrapperBasic {
 private:
-  // FIXME: Track VGPR/SGPR tuples or refactor Scheduler to use LLVM/GCN RP tracker.
-  enum SubRegKind {
-    SGPR32,
-    VGPR32,
-    TOTAL_KINDS
-  };
-
   // Map sub-registers in LLVM to a list of live subreg lanes for that register.
   // Each live lane represents either a VGPR32 or SGPR32. In our model each live
   // subreg lane is identified by a separate OptSched register.
@@ -69,6 +62,13 @@ private:
                      const LaneBitmask &LiveMask, bool LiveOut = false);
 
 public:
+  // FIXME: Track VGPR/SGPR tuples or refactor Scheduler to use LLVM/GCN RP tracker.
+  enum SubRegKind {
+    SGPR32,
+    VGPR32,
+    TOTAL_KINDS
+  };
+
   OptSchedDDGWrapperGCN(llvm::MachineSchedContext *Context,
                         ScheduleDAGOptSched *DAG, OptSchedMachineModel *MM,
                         LATENCY_PRECISION LatencyPrecision,

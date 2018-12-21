@@ -1134,16 +1134,11 @@ bool Enumerator::ProbeBranch_(SchedInstruction *inst, EnumTreeNode *&newNode,
   // If we are scheduling for register pressure only, and this branch
   // defines a register but does not use any, we can prune this branch
   // if another instruction in the ready list does use a register.
-  if (schedForRPOnly_)
-    if (inst != NULL)
-      if (crntNode_->FoundInstWithUse())
-        if (inst->GetAdjustedUseCnt() == 0 &&
-            !dataDepGraph_->DoesFeedUser(inst)) {
-#ifdef IS_DEBUG_RP_ONLY_RES
-          Logger::Info("RP Only pruning");
-#endif
-          return false;
-        }
+  if (schedForRPOnly_) {
+    if (inst != NULL && crntNode_->FoundInstWithUse() &&
+        inst->GetAdjustedUseCnt() == 0 && !dataDepGraph_->DoesFeedUser(inst))
+      return false;
+  }
 
   if (prune_.nodeSup) {
     if (inst != NULL)

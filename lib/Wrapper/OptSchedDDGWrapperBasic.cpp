@@ -450,17 +450,12 @@ void OptSchedDDGWrapperBasic::convertEdges(const SUnit &SU) {
       break;
     }
 
-    if (LatencyPrecision == LTP_PRECISE && MaxSizeForPreciseLatency > 0 &&
-        DAG->SUnits.size() > static_cast<size_t>(MaxSizeForPreciseLatency))
-      LatencyPrecision = LTP_ROUGH; // TODO: (eliminate)
-
     int16_t Latency;
-    if (LatencyPrecision ==
-        LTP_PRECISE) { // get precise latency from the machine model
+    if (ltncyPrcsn_ == LTP_PRECISE) { // get latency from the machine model
       const auto &InstName = DAG->TII->getName(instr->getOpcode());
       const auto &InstType = MM->GetInstTypeByName(InstName);
       Latency = MM->GetLatency(InstType, DepType);
-    } else if (LatencyPrecision == LTP_ROUGH) // rough latency = llvm latency
+    } else if (ltncyPrcsn_ == LTP_ROUGH) // rough latency = llvm latency
       Latency = I->getLatency();
     else
       Latency = 1; // unit latency = ignore ilp

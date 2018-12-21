@@ -3105,15 +3105,15 @@ void InstSchedule::GetCycleAndSlotNums_(InstCount globSlotNum,
 
 void InstSchedule::SetCost(InstCount cost) { cost_ = cost; }
 
-InstCount InstSchedule::GetCost() { return cost_; }
+InstCount InstSchedule::GetCost() const { return cost_; }
 
 void InstSchedule::SetExecCost(InstCount cost) { execCost_ = cost; }
 
-InstCount InstSchedule::GetExecCost() { return execCost_; }
+InstCount InstSchedule::GetExecCost() const { return execCost_; }
 
 void InstSchedule::SetSpillCost(InstCount cost) { spillCost_ = cost; }
 
-InstCount InstSchedule::GetSpillCost() { return spillCost_; }
+InstCount InstSchedule::GetSpillCost() const { return spillCost_; }
 
 /*******************************************************************************
  * Previously inlined functions
