@@ -442,8 +442,8 @@ void BBWithSpill::UpdateSpillInfoForSchdul_(SchedInstruction *inst,
   int defCnt, useCnt, regNum, physRegNum;
   Register **defs, **uses;
   Register *def, *use;
-  int excessRegs, liveRegs;
-  InstCount newSpillCost, targetSpillCost;
+  int liveRegs;
+  InstCount newSpillCost;
 
   defCnt = inst->GetDefs(defs);
   useCnt = inst->GetUses(uses);
