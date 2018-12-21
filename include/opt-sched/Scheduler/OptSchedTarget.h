@@ -12,6 +12,7 @@
 #include "opt-sched/Scheduler/data_dep.h"
 #include "opt-sched/Scheduler/machine_model.h"
 #include "opt-sched/Scheduler/defines.h"
+#include "llvm/CodeGen/MachineScheduler.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/CodeGen/MachineScheduler.h"
@@ -37,7 +38,7 @@ public:
                    GraphTransTypes GraphTransTypes,
                    const std::string &RegionID) = 0;
 
-  virtual void initRegion(const MachineSchedContext *Context,
+  virtual void initRegion(ScheduleDAGInstrs *DAG,
                           MachineModel *MM) = 0;
   virtual void finalizeRegion(const InstSchedule *Schedule) = 0;
   // FIXME: This is a shortcut to doing the proper thing and creating a RP class that

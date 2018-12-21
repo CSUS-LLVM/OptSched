@@ -305,7 +305,7 @@ void ScheduleDAGOptSched::schedule() {
   // Build LLVM DAG
   SetupLLVMDag();
 
-  OST->initRegion(context, MM.get());
+  OST->initRegion(this, MM.get());
 
   // Apply llvm DAG post processing.
   if (enableMutations)

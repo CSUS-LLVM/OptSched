@@ -7,6 +7,7 @@
 #include "opt-sched/Scheduler/OptSchedTarget.h"
 #include "opt-sched/Scheduler/machine_model.h"
 #include "opt-sched/Scheduler/defines.h"
+#include "llvm/CodeGen/ScheduleDAGInstrs.h"
 #include "llvm/ADT/STLExtras.h"
 #include <memory>
 
@@ -31,7 +32,7 @@ public:
         Context, DAG, MM, LatencyPrecision, GraphTransTypes, RegionID);
   }
 
-  void initRegion(const llvm::MachineSchedContext *Context_,
+  void initRegion(llvm::ScheduleDAGInstrs *DAG,
                   MachineModel *MM_) override {
     MM = MM_;
   }

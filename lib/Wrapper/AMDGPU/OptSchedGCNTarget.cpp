@@ -11,6 +11,7 @@
 #include "opt-sched/Scheduler/machine_model.h"
 #include "opt-sched/Scheduler/data_dep.h"
 #include "llvm/ADT/STLExtras.h"
+#include "llvm/CodeGen/ScheduleDAGInstrs.h"
 #include <algorithm>
 #include <memory>
 
@@ -30,14 +31,13 @@ public:
 
   std::unique_ptr<OptSchedDDGWrapperBase>
   createDDGWrapper(llvm::MachineSchedContext *Context, ScheduleDAGOptSched *DAG,
-                   OptSchedMachineModel *MM, LATENCY_PRECISION LatencyPrecision,
-                   GraphTransTypes GraphTransTypes,
+                   OptSchedMachineModel *MM, LATENCY_PRECISION LatencyPrecision, GraphTransTypes GraphTransTypes,
                    const std::string &RegionID) override {
     return llvm::make_unique<OptSchedDDGWrapperGCN>(
         Context, DAG, MM, LatencyPrecision, GraphTransTypes, RegionID);
   }
 
-  void initRegion(const llvm::MachineSchedContext *Context,
+  void initRegion(llvm::ScheduleDAGInstrs *DAG,
                   MachineModel *MM_) override;
   void finalizeRegion(const InstSchedule *Schedule) override;
 
@@ -85,9 +85,9 @@ void OptSchedGCNTarget::dumpOccupancyInfo(const InstSchedule *Schedule) const {
 }
 #endif
 
-void OptSchedGCNTarget::initRegion(const llvm::MachineSchedContext *Context,
+void OptSchedGCNTarget::initRegion(llvm::ScheduleDAGInstrs *DAG,
                                    MachineModel *MM_) {
-  MF = Context->MF;
+  MF = &DAG->MF;
   MFI = const_cast<SIMachineFunctionInfo *>(
       MF->getInfo<SIMachineFunctionInfo>());
   MM = MM_;
