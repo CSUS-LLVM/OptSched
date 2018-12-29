@@ -31,7 +31,7 @@ namespace opt_sched {
 // when it is needed. This object is created for each function the
 // Machine Schduler schedules
 class ScheduleDAGOptSched : public ScheduleDAGMILive {
-private:
+protected:
   // Path to opt-sched config options directory.
   SmallString<128> PathCfg;
   // Path to the scheduler options configuration file for opt-sched.
@@ -170,8 +170,8 @@ public:
   // System time that the scheduler was created
   static std::chrono::milliseconds startTime;
 
-  ScheduleDAGOptSched(MachineSchedContext *C);
-  ~ScheduleDAGOptSched() {}
+  ScheduleDAGOptSched(MachineSchedContext *C,
+                      std::unique_ptr<MachineSchedStrategy> S);
   // The fallback LLVM scheduler
   void fallbackScheduler();
   // Print out total block spills for the function.
@@ -192,4 +192,4 @@ public:
 } // namespace opt_sched
 } // namespace llvm
 
-#endif // LLVM_OPTIMIZING_SCHEDULER_H
+#endif // LLVM_OPT_SCHED_OPTIMIZING_SCHEDULER_H

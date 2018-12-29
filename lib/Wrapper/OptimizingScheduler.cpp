@@ -62,7 +62,7 @@ static constexpr const char *DEFAULT_CFGMM_FNAME = "/machine_model.cfg";
 
 // Create OptSched ScheduleDAG.
 static ScheduleDAGInstrs *createOptSched(MachineSchedContext *C) {
-  return new ScheduleDAGOptSched(C);
+  return new ScheduleDAGOptSched(C, llvm::make_unique<GenericScheduler>(C));
 }
 
 // Register the machine scheduler.
@@ -125,9 +125,9 @@ MachineBasicBlock::iterator nextIfDebug(MachineBasicBlock::iterator I,
 
 } // end anonymous namespace
 
-ScheduleDAGOptSched::ScheduleDAGOptSched(MachineSchedContext *C)
-    : ScheduleDAGMILive(C, make_unique<GenericScheduler>(C)), context(C),
-      totalSimulatedSpills(0) {
+ScheduleDAGOptSched::ScheduleDAGOptSched(
+    MachineSchedContext *C, std::unique_ptr<MachineSchedStrategy> S)
+    : ScheduleDAGMILive(C, std::move(S)), context(C) {
 
   // Find the native paths to the scheduler configuration files.
   getRealCfgPaths();
