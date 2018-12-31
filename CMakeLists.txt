@@ -70,7 +70,8 @@ IF ("AMDGPU" IN_LIST LLVM_TARGETS_TO_BUILD)
   check_if_AMDGPU_supported()
   IF (${AMDGPU_SUPPORTED})
     SET (OPT_SCHED_TARGET_DEPS "AMDGPUCommonTableGen")
-    SET (OPT_SCHED_SRCS ${OPT_SCHED_SRCS} Wrapper/AMDGPU/OptSchedGCNTarget.cpp
+    SET (OPT_SCHED_SRCS ${OPT_SCHED_SRCS} Wrapper/AMDGPU/GCNOptSched.cpp
+                                          Wrapper/AMDGPU/OptSchedGCNTarget.cpp
                                           Wrapper/AMDGPU/OptSchedDDGWrapperGCN.cpp)
     SET (OPT_SCHED_INCLUDE_DIRS ${OPT_SCHED_INCLUDE_DIRS} ${CMAKE_CURRENT_SOURCE_DIR}/lib
                                 ${LLVM_MAIN_SRC_DIR}/lib/Target/AMDGPU
