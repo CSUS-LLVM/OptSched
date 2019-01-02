@@ -7,9 +7,9 @@
 #include "SIMachineFunctionInfo.h"
 #include "Wrapper/OptSchedMachineWrapper.h"
 #include "opt-sched/Scheduler/OptSchedTarget.h"
+#include "opt-sched/Scheduler/data_dep.h"
 #include "opt-sched/Scheduler/defines.h"
 #include "opt-sched/Scheduler/machine_model.h"
-#include "opt-sched/Scheduler/data_dep.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/CodeGen/ScheduleDAGInstrs.h"
 #include <algorithm>
@@ -31,14 +31,15 @@ public:
 
   std::unique_ptr<OptSchedDDGWrapperBase>
   createDDGWrapper(llvm::MachineSchedContext *Context, ScheduleDAGOptSched *DAG,
-                   OptSchedMachineModel *MM, LATENCY_PRECISION LatencyPrecision, GraphTransTypes GraphTransTypes,
+                   OptSchedMachineModel *MM, LATENCY_PRECISION LatencyPrecision,
+                   GraphTransTypes GraphTransTypes,
                    const std::string &RegionID) override {
     return llvm::make_unique<OptSchedDDGWrapperGCN>(
         Context, DAG, MM, LatencyPrecision, GraphTransTypes, RegionID);
   }
 
-  void initRegion(llvm::ScheduleDAGInstrs *DAG,
-                  MachineModel *MM_) override;
+  void initRegion(llvm::ScheduleDAGInstrs *DAG, MachineModel *MM_) override;
+
   void finalizeRegion(const InstSchedule *Schedule) override;
 
   // Returns occupancy cost with number of VGPRs and SGPRs from PRP for
@@ -50,9 +51,18 @@ public:
 private:
   const llvm::MachineFunction *MF;
   SIMachineFunctionInfo *MFI;
+  ScheduleDAGOptSched *DAG;
 
   // Max occupancy with local memory size;
   unsigned MaxOccLDS;
+
+  // In RP only (max occupancy) scheduling mode we should try to find
+  // a min-RP schedule without considering perf hints which suggest limiting
+  // occupancy. Returns true if we should consider perf hints.
+  bool shouldLimitWaves() const;
+
+  // Find occupancy with spill cost.
+  unsigned getOccupancyWithCost(const InstCount Cost) const;
 };
 
 std::unique_ptr<OptSchedTarget> createOptSchedGCNTarget() {
@@ -85,27 +95,37 @@ void OptSchedGCNTarget::dumpOccupancyInfo(const InstSchedule *Schedule) const {
 }
 #endif
 
-void OptSchedGCNTarget::initRegion(llvm::ScheduleDAGInstrs *DAG,
+void OptSchedGCNTarget::initRegion(llvm::ScheduleDAGInstrs *DAG_,
                                    MachineModel *MM_) {
+  DAG = static_cast<ScheduleDAGOptSched *>(DAG);
+  MFI =
+      const_cast<SIMachineFunctionInfo *>(MF->getInfo<SIMachineFunctionInfo>());
   MF = &DAG->MF;
-  MFI = const_cast<SIMachineFunctionInfo *>(
-      MF->getInfo<SIMachineFunctionInfo>());
   MM = MM_;
+
   auto &ST = MF->getSubtarget<GCNSubtarget>();
   MaxOccLDS = ST.getOccupancyWithLocalMemSize(*MF);
+}
+
+bool OptSchedGCNTarget::shouldLimitWaves() const {
+  // FIXME: Consider machine model here as well.
+  return DAG->getLatencyType() != LTP_UNITY;
+}
+
+unsigned OptSchedGCNTarget::getOccupancyWithCost(const InstCount Cost) const {
+  if (shouldLimitWaves())
+    return MFI->getMinAllowedOccupancy() - Cost;
+
+  return 10 - Cost;
 }
 
 void OptSchedGCNTarget::finalizeRegion(const InstSchedule *Schedule) {
   LLVM_DEBUG(dumpOccupancyInfo(Schedule));
 
-  // WavesAfter is actually WavesAfter + (10 – MinWaves). We don’t need to do
-  // this calculation since we just need WavesAfter to be a lower bound on the
-  // actual value.
-  unsigned WavesAfter = 10 - Schedule->GetSpillCost();
+  unsigned WavesAfter = getOccupancyWithCost(Schedule->GetSpillCost());
   if (WavesAfter < MFI->getOccupancy()) {
-    LLVM_DEBUG(dbgs() << "Limiting occupancy to "
-                      << WavesAfter + (10 - MFI->getMinAllowedOccupancy())
-                      << " waves.");
+    LLVM_DEBUG(dbgs() << "Limiting occupancy to " << WavesAfter << " waves.");
+
     MFI->limitOccupancy(WavesAfter);
   }
 }
@@ -125,7 +145,7 @@ OptSchedGCNTarget::getCost(const llvm::SmallVectorImpl<unsigned> &PRP) const {
   auto MaxOccVGPR = ST.getOccupancyWithNumVGPRs(VGPR32Count);
 
   auto Occ = std::min(std::min(MaxOccSGPR, MaxOccVGPR), MaxOccLDS);
-  auto MinOcc = MFI->getMinAllowedOccupancy();
+  auto MinOcc = shouldLimitWaves() ? MFI->getMinAllowedOccupancy() : 10;
   // RP cost is the difference between the minimum allowed occupancy for the
   // function and the current occupancy.
   return Occ >= MinOcc ? 0 : MinOcc - Occ;

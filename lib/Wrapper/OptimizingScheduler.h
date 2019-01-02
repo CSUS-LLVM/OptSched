@@ -174,18 +174,27 @@ public:
                       std::unique_ptr<MachineSchedStrategy> S);
   // The fallback LLVM scheduler
   void fallbackScheduler();
+
   // Print out total block spills for the function.
   void finalizeSchedule() override;
+
   // Schedule the current region using the OptScheduler
   void schedule() override;
+
   // Print info for all LLVM registers that are used or defined in the region.
   void dumpLLVMRegisters() const;
+
   // Getter for region number
   inline int getRegionNum() const { return regionNum; }
+
   // Return the boundary instruction for this region if it is not a sentinel
   // value.
-  inline const MachineInstr *getRegionEnd() const {
+  const MachineInstr *getRegionEnd() const {
     return (RegionEnd == BB->end() ? nullptr : &*RegionEnd);
+  }
+
+  LATENCY_PRECISION getLatencyType() const {
+    return latencyPrecision;
   }
 };
 
