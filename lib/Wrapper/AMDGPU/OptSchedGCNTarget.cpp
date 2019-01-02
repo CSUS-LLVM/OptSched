@@ -84,23 +84,25 @@ void OptSchedGCNTarget::dumpOccupancyInfo(const InstSchedule *Schedule) const {
   auto MaxOccVGPR = ST.getOccupancyWithNumVGPRs(VGPR32Count);
 
   dbgs() << "Estimated Max Occupancy After Scheduling: "
-         << std::min(std::min(MaxOccSGPR, MaxOccVGPR), MaxOccLDS) << "\n";
-  dbgs() << "Max Occ with LDS: " << MaxOccLDS << "\n";
-  dbgs() << "Max Occ with Num SGPRs: " << MaxOccSGPR << "\n";
-  dbgs() << "Max Occ with Num VGPRs: " << MaxOccVGPR << "\n";
-  dbgs() << "Function "
-         << (MF->getInfo<SIMachineFunctionInfo>()->isMemoryBound() ? "is"
-                                                                   : "is not")
-         << " memory bound.\n";
+         << std::min(std::min(MaxOccSGPR, MaxOccVGPR), MaxOccLDS) << "\n"
+         << "Max Occ with LDS: " << MaxOccLDS << "\n"
+         << "Max Occ with Num SGPRs: " << MaxOccSGPR << "\n"
+         << "Max Occ with Num VGPRs: " << MaxOccVGPR << "\n";
+
+  if (MFI->getMinAllowedOccupancy() < MFI->getOccupancy())
+    dbgs() << "Occupancy is limited by perf hints:"
+           << " MemoryBound=" << (MFI->isMemoryBound() ? "1" : "0")
+           << " WaveLimiterHint=" << (MFI->needsWaveLimiter() ? "1" : "0")
+           << "\n";
 }
 #endif
 
 void OptSchedGCNTarget::initRegion(llvm::ScheduleDAGInstrs *DAG_,
                                    MachineModel *MM_) {
-  DAG = static_cast<ScheduleDAGOptSched *>(DAG);
+  DAG = static_cast<ScheduleDAGOptSched *>(DAG_);
+  MF = &DAG->MF;
   MFI =
       const_cast<SIMachineFunctionInfo *>(MF->getInfo<SIMachineFunctionInfo>());
-  MF = &DAG->MF;
   MM = MM_;
 
   auto &ST = MF->getSubtarget<GCNSubtarget>();
@@ -124,7 +126,7 @@ void OptSchedGCNTarget::finalizeRegion(const InstSchedule *Schedule) {
 
   unsigned WavesAfter = getOccupancyWithCost(Schedule->GetSpillCost());
   if (WavesAfter < MFI->getOccupancy()) {
-    LLVM_DEBUG(dbgs() << "Limiting occupancy to " << WavesAfter << " waves.");
+    LLVM_DEBUG(dbgs() << "Limiting occupancy to " << WavesAfter << " waves.\n");
 
     MFI->limitOccupancy(WavesAfter);
   }
