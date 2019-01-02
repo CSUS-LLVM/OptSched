@@ -173,6 +173,13 @@ void ScheduleDAGOptSched::SetupLLVMDag() {
 
   // Finalize live-in
   RPTracker.closeTop();
+
+  // Apply llvm DAG post processing.
+  if (enableMutations) {
+    Topo.InitDAGTopologicalSorting();
+
+    postprocessDAG();
+  }
 }
 
 // schedule called for each basic block
@@ -307,10 +314,6 @@ void ScheduleDAGOptSched::schedule() {
 
   OST->initRegion(this, MM.get());
 
-  // Apply llvm DAG post processing.
-  if (enableMutations)
-    postprocessDAG();
-
   // Convert graph
   auto DDG = OST->createDDGWrapper(context, this, MM.get(), latencyPrecision,
                                    graphTransTypes, RegionName);
@@ -409,6 +412,7 @@ void ScheduleDAGOptSched::schedule() {
   }
 
   OST->finalizeRegion(sched);
+  placeDebugValues();
 
 #ifdef IS_DEBUG_PEAK_PRESSURE
   Logger::Info("Register pressure after");
@@ -518,7 +522,7 @@ void ScheduleDAGOptSched::loadOptSchedConfig() {
   // To support old sched.ini files setting NID as the heuristic means LLVM
   // scheduling is enabled.
   llvmScheduling = schedIni.GetBool("LLVM_SCHEDULING", false) ||
-                   schedIni.GetString("HEURISTIC") == "NID";
+                   schedIni.GetString("HEURISTIC") == "LLVM";
   enumPriorities = parseHeuristic(schedIni.GetString("ENUM_HEURISTIC"));
   spillCostFunction = parseSpillCostFunc();
   regionTimeout = schedIni.GetInt("REGION_TIMEOUT");
