@@ -202,11 +202,13 @@ void ReadyList::AddLatestSubLists(LinkedList<SchedInstruction> *lst1,
 }
 
 void ReadyList::Print(std::ostream &out) {
-  out << "\nReady List: ";
-  for (SchedInstruction *crntInst = prirtyLst_->GetFrstElmnt();
+  out << "Ready List: ";
+  for (const auto *crntInst = prirtyLst_->GetFrstElmnt();
        crntInst != NULL; crntInst = prirtyLst_->GetNxtElmnt()) {
-    out << crntInst->GetNum() << ", ";
+    out << " " << crntInst->GetNum();
   }
+  out << '\n';
+
   prirtyLst_->ResetIterator();
 }
 

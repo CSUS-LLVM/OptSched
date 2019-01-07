@@ -194,7 +194,10 @@ protected:
   void CleanupCycle_(InstCount cycleNum);
 
   // Checks the legality of issuing an instruction of a given issue type.
-  bool ChkInstLglty_(SchedInstruction *inst);
+  bool ChkInstLglty_(SchedInstruction *inst) const;
+
+  // Early check for instruction legality.
+  bool IsTriviallyLegal_(const SchedInstruction *inst) const;
 
   // Checks the legality of the current schedule.
   bool ChkSchedLglty_(bool isEmptyCycle);

@@ -280,10 +280,24 @@ void ConstrainedScheduler::CleanupCycle_(InstCount cycleNum) {
   }
 }
 
-bool ConstrainedScheduler::ChkInstLglty_(SchedInstruction *inst) {
-  // Logger::Info("Checking inst %d", inst==NULL? -1: inst->GetNum());
+bool ConstrainedScheduler::IsTriviallyLegal_(const SchedInstruction *inst) const {
+  // Scheduling a stall is always legal.
   if (inst == NULL)
     return true;
+
+  // Artificial root and leaf instructions can only be in the ready list if all
+  // other dependencies have been satisfied. They are fixed in the first or last
+  // slot.
+  if (inst->IsRoot() || inst->IsLeaf())
+    return true;
+
+  return false;
+}
+
+bool ConstrainedScheduler::ChkInstLglty_(SchedInstruction *inst) const {
+  if (IsTriviallyLegal_(inst))
+    return true;
+
   // Do region-specific legality check
   if (rgn_->ChkInstLglty(inst) == false)
     return false;
@@ -300,7 +314,6 @@ bool ConstrainedScheduler::ChkInstLglty_(SchedInstruction *inst) {
       crntCycleNum_ <= rsrvSlots_[crntSlotNum_].endCycle) {
     return false;
   }
-  // Logger::Info("Pipelining OK");
 
   IssueType issuType = inst->GetIssueType();
   assert(issuType < issuTypeCnt_);
