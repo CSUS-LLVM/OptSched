@@ -34,9 +34,10 @@ BBWithSpill::BBWithSpill(const OptSchedTarget *OST_, DataDepGraph *dataDepGraph,
                          Pruning prune, bool schedForRPOnly, bool enblStallEnum,
                          int spillCostFactor, SPILL_COST_FUNCTION spillCostFunc,
                          bool chkSpillCostSum, bool chkCnflcts, bool fixLivein,
-                         bool fixLiveout, int maxSpillCost)
+                         bool fixLiveout, int maxSpillCost,
+                         SchedulerType heurSchedType)
     : SchedRegion(OST_->MM, dataDepGraph, rgnNum, sigHashSize, lbAlg,
-                  hurstcPrirts, enumPrirts, vrfySched, prune),
+                  hurstcPrirts, enumPrirts, vrfySched, prune, heurSchedType),
       OST(OST_) {
   costLwrBound_ = 0;
   enumrtr_ = NULL;
@@ -102,13 +103,22 @@ bool BBWithSpill::EnableEnum_() {
 /*****************************************************************************/
 
 ConstrainedScheduler *BBWithSpill::AllocHeuristicScheduler_() {
-  Config &schedIni = SchedulerOptions::getInstance();
-  if (schedIni.GetBool("USE_ACO", false))
-    return new ACOScheduler(dataDepGraph_, machMdl_, abslutSchedUprBound_,
-                            hurstcPrirts_);
-  else
+  switch (heurSchedType_) {
+  case SCHED_LIST:
     return new ListScheduler(dataDepGraph_, machMdl_, abslutSchedUprBound_,
                              hurstcPrirts_);
+    break;
+  case SCHED_ACO:
+    return new ACOScheduler(dataDepGraph_, machMdl_, abslutSchedUprBound_,
+                            hurstcPrirts_);
+    break;
+  case SCHED_SEQ:
+    return new SequentialListScheduler(dataDepGraph_, machMdl_,
+                                       abslutSchedUprBound_, hurstcPrirts_);
+    break;
+  default:
+    llvm_unreachable("Unknown heuristic scheduler type!");
+  }
 }
 /*****************************************************************************/
 
@@ -757,8 +767,6 @@ void BBWithSpill::UnschdulInst(SchedInstruction *inst, InstCount cycleNum,
   if (inst == NULL) {
     return;
   }
-
-  assert(inst != NULL);
 
   UpdateSpillInfoForUnSchdul_(inst);
   peakSpillCost_ = trgtNode->GetPeakSpillCost();

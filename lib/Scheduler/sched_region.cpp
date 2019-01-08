@@ -22,7 +22,7 @@ SchedRegion::SchedRegion(MachineModel *machMdl, DataDepGraph *dataDepGraph,
                          long rgnNum, int16_t sigHashSize, LB_ALG lbAlg,
                          SchedPriorities hurstcPrirts,
                          SchedPriorities enumPrirts, bool vrfySched,
-                         Pruning prune) {
+                         Pruning prune, SchedulerType heurSchedType) {
   machMdl_ = machMdl;
   dataDepGraph_ = dataDepGraph;
   rgnNum_ = rgnNum;
@@ -32,6 +32,7 @@ SchedRegion::SchedRegion(MachineModel *machMdl, DataDepGraph *dataDepGraph,
   enumPrirts_ = enumPrirts;
   vrfySched_ = vrfySched;
   prune_ = prune;
+  heurSchedType_ = heurSchedType;
 
   totalSimSpills_ = INVALID_VALUE;
   bestCost_ = 0;

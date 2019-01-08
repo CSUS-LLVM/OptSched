@@ -139,6 +139,8 @@ protected:
   bool llvmScheduling;
   // The number of simulated register spills in this function
   int totalSimulatedSpills;
+  // What list scheduler should be used to find an initial feasible schedule.
+  SchedulerType heurSchedType;
 
   // Load config files for the OptScheduler and set flags
   void loadOptSchedConfig();

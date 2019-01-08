@@ -36,7 +36,6 @@
 
 #define DEBUG_TYPE "optsched"
 
-using namespace llvm;
 using namespace llvm::opt_sched;
 
 // hack to print spills
@@ -327,7 +326,7 @@ void ScheduleDAGOptSched::schedule() {
       lowerBoundAlgorithm, heuristicPriorities, enumPriorities, verifySchedule,
       prune, schedForRPOnly, enumerateStalls, spillCostFactor,
       spillCostFunction, checkSpillCostSum, checkConflicts, fixLiveIn,
-      fixLiveOut, maxSpillCost);
+      fixLiveOut, maxSpillCost, heurSchedType);
 
   // Schedule
   bool isEasy;
@@ -380,7 +379,6 @@ void ScheduleDAGOptSched::schedule() {
 
       // Scheduling with opt-sched failed.
       fallbackScheduler();
-
     } else {
       LLVM_DEBUG(Logger::Info("OptSched succeeded."));
       // Count simulated spills.
@@ -479,6 +477,23 @@ void ScheduleDAGOptSched::fallbackScheduler() {
   }
 }
 
+static SchedulerType parseListSchedType() {
+  auto SchedTypeString =
+      SchedulerOptions::getInstance().GetString("HEUR_SCHED_TYPE", "LIST");
+
+  if (SchedTypeString == "LIST")
+    return SCHED_LIST;
+  else if (SchedTypeString == "SEQ")
+    return SCHED_SEQ;
+  else if (SchedTypeString == "ACO")
+    return SCHED_ACO;
+  else {
+    Logger::Info("Unknown heuristic scheduler type selected defaulting to basic "
+                 "list scheduler.");
+    return SCHED_LIST;
+  }
+}
+
 void ScheduleDAGOptSched::loadOptSchedConfig() {
   SchedulerOptions &schedIni = SchedulerOptions::getInstance();
   // setup OptScheduler configuration options
@@ -538,11 +553,12 @@ void ScheduleDAGOptSched::loadOptSchedConfig() {
   if (randomSeed == 0)
     randomSeed = time(NULL);
   RandomGen::SetSeed(randomSeed);
+  heurSchedType = parseListSchedType();
 }
 
 bool ScheduleDAGOptSched::isOptSchedEnabled() const {
   // check scheduler ini file to see if optsched is enabled
-  std::string optSchedOption =
+  auto optSchedOption =
       SchedulerOptions::getInstance().GetString("USE_OPT_SCHED");
   if (optSchedOption == "YES") {
     return true;

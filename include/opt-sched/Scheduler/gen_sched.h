@@ -29,6 +29,15 @@ struct ReserveSlot {
   InstCount endCycle;
 };
 
+enum SchedulerType {
+  // List scheduler.
+  SCHED_LIST,
+  // Sequential list scheduler.
+  SCHED_SEQ,
+  // Ant colony scheduler.
+  SCHED_ACO
+};
+
 // Forward declarations used to reduce the number of #includes.
 class MachineModel;
 class DataDepStruct;
@@ -194,7 +203,7 @@ protected:
   void CleanupCycle_(InstCount cycleNum);
 
   // Checks the legality of issuing an instruction of a given issue type.
-  bool ChkInstLglty_(SchedInstruction *inst) const;
+  virtual bool ChkInstLglty_(SchedInstruction *inst) const;
 
   // Early check for instruction legality.
   bool IsTriviallyLegal_(const SchedInstruction *inst) const;

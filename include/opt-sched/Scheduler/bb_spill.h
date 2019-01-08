@@ -122,7 +122,7 @@ public:
               bool schedForRPOnly, bool enblStallEnum, int spillCostFactor,
               SPILL_COST_FUNCTION spillCostFunc, bool chkSpillCostSum,
               bool chkCnflcts, bool fixLivein, bool fixLiveout,
-              int maxSpillCost);
+              int maxSpillCost, SchedulerType heurSchedType);
   ~BBWithSpill();
 
   int CmputCostLwrBound();

@@ -1,9 +1,9 @@
 #include "opt-sched/Scheduler/list_sched.h"
 #include "opt-sched/Scheduler/data_dep.h"
-#include "opt-sched/Scheduler/ready_list.h"
 #include "opt-sched/Scheduler/logger.h"
-#include "opt-sched/Scheduler/stats.h"
+#include "opt-sched/Scheduler/ready_list.h"
 #include "opt-sched/Scheduler/sched_region.h"
+#include "opt-sched/Scheduler/stats.h"
 
 using namespace llvm::opt_sched;
 
@@ -19,6 +19,16 @@ ListScheduler::ListScheduler(DataDepGraph *dataDepGraph, MachineModel *machMdl,
 }
 
 ListScheduler::~ListScheduler() { delete rdyLst_; }
+
+SchedInstruction *ListScheduler::PickInst() const {
+  SchedInstruction *inst = NULL;
+  bool legalInst = false;
+  while (!legalInst) {
+    inst = rdyLst_->GetNextPriorityInst();
+    legalInst = ChkInstLglty_(inst);
+  }
+  return inst;
+}
 
 FUNC_RESULT ListScheduler::FindSchedule(InstSchedule *sched, SchedRegion *rgn) {
   InstCount rdyLstSize, maxRdyLstSize = 0, avgRdyLstSize = 0, iterCnt = 0;
@@ -38,23 +48,8 @@ FUNC_RESULT ListScheduler::FindSchedule(InstSchedule *sched, SchedRegion *rgn) {
     if (rdyLstSize > maxRdyLstSize)
       maxRdyLstSize = rdyLstSize;
     avgRdyLstSize += rdyLstSize;
-    // if(dataDepGraph_->GetInstCnt() > 1000)
-    // Logger::Info("ready list size = %d", rdyLstSize);
 
-    SchedInstruction *inst = NULL;
-    bool legalInst = false;
-    int lgltyChkCnt = 0;
-    while (!legalInst) {
-      lgltyChkCnt++;
-      inst = rdyLst_->GetNextPriorityInst();
-      legalInst = ChkInstLglty_(inst);
-    }
-
-#ifdef IS_DEBUG_MODEL
-    Logger::Info("Legality checks made: %d", lgltyChkCnt);
-    stats::legalListSchedulerInstructionHits++;
-    stats::illegalListSchedulerInstructionHits += (lgltyChkCnt - 1);
-#endif
+    SchedInstruction *inst = PickInst();
 
     InstCount instNum;
     // If the ready list is empty.
@@ -63,7 +58,6 @@ FUNC_RESULT ListScheduler::FindSchedule(InstSchedule *sched, SchedRegion *rgn) {
     } else {
       isEmptyCycle = false;
       instNum = inst->GetNum();
-      //      Logger::Info("Scheduling inst %d", instNum);
       SchdulInst_(inst, crntCycleNum_);
       inst->Schedule(crntCycleNum_, crntSlotNum_);
       rgn_->SchdulInst(inst, crntCycleNum_, crntSlotNum_, false);
@@ -72,7 +66,6 @@ FUNC_RESULT ListScheduler::FindSchedule(InstSchedule *sched, SchedRegion *rgn) {
       UpdtSlotAvlblty_(inst);
     }
 
-    // if (inst && machMdl_->IsRealInst(inst->GetInstType())) {
     crntSched_->AppendInst(instNum);
     bool cycleAdvanced = MovToNxtSlot_(inst);
     if (cycleAdvanced) {
@@ -90,6 +83,48 @@ FUNC_RESULT ListScheduler::FindSchedule(InstSchedule *sched, SchedRegion *rgn) {
 #endif
 
   return RES_SUCCESS;
+}
+
+SequentialListScheduler::SequentialListScheduler(DataDepGraph *dataDepGraph,
+                                                 MachineModel *machMdl,
+                                                 InstCount schedUprBound,
+                                                 SchedPriorities prirts)
+    : ListScheduler(dataDepGraph, machMdl, schedUprBound, prirts) {}
+
+bool SequentialListScheduler::ChkInstLglty_(SchedInstruction *inst) const {
+  if (IsTriviallyLegal_(inst))
+    return true;
+
+  if (!IsSequentialInstruction(inst))
+    return false;
+
+  // Do region-specific legality check
+  if (rgn_->ChkInstLglty(inst) == false)
+    return false;
+
+  // Account for instructions that block the whole cycle.
+  if (isCrntCycleBlkd_)
+    return false;
+
+  if (inst->BlocksCycle() && crntSlotNum_ != 0)
+    return false;
+
+  if (includesUnpipelined_ && rsrvSlots_ &&
+      rsrvSlots_[crntSlotNum_].strtCycle != INVALID_VALUE &&
+      crntCycleNum_ <= rsrvSlots_[crntSlotNum_].endCycle) {
+    return false;
+  }
+
+  IssueType issuType = inst->GetIssueType();
+  assert(issuType < issuTypeCnt_);
+  assert(avlblSlotsInCrntCycle_[issuType] >= 0);
+  return (avlblSlotsInCrntCycle_[issuType] > 0);
+}
+
+bool SequentialListScheduler::IsSequentialInstruction(
+    const SchedInstruction *Inst) const {
+  // Instr with number N-1 must already be scheduled.
+  return crntSched_->GetSchedCycle(Inst->GetNum() - 1) != SCHD_UNSCHDULD;
 }
 
 void ListScheduler::UpdtRdyLst_(InstCount cycleNum, int slotNum) {

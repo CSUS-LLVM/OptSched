@@ -26,11 +26,30 @@ public:
   // Calculates the schedule and returns it in the passed argument.
   FUNC_RESULT FindSchedule(InstSchedule *sched, SchedRegion *rgn);
 
-private:
+protected:
   bool isDynmcPrirty_;
   // Adds the instructions that have just become ready at this cycle to the
   // ready list.
   void UpdtRdyLst_(InstCount cycleNum, int slotNum);
+
+  // Pick next instruction to be scheduled. Returns NULL if no instructions are
+  // ready.
+  virtual SchedInstruction *PickInst() const;
+};
+
+// Force the list scheduler to maintain the source ordering of the instructions
+// regardless of latency or machine model constraints.
+class SequentialListScheduler : public ListScheduler {
+public:
+  SequentialListScheduler(DataDepGraph *dataDepGraph, MachineModel *machMdl,
+                          InstCount schedUprBound, SchedPriorities prirts);
+
+private:
+  // Does this instruction come next in the source ordering after all currently
+  // scheduled instructions, e.g. 0, 1, 2, 3, 4.
+  bool IsSequentialInstruction(const SchedInstruction *Inst) const;
+
+  bool ChkInstLglty_(SchedInstruction *inst) const override;
 };
 
 } // namespace opt_sched
