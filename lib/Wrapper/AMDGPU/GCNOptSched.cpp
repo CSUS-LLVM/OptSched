@@ -44,8 +44,10 @@ void ScheduleDAGOptSchedGCN::initSchedulers() {
   // Add passes
 
   // First
-  SchedPasses.push_back(GCNMaxOcc);
+  // SchedPasses.push_back(GCNMaxOcc);
   // Second
+  SchedPasses.push_back(OptSchedMaxOcc);
+  // Third
   SchedPasses.push_back(OptSchedBalanced);
 }
 
@@ -92,6 +94,7 @@ void ScheduleDAGOptSchedGCN::finalizeSchedule() {
                  dbgs() << " RegionInstrs: " << NumRegionInstrs << '\n');
 
       runSchedPass(S);
+
       Region = std::make_pair(RegionBegin, RegionEnd);
       exitRegion();
     }
@@ -114,8 +117,8 @@ void ScheduleDAGOptSchedGCN::runSchedPass(SchedPassStrategy S) {
 }
 
 void ScheduleDAGOptSchedGCN::scheduleGCNMaxOcc() {
+  auto &S = (GCNMaxOccupancySchedStrategy &)*SchedImpl;
   if (GCNLimitOccWithHints) {
-    auto &S = (GCNMaxOccupancySchedStrategy &)*SchedImpl;
     const auto &MFI = *MF.getInfo<SIMachineFunctionInfo>();
     S.setTargetOccupancy(MFI.getMinAllowedOccupancy());
   }
@@ -124,9 +127,20 @@ void ScheduleDAGOptSchedGCN::scheduleGCNMaxOcc() {
 }
 
 void ScheduleDAGOptSchedGCN::scheduleOptSchedMaxOcc() {
-  // stub
+  latencyPrecision = LTP_UNITY;
+  heurSchedType = SCHED_LIST;
+  spillCostFunction = SCF_TARGET;
+
+  ScheduleDAGOptSched::schedule();
 }
 
 void ScheduleDAGOptSchedGCN::scheduleOptSchedBalanced() {
+  latencyPrecision = LTP_ROUGH;
+  // Force the input to the balanced scheduler to be the sequential order of the
+  // (hopefully) good max occupancy schedule. We don’t want the list scheduler
+  // to mangle the input because of latency or resource constraints.
+  heurSchedType = SCHED_SEQ;
+  spillCostFunction = SCF_TARGET;
+
   ScheduleDAGOptSched::schedule();
 }

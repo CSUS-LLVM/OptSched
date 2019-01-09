@@ -111,7 +111,8 @@ void OptSchedGCNTarget::initRegion(llvm::ScheduleDAGInstrs *DAG_,
 
 bool OptSchedGCNTarget::shouldLimitWaves() const {
   // FIXME: Consider machine model here as well.
-  return DAG->getLatencyType() != LTP_UNITY;
+  //return DAG->getLatencyType() != LTP_UNITY;
+  return false;
 }
 
 unsigned OptSchedGCNTarget::getOccupancyWithCost(const InstCount Cost) const {
@@ -140,10 +141,11 @@ OptSchedGCNTarget::getCost(const llvm::SmallVectorImpl<unsigned> &PRP) const {
   // replace OptSched register types completely with PSets to fix both issues.
   const auto &ST = MF->getSubtarget<GCNSubtarget>();
 
-  unsigned SGPR32Count = PRP[OptSchedDDGWrapperGCN::SGPR32] + 3;
+  const unsigned ErrorMargin = 3;
+  unsigned SGPR32Count = PRP[OptSchedDDGWrapperGCN::SGPR32] + ErrorMargin;
   auto MaxOccSGPR = ST.getOccupancyWithNumSGPRs(SGPR32Count);
 
-  unsigned VGPR32Count = PRP[OptSchedDDGWrapperGCN::VGPR32] + 3;
+  unsigned VGPR32Count = PRP[OptSchedDDGWrapperGCN::VGPR32] + ErrorMargin;
   auto MaxOccVGPR = ST.getOccupancyWithNumVGPRs(VGPR32Count);
 
   auto Occ = std::min(std::min(MaxOccSGPR, MaxOccVGPR), MaxOccLDS);

@@ -25,7 +25,7 @@ extern bool OPTSCHED_gPrintSpills;
 using namespace llvm::opt_sched;
 
 // The denominator used when calculating cost weight.
-static const int COST_WGHT_BASE = 10000;
+static const int COST_WGHT_BASE = 10;
 
 BBWithSpill::BBWithSpill(const OptSchedTarget *OST_, DataDepGraph *dataDepGraph,
                          long rgnNum, int16_t sigHashSize, LB_ALG lbAlg,

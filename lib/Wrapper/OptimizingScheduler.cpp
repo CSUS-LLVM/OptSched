@@ -208,24 +208,14 @@ void ScheduleDAGOptSched::schedule() {
                                 RegionName) != std::end(regionList);
   }
 
+  if (!optSchedEnabled)
+    return;
+
 #ifdef IS_DEBUG_PEAK_PRESSURE
   SetupLLVMDag();
   Logger::Info("RP before scheduling");
   RPTracker.dump();
 #endif
-
-  if (!optSchedEnabled) {
-    LLVM_DEBUG(dbgs() << "********** LLVM Scheduling **********n");
-
-    ScheduleDAGMILive::schedule();
-
-#ifdef IS_DEBUG_PEAK_PRESSURE
-    SetupLLVMDag();
-    Logger::Info("RP after llvm scheduling");
-    RPTracker.dump();
-#endif
-    return;
-  }
 
   // Use LLVM's heuristic schedule as input to the B&B scheduler.
   if (llvmScheduling) {
