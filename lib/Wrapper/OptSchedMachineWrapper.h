@@ -34,8 +34,6 @@ public:
   // optimal scheduler machine model
   void convertMachineModel(const llvm::ScheduleDAGInstrs &dag,
                            const llvm::RegisterClassInfo *regClassInfo);
-  // Pointer to register info for target
-  const llvm::TargetRegisterInfo *registerInfo;
   MachineModelGenerator *getMMGen() { return MMGen.get(); }
   ~OptSchedMachineModel() = default;
 

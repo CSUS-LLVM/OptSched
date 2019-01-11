@@ -91,8 +91,8 @@ void OptSchedGCNTarget::dumpOccupancyInfo(const InstSchedule *Schedule) const {
 
   if (MFI->getMinAllowedOccupancy() < MFI->getOccupancy())
     dbgs() << "Occupancy is limited by perf hints:"
-           << " MemoryBound=" << (MFI->isMemoryBound() ? "1" : "0")
-           << " WaveLimiterHint=" << (MFI->needsWaveLimiter() ? "1" : "0")
+           << " MemoryBound=" << MFI->isMemoryBound()
+           << " WaveLimiterHint=" << MFI->needsWaveLimiter()
            << "\n";
 }
 #endif
@@ -149,7 +149,7 @@ OptSchedGCNTarget::getCost(const llvm::SmallVectorImpl<unsigned> &PRP) const {
   auto MaxOccVGPR = ST.getOccupancyWithNumVGPRs(VGPR32Count);
 
   auto Occ = std::min(std::min(MaxOccSGPR, MaxOccVGPR), MaxOccLDS);
-  auto MinOcc = shouldLimitWaves() ? MFI->getMinAllowedOccupancy() : 10;
+  auto MinOcc = shouldLimitWaves() ? MFI->getMinAllowedOccupancy() : MFI->getOccupancy();
   // RP cost is the difference between the minimum allowed occupancy for the
   // function and the current occupancy.
   return Occ >= MinOcc ? 0 : MinOcc - Occ;
