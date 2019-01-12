@@ -20,6 +20,31 @@ using namespace llvm::opt_sched;
 
 #define DEBUG_TYPE "optsched"
 
+static unsigned getOccupancyWeight(unsigned Occupancy) {
+  if (Occupancy == 1)
+    return 100;
+  if (Occupancy == 2)
+    return 300;
+  if (Occupancy == 3)
+    return 450;
+  if (Occupancy == 4)
+    return 583;
+  if (Occupancy == 5)
+    return 708;
+  if (Occupancy == 6)
+    return 828;
+  if (Occupancy == 7)
+    return 944;
+  if (Occupancy == 8)
+    return 1059;
+  if (Occupancy == 9)
+    return 1172;
+  if (Occupancy == 10)
+    return 1283;
+
+  llvm_unreachable("Occupancy must be between 1 and 10");
+}
+
 namespace {
 
 class OptSchedGCNTarget : public OptSchedTarget {
@@ -92,8 +117,7 @@ void OptSchedGCNTarget::dumpOccupancyInfo(const InstSchedule *Schedule) const {
   if (MFI->getMinAllowedOccupancy() < MFI->getOccupancy())
     dbgs() << "Occupancy is limited by perf hints:"
            << " MemoryBound=" << MFI->isMemoryBound()
-           << " WaveLimiterHint=" << MFI->needsWaveLimiter()
-           << "\n";
+           << " WaveLimiterHint=" << MFI->needsWaveLimiter() << "\n";
 }
 #endif
 
@@ -111,7 +135,7 @@ void OptSchedGCNTarget::initRegion(llvm::ScheduleDAGInstrs *DAG_,
 
 bool OptSchedGCNTarget::shouldLimitWaves() const {
   // FIXME: Consider machine model here as well.
-  //return DAG->getLatencyType() != LTP_UNITY;
+  // return DAG->getLatencyType() != LTP_UNITY;
   return false;
 }
 
@@ -149,10 +173,12 @@ OptSchedGCNTarget::getCost(const llvm::SmallVectorImpl<unsigned> &PRP) const {
   auto MaxOccVGPR = ST.getOccupancyWithNumVGPRs(VGPR32Count);
 
   auto Occ = std::min(std::min(MaxOccSGPR, MaxOccVGPR), MaxOccLDS);
-  auto MinOcc = shouldLimitWaves() ? MFI->getMinAllowedOccupancy() : MFI->getOccupancy();
+  auto MinOcc =
+      shouldLimitWaves() ? MFI->getMinAllowedOccupancy() : MFI->getOccupancy();
   // RP cost is the difference between the minimum allowed occupancy for the
   // function and the current occupancy.
-  return Occ >= MinOcc ? 0 : MinOcc - Occ;
+  return Occ >= MinOcc ? 0
+                       : getOccupancyWeight(MinOcc) - getOccupancyWeight(Occ);
 }
 
 namespace llvm {
