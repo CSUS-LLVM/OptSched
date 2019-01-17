@@ -114,19 +114,11 @@ void OptSchedDDGWrapperBasic::countDefs() {
   std::vector<int> RegDefCounts(MM->GetRegTypeCnt());
   // Track all regs that are defined.
   std::set<unsigned> Defs;
-  // Should we add uses that have no definition.
-  bool AddUsedAndNotDefined =
-      SchedulerOptions::getInstance().GetBool("ADD_USED_AND_NOT_DEFINED_REGS");
-  // Should we add live-out registers that have no definition.
-  bool AddLiveOutAndNotDefined = SchedulerOptions::getInstance().GetBool(
-      "ADD_LIVE_OUT_AND_NOT_DEFINED_REGS");
 
   // count live-in as defs in root node
   for (const auto &L : DAG->getRegPressure().LiveInRegs) {
     for (int Type : getRegisterType(L.RegUnit))
       RegDefCounts[Type]++;
-
-    if (AddUsedAndNotDefined)
       Defs.insert(L.RegUnit);
   }
 
@@ -137,15 +129,13 @@ void OptSchedDDGWrapperBasic::countDefs() {
     RegisterOperands RegOpers;
     RegOpers.collect(*MI, *DAG->TRI, DAG->MRI, true, false);
 
-    if (AddUsedAndNotDefined) {
-      for (const auto &U : RegOpers.Uses) {
-        // If this register is not defined, add it as live-in.
-        if (!Defs.count(U.RegUnit)) {
-          for (int Type : getRegisterType(U.RegUnit))
-            RegDefCounts[Type]++;
+    for (const auto &U : RegOpers.Uses) {
+      // If this register is not defined, add it as live-in.
+      if (!Defs.count(U.RegUnit)) {
+        for (int Type : getRegisterType(U.RegUnit))
+          RegDefCounts[Type]++;
 
-          Defs.insert(U.RegUnit);
-        }
+        Defs.insert(U.RegUnit);
       }
     }
 
@@ -153,8 +143,6 @@ void OptSchedDDGWrapperBasic::countDefs() {
     for (const auto &D : RegOpers.Defs) {
       for (int Type : getRegisterType(D.RegUnit))
         RegDefCounts[Type]++;
-
-      if (AddUsedAndNotDefined)
         Defs.insert(D.RegUnit);
     }
   }
@@ -162,13 +150,12 @@ void OptSchedDDGWrapperBasic::countDefs() {
   // Get region end instruction if it is not a sentinel value
   const MachineInstr *MI = DAG->getRegionEnd();
   if (MI)
-    countBoundaryLiveness(RegDefCounts, Defs, AddUsedAndNotDefined, MI);
+    countBoundaryLiveness(RegDefCounts, Defs, MI);
 
-  if (AddLiveOutAndNotDefined)
-    for (const RegisterMaskPair &O : DAG->getRegPressure().LiveOutRegs)
-      if (!Defs.count(O.RegUnit))
-        for (int Type : getRegisterType(O.RegUnit))
-          RegDefCounts[Type]++;
+  for (const RegisterMaskPair &O : DAG->getRegPressure().LiveOutRegs)
+    if (!Defs.count(O.RegUnit))
+      for (int Type : getRegisterType(O.RegUnit))
+        RegDefCounts[Type]++;
 
   for (int i = 0; i < MM->GetRegTypeCnt(); i++) {
     LLVM_DEBUG(if (RegDefCounts[i]) dbgs()
@@ -212,22 +199,19 @@ void OptSchedDDGWrapperBasic::addDefsAndUses() {
   // Check for any registers that are not used but are also not in LLVM's
   // live-out set.
   // Optionally, add these registers as uses in the aritificial leaf node.
-  if (SchedulerOptions::getInstance().GetBool("ADD_DEFINED_AND_NOT_USED_REGS"))
-    for (int16_t i = 0; i < MM->GetRegTypeCnt(); i++)
-      for (int j = 0; j < RegFiles[i].GetRegCnt(); j++) {
-        Register *Reg = RegFiles[i].GetReg(j);
-        if (Reg->GetUseCnt() == 0)
-          addDefAndNotUsed(Reg);
-      }
+  for (int16_t i = 0; i < MM->GetRegTypeCnt(); i++)
+    for (int j = 0; j < RegFiles[i].GetRegCnt(); j++) {
+      Register *Reg = RegFiles[i].GetReg(j);
+      if (Reg->GetUseCnt() == 0)
+        addDefAndNotUsed(Reg);
+    }
 
   LLVM_DEBUG(DAG->dumpLLVMRegisters());
   LLVM_DEBUG(dumpOptSchedRegisters());
 }
 
 void OptSchedDDGWrapperBasic::addUse(unsigned RegUnit, InstCount Index) {
-  bool addUsedAndNotDefined =
-      SchedulerOptions::getInstance().GetBool("ADD_USED_AND_NOT_DEFINED_REGS");
-  if (addUsedAndNotDefined && LastDef.find(RegUnit) == LastDef.end()) {
+  if (LastDef.find(RegUnit) == LastDef.end()) {
     addLiveInReg(RegUnit);
 
     LLVM_DEBUG(dbgs() << "Adding register that is used-and-not-defined: ");
@@ -266,10 +250,8 @@ void OptSchedDDGWrapperBasic::addLiveInReg(unsigned RegUnit) {
 }
 
 void OptSchedDDGWrapperBasic::addLiveOutReg(unsigned RegUnit) {
-  // Should we add live-out registers that have no definition.
-  bool AddLiveOutAndNotDefined = SchedulerOptions::getInstance().GetBool(
-      "ADD_LIVE_OUT_AND_NOT_DEFINED_REGS");
-  if (AddLiveOutAndNotDefined && LastDef.find(RegUnit) == LastDef.end()) {
+  // Add live-out registers that have no definition.
+  if (LastDef.find(RegUnit) == LastDef.end()) {
     addLiveInReg(RegUnit);
 
     LLVM_DEBUG(dbgs() << "Adding register that is live-out-and-not-defined: ");
@@ -509,16 +491,14 @@ void OptSchedDDGWrapperBasic::discoverBoundaryLiveness(const MachineInstr *MI) {
 
 void OptSchedDDGWrapperBasic::countBoundaryLiveness(
     std::vector<int> &RegDefCounts, std::set<unsigned> &Defs,
-    bool AddUsedAndNotDefined, const MachineInstr *MI) {
+    const MachineInstr *MI) {
   RegisterOperands RegOpers;
   RegOpers.collect(*MI, *DAG->TRI, DAG->MRI, true, false);
 
   for (auto &D : RegOpers.Defs) {
     for (int Type : getRegisterType(D.RegUnit))
       RegDefCounts[Type]++;
-
-    if (AddUsedAndNotDefined)
-      Defs.insert(D.RegUnit);
+    Defs.insert(D.RegUnit);
   }
 }
 
