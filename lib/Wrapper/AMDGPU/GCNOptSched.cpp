@@ -43,11 +43,11 @@ void ScheduleDAGOptSchedGCN::initSchedulers() {
 
   // Add passes
 
-  // First
   // SchedPasses.push_back(GCNMaxOcc);
-  // Second
+
+  // First
   SchedPasses.push_back(OptSchedMaxOcc);
-  // Third
+  // Second
   SchedPasses.push_back(OptSchedBalanced);
 }
 

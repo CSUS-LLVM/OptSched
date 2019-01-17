@@ -8,7 +8,6 @@
 #ifndef LLVM_OPT_SCHED_OPTIMIZING_SCHEDULER_H
 #define LLVM_OPT_SCHED_OPTIMIZING_SCHEDULER_H
 
-#include "OptSchedDDGWrapperBasic.h"
 #include "OptSchedMachineWrapper.h"
 #include "opt-sched/Scheduler/config.h"
 #include "opt-sched/Scheduler/data_dep.h"
@@ -26,6 +25,8 @@ using namespace llvm;
 
 namespace llvm {
 namespace opt_sched {
+
+class OptSchedDDGWrapperBasic;
 
 // derive from the default scheduler so it is easy to fallback to it
 // when it is needed. This object is created for each function the

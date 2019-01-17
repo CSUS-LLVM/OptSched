@@ -4,6 +4,7 @@
 //
 //===----------------------------------------------------------------------===//
 #include "OptSchedMachineWrapper.h"
+#include "OptSchedDDGWrapperBasic.h"
 #include "opt-sched/Scheduler/OptSchedTarget.h"
 #include "opt-sched/Scheduler/machine_model.h"
 #include "opt-sched/Scheduler/defines.h"
