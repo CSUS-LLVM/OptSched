@@ -412,7 +412,7 @@ protected:
   bool isEarlySubProbDom_;
 
   // Should we ignore ilp and only schedule for register pressure.
-  bool schedForRPOnly_;
+  bool SchedForRPOnly_;
 
   // (Chris): Store the most recent matching hist node when checking for
   // history domination
@@ -506,7 +506,7 @@ protected:
 public:
   Enumerator(DataDepGraph *dataDepGraph, MachineModel *machMdl,
              InstCount schedUprBound, int16_t sigHashSize,
-             SchedPriorities prirts, Pruning prune, bool schedForRPOnly,
+             SchedPriorities prirts, Pruning PruningStrategy, bool SchedForRPOnly,
              bool enblStallEnum, Milliseconds timeout,
              InstCount preFxdInstCnt = 0,
              SchedInstruction *preFxdInsts[] = NULL);
@@ -523,7 +523,7 @@ public:
   virtual bool IsCostEnum() = 0;
 
   // (Chris)
-  inline bool IsSchedForRPOnly() const { return schedForRPOnly_; }
+  inline bool IsSchedForRPOnly() const { return SchedForRPOnly_; }
 
   // Calculates the schedule and returns it in the passed argument.
   FUNC_RESULT FindSchedule(InstSchedule *sched, SchedRegion *rgn) { return RES_ERROR; }
@@ -549,7 +549,7 @@ private:
 public:
   LengthEnumerator(DataDepGraph *dataDepGraph, MachineModel *machMdl,
                    InstCount schedUprBound, int16_t sigHashSize,
-                   SchedPriorities prirts, Pruning prune, bool schedForRPOnly,
+                   SchedPriorities prirts, Pruning PruningStrategy, bool SchedForRPOnly,
                    bool enblStallEnum, Milliseconds timeout,
                    InstCount preFxdInstCnt = 0,
                    SchedInstruction *preFxdInsts[] = NULL);
@@ -598,8 +598,8 @@ private:
 public:
   LengthCostEnumerator(DataDepGraph *dataDepGraph, MachineModel *machMdl,
                        InstCount schedUprBound, int16_t sigHashSize,
-                       SchedPriorities prirts, Pruning prune,
-                       bool schedForRPOnly, bool enblStallEnum,
+                       SchedPriorities prirts, Pruning PruningStrategy,
+                       bool SchedForRPOnly, bool enblStallEnum,
                        Milliseconds timeout, SPILL_COST_FUNCTION spillCostFunc,
                        InstCount preFxdInstCnt = 0,
                        SchedInstruction *preFxdInsts[] = NULL);

@@ -174,7 +174,7 @@ protected:
 class DataDepGraph : public llvm::opt_sched::OptSchedDDGWrapperBase, public DirAcycGraph, public DataDepStruct {
 public:
   DataDepGraph(MachineModel *machMdl, LATENCY_PRECISION ltncyPcsn,
-               GraphTransTypes graphTransTypes);
+               GraphTransTypes GTT);
   virtual ~DataDepGraph();
 
   // Reads the data dependence graph from a text file.
@@ -339,7 +339,7 @@ protected:
   InstCount graphTransCnt_;
 
   // A list of enabled graph transformations
-  struct GraphTransTypes graphTransTypes_;
+  struct GraphTransTypes GTT_;
 
   MachineModel *machMdl_;
 

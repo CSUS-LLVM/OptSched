@@ -37,10 +37,10 @@ private:
   const OptSchedTarget *OST;
 
   bool enblStallEnum_;
-  int spillCostFactor_;
+  int SCW_;
   int schedCostFactor_;
 
-  bool schedForRPOnly_;
+  bool SchedForRPOnly_;
 
   int16_t regTypeCnt_;
   RegisterFile *regFiles_;
@@ -118,11 +118,11 @@ private:
 public:
   BBWithSpill(const OptSchedTarget *OST_, DataDepGraph *dataDepGraph, long rgnNum,
               int16_t sigHashSize, LB_ALG lbAlg, SchedPriorities hurstcPrirts,
-              SchedPriorities enumPrirts, bool vrfySched, Pruning prune,
-              bool schedForRPOnly, bool enblStallEnum, int spillCostFactor,
+              SchedPriorities enumPrirts, bool vrfySched, Pruning PruningStrategy,
+              bool SchedForRPOnly, bool enblStallEnum, int SCW,
               SPILL_COST_FUNCTION spillCostFunc, bool chkSpillCostSum,
               bool chkCnflcts, bool fixLivein, bool fixLiveout,
-              int maxSpillCost, SchedulerType heurSchedType);
+              int maxSpillCost, SchedulerType HeurSchedType);
   ~BBWithSpill();
 
   int CmputCostLwrBound();

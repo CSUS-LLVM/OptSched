@@ -444,8 +444,8 @@ EnumTreeNode::ExaminedInst::~ExaminedInst() {
 
 Enumerator::Enumerator(DataDepGraph *dataDepGraph, MachineModel *machMdl,
                        InstCount schedUprBound, int16_t sigHashSize,
-                       SchedPriorities prirts, Pruning prune,
-                       bool schedForRPOnly, bool enblStallEnum,
+                       SchedPriorities prirts, Pruning PruningStrategy,
+                       bool SchedForRPOnly, bool enblStallEnum,
                        Milliseconds timeout, InstCount preFxdInstCnt,
                        SchedInstruction *preFxdInsts[])
     : ConstrainedScheduler(dataDepGraph, machMdl, schedUprBound) {
@@ -463,8 +463,8 @@ Enumerator::Enumerator(DataDepGraph *dataDepGraph, MachineModel *machMdl,
   isCnstrctd_ = false;
   rdyLst_ = NULL;
   prirts_ = prirts;
-  prune_ = prune;
-  schedForRPOnly_ = schedForRPOnly;
+  prune_ = PruningStrategy;
+  SchedForRPOnly_ = SchedForRPOnly;
   enblStallEnum_ = enblStallEnum;
 
   isEarlySubProbDom_ = true;
@@ -1026,7 +1026,7 @@ bool Enumerator::FindNxtFsblBrnch_(EnumTreeNode *&newNode) {
   stats::maxReadyListSize.SetMax(rdyInstCnt);
 #endif
 
-  if (crntBrnchNum == 0 && schedForRPOnly_)
+  if (crntBrnchNum == 0 && SchedForRPOnly_)
     crntNode_->SetFoundInstWithUse(IsUseInRdyLst_());
 
   for (i = crntBrnchNum; i < brnchCnt && crntNode_->IsFeasible(); i++) {
@@ -1134,7 +1134,7 @@ bool Enumerator::ProbeBranch_(SchedInstruction *inst, EnumTreeNode *&newNode,
   // If we are scheduling for register pressure only, and this branch
   // defines a register but does not use any, we can prune this branch
   // if another instruction in the ready list does use a register.
-  if (schedForRPOnly_) {
+  if (SchedForRPOnly_) {
     if (inst != NULL && crntNode_->FoundInstWithUse() &&
         inst->GetAdjustedUseCnt() == 0 && !dataDepGraph_->DoesFeedUser(inst))
       return false;
@@ -1902,11 +1902,11 @@ bool Enumerator::EnumStall_() { return enblStallEnum_; }
 
 LengthEnumerator::LengthEnumerator(
     DataDepGraph *dataDepGraph, MachineModel *machMdl, InstCount schedUprBound,
-    int16_t sigHashSize, SchedPriorities prirts, Pruning prune,
-    bool schedForRPOnly, bool enblStallEnum, Milliseconds timeout,
+    int16_t sigHashSize, SchedPriorities prirts, Pruning PruningStrategy,
+    bool SchedForRPOnly, bool enblStallEnum, Milliseconds timeout,
     InstCount preFxdInstCnt, SchedInstruction *preFxdInsts[])
     : Enumerator(dataDepGraph, machMdl, schedUprBound, sigHashSize, prirts,
-                 prune, schedForRPOnly, enblStallEnum, timeout, preFxdInstCnt,
+                 PruningStrategy, SchedForRPOnly, enblStallEnum, timeout, preFxdInstCnt,
                  preFxdInsts) {
   SetupAllocators_();
   tmpHstryNode_ = new HistEnumTreeNode;
@@ -1994,12 +1994,12 @@ void LengthEnumerator::FreeHistNode_(HistEnumTreeNode *histNode) {
 
 LengthCostEnumerator::LengthCostEnumerator(
     DataDepGraph *dataDepGraph, MachineModel *machMdl, InstCount schedUprBound,
-    int16_t sigHashSize, SchedPriorities prirts, Pruning prune,
-    bool schedForRPOnly, bool enblStallEnum, Milliseconds timeout,
+    int16_t sigHashSize, SchedPriorities prirts, Pruning PruningStrategy,
+    bool SchedForRPOnly, bool enblStallEnum, Milliseconds timeout,
     SPILL_COST_FUNCTION spillCostFunc, InstCount preFxdInstCnt,
     SchedInstruction *preFxdInsts[])
     : Enumerator(dataDepGraph, machMdl, schedUprBound, sigHashSize, prirts,
-                 prune, schedForRPOnly, enblStallEnum, timeout, preFxdInstCnt,
+                 PruningStrategy, SchedForRPOnly, enblStallEnum, timeout, preFxdInstCnt,
                  preFxdInsts) {
   SetupAllocators_();
 

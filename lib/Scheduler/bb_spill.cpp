@@ -31,13 +31,13 @@ BBWithSpill::BBWithSpill(const OptSchedTarget *OST_, DataDepGraph *dataDepGraph,
                          long rgnNum, int16_t sigHashSize, LB_ALG lbAlg,
                          SchedPriorities hurstcPrirts,
                          SchedPriorities enumPrirts, bool vrfySched,
-                         Pruning prune, bool schedForRPOnly, bool enblStallEnum,
-                         int spillCostFactor, SPILL_COST_FUNCTION spillCostFunc,
+                         Pruning PruningStrategy, bool SchedForRPOnly, bool enblStallEnum,
+                         int SCW, SPILL_COST_FUNCTION spillCostFunc,
                          bool chkSpillCostSum, bool chkCnflcts, bool fixLivein,
                          bool fixLiveout, int maxSpillCost,
-                         SchedulerType heurSchedType)
+                         SchedulerType HeurSchedType)
     : SchedRegion(OST_->MM, dataDepGraph, rgnNum, sigHashSize, lbAlg,
-                  hurstcPrirts, enumPrirts, vrfySched, prune, heurSchedType),
+                  hurstcPrirts, enumPrirts, vrfySched, PruningStrategy, HeurSchedType),
       OST(OST_) {
   costLwrBound_ = 0;
   enumrtr_ = NULL;
@@ -47,10 +47,10 @@ BBWithSpill::BBWithSpill(const OptSchedTarget *OST_, DataDepGraph *dataDepGraph,
   crntSlotNum_ = INVALID_VALUE;
   crntSpillCost_ = INVALID_VALUE;
 
-  schedForRPOnly_ = schedForRPOnly;
+  SchedForRPOnly_ = SchedForRPOnly;
 
   enblStallEnum_ = enblStallEnum;
-  spillCostFactor_ = spillCostFactor;
+  SCW_ = SCW;
   schedCostFactor_ = COST_WGHT_BASE;
   spillCostFunc_ = spillCostFunc;
   chkSpillCostSum_ = chkSpillCostSum;
@@ -103,7 +103,7 @@ bool BBWithSpill::EnableEnum_() {
 /*****************************************************************************/
 
 ConstrainedScheduler *BBWithSpill::AllocHeuristicScheduler_() {
-  switch (heurSchedType_) {
+  switch (HeurSchedType_) {
   case SCHED_LIST:
     return new ListScheduler(dataDepGraph_, machMdl_, abslutSchedUprBound_,
                              hurstcPrirts_);
@@ -314,12 +314,12 @@ InstCount BBWithSpill::CmputCostLwrBound() {
   // }
 
   InstCount staticLowerBound =
-      schedLwrBound_ * schedCostFactor_ + spillCostLwrBound * spillCostFactor_;
+      schedLwrBound_ * schedCostFactor_ + spillCostLwrBound * SCW_;
 
 #if defined(IS_DEBUG_STATIC_LOWER_BOUND)
   Logger::Info(
       "DAG %s spillCostLB %d scFactor %d lengthLB %d lenFactor %d staticLB %d",
-      dataDepGraph_->GetDagID(), spillCostLwrBound, spillCostFactor_,
+      dataDepGraph_->GetDagID(), spillCostLwrBound, SCW_,
       schedLwrBound_, schedCostFactor_, staticLowerBound);
 #endif
 
@@ -413,7 +413,7 @@ InstCount BBWithSpill::CmputCost_(InstSchedule *sched, COST_COMP_MODE compMode,
   assert(sched->IsComplete());
   InstCount cost = sched->GetCrntLngth() * schedCostFactor_;
   execCost = cost;
-  cost += crntSpillCost_ * spillCostFactor_;
+  cost += crntSpillCost_ * SCW_;
   sched->SetSpillCosts(spillCosts_);
   sched->SetPeakRegPressures(peakRegPressures_);
   sched->SetSpillCost(crntSpillCost_);
@@ -800,7 +800,7 @@ Enumerator *BBWithSpill::AllocEnumrtr_(Milliseconds timeout) {
 
   enumrtr_ = new LengthCostEnumerator(
       dataDepGraph_, machMdl_, schedUprBound_, sigHashSize_, enumPrirts_,
-      prune_, schedForRPOnly_, enblStallEnum, timeout, spillCostFunc_, 0, NULL);
+      prune_, SchedForRPOnly_, enblStallEnum, timeout, spillCostFunc_, 0, NULL);
   if (enumrtr_ == NULL)
     Logger::Fatal("Out of memory.");
 
@@ -921,10 +921,10 @@ bool BBWithSpill::ChkCostFsblty(InstCount trgtLngth, EnumTreeNode *node) {
   bool fsbl = true;
   InstCount crntCost, dynmcCostLwrBound;
   if (spillCostFunc_ == SCF_SLIL) {
-    crntCost = dynamicSlilLowerBound_ * spillCostFactor_ +
+    crntCost = dynamicSlilLowerBound_ * SCW_ +
                trgtLngth * schedCostFactor_;
   } else {
-    crntCost = crntSpillCost_ * spillCostFactor_ + trgtLngth * schedCostFactor_;
+    crntCost = crntSpillCost_ * SCW_ + trgtLngth * schedCostFactor_;
   }
   crntCost -= costLwrBound_;
   dynmcCostLwrBound = crntCost;

@@ -127,20 +127,20 @@ void ScheduleDAGOptSchedGCN::scheduleGCNMaxOcc() {
 }
 
 void ScheduleDAGOptSchedGCN::scheduleOptSchedMaxOcc() {
-  latencyPrecision = LTP_UNITY;
-  heurSchedType = SCHED_LIST;
-  spillCostFunction = SCF_TARGET;
+  LatencyPrecision = LTP_UNITY;
+  HeurSchedType = SCHED_LIST;
+  SCF = SCF_TARGET;
 
   ScheduleDAGOptSched::schedule();
 }
 
 void ScheduleDAGOptSchedGCN::scheduleOptSchedBalanced() {
-  latencyPrecision = LTP_ROUGH;
+  LatencyPrecision = LTP_ROUGH;
   // Force the input to the balanced scheduler to be the sequential order of the
   // (hopefully) good max occupancy schedule. We don’t want the list scheduler
   // to mangle the input because of latency or resource constraints.
-  heurSchedType = SCHED_SEQ;
-  spillCostFunction = SCF_TARGET;
+  HeurSchedType = SCHED_SEQ;
+  SCF = SCF_TARGET;
 
   ScheduleDAGOptSched::schedule();
 }
