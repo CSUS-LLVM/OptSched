@@ -15,6 +15,9 @@
 using namespace llvm;
 using namespace llvm::opt_sched;
 
+OptSchedRegistry<OptSchedTargetRegistry::OptSchedTargetFactory>
+    OptSchedTargetRegistry::Registry;
+
 namespace {
 
 class OptSchedGenericTarget : public OptSchedTarget {
