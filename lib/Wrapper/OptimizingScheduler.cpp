@@ -88,18 +88,13 @@ static cl::opt<std::string> OptSchedCfgMM(
     "optsched-cfg-machine-model", cl::Hidden,
     cl::desc("Path to the machine model specification file for opt-sched."));
 
-OptSchedRegistry<OptSchedTargetRegistry::OptSchedTargetFactory>
-    OptSchedTargetRegistry::Registry;
-
-namespace {
-
-void getRealCfgPathCL(SmallString<128> &Path) {
+static void getRealCfgPathCL(SmallString<128> &Path) {
   SmallString<128> Tmp = Path;
   auto EC = sys::fs::real_path(Tmp, Path, true);
   if (EC)
     llvm::report_fatal_error(EC.message() + ": " + Tmp, false); }
 
-void reportCfgDirPathError(std::error_code EC, llvm::StringRef OptSchedCfg) {
+static void reportCfgDirPathError(std::error_code EC, llvm::StringRef OptSchedCfg) {
   if (OptSchedCfg == DEFAULT_CFG_DIR)
     llvm::report_fatal_error(EC.message() +
                              ": Error searching for the OptSched config "
@@ -113,7 +108,7 @@ void reportCfgDirPathError(std::error_code EC, llvm::StringRef OptSchedCfg) {
 // If this iterator is a debug value, increment until reaching the End or a
 // non-debug instruction. static function copied from
 // llvm/CodeGen/MachineScheduler.cpp
-MachineBasicBlock::iterator nextIfDebug(MachineBasicBlock::iterator I,
+static MachineBasicBlock::iterator nextIfDebug(MachineBasicBlock::iterator I,
                                         MachineBasicBlock::const_iterator End) {
   for (; I != End; ++I) {
     if (!I->isDebugValue())
@@ -122,7 +117,18 @@ MachineBasicBlock::iterator nextIfDebug(MachineBasicBlock::iterator I,
   return I;
 }
 
-} // end anonymous namespace
+static bool skipRegion(const StringRef RegionName, const Config &SchedIni) {
+  const bool ScheduleSpecificRegions =
+      SchedIni.GetBool("SCHEDULE_SPECIFIC_REGIONS");
+
+  if (!ScheduleSpecificRegions)
+    return false;
+
+  const std::list<std::string> regionList =
+      SchedIni.GetStringList("REGIONS_TO_SCHEDULE");
+  return std::find(std::begin(regionList), std::end(regionList), RegionName) !=
+         std::end(regionList);
+}
 
 ScheduleDAGOptSched::ScheduleDAGOptSched(
     MachineSchedContext *C, std::unique_ptr<MachineSchedStrategy> S)
@@ -186,29 +192,13 @@ void ScheduleDAGOptSched::schedule() {
   ShouldTrackPressure = true;
   ShouldTrackLaneMasks = true;
 
-  // (Chris) Increment the region number here to get unique dag IDs
-  // per scheduling region within a machine function.
+  Config &schedIni = SchedulerOptions::getInstance();
   ++RegionNumber;
   const std::string RegionName = C->MF->getFunction().getName().data() +
-                                  std::string(":") + std::to_string(RegionNumber);
+                                 std::string(":") +
+                                 std::to_string(RegionNumber);
 
-  // (Chris): This option in the sched.ini file will override USE_OPT_SCHED. It
-  // will only apply B&B if the region name belongs in the list of specified
-  // regions. Region names are of the form:
-  //   funcName:RegionNumber
-  // No leading zeroes in RegionNumber, and no whitespace.
-  // Get config options.
-  Config &schedIni = SchedulerOptions::getInstance();
-  const bool scheduleSpecificRegions =
-      schedIni.GetBool("SCHEDULE_SPECIFIC_REGIONS");
-  if (scheduleSpecificRegions) {
-    const std::list<std::string> regionList =
-        schedIni.GetStringList("REGIONS_TO_SCHEDULE");
-    OptSchedEnabled = std::find(std::begin(regionList), std::end(regionList),
-                                RegionName) != std::end(regionList);
-  }
-
-  if (!OptSchedEnabled)
+  if (!OptSchedEnabled || skipRegion(RegionName, schedIni))
     return;
 
 #ifdef IS_DEBUG_PEAK_PRESSURE
