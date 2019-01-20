@@ -304,9 +304,7 @@ void ScheduleDAGOptSched::schedule() {
   SchedRegion *region = new BBWithSpill(
       OST.get(), static_cast<DataDepGraph *>(DDG.get()), 0, HistTableHashBits,
       LowerBoundAlgorithm, HeuristicPriorities, EnumPriorities, VerifySchedule,
-      PruningStrategy, SchedForRPOnly, EnumStalls, SCW,
-      SCF, checkSpillCostSum, checkConflicts, fixLiveIn,
-      fixLiveOut, maxSpillCost, HeurSchedType);
+      PruningStrategy, SchedForRPOnly, EnumStalls, SCW, SCF, HeurSchedType);
 
   // Schedule
   bool isEasy;
@@ -327,67 +325,58 @@ void ScheduleDAGOptSched::schedule() {
   // Setup time before scheduling
   Utilities::startTime = std::chrono::high_resolution_clock::now();
 
-  if (SUnits.size() < minDagSize || SUnits.size() > maxDagSize) {
-    rslt = RES_FAIL;
+  bool filterByPerp = schedIni.GetBool("FILTER_BY_PERP");
+  auto blocksToKeep = [&]() {
+    auto setting = schedIni.GetString("BLOCKS_TO_KEEP");
+    if (setting == "ZERO_COST")
+      return BLOCKS_TO_KEEP::ZERO_COST;
+    else if (setting == "OPTIMAL")
+      return BLOCKS_TO_KEEP::OPTIMAL;
+    else if (setting == "IMPROVED")
+      return BLOCKS_TO_KEEP::IMPROVED;
+    else if (setting == "IMPROVED_OR_OPTIMAL")
+      return BLOCKS_TO_KEEP::IMPROVED_OR_OPTIMAL;
+    else
+      return BLOCKS_TO_KEEP::ALL;
+  }();
+  rslt = region->FindOptimalSchedule(
+      RegionTimeout, LengthTimeout, isEasy, normBestCost, bestSchedLngth,
+      normHurstcCost, hurstcSchedLngth, sched, filterByPerp, blocksToKeep);
+  if ((!(rslt == RES_SUCCESS || rslt == RES_TIMEOUT) || sched == NULL)) {
     LLVM_DEBUG(
-        Logger::Error("Dag skipped due to out-of-range size. DAG size = %d, \
-                  valid range is [%d, %d]",
-                      SUnits.size(), minDagSize, maxDagSize));
+        Logger::Info("OptSched run failed: rslt=%d, sched=%p. Falling back.",
+                     rslt, (void *)sched));
+
+    // Scheduling with opt-sched failed.
+    fallbackScheduler();
   } else {
-    bool filterByPerp = schedIni.GetBool("FILTER_BY_PERP");
-    auto blocksToKeep = [&]() {
-      auto setting = schedIni.GetString("BLOCKS_TO_KEEP");
-      if (setting == "ZERO_COST")
-        return BLOCKS_TO_KEEP::ZERO_COST;
-      else if (setting == "OPTIMAL")
-        return BLOCKS_TO_KEEP::OPTIMAL;
-      else if (setting == "IMPROVED")
-        return BLOCKS_TO_KEEP::IMPROVED;
-      else if (setting == "IMPROVED_OR_OPTIMAL")
-        return BLOCKS_TO_KEEP::IMPROVED_OR_OPTIMAL;
-      else
-        return BLOCKS_TO_KEEP::ALL;
-    }();
-    rslt = region->FindOptimalSchedule(
-        useFileBounds, RegionTimeout, LengthTimeout, isEasy, normBestCost,
-        bestSchedLngth, normHurstcCost, hurstcSchedLngth, sched, filterByPerp,
-        blocksToKeep);
-    if ((!(rslt == RES_SUCCESS || rslt == RES_TIMEOUT) || sched == NULL)) {
-      LLVM_DEBUG(
-          Logger::Info("OptSched run failed: rslt=%d, sched=%p. Falling back.",
-                       rslt, (void *)sched));
+    LLVM_DEBUG(Logger::Info("OptSched succeeded."));
+    // Count simulated spills.
+    if (isSimRegAllocEnabled()) {
+      SimulatedSpills += region->GetSimSpills();
+    }
 
-      // Scheduling with opt-sched failed.
-      fallbackScheduler();
-    } else {
-      LLVM_DEBUG(Logger::Info("OptSched succeeded."));
-      // Count simulated spills.
-      if (isSimRegAllocEnabled()) {
-        SimulatedSpills += region->GetSimSpills();
+    // Convert back to LLVM.
+    // Advance past initial DebugValues.
+    CurrentTop = nextIfDebug(RegionBegin, RegionEnd);
+    CurrentBottom = RegionEnd;
+    InstCount cycle, slot;
+    for (InstCount i = sched->GetFrstInst(cycle, slot); i != INVALID_VALUE;
+         i = sched->GetNxtInst(cycle, slot)) {
+      // Skip artificial instrs.
+      if (i > static_cast<int>(SUnits.size()) - 1)
+        continue;
+
+      if (i == SCHD_STALL) {
+        ScheduleNode(NULL, cycle);
+      } else {
+        SUnit *unit = &SUnits[i];
+
+        if (unit && unit->isInstr())
+          ScheduleNode(unit, cycle);
       }
-
-      // Convert back to LLVM.
-      // Advance past initial DebugValues.
-      CurrentTop = nextIfDebug(RegionBegin, RegionEnd);
-      CurrentBottom = RegionEnd;
-      InstCount cycle, slot;
-      for (InstCount i = sched->GetFrstInst(cycle, slot); i != INVALID_VALUE;
-           i = sched->GetNxtInst(cycle, slot)) {
-        // Skip artificial instrs.
-        if (i > static_cast<int>(SUnits.size()) - 1)
-          continue;
-
-        if (i == SCHD_STALL) {
-          ScheduleNode(NULL, cycle);
-        } else {
-          SUnit *unit = &SUnits[i];
-
-          if (unit && unit->isInstr())
-            ScheduleNode(unit, cycle);
-        }
-      }
-    } // end OptSched succeeded
-  }
+    }
+  } // end OptSched succeeded
 
   OST->finalizeRegion(sched);
   placeDebugValues();
@@ -479,8 +468,6 @@ void ScheduleDAGOptSched::loadOptSchedConfig() {
   // setup OptScheduler configuration options
   OptSchedEnabled = isOptSchedEnabled();
   LatencyPrecision = fetchLatencyPrecision();
-  maxDagSizeForLatencyPrecision =
-      schedIni.GetInt("MAX_DAG_SIZE_FOR_PRECISE_LATENCY");
   TreatOrderAsDataDeps = schedIni.GetBool("TREAT_ORDER_DEPS_AS_DATA_DEPS");
 
   // should we print spills for the current function
@@ -507,11 +494,6 @@ void ScheduleDAGOptSched::loadOptSchedConfig() {
   EnableMutations = schedIni.GetBool("LLVM_MUTATIONS");
   EnumStalls = schedIni.GetBool("ENUMERATE_STALLS");
   SCW = schedIni.GetInt("SPILL_COST_FACTOR");
-  checkSpillCostSum = schedIni.GetBool("CHECK_SPILL_COST_SUM");
-  checkConflicts = schedIni.GetBool("CHECK_CONFLICTS");
-  fixLiveIn = schedIni.GetBool("FIX_LIVEIN");
-  fixLiveOut = schedIni.GetBool("FIX_LIVEOUT");
-  maxSpillCost = schedIni.GetInt("MAX_SPILL_COST");
   LowerBoundAlgorithm = parseLowerBoundAlgorithm();
   HeuristicPriorities = parseHeuristic(schedIni.GetString("HEURISTIC"));
   // To support old sched.ini files setting NID as the heuristic means LLVM
@@ -526,9 +508,6 @@ void ScheduleDAGOptSched::loadOptSchedConfig() {
     IsTimeoutPerInst = true;
   else
     IsTimeoutPerInst = false;
-  minDagSize = schedIni.GetInt("MIN_DAG_SIZE");
-  maxDagSize = schedIni.GetInt("MAX_DAG_SIZE");
-  useFileBounds = schedIni.GetBool("USE_FILE_BOUNDS");
   int randomSeed = schedIni.GetInt("RANDOM_SEED", 0);
   if (randomSeed == 0)
     randomSeed = time(NULL);

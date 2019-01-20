@@ -31,13 +31,13 @@ BBWithSpill::BBWithSpill(const OptSchedTarget *OST_, DataDepGraph *dataDepGraph,
                          long rgnNum, int16_t sigHashSize, LB_ALG lbAlg,
                          SchedPriorities hurstcPrirts,
                          SchedPriorities enumPrirts, bool vrfySched,
-                         Pruning PruningStrategy, bool SchedForRPOnly, bool enblStallEnum,
-                         int SCW, SPILL_COST_FUNCTION spillCostFunc,
-                         bool chkSpillCostSum, bool chkCnflcts, bool fixLivein,
-                         bool fixLiveout, int maxSpillCost,
+                         Pruning PruningStrategy, bool SchedForRPOnly,
+                         bool enblStallEnum, int SCW,
+                         SPILL_COST_FUNCTION spillCostFunc,
                          SchedulerType HeurSchedType)
     : SchedRegion(OST_->MM, dataDepGraph, rgnNum, sigHashSize, lbAlg,
-                  hurstcPrirts, enumPrirts, vrfySched, PruningStrategy, HeurSchedType),
+                  hurstcPrirts, enumPrirts, vrfySched, PruningStrategy,
+                  HeurSchedType),
       OST(OST_) {
   costLwrBound_ = 0;
   enumrtr_ = NULL;
@@ -53,15 +53,7 @@ BBWithSpill::BBWithSpill(const OptSchedTarget *OST_, DataDepGraph *dataDepGraph,
   SCW_ = SCW;
   schedCostFactor_ = COST_WGHT_BASE;
   spillCostFunc_ = spillCostFunc;
-  chkSpillCostSum_ = chkSpillCostSum;
-  chkCnflcts_ = chkCnflcts;
-  fixLivein_ = fixLivein;
-  fixLiveout_ = fixLiveout;
-  maxSpillCost_ = maxSpillCost;
   trackLiveRangeLngths_ = true;
-
-  if (fixLivein_ || fixLiveout_)
-    needTrnstvClsr_ = true;
 
   regTypeCnt_ = OST->MM->GetRegTypeCnt();
   regFiles_ = dataDepGraph->getRegFiles();
@@ -93,12 +85,15 @@ BBWithSpill::~BBWithSpill() {
 /*****************************************************************************/
 
 bool BBWithSpill::EnableEnum_() {
+  return true;
+  /*
   if (maxSpillCost_ > 0 && hurstcCost_ > maxSpillCost_) {
     Logger::Info("Bypassing enumeration due to a large spill cost of %d",
                  hurstcCost_);
     return false;
   }
   return true;
+  */
 }
 /*****************************************************************************/
 
@@ -355,8 +350,8 @@ void BBWithSpill::InitForCostCmputtn_() {
     liveRegs_[i].Reset();
     if (regFiles_[i].GetPhysRegCnt() > 0)
       livePhysRegs_[i].Reset();
-    if (chkCnflcts_)
-      regFiles_[i].ResetConflicts();
+//    if (chkCnflcts_)
+//      regFiles_[i].ResetConflicts();
     peakRegPressures_[i] = 0;
     regPressures_[i] = 0;
   }
@@ -910,10 +905,12 @@ void BBWithSpill::SetupForSchdulng_() {
   schduldEntryInstCnt_ = 0;
   schduldExitInstCnt_ = 0;
 
+  /*
   if (chkCnflcts_)
     for (int i = 0; i < regTypeCnt_; i++) {
       regFiles_[i].SetupConflicts();
     }
+ */
 }
 /*****************************************************************************/
 
@@ -953,6 +950,8 @@ void BBWithSpill::SetSttcLwrBounds(EnumTreeNode *) {
 /*****************************************************************************/
 
 bool BBWithSpill::ChkInstLglty(SchedInstruction *inst) {
+  return true;
+  /*
   int16_t regType;
   int defCnt, physRegNum;
   Register **defs;
@@ -1001,10 +1000,13 @@ bool BBWithSpill::ChkInstLglty(SchedInstruction *inst) {
     } // end if
   }   // end for
   return true;
+  */
 }
 
 bool BBWithSpill::ChkSchedule_(InstSchedule *bestSched,
                                InstSchedule *lstSched) {
+  return true;
+  /*
   if (bestSched == NULL || bestSched == lstSched)
     return true;
   if (chkSpillCostSum_) {
@@ -1057,6 +1059,7 @@ bool BBWithSpill::ChkSchedule_(InstSchedule *bestSched,
     }
   }
   return true;
+  */
 }
 
 void BBWithSpill::CmputCnflcts_(InstSchedule *sched) {

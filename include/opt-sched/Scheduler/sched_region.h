@@ -63,11 +63,11 @@ public:
 
   // TODO(max): Document.
   virtual FUNC_RESULT
-  FindOptimalSchedule(bool useFileBounds, Milliseconds rgnTimeout,
-                      Milliseconds lngthTimeout, bool &isHurstcOptml,
-                      InstCount &bestCost, InstCount &bestSchedLngth,
-                      InstCount &hurstcCost, InstCount &hurstcSchedLngth,
-                      InstSchedule *&bestSched, bool filterByPerp, const BLOCKS_TO_KEEP blocksToKeep);
+  FindOptimalSchedule(Milliseconds rgnTimeout, Milliseconds lngthTimeout,
+                      bool &isHurstcOptml, InstCount &bestCost,
+                      InstCount &bestSchedLngth, InstCount &hurstcCost,
+                      InstCount &hurstcSchedLngth, InstSchedule *&bestSched,
+                      bool filterByPerp, const BLOCKS_TO_KEEP blocksToKeep);
 
   // External abstract functions.
 

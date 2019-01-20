@@ -69,8 +69,6 @@ private:
   int schduldEntryInstCnt_;
   int schduldExitInstCnt_;
   int schduldInstCnt_;
-  bool fixLivein_;
-  bool fixLiveout_;
 
   InstCount *spillCosts_;
   // Current register pressure for each register type.
@@ -80,9 +78,6 @@ private:
   InstCount peakSpillCost_;
   InstCount totSpillCost_;
   InstCount slilSpillCost_;
-  bool chkSpillCostSum_;
-  bool chkCnflcts_;
-  int maxSpillCost_;
   bool trackLiveRangeLngths_;
 
   // Virtual Functions:
@@ -116,13 +111,12 @@ private:
   void CmputCnflcts_(InstSchedule *sched);
 
 public:
-  BBWithSpill(const OptSchedTarget *OST_, DataDepGraph *dataDepGraph, long rgnNum,
-              int16_t sigHashSize, LB_ALG lbAlg, SchedPriorities hurstcPrirts,
-              SchedPriorities enumPrirts, bool vrfySched, Pruning PruningStrategy,
-              bool SchedForRPOnly, bool enblStallEnum, int SCW,
-              SPILL_COST_FUNCTION spillCostFunc, bool chkSpillCostSum,
-              bool chkCnflcts, bool fixLivein, bool fixLiveout,
-              int maxSpillCost, SchedulerType HeurSchedType);
+  BBWithSpill(const OptSchedTarget *OST_, DataDepGraph *dataDepGraph,
+              long rgnNum, int16_t sigHashSize, LB_ALG lbAlg,
+              SchedPriorities hurstcPrirts, SchedPriorities enumPrirts,
+              bool vrfySched, Pruning PruningStrategy, bool SchedForRPOnly,
+              bool enblStallEnum, int SCW, SPILL_COST_FUNCTION spillCostFunc,
+              SchedulerType HeurSchedType);
   ~BBWithSpill();
 
   int CmputCostLwrBound();

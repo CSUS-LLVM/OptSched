@@ -72,10 +72,9 @@ void SchedRegion::CmputAbslutUprBound_() {
 }
 
 FUNC_RESULT SchedRegion::FindOptimalSchedule(
-    bool useFileBounds, Milliseconds rgnTimeout, Milliseconds lngthTimeout,
-    bool &isLstOptml, InstCount &bestCost, InstCount &bestSchedLngth,
-    InstCount &hurstcCost, InstCount &hurstcSchedLngth,
-    InstSchedule *&bestSched, bool filterByPerp,
+    Milliseconds rgnTimeout, Milliseconds lngthTimeout, bool &isLstOptml,
+    InstCount &bestCost, InstCount &bestSchedLngth, InstCount &hurstcCost,
+    InstCount &hurstcSchedLngth, InstSchedule *&bestSched, bool filterByPerp,
     const BLOCKS_TO_KEEP blocksToKeep) {
   ConstrainedScheduler *lstSchdulr;
   InstSchedule *lstSched = NULL;
@@ -180,7 +179,7 @@ FUNC_RESULT SchedRegion::FindOptimalSchedule(
   if (rgnTimeout == 0)
     costLwrBound_ = CmputCostLwrBound();
   else
-    CmputLwrBounds_(useFileBounds);
+    CmputLwrBounds_(false);
   assert(schedLwrBound_ <= lstSched->GetCrntLngth());
 
   InstCount hurstcExecCost;
@@ -191,7 +190,7 @@ FUNC_RESULT SchedRegion::FindOptimalSchedule(
     CmputNormCost_(lstSched, CCM_STTC, hurstcExecCost, false);
   }
   hurstcCost_ = lstSched->GetCost();
-  isLstOptml = CmputUprBounds_(lstSched, useFileBounds);
+  isLstOptml = CmputUprBounds_(lstSched, false);
   boundTime = Utilities::GetProcessorTime() - boundStart;
   stats::boundComputationTime.Record(boundTime);
 
