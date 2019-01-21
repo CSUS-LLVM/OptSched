@@ -57,8 +57,6 @@ OptSchedDDGWrapperBasic::OptSchedDDGWrapperBasic(
   isTraceFormat_ = false;
   TreatOrderDepsAsDataDeps =
       SchedulerOptions::getInstance().GetBool("TREAT_ORDER_DEPS_AS_DATA_DEPS");
-  MaxSizeForPreciseLatency = SchedulerOptions::getInstance().GetInt(
-      "MAX_DAG_SIZE_FOR_PRECISE_LATENCY");
   ShouldFilterRegisterTypes = SchedulerOptions::getInstance().GetBool(
       "FILTER_REGISTERS_TYPES_WITH_LOW_PRP", false);
   ShouldGenerateMM =
@@ -119,7 +117,7 @@ void OptSchedDDGWrapperBasic::countDefs() {
   for (const auto &L : DAG->getRegPressure().LiveInRegs) {
     for (int Type : getRegisterType(L.RegUnit))
       RegDefCounts[Type]++;
-      Defs.insert(L.RegUnit);
+    Defs.insert(L.RegUnit);
   }
 
   std::vector<SUnit>::const_iterator I, E;
@@ -143,7 +141,7 @@ void OptSchedDDGWrapperBasic::countDefs() {
     for (const auto &D : RegOpers.Defs) {
       for (int Type : getRegisterType(D.RegUnit))
         RegDefCounts[Type]++;
-        Defs.insert(D.RegUnit);
+      Defs.insert(D.RegUnit);
     }
   }
 

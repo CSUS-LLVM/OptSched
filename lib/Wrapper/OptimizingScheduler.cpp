@@ -6,8 +6,8 @@
 #include "OptimizingScheduler.h"
 #include "OptSchedDDGWrapperBasic.h"
 #include "OptSchedMachineWrapper.h"
-#include "opt-sched/Scheduler/OptSchedTarget.h"
 #include "opt-sched/Scheduler/OptSchedDDGWrapperBase.h"
+#include "opt-sched/Scheduler/OptSchedTarget.h"
 #include "opt-sched/Scheduler/bb_spill.h"
 #include "opt-sched/Scheduler/config.h"
 #include "opt-sched/Scheduler/data_dep.h"
@@ -16,8 +16,8 @@
 #include "opt-sched/Scheduler/register.h"
 #include "opt-sched/Scheduler/sched_region.h"
 #include "opt-sched/Scheduler/utilities.h"
-#include "llvm/CodeGen/LiveIntervals.h"
 #include "llvm/ADT/StringMap.h"
+#include "llvm/CodeGen/LiveIntervals.h"
 #include "llvm/CodeGen/MachineRegisterInfo.h"
 #include "llvm/CodeGen/MachineScheduler.h"
 #include "llvm/CodeGen/RegisterClassInfo.h"
@@ -65,8 +65,9 @@ static ScheduleDAGInstrs *createOptSched(MachineSchedContext *C) {
 }
 
 // Register the machine scheduler.
-static MachineSchedRegistry
-    OptSchedMIRegistry("optsched", "Use the OptSched scheduler.", createOptSched);
+static MachineSchedRegistry OptSchedMIRegistry("optsched",
+                                               "Use the OptSched scheduler.",
+                                               createOptSched);
 
 // Command line options for opt-sched.
 static cl::opt<std::string> OptSchedCfg(
@@ -92,14 +93,16 @@ static void getRealCfgPathCL(SmallString<128> &Path) {
   SmallString<128> Tmp = Path;
   auto EC = sys::fs::real_path(Tmp, Path, true);
   if (EC)
-    llvm::report_fatal_error(EC.message() + ": " + Tmp, false); }
+    llvm::report_fatal_error(EC.message() + ": " + Tmp, false);
+}
 
-static void reportCfgDirPathError(std::error_code EC, llvm::StringRef OptSchedCfg) {
+static void reportCfgDirPathError(std::error_code EC,
+                                  llvm::StringRef OptSchedCfg) {
   if (OptSchedCfg == DEFAULT_CFG_DIR)
     llvm::report_fatal_error(EC.message() +
-                             ": Error searching for the OptSched config "
-                             "directory in the default location: " +
-                             DEFAULT_CFG_DIR,
+                                 ": Error searching for the OptSched config "
+                                 "directory in the default location: " +
+                                 DEFAULT_CFG_DIR,
                              false);
   else
     llvm::report_fatal_error(EC.message() + ": " + OptSchedCfg, false);
@@ -108,8 +111,9 @@ static void reportCfgDirPathError(std::error_code EC, llvm::StringRef OptSchedCf
 // If this iterator is a debug value, increment until reaching the End or a
 // non-debug instruction. static function copied from
 // llvm/CodeGen/MachineScheduler.cpp
-static MachineBasicBlock::iterator nextIfDebug(MachineBasicBlock::iterator I,
-                                        MachineBasicBlock::const_iterator End) {
+static MachineBasicBlock::iterator
+nextIfDebug(MachineBasicBlock::iterator I,
+            MachineBasicBlock::const_iterator End) {
   for (; I != End; ++I) {
     if (!I->isDebugValue())
       break;
@@ -128,6 +132,35 @@ static bool skipRegion(const StringRef RegionName, const Config &SchedIni) {
       SchedIni.GetStringList("REGIONS_TO_SCHEDULE");
   return std::find(std::begin(regionList), std::end(regionList), RegionName) !=
          std::end(regionList);
+}
+
+static BLOCKS_TO_KEEP blocksToKeep(const Config &SchedIni) {
+  const auto &Setting = SchedIni.GetString("BLOCKS_TO_KEEP");
+  if (Setting == "ZERO_COST")
+    return BLOCKS_TO_KEEP::ZERO_COST;
+  if (Setting == "OPTIMAL")
+    return BLOCKS_TO_KEEP::OPTIMAL;
+  if (Setting == "IMPROVED")
+    return BLOCKS_TO_KEEP::IMPROVED;
+  if (Setting == "IMPROVED_OR_OPTIMAL")
+    return BLOCKS_TO_KEEP::IMPROVED_OR_OPTIMAL;
+
+  return BLOCKS_TO_KEEP::ALL;
+}
+
+static SchedulerType parseListSchedType() {
+  auto SchedTypeString =
+      SchedulerOptions::getInstance().GetString("HEUR_SCHED_TYPE", "LIST");
+  if (SchedTypeString == "LIST")
+    return SCHED_LIST;
+  if (SchedTypeString == "SEQ")
+    return SCHED_SEQ;
+  if (SchedTypeString == "ACO")
+    return SCHED_ACO;
+
+  Logger::Info("Unknown heuristic scheduler type selected defaulting to basic "
+               "list scheduler.");
+  return SCHED_LIST;
 }
 
 ScheduleDAGOptSched::ScheduleDAGOptSched(
@@ -149,13 +182,12 @@ ScheduleDAGOptSched::ScheduleDAGOptSched(
   loadOptSchedConfig();
 
   StringRef ArchName = TM.getTargetTriple().getArchName();
-	auto TargetFactory =
+  auto TargetFactory =
       OptSchedTargetRegistry::Registry.getFactoryWithName(ArchName);
 
-    if (!TargetFactory)
-      TargetFactory =
+  if (!TargetFactory)
+    TargetFactory =
         OptSchedTargetRegistry::Registry.getFactoryWithName("generic");
-
 
   OST = TargetFactory();
   MM = OST->createMachineModel(PathCfgMM.c_str());
@@ -209,7 +241,6 @@ void ScheduleDAGOptSched::schedule() {
 
   // Use LLVM's heuristic schedule as input to the B&B scheduler.
   if (UseLLVMScheduler) {
-
     ScheduleDAGMILive::schedule();
 
     OriginalDAG = SUnits;
@@ -224,7 +255,6 @@ void ScheduleDAGOptSched::schedule() {
     for (MachineBasicBlock::instr_iterator I = BB->instr_begin(),
                                            E = BB->instr_end();
          I != E; ++I) {
-
       MachineInstr &instr = *I;
       SUnit *su = getSUnit(&instr);
 
@@ -290,12 +320,10 @@ void ScheduleDAGOptSched::schedule() {
 
   // Build LLVM DAG
   SetupLLVMDag();
-
   OST->initRegion(this, MM.get());
-
   // Convert graph
-  auto DDG = OST->createDDGWrapper(C, this, MM.get(), LatencyPrecision,
-                                   GTT, RegionName);
+  auto DDG = OST->createDDGWrapper(C, this, MM.get(), LatencyPrecision, GTT,
+                                   RegionName);
 
   DDG->convertSUnits();
   DDG->convertRegFiles();
@@ -306,14 +334,14 @@ void ScheduleDAGOptSched::schedule() {
       LowerBoundAlgorithm, HeuristicPriorities, EnumPriorities, VerifySchedule,
       PruningStrategy, SchedForRPOnly, EnumStalls, SCW, SCF, HeurSchedType);
 
-  // Schedule
-  bool isEasy;
-  InstCount normBestCost = 0;
-  InstCount bestSchedLngth = 0;
-  InstCount normHurstcCost = 0;
-  InstCount hurstcSchedLngth = 0;
-  InstSchedule *sched = NULL;
-  FUNC_RESULT rslt;
+  bool IsEasy = false;
+  InstCount NormBestCost = 0;
+  InstCount BestSchedLngth = 0;
+  InstCount NormHurstcCost = 0;
+  InstCount HurstcSchedLngth = 0;
+  InstSchedule *Sched = NULL;
+  FUNC_RESULT Rslt;
+  bool FilterByPerp = schedIni.GetBool("FILTER_BY_PERP");
 
   if (IsTimeoutPerInst) {
     // Re-calculate timeout values if timeout setting is per instruction
@@ -324,61 +352,50 @@ void ScheduleDAGOptSched::schedule() {
 
   // Setup time before scheduling
   Utilities::startTime = std::chrono::high_resolution_clock::now();
+  // Schedule region.
+  Rslt = region->FindOptimalSchedule(RegionTimeout, LengthTimeout, IsEasy,
+                                     NormBestCost, BestSchedLngth,
+                                     NormHurstcCost, HurstcSchedLngth, Sched,
+                                     FilterByPerp, blocksToKeep(schedIni));
 
-  bool filterByPerp = schedIni.GetBool("FILTER_BY_PERP");
-  auto blocksToKeep = [&]() {
-    auto setting = schedIni.GetString("BLOCKS_TO_KEEP");
-    if (setting == "ZERO_COST")
-      return BLOCKS_TO_KEEP::ZERO_COST;
-    else if (setting == "OPTIMAL")
-      return BLOCKS_TO_KEEP::OPTIMAL;
-    else if (setting == "IMPROVED")
-      return BLOCKS_TO_KEEP::IMPROVED;
-    else if (setting == "IMPROVED_OR_OPTIMAL")
-      return BLOCKS_TO_KEEP::IMPROVED_OR_OPTIMAL;
-    else
-      return BLOCKS_TO_KEEP::ALL;
-  }();
-  rslt = region->FindOptimalSchedule(
-      RegionTimeout, LengthTimeout, isEasy, normBestCost, bestSchedLngth,
-      normHurstcCost, hurstcSchedLngth, sched, filterByPerp, blocksToKeep);
-  if ((!(rslt == RES_SUCCESS || rslt == RES_TIMEOUT) || sched == NULL)) {
+  if ((!(Rslt == RES_SUCCESS || Rslt == RES_TIMEOUT) || Sched == NULL)) {
     LLVM_DEBUG(
         Logger::Info("OptSched run failed: rslt=%d, sched=%p. Falling back.",
-                     rslt, (void *)sched));
-
+                     Rslt, (void *)Sched));
     // Scheduling with opt-sched failed.
     fallbackScheduler();
-  } else {
-    LLVM_DEBUG(Logger::Info("OptSched succeeded."));
-    // Count simulated spills.
-    if (isSimRegAllocEnabled()) {
-      SimulatedSpills += region->GetSimSpills();
+    return;
+  }
+
+  LLVM_DEBUG(Logger::Info("OptSched succeeded."));
+  OST->finalizeRegion(Sched);
+  if (!OST->shouldKeepSchedule())
+    return;
+
+  // Count simulated spills.
+  if (isSimRegAllocEnabled()) {
+    SimulatedSpills += region->GetSimSpills();
+  }
+
+  // Convert back to LLVM.
+  // Advance past initial DebugValues.
+  CurrentTop = nextIfDebug(RegionBegin, RegionEnd);
+  CurrentBottom = RegionEnd;
+  InstCount cycle, slot;
+  for (InstCount i = Sched->GetFrstInst(cycle, slot); i != INVALID_VALUE;
+       i = Sched->GetNxtInst(cycle, slot)) {
+    // Skip artificial instrs.
+    if (i > static_cast<int>(SUnits.size()) - 1)
+      continue;
+
+    if (i == SCHD_STALL)
+      ScheduleNode(NULL, cycle);
+    else {
+      SUnit *unit = &SUnits[i];
+      if (unit && unit->isInstr())
+        ScheduleNode(unit, cycle);
     }
-
-    // Convert back to LLVM.
-    // Advance past initial DebugValues.
-    CurrentTop = nextIfDebug(RegionBegin, RegionEnd);
-    CurrentBottom = RegionEnd;
-    InstCount cycle, slot;
-    for (InstCount i = sched->GetFrstInst(cycle, slot); i != INVALID_VALUE;
-         i = sched->GetNxtInst(cycle, slot)) {
-      // Skip artificial instrs.
-      if (i > static_cast<int>(SUnits.size()) - 1)
-        continue;
-
-      if (i == SCHD_STALL) {
-        ScheduleNode(NULL, cycle);
-      } else {
-        SUnit *unit = &SUnits[i];
-
-        if (unit && unit->isInstr())
-          ScheduleNode(unit, cycle);
-      }
-    }
-  } // end OptSched succeeded
-
-  OST->finalizeRegion(sched);
+  }
   placeDebugValues();
 
 #ifdef IS_DEBUG_PEAK_PRESSURE
@@ -446,23 +463,6 @@ void ScheduleDAGOptSched::fallbackScheduler() {
   }
 }
 
-static SchedulerType parseListSchedType() {
-  auto SchedTypeString =
-      SchedulerOptions::getInstance().GetString("HEUR_SCHED_TYPE", "LIST");
-
-  if (SchedTypeString == "LIST")
-    return SCHED_LIST;
-  else if (SchedTypeString == "SEQ")
-    return SCHED_SEQ;
-  else if (SchedTypeString == "ACO")
-    return SCHED_ACO;
-  else {
-    Logger::Info("Unknown heuristic scheduler type selected defaulting to basic "
-                 "list scheduler.");
-    return SCHED_LIST;
-  }
-}
-
 void ScheduleDAGOptSched::loadOptSchedConfig() {
   SchedulerOptions &schedIni = SchedulerOptions::getInstance();
   // setup OptScheduler configuration options
@@ -499,7 +499,7 @@ void ScheduleDAGOptSched::loadOptSchedConfig() {
   // To support old sched.ini files setting NID as the heuristic means LLVM
   // scheduling is enabled.
   UseLLVMScheduler = schedIni.GetBool("LLVM_SCHEDULING", false) ||
-                   schedIni.GetString("HEURISTIC") == "LLVM";
+                     schedIni.GetString("HEURISTIC") == "LLVM";
   EnumPriorities = parseHeuristic(schedIni.GetString("ENUM_HEURISTIC"));
   SCF = parseSpillCostFunc();
   RegionTimeout = schedIni.GetInt("REGION_TIMEOUT");

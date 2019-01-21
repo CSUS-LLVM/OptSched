@@ -10,9 +10,8 @@
 
 #include "opt-sched/Scheduler/OptSchedDDGWrapperBase.h"
 #include "opt-sched/Scheduler/data_dep.h"
-#include "opt-sched/Scheduler/machine_model.h"
 #include "opt-sched/Scheduler/defines.h"
-#include "llvm/CodeGen/MachineScheduler.h"
+#include "opt-sched/Scheduler/machine_model.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/CodeGen/MachineScheduler.h"
@@ -38,16 +37,21 @@ public:
                    GraphTransTypes GraphTransTypes,
                    const std::string &RegionID) = 0;
 
-  virtual void initRegion(ScheduleDAGInstrs *DAG,
-                          MachineModel *MM) = 0;
+  virtual void initRegion(ScheduleDAGInstrs *DAG, MachineModel *MM) = 0;
   virtual void finalizeRegion(const InstSchedule *Schedule) = 0;
-  // FIXME: This is a shortcut to doing the proper thing and creating a RP class that
-  // targets can overrride. It’s hard to justify spending the extra time when we
-  // will be refactoring RP tracking in general if we do a rewrite to fully
-  // integrate the scheduler in LLVM.
+  // FIXME: This is a shortcut to doing the proper thing and creating a RP class
+  // that targets can overrride. It’s hard to justify spending the extra time
+  // when we will be refactoring RP tracking in general if we do a rewrite to
+  // fully integrate the scheduler in LLVM.
   //
-  // Get target specific cost from peak register pressure (e.g. occupancy for AMDGPU)
-  virtual InstCount getCost(const llvm::SmallVectorImpl<unsigned> &PRP) const = 0;
+  // Get target specific cost from peak register pressure (e.g. occupancy for
+  // AMDGPU)
+  virtual InstCount
+  getCost(const llvm::SmallVectorImpl<unsigned> &PRP) const = 0;
+
+  // Targets that wish to discard the finalized schedule for any reason can
+  // override this.
+  virtual bool shouldKeepSchedule() { return true; }
 };
 
 template <typename FactoryT> class OptSchedRegistryNode {
