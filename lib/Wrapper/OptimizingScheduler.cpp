@@ -363,7 +363,7 @@ void ScheduleDAGOptSched::schedule() {
         Logger::Info("OptSched run failed: rslt=%d, sched=%p. Falling back.",
                      Rslt, (void *)Sched));
     // Scheduling with opt-sched failed.
-    fallbackScheduler();
+    //fallbackScheduler();
     return;
   }
 
@@ -493,7 +493,7 @@ void ScheduleDAGOptSched::loadOptSchedConfig() {
   VerifySchedule = schedIni.GetBool("VERIFY_SCHEDULE");
   EnableMutations = schedIni.GetBool("LLVM_MUTATIONS");
   EnumStalls = schedIni.GetBool("ENUMERATE_STALLS");
-  SCW = schedIni.GetInt("SPILL_COST_FACTOR");
+  SCW = schedIni.GetInt("SPILL_COST_WEIGHT");
   LowerBoundAlgorithm = parseLowerBoundAlgorithm();
   HeuristicPriorities = parseHeuristic(schedIni.GetString("HEURISTIC"));
   // To support old sched.ini files setting NID as the heuristic means LLVM

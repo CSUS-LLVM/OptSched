@@ -49,6 +49,13 @@ static unsigned getOccupancyWeight(unsigned Occupancy) {
   llvm_unreachable("Occupancy must be between 1 and 10");
 }
 
+static unsigned getAdjustedOccupancy(const GCNSubtarget *ST, unsigned VGPRCount,
+                                     unsigned SGPRCount, unsigned MaxOccLDS) {
+  unsigned MaxOccVGPR = ST->getOccupancyWithNumVGPRs(VGPRCount + GPRErrorMargin);
+  unsigned MaxOccSGPR = ST->getOccupancyWithNumSGPRs(SGPRCount + GPRErrorMargin);
+  return std::min(MaxOccLDS, std::min(MaxOccVGPR, MaxOccSGPR));
+}
+
 namespace {
 
 class OptSchedGCNTarget : public OptSchedTarget {
@@ -145,9 +152,12 @@ void OptSchedGCNTarget::initRegion(llvm::ScheduleDAGInstrs *DAG_,
 
   GCNDownwardRPTracker RPTracker(*DAG->getLIS());
   RPTracker.advance(DAG->begin(), DAG->end(), nullptr);
-  RegionStartingOccupancy = RPTracker.moveMaxPressure().getOccupancy(*ST);
+  const GCNRegPressure &P = RPTracker.moveMaxPressure();
+  RegionStartingOccupancy =
+      getAdjustedOccupancy(ST, P.getVGPRNum(), P.getSGPRNum(), MaxOccLDS);
   TargetOccupancy =
       shouldLimitWaves() ? MFI->getMinAllowedOccupancy() : MFI->getOccupancy();
+
   LLVM_DEBUG(dbgs() << "Region starting occupancy is "
                     << RegionStartingOccupancy << "\n"
                     << "Target occupancy is " << TargetOccupancy << "\n");
@@ -183,15 +193,11 @@ OptSchedGCNTarget::getCost(const llvm::SmallVectorImpl<unsigned> &PRP) const {
   // fixed, but we avoid doing an expensive string compare here with
   // GetRegTypeByName since updating the cost happens so often. We should
   // replace OptSched register types completely with PSets to fix both issues.
-  unsigned SGPR32Count = PRP[OptSchedDDGWrapperGCN::SGPR32] + GPRErrorMargin;
-  auto MaxOccSGPR = ST->getOccupancyWithNumSGPRs(SGPR32Count);
-
-  unsigned VGPR32Count = PRP[OptSchedDDGWrapperGCN::VGPR32] + GPRErrorMargin;
-  auto MaxOccVGPR = ST->getOccupancyWithNumVGPRs(VGPR32Count);
-
-  auto Occ = std::min(std::min(MaxOccSGPR, MaxOccVGPR), MaxOccLDS);
+  auto Occ =
+      getAdjustedOccupancy(ST, PRP[OptSchedDDGWrapperGCN::VGPR32],
+                           PRP[OptSchedDDGWrapperGCN::SGPR32], MaxOccLDS);
   // RP cost is the difference between the minimum allowed occupancy for the
-  // function and the current occupancy.
+  // function, and the current occupancy.
   return Occ >= TargetOccupancy ? 0 : TargetOccupancy - Occ;
 }
 

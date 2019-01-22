@@ -30,6 +30,18 @@ static MachineSchedRegistry
     OptSchedMIRegistry("gcn-optsched", "Use the GCN OptSched scheduler.",
                        createOptSchedGCN);
 
+#if !defined(NDEBUG) || defined(LLVM_ENABLE_DUMP)
+static void getRealRegionPressure(MachineBasicBlock::const_iterator Begin,
+                                  MachineBasicBlock::const_iterator End,
+                                  const LiveIntervals *LIS,
+                                  StringRef Label) {
+  GCNDownwardRPTracker RP(*LIS);
+  RP.advance(Begin, End, nullptr);
+  dbgs() << "Dumping real RP " << Label << "\n";
+  RP.moveMaxPressure().dump();
+}
+#endif
+
 ScheduleDAGOptSchedGCN::ScheduleDAGOptSchedGCN(
     llvm::MachineSchedContext *C, std::unique_ptr<MachineSchedStrategy> S)
     : ScheduleDAGOptSched(C, std::move(S)) {}
@@ -43,7 +55,7 @@ void ScheduleDAGOptSchedGCN::initSchedulers() {
 
   // Add passes
 
-  // SchedPasses.push_back(GCNMaxOcc);
+  //SchedPasses.push_back(GCNMaxOcc);
 
   // First
   SchedPasses.push_back(OptSchedMaxOcc);
