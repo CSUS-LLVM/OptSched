@@ -18,11 +18,11 @@ This plugin for the [LLVM](https://llvm.org/) compiler is an optional machine sc
 
 ## Configuration files
 
-OptSched currently needs to read from configuration files to initialize the scheduler. There are example files in the [“optsched-cfg”](https://github.com/OptSched/OptSched/tree/master/optsched-cfg) directory. The default search location for these files is ```~/.optsched-cfg```. You can optionally specify the path to this directory or any of the configuration files with [command-line options](#Command-Line-Options).
+OptSched reads from configuration files at runtime to initialize the scheduler. There are templates in the [example](https://github.com/OptSched/OptSched/tree/master/example/optsched-cfg) directory. The default search location for these files is ```~/.optsched-cfg```. You can optionally specify the path to this directory or any of the configuration files individually with [command-line options](#Command-Line-Options).
 
 ## Usage
 
-`clang++ -O3 -Xclang -load -Xclang <path/to/OptSched.so> -mllvm -misched=optsched <example.cpp>`
+`clang++ -O3 -fplugin=<path/to/OptSched.so> -mllvm -misched=optsched -mllvm -optsched-cfg=<path/to/optsched-cfg>  <example.cpp>`
   
 `llc -load <path/to/OptSched.so> -misched=optsched -optsched-cfg=<path/to/optsched-cfg> <example.ll>`
   
@@ -31,12 +31,10 @@ OptSched currently needs to read from configuration files to initialize the sche
 | CL Opt | Description |
 | ------ | ----------- |
 | -enable-misched | Enable the machine scheduling pass in LLVM (Targets can override this option). |
-| -misched=optsched | Use the OptSched scheduler. |
+| -misched=optsched | Select the optimizing scheduler. |
 | -optsched-cfg=\<string\> | Path to the directory containing configuration files for opt-sched. |
 | -optsched-cfg-hotfuncs=\<string\> | Path to the list of hot functions to schedule using opt-sched. |
 | -optsched-cfg-machine-model=\<string\> | Path to the machine model specification file for opt-sched. |
 | -optsched-cfg-sched=\<string\> | Path to the scheduler options configuration file for opt-sched. |
-| -mllvm \<opt\>| Add llvm options. |
-| -Xclang \<opt\>| Tell the clang driver to pass options directly to the frontend. |
-  
-  
+| -mllvm \<opt\> | Add llvm options. |
+| -fplugin=\<string\> | Load a shared library. |
