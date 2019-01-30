@@ -51,7 +51,7 @@ void ScheduleDAGOptSchedGCN::initSchedulers() {
 
   addMutation(createLoadClusterDAGMutation(TII, TRI));
   addMutation(createStoreClusterDAGMutation(TII, TRI));
-  addMutation(createAMDGPUMacroFusionDAGMutation());
+  //addMutation(createAMDGPUMacroFusionDAGMutation());
 
   // Add passes
 
@@ -76,6 +76,8 @@ void ScheduleDAGOptSchedGCN::finalizeSchedule() {
 
   for (const SchedPassStrategy &S : SchedPasses) {
     MachineBasicBlock *MBB = nullptr;
+    // Reset
+    RegionNumber = ~0u;
 
     for (auto &Region : Regions) {
       RegionBegin = Region.first;

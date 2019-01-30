@@ -229,7 +229,6 @@ void ScheduleDAGOptSched::schedule() {
   const std::string RegionName = C->MF->getFunction().getName().data() +
                                  std::string(":") +
                                  std::to_string(RegionNumber);
-
   if (!OptSchedEnabled || skipRegion(RegionName, schedIni))
     return;
 

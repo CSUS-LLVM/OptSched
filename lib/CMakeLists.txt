@@ -8,4 +8,4 @@ add_llvm_library(OptSched MODULE
   )
 ENDIF()
 
-add_dependencies(OptSched intrinsics_gen ${OPT_SCHED_TARGET_DEPS})
+add_dependencies(OptSched ${OPT_SCHED_TARGET_DEPS})

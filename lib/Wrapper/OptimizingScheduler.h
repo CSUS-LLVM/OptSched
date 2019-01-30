@@ -43,7 +43,7 @@ protected:
   SmallString<128> PathCfgMM;
 
   // Region number uniquely identifies DAGs.
-  unsigned RegionNumber = 0;
+  unsigned RegionNumber = ~0u;
 
   MachineSchedContext *C;
 

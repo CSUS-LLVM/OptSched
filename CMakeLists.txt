@@ -53,6 +53,7 @@ SET(OPT_SCHED_SRCS Scheduler/aco.cpp
   Wrapper/OptSchedGenericTarget.cpp)
 
 SET(OPT_SCHED_INCLUDE_DIRS ${CMAKE_CURRENT_SOURCE_DIR}/include)
+SET (OPT_SCHED_TARGET_DEPS "LLVMCodeGen")
 
 function(check_if_AMDGPU_supported)
   IF (${PACKAGE_VERSION} VERSION_LESS "7.0")
@@ -69,7 +70,7 @@ endfunction(check_if_AMDGPU_supported)
 IF ("AMDGPU" IN_LIST LLVM_TARGETS_TO_BUILD)
   check_if_AMDGPU_supported()
   IF (${AMDGPU_SUPPORTED})
-    SET (OPT_SCHED_TARGET_DEPS "AMDGPUCommonTableGen")
+    SET (OPT_SCHED_TARGET_DEPS ${OPT_SCHED_TARGET_DEPS} AMDGPUCommonTableGen)
     SET (OPT_SCHED_SRCS ${OPT_SCHED_SRCS} Wrapper/AMDGPU/GCNOptSched.cpp
                                           Wrapper/AMDGPU/OptSchedGCNTarget.cpp
                                           Wrapper/AMDGPU/OptSchedDDGWrapperGCN.cpp)
