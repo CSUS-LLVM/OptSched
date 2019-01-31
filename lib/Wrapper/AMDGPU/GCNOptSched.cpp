@@ -89,7 +89,6 @@ void ScheduleDAGOptSchedGCN::finalizeSchedule() {
         MBB = RegionBegin->getParent();
         startBlock(MBB);
       }
-
       unsigned NumRegionInstrs = std::distance(begin(), end());
       enterRegion(MBB, begin(), end(), NumRegionInstrs);
 
@@ -98,7 +97,6 @@ void ScheduleDAGOptSchedGCN::finalizeSchedule() {
         exitRegion();
         continue;
       }
-
       LLVM_DEBUG(dbgs() << "********** MI Scheduling **********\n");
       LLVM_DEBUG(dbgs() << MF.getName() << ":" << printMBBReference(*MBB) << " "
                         << MBB->getName() << "\n  From: " << *begin()
@@ -106,9 +104,9 @@ void ScheduleDAGOptSchedGCN::finalizeSchedule() {
                  if (RegionEnd != MBB->end()) dbgs() << *RegionEnd;
                  else dbgs() << "End";
                  dbgs() << " RegionInstrs: " << NumRegionInstrs << '\n');
-
+      LLVM_DEBUG(getRealRegionPressure(RegionBegin, RegionEnd, LIS, "Before"));
       runSchedPass(S);
-
+      LLVM_DEBUG(getRealRegionPressure(RegionBegin, RegionEnd, LIS, "After"));
       Region = std::make_pair(RegionBegin, RegionEnd);
       exitRegion();
     }
