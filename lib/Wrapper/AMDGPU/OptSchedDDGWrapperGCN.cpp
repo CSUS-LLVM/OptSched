@@ -12,7 +12,7 @@
 #include "llvm/CodeGen/MachineRegisterInfo.h"
 #include "llvm/Support/Debug.h"
 
-#define DEBUG_TYPE "optsched"
+#define DEBUG_TYPE "optsched-ddg-wrapper"
 
 using namespace llvm;
 using namespace llvm::opt_sched;

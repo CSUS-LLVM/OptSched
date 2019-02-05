@@ -16,7 +16,7 @@ Description:  A wrapper that convert an LLVM target to an OptSched MachineModel.
 #include "llvm/Target/TargetMachine.h"
 #include <memory>
 
-#define DEBUG_TYPE "optsched"
+#define DEBUG_TYPE "optsched-machine-model"
 
 using namespace llvm;
 using namespace llvm::opt_sched;

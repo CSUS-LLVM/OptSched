@@ -97,13 +97,6 @@ void ScheduleDAGOptSchedGCN::finalizeSchedule() {
         exitRegion();
         continue;
       }
-      LLVM_DEBUG(dbgs() << "********** MI Scheduling **********\n");
-      LLVM_DEBUG(dbgs() << MF.getName() << ":" << printMBBReference(*MBB) << " "
-                        << MBB->getName() << "\n  From: " << *begin()
-                        << "    To: ";
-                 if (RegionEnd != MBB->end()) dbgs() << *RegionEnd;
-                 else dbgs() << "End";
-                 dbgs() << " RegionInstrs: " << NumRegionInstrs << '\n');
       LLVM_DEBUG(getRealRegionPressure(RegionBegin, RegionEnd, LIS, "Before"));
       runSchedPass(S);
       LLVM_DEBUG(getRealRegionPressure(RegionBegin, RegionEnd, LIS, "After"));

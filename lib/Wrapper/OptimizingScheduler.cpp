@@ -166,6 +166,7 @@ static SchedulerType parseListSchedType() {
 ScheduleDAGOptSched::ScheduleDAGOptSched(
     MachineSchedContext *C, std::unique_ptr<MachineSchedStrategy> S)
     : ScheduleDAGMILive(C, std::move(S)), C(C) {
+  LLVM_DEBUG(dbgs() << "********** Optimizing Scheduler **********\n");
 
   // Find the native paths to the scheduler configuration files.
   getRealCfgPaths();
@@ -223,14 +224,24 @@ void ScheduleDAGOptSched::SetupLLVMDag() {
 void ScheduleDAGOptSched::schedule() {
   ShouldTrackPressure = true;
   ShouldTrackLaneMasks = true;
-
   Config &schedIni = SchedulerOptions::getInstance();
+
   ++RegionNumber;
   const std::string RegionName = C->MF->getFunction().getName().data() +
                                  std::string(":") +
                                  std::to_string(RegionNumber);
-  if (!OptSchedEnabled || skipRegion(RegionName, schedIni))
+  if (!OptSchedEnabled || skipRegion(RegionName, schedIni)) {
+    LLVM_DEBUG(dbgs() << "Skipping region " << RegionName << "\n");
     return;
+  }
+  LLVM_DEBUG(dbgs() << "********** Scheduling Region " << RegionName
+                    << " **********\n");
+  LLVM_DEBUG(const auto *MBB = RegionBegin->getParent();
+             dbgs() << MF.getName() << ":" << printMBBReference(*MBB) << " "
+                    << MBB->getName() << "\n  From: " << *begin() << "    To: ";
+             if (RegionEnd != MBB->end()) dbgs() << *RegionEnd;
+             else dbgs() << "End";
+             dbgs() << " RegionInstrs: " << NumRegionInstrs << '\n');
 
 #ifdef IS_DEBUG_PEAK_PRESSURE
   SetupLLVMDag();
@@ -314,8 +325,6 @@ void ScheduleDAGOptSched::schedule() {
       }
     }
   }
-
-  LLVM_DEBUG(dbgs() << "********** Opt Scheduling **********\n");
 
   // Build LLVM DAG
   SetupLLVMDag();

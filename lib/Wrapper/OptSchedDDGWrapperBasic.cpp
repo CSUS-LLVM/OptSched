@@ -28,7 +28,7 @@
 #include <string>
 #include <vector>
 
-#define DEBUG_TYPE "optsched"
+#define DEBUG_TYPE "optsched-ddg-wrapper"
 
 using namespace llvm;
 using namespace llvm::opt_sched;
