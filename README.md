@@ -43,25 +43,27 @@ OptSched reads from configuration files at runtime to initialize the scheduler. 
 
 ## Getting started
 
-Steps to build LLVM and clang with OptSched.
-
 1. Clone the LLVM project:
 
 `git clone https://github.com/llvm/llvm-project.git`
 
-2. Clone OptSched in the projects directory:
+2. Checkout release 6:
 
-`cd llvm-project/llvm/projects && git clone https://github.com/CSUS-LLVM/OptSched.git`
+`cd llvm-project && git checkout release/6.x` 
 
-3. Create a build directory:
+3. Clone OptSched in the projects directory:
+
+`cd llvm/projects && git clone https://github.com/CSUS-LLVM/OptSched.git`
+
+4. Create a build directory:
 
 `mkdir build && cd build`
 
-4. Build LLVM/clang/OptSched. See [https://llvm.org/docs/CMake.html]( https://llvm.org/docs/CMake.html) for more build options:
+5. Build LLVM/clang/OptSched. See [https://llvm.org/docs/CMake.html]( https://llvm.org/docs/CMake.html) for more build options:
 
-`cmake -DLLVM_ENABLE_PROJECTS='clang' -DCMAKE_BUILD_TYPE=Debug '-DLLVM_TARGETS_TO_BUILD=X86' -DLLVM_BUILD_TOOLS=ON -DLLVM_INCLUDE_TESTS=ON -DLLVM_OPTIMIZED_TABLEGEN=ON ../.. && make -j8`
+`cmake -DLLVM_ENABLE_PROJECTS='clang' -DCMAKE_BUILD_TYPE=Debug '-DLLVM_TARGETS_TO_BUILD=X86' -DLLVM_BUILD_TOOLS=ON -DLLVM_INCLUDE_TESTS=ON -DLLVM_OPTIMIZED_TABLEGEN=ON ../.. && make -j32`
 
-5. Test the build:
+6. Test the build:
 
 `echo 'int main(){};' | ./bin/clang -xc - -O3 -fplugin=lib/OptSched.so -mllvm -misched=optsched -mllvm -enable-misched -mllvm -optsched-cfg=../OptSched/example/optsched-cfg`
 
