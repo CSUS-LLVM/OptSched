@@ -42,5 +42,3 @@ else:
   total += getNodeCount(args.path)
   
 print(total)
-
-
