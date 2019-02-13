@@ -44,6 +44,7 @@ ReadyList::ReadyList(DataDepGraph *dataDepGraph, SchedPriorities prirts) {
       break;
 
     case LSH_NID:
+    case LSH_LLVM:
       maxNodeID_ = dataDepGraph->GetInstCnt() - 1;
       nodeID_Bits_ = Utilities::clcltBitsNeededToHoldNum(maxNodeID_);
       totKeyBits += nodeID_Bits_;
@@ -97,6 +98,7 @@ ReadyList::ReadyList(DataDepGraph *dataDepGraph, SchedPriorities prirts) {
       AddPrirtyToKey_(maxPriority_, keySize, useCntBits_, maxUseCnt_, maxUseCnt_);
       break;
     case LSH_NID:
+    case LSH_LLVM:
       AddPrirtyToKey_(maxPriority_, keySize, nodeID_Bits_, maxNodeID_, maxNodeID_);
       break;
     case LSH_ISO:
@@ -167,6 +169,7 @@ unsigned long ReadyList::CmputKey_(SchedInstruction *inst, bool isUpdate,
       break;
 
     case LSH_NID:
+    case LSH_LLVM:
       AddPrirtyToKey_(key, keySize, nodeID_Bits_,
                       maxNodeID_ - inst->GetNodeID(), maxNodeID_);
       break;

@@ -48,7 +48,10 @@ enum LISTSCHED_HEURISTIC {
   LSH_SC = 6,
 
   // Latency sum
-  LSH_LS = 7
+  LSH_LS = 7,
+
+  // LLVM list scheduler order
+  LSH_LLVM = 8
 };
 
 #define MAX_SCHED_PRIRTS 10

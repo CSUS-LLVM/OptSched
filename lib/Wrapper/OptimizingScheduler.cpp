@@ -33,6 +33,7 @@
 #include "llvm/Support/raw_ostream.h"
 #include <algorithm>
 #include <chrono>
+#include <string>
 
 #define DEBUG_TYPE "optsched"
 
@@ -42,8 +43,14 @@ using namespace llvm::opt_sched;
 bool OPTSCHED_gPrintSpills;
 
 // An array of possible OptSched heuristic names
-static constexpr const char *hurstcNames[] = {"CP",  "LUC", "UC", "NID",
-                                              "CPR", "ISO", "SC", "LS"};
+#define LSHPair std::pair<const char *, LISTSCHED_HEURISTIC>
+static constexpr LSHPair HeuristicNames[] = {
+    LSHPair("CP", LSH_CP),    LSHPair("LUC", LSH_LUC),
+    LSHPair("UC", LSH_UC),    LSHPair("NID", LSH_NID),
+    LSHPair("CPR", LSH_CPR),  LSHPair("ISO", LSH_ISO),
+    LSHPair("SC", LSH_SC),    LSHPair("LS", LSH_LS),
+    LSHPair("LLVM", LSH_LLVM)};
+
 // Max size for heuristic name.
 static constexpr int HEUR_NAME_MAX_SIZE = 10;
 
@@ -504,10 +511,6 @@ void ScheduleDAGOptSched::loadOptSchedConfig() {
   SCW = schedIni.GetInt("SPILL_COST_WEIGHT");
   LowerBoundAlgorithm = parseLowerBoundAlgorithm();
   HeuristicPriorities = parseHeuristic(schedIni.GetString("HEURISTIC"));
-  // To support old sched.ini files setting NID as the heuristic means LLVM
-  // scheduling is enabled.
-  UseLLVMScheduler = schedIni.GetBool("LLVM_SCHEDULING", false) ||
-                     schedIni.GetString("HEURISTIC") == "LLVM";
   EnumPriorities = parseHeuristic(schedIni.GetString("ENUM_HEURISTIC"));
   SCF = parseSpillCostFunc();
   RegionTimeout = schedIni.GetInt("REGION_TIMEOUT");
@@ -572,41 +575,47 @@ LB_ALG ScheduleDAGOptSched::parseLowerBoundAlgorithm() const {
   }
 }
 
-SchedPriorities
-ScheduleDAGOptSched::parseHeuristic(const std::string &str) const {
-  SchedPriorities prirts;
-  size_t len = str.length();
-  char word[HEUR_NAME_MAX_SIZE];
-  int wIndx = 0;
-  prirts.cnt = 0;
-  prirts.isDynmc = false;
-  size_t i, j;
+// Helper function to find the next substring which is a heuristic name in Str
+static LISTSCHED_HEURISTIC GetNextHeuristicName(const std::string &Str,
+                                                size_t &StartIndex) {
+  size_t Walk;
+  for (Walk = StartIndex; Walk <= Str.length(); ++Walk) {
+    if (Str[Walk] == '_')
+      break;
+  }
 
-  for (i = 0; i <= len; i++) {
-    char ch = str.c_str()[i];
-    if (ch == '_' || ch == 0) { // end of word
-      word[wIndx] = 0;
-      for (j = 0; j < sizeof(hurstcNames); j++) {
-        if (strcmp(word, hurstcNames[j]) == 0) {
-          prirts.vctr[prirts.cnt] = (LISTSCHED_HEURISTIC)j;
-          if ((LISTSCHED_HEURISTIC)j == LSH_LUC)
-            prirts.isDynmc = true;
-          break;
-        } // end if
-      }   // end for j
-      if (j == sizeof(hurstcNames)) {
-        LLVM_DEBUG(
-            Logger::Error("Unrecognized heuristic %s. Defaulted to CP.", word));
-        prirts.vctr[prirts.cnt] = LSH_CP;
-      }
-      prirts.cnt++;
-      wIndx = 0;
-    } else {
-      word[wIndx] = ch;
-      wIndx++;
-    } // end else
-  }   // end for i
-  return prirts;
+  // Match heuristic name to enum id
+  for (const auto &LSH : HeuristicNames)
+    if (!Str.compare(StartIndex, Walk - StartIndex, LSH.first)) {
+      StartIndex = Walk + 1;
+      return LSH.second;
+    }
+  llvm_unreachable("Unknown heuristic.");
+}
+
+SchedPriorities
+ScheduleDAGOptSched::parseHeuristic(const std::string &Str) {
+  SchedPriorities Priorities;
+  size_t StartIndex = 0;
+  Priorities.cnt = 0;
+  Priorities.isDynmc = false;
+  do {
+    LISTSCHED_HEURISTIC LSH = GetNextHeuristicName(Str, StartIndex);
+    Priorities.vctr[Priorities.cnt++] = LSH;
+    switch (LSH) {
+      // Is LUC still the only dynamic heuristic?
+      case LSH_LUC:
+        Priorities.isDynmc = true;
+        break;
+      case LSH_LLVM:
+        UseLLVMScheduler = true;
+        break;
+      default:
+        break;
+    }
+  } while (!(StartIndex > Str.length()));
+
+  return Priorities;
 }
 
 SPILL_COST_FUNCTION ScheduleDAGOptSched::parseSpillCostFunc() const {
@@ -755,7 +764,6 @@ printMaskPairs(const SmallVectorImpl<RegisterMaskPair> &RegPairs,
 LLVM_DUMP_METHOD
 void ScheduleDAGOptSched::dumpLLVMRegisters() const {
   dbgs() << "LLVM Registers\n";
-
   for (const auto &SU : SUnits) {
     assert(SU.isInstr());
     const MachineInstr *MI = SU.getInstr();

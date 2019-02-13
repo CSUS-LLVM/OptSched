@@ -155,7 +155,7 @@ protected:
   LATENCY_PRECISION fetchLatencyPrecision() const;
 
   // Get OptSched heuristic setting
-  SchedPriorities parseHeuristic(const std::string &str) const;
+  SchedPriorities parseHeuristic(const std::string &str);
 
   // Return true if we should print spill count for the current function
   bool shouldPrintSpills() const;
