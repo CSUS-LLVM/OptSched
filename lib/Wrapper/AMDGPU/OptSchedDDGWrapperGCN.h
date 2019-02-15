@@ -72,7 +72,6 @@ public:
   OptSchedDDGWrapperGCN(llvm::MachineSchedContext *Context,
                         ScheduleDAGOptSched *DAG, OptSchedMachineModel *MM,
                         LATENCY_PRECISION LatencyPrecision,
-                        GraphTransTypes GraphTransTypes,
                         const std::string &RegionID);
 
   void convertRegFiles() override;

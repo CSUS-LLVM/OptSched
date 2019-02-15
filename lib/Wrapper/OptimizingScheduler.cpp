@@ -16,6 +16,7 @@
 #include "opt-sched/Scheduler/register.h"
 #include "opt-sched/Scheduler/sched_region.h"
 #include "opt-sched/Scheduler/utilities.h"
+#include "opt-sched/Scheduler/graph_trans.h"
 #include "llvm/ADT/StringMap.h"
 #include "llvm/CodeGen/LiveIntervals.h"
 #include "llvm/CodeGen/MachineRegisterInfo.h"
@@ -170,6 +171,17 @@ static SchedulerType parseListSchedType() {
   return SCHED_LIST;
 }
 
+static std::unique_ptr<GraphTrans>
+createStaticNodeSupTrans(DataDepGraph *DataDepGraph, bool IsMultiPass = false) {
+  return llvm::make_unique<StaticNodeSupTrans>(DataDepGraph, IsMultiPass);
+}
+
+void ScheduleDAGOptSched::addGraphTransformations(OptSchedDDGWrapperBasic *BDDG) {
+  auto *GraphTransfomations = BDDG->GetGraphTrans();
+  if (StaticNodeSup)
+    GraphTransfomations->push_back(createStaticNodeSupTrans(BDDG, MultiPassStaticNodeSup));
+}
+
 ScheduleDAGOptSched::ScheduleDAGOptSched(
     MachineSchedContext *C, std::unique_ptr<MachineSchedStrategy> S)
     : ScheduleDAGMILive(C, std::move(S)), C(C) {
@@ -222,7 +234,6 @@ void ScheduleDAGOptSched::SetupLLVMDag() {
   // Apply llvm DAG post processing.
   if (EnableMutations) {
     Topo.InitDAGTopologicalSorting();
-
     postprocessDAG();
   }
 }
@@ -337,11 +348,13 @@ void ScheduleDAGOptSched::schedule() {
   SetupLLVMDag();
   OST->initRegion(this, MM.get());
   // Convert graph
-  auto DDG = OST->createDDGWrapper(C, this, MM.get(), LatencyPrecision, GTT,
+  auto DDG = OST->createDDGWrapper(C, this, MM.get(), LatencyPrecision,
                                    RegionName);
-
   DDG->convertSUnits();
   DDG->convertRegFiles();
+
+  auto *BDDG = static_cast<OptSchedDDGWrapperBasic*>(DDG.get());
+  addGraphTransformations(BDDG);
 
   // create region
   SchedRegion *region = new BBWithSpill(
@@ -487,7 +500,8 @@ void ScheduleDAGOptSched::loadOptSchedConfig() {
 
   // should we print spills for the current function
   OPTSCHED_gPrintSpills = shouldPrintSpills();
-
+  StaticNodeSup = schedIni.GetBool("STATIC_NODE_SUPERIORITY", false);
+  MultiPassStaticNodeSup = schedIni.GetBool("MULTI_PASS_NODE_SUPERIORITY", false);
   // setup pruning
   PruningStrategy.rlxd = schedIni.GetBool("APPLY_RELAXED_PRUNING");
   PruningStrategy.nodeSup = schedIni.GetBool("DYNAMIC_NODE_SUPERIORITY");
@@ -495,13 +509,7 @@ void ScheduleDAGOptSched::loadOptSchedConfig() {
   PruningStrategy.spillCost = schedIni.GetBool("APPLY_SPILL_COST_PRUNING");
   PruningStrategy.useSuffixConcatenation =
       schedIni.GetBool("ENABLE_SUFFIX_CONCATENATION");
-
-  // setup graph transformations
-  GTT.staticNodeSup = schedIni.GetBool("STATIC_NODE_SUPERIORITY");
-  // setup graph transformation flags
-  GraphTrans::GRAPHTRANSFLAGS.multiPassNodeSup =
-      schedIni.GetBool("MULTI_PASS_NODE_SUPERIORITY");
-
+  MultiPassStaticNodeSup = schedIni.GetBool("MULTI_PASS_NODE_SUPERIORITY");
   SchedForRPOnly = schedIni.GetBool("SCHEDULE_FOR_RP_ONLY");
   HistTableHashBits =
       static_cast<int16_t>(schedIni.GetInt("HIST_TABLE_HASH_BITS"));

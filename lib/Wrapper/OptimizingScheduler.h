@@ -60,9 +60,6 @@ protected:
   // Struct for setting the pruning strategy
   Pruning PruningStrategy;
 
-  // Struct for setting graph transformations to apply
-  GraphTransTypes GTT;
-
   // If we should schedule for register pressure only and ignore ilp.
   bool SchedForRPOnly;
 
@@ -129,6 +126,13 @@ protected:
   // The heuristic used for the enumerator.
   SchedPriorities EnumPriorities;
 
+  // Static node superiority RP only graph transformation.
+  bool StaticNodeSup;
+
+  // Run multiple passes of the static node superiority algorithm
+  // (StaticNodeSup must be enabled).
+  bool MultiPassStaticNodeSup;
+
   // Should we run the LLVM converging scheduler as input to the enumerator.
   bool UseLLVMScheduler;
 
@@ -175,6 +179,9 @@ protected:
   // Find the real paths to optsched-cfg files.
   void getRealCfgPaths();
 
+  // Create and add OptSched DDG mutations.
+  void addGraphTransformations(OptSchedDDGWrapperBasic *BDDG);
+
 public:
   ScheduleDAGOptSched(MachineSchedContext *C,
                       std::unique_ptr<MachineSchedStrategy> S);
@@ -207,3 +214,4 @@ public:
 } // namespace llvm
 
 #endif // LLVM_OPT_SCHED_OPTIMIZING_SCHEDULER_H
+

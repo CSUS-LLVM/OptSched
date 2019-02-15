@@ -34,7 +34,6 @@ public:
   virtual std::unique_ptr<OptSchedDDGWrapperBase>
   createDDGWrapper(MachineSchedContext *Context, ScheduleDAGOptSched *DAG,
                    OptSchedMachineModel *MM, LATENCY_PRECISION LatencyPrecision,
-                   GraphTransTypes GraphTransTypes,
                    const std::string &RegionID) = 0;
 
   virtual void initRegion(ScheduleDAGInstrs *DAG, MachineModel *MM) = 0;

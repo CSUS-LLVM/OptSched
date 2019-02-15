@@ -50,9 +50,9 @@ static std::unique_ptr<LLVMRegTypeFilter> createLLVMRegTypeFilter(
 OptSchedDDGWrapperBasic::OptSchedDDGWrapperBasic(
     MachineSchedContext *Context, ScheduleDAGOptSched *DAG,
     OptSchedMachineModel *MM, LATENCY_PRECISION LatencyPrecision,
-    GraphTransTypes GraphTransTypes, const std::string &RegionID)
-    : DataDepGraph(MM, LatencyPrecision, GraphTransTypes), MM(MM),
-      Contex(Context), DAG(DAG), RTFilter(nullptr) {
+    const std::string &RegionID)
+    : DataDepGraph(MM, LatencyPrecision), MM(MM), Contex(Context), DAG(DAG),
+      RTFilter(nullptr) {
   dagFileFormat_ = DFF_BB;
   isTraceFormat_ = false;
   TreatOrderDepsAsDataDeps =

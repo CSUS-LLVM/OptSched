@@ -13,6 +13,7 @@ Last Update:  Mar. 2011
 #include "opt-sched/Scheduler/buffers.h"
 #include "opt-sched/Scheduler/defines.h"
 #include "opt-sched/Scheduler/OptSchedDDGWrapperBase.h"
+#include "llvm/ADT/SmallVector.h"
 #include <memory>
 
 namespace llvm {
@@ -78,9 +79,6 @@ enum SUB_GRAPH_TYPE {
   // Discontinuous.
   SGT_DISC
 };
-
-// Graph transformations we should apply.
-typedef struct GraphTransTypes { bool staticNodeSup; } GraphTransTypes;
 
 // TODO(max): Document.
 const size_t MAX_INSTNAME_LNGTH = 160;
@@ -173,8 +171,7 @@ protected:
 // a Data Dependence Structure as well
 class DataDepGraph : public llvm::opt_sched::OptSchedDDGWrapperBase, public DirAcycGraph, public DataDepStruct {
 public:
-  DataDepGraph(MachineModel *machMdl, LATENCY_PRECISION ltncyPcsn,
-               GraphTransTypes GTT);
+  DataDepGraph(MachineModel *machMdl, LATENCY_PRECISION ltncyPcsn);
   virtual ~DataDepGraph();
 
   // Reads the data dependence graph from a text file.
@@ -203,12 +200,7 @@ public:
   FUNC_RESULT UpdateSetupForSchdulng(bool cmputTrnstvClsr);
 
   // Returns transformations that we will apply to the graph
-  std::unique_ptr<GraphTrans> *GetGraphTrans() { return graphTrans_; }
-  // Returns number of graph transformations to apply
-  InstCount GetGraphTransCnt() const { return graphTransCnt_; }
-
-  // Create graph transformation objects
-  void InitGraphTrans();
+  SmallVector<std::unique_ptr<GraphTrans>, 0> *GetGraphTrans() { return &graphTrans_; }
 
   void EnableBackTracking();
 
@@ -333,13 +325,8 @@ protected:
   // program ,e.g., gcc when the input DAGs come from gcc
   InstCount knwnSchedLngth_;
 
-  // Graph transformations that we will apply to the DataDepGraph
-  std::unique_ptr<GraphTrans> graphTrans_[NUM_GRAPH_TRANS];
-  // The number of graph transformations to apply
-  InstCount graphTransCnt_;
-
-  // A list of enabled graph transformations
-  struct GraphTransTypes GTT_;
+  // A list of DDG mutations
+  SmallVector<std::unique_ptr<GraphTrans>, 0> graphTrans_;
 
   MachineModel *machMdl_;
 

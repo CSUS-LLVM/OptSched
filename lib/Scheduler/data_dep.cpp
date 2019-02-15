@@ -149,8 +149,7 @@ InstCount DataDepStruct::CmputAbslutUprBound_() {
   return schedUprBound_;
 }
 
-DataDepGraph::DataDepGraph(MachineModel *machMdl, LATENCY_PRECISION ltncyPrcsn,
-                           GraphTransTypes GTT)
+DataDepGraph::DataDepGraph(MachineModel *machMdl, LATENCY_PRECISION ltncyPrcsn)
     : DataDepStruct(machMdl) {
   int i;
 
@@ -161,7 +160,6 @@ DataDepGraph::DataDepGraph(MachineModel *machMdl, LATENCY_PRECISION ltncyPrcsn,
   outptDags_ = ODG_ALL;
   maxOutptDagSize_ = 1000;
   ltncyPrcsn_ = ltncyPrcsn;
-  GTT_ = GTT;
   includesCall_ = false;
   includesUnpipelined_ = false;
 
@@ -313,13 +311,6 @@ FUNC_RESULT DataDepGraph::UpdateSetupForSchdulng(bool cmputTrnstvClsr) {
   CmputBasicLwrBounds_();
 
   return RES_SUCCESS;
-}
-
-void DataDepGraph::InitGraphTrans() {
-  graphTransCnt_ = 0;
-
-  if (GTT_.staticNodeSup)
-    graphTrans_[graphTransCnt_++] = GraphTrans::CreateGraphTrans(TT_NSP, this);
 }
 
 void DataDepGraph::CmputBasicLwrBounds_() {

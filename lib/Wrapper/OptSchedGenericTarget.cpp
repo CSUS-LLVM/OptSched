@@ -30,10 +30,9 @@ public:
   std::unique_ptr<OptSchedDDGWrapperBase>
   createDDGWrapper(llvm::MachineSchedContext *Context, ScheduleDAGOptSched *DAG,
                    OptSchedMachineModel *MM, LATENCY_PRECISION LatencyPrecision,
-                   GraphTransTypes GraphTransTypes,
                    const std::string &RegionID) override {
     return llvm::make_unique<OptSchedDDGWrapperBasic>(
-        Context, DAG, MM, LatencyPrecision, GraphTransTypes, RegionID);
+        Context, DAG, MM, LatencyPrecision, RegionID);
   }
 
   void initRegion(llvm::ScheduleDAGInstrs *DAG,

@@ -2,6 +2,7 @@
 #include "opt-sched/Scheduler/register.h"
 #include "opt-sched/Scheduler/bit_vector.h"
 #include "opt-sched/Scheduler/logger.h"
+#include "llvm/ADT/STLExtras.h"
 #include <list>
 
 using namespace llvm::opt_sched;
@@ -11,17 +12,6 @@ GraphTrans::GraphTrans(DataDepGraph *dataDepGraph) {
 
   SetDataDepGraph(dataDepGraph);
   SetNumNodesInGraph(dataDepGraph->GetInstCnt());
-}
-
-std::unique_ptr<GraphTrans>
-GraphTrans::CreateGraphTrans(TRANS_TYPE type, DataDepGraph *dataDepGraph) {
-  switch (type) {
-  // Create equivalence detection graph transformation.
-  case TT_NSP:
-    return std::unique_ptr<GraphTrans>(new StaticNodeSupTrans(dataDepGraph));
-  default:
-    return nullptr;
-  }
 }
 
 bool GraphTrans::AreNodesIndep_(SchedInstruction *inst1,
@@ -59,6 +49,12 @@ void GraphTrans::UpdatePrdcsrAndScsr_(SchedInstruction *nodeA,
       }
     }
   }
+}
+
+StaticNodeSupTrans::StaticNodeSupTrans(DataDepGraph *dataDepGraph,
+                                       bool IsMultiPass_)
+    : GraphTrans(dataDepGraph) {
+  IsMultiPass = IsMultiPass_;
 }
 
 bool StaticNodeSupTrans::TryAddingSuperiorEdge_(SchedInstruction *nodeA,
@@ -127,8 +123,7 @@ FUNC_RESULT StaticNodeSupTrans::ApplyTrans() {
     }
   }
   
-  // Multi pass node superiority.
-  if (GRAPHTRANSFLAGS.multiPassNodeSup)
+  if (IsMultiPass)
     nodeMultiPass_(indepNodes);
 
   return RES_SUCCESS;
@@ -336,5 +331,3 @@ void StaticNodeSupTrans::nodeMultiPass_(std::list<std::pair<SchedInstruction *, 
     }
   }
 }
-
-GraphTransFlags GraphTrans::GRAPHTRANSFLAGS;

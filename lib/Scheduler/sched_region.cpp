@@ -96,21 +96,11 @@ FUNC_RESULT SchedRegion::FindOptimalSchedule(
 
   stats::problemSize.Record(dataDepGraph_->GetInstCnt());
 
-  // Setup graph transformations
-  dataDepGraph_->InitGraphTrans();
-  std::unique_ptr<GraphTrans> *graphTrans = dataDepGraph_->GetGraphTrans();
-
-  // In the future if we apply graph transformations that require the transitive
-  // closure to be
-  // computed this will have to be changed. Or if there is some other reason
-  // that we may want
-  // the transitive closure to be computed when only using the list scheduler.
-  // (Chris) SLIL needs the transitive closure in order to calculate the static
-  // lower bound,
-  // even when only using the list scheduler.
-  if (rgnTimeout > 0 || dataDepGraph_->GetGraphTransCnt() > 0 ||
+  const auto *GraphTransformations = dataDepGraph_->GetGraphTrans();
+  if (rgnTimeout > 0 || GraphTransformations->size() > 0 ||
       spillCostFunc_ == SCF_SLIL)
     needTrnstvClsr_ = true;
+
   rslt = dataDepGraph_->SetupForSchdulng(needTrnstvClsr_);
   if (rslt != RES_SUCCESS) {
     Logger::Info("Invalid input DAG");
@@ -118,8 +108,8 @@ FUNC_RESULT SchedRegion::FindOptimalSchedule(
   }
 
   // Apply graph transformations
-  for (InstCount i = 0; i < dataDepGraph_->GetGraphTransCnt(); i++) {
-    rslt = graphTrans[i]->ApplyTrans();
+  for (auto &GT : *GraphTransformations) {
+    rslt = GT->ApplyTrans();
 
     if (rslt != RES_SUCCESS)
       return rslt;
