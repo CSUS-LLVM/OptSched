@@ -11,7 +11,7 @@
 
 using namespace llvm::opt_sched;
 
-//static void PrintInstruction(SchedInstruction *inst);
+static void PrintInstruction(SchedInstruction *inst);
 void PrintSchedule(InstSchedule *schedule);
 
 double RandDouble(double min, double max) {
@@ -20,26 +20,45 @@ double RandDouble(double min, double max) {
 }
 
 #define USE_ACS 1
-#define BIASED_CHOICES 10
-#define LOCAL_DECAY 0.1
+//#define BIASED_CHOICES 10000000
+//#define LOCAL_DECAY 0.1
 
-#if USE_ACS
-#define ANTS_PER_ITERATION 10
-#define DECAY_FACTOR 0.1
-#else
-#define ANTS_PER_ITERATION count_
-#define DECAY_FACTOR 0.5
-#endif
+//#if USE_ACS
+//#define ANTS_PER_ITERATION 10
+//#define DECAY_FACTOR 0.1
+//#else
+//#define ANTS_PER_ITERATION count_
+//#define DECAY_FACTOR 0.5
+//#endif
 
 ACOScheduler::ACOScheduler(DataDepGraph *dataDepGraph, MachineModel *machineModel, InstCount upperBound, SchedPriorities priorities) : ConstrainedScheduler(dataDepGraph, machineModel, upperBound) {
   prirts_ = priorities;
   rdyLst_ = new ReadyList(dataDepGraph_, priorities);
   count_ = dataDepGraph->GetInstCnt();
   Config &schedIni = SchedulerOptions::getInstance();
+  
+  use_fixed_bias = schedIni.GetBool("ACO_USE_FIXED_BIAS");
   heuristicImportance_ = schedIni.GetInt("ACO_HEURISTIC_IMPORTANCE");
-
+  use_tournament = schedIni.GetBool("ACO_TOURNAMENT");
+  fixed_bias = schedIni.GetInt("ACO_FIXED_BIAS");
+  bias_ratio = schedIni.GetFloat("ACO_BIAS_RATIO");
+  local_decay = schedIni.GetFloat("ACO_LOCAL_DECAY");
+  decay_factor = schedIni.GetFloat("ACO_DECAY_FACTOR");
+  ants_per_iteration = schedIni.GetInt("ACO_ANT_PER_ITERATION");
+  print_aco_trace = schedIni.GetBool("ACO_TRACE");
+  
+  /*
+  std::cerr << "useOldAlg===="<<useOldAlg<<"\n\n";
+  std::cerr << "heuristicImportance_===="<<heuristicImportance_<<"\n\n";
+  std::cerr << "tournament===="<<tournament<<"\n\n";
+  std::cerr << "bias_ratio===="<<bias_ratio<<"\n\n";
+  std::cerr << "local_decay===="<<local_decay<<"\n\n";
+  std::cerr << "decay_factor===="<<decay_factor<<"\n\n";
+  std::cerr << "ants_per_iteration===="<<ants_per_iteration<<"\n\n";
+  */
   int pheremone_size = (count_ + 1) * count_;
   pheremone_ = new pheremone_t[pheremone_size];
+  
 }
 
 ACOScheduler::~ACOScheduler() {
@@ -77,32 +96,65 @@ std::vector<double> ACOScheduler::scores(std::vector<Choice> ready, SchedInstruc
 }
 
 SchedInstruction *ACOScheduler::SelectInstruction(std::vector<Choice> ready, SchedInstruction *lastInst) {
-#if USE_ACS
-  double choose_best_chance = fmax(0, 1 - (double) BIASED_CHOICES / count_);
-  if (RandDouble(0, 1) < choose_best_chance) {
-    pheremone_t max = -1;
-    Choice maxChoice;
-    for (auto choice : ready) {
-      if (Score(lastInst, choice) > max) {
-        max = Score(lastInst, choice);
-        maxChoice = choice;
-      }
+    #if USE_ACS
+    double choose_best_chance;    
+    if (use_fixed_bias)
+        choose_best_chance = fmax(0, 1 - (double)fixed_bias / count_);
+    else
+        choose_best_chance = bias_ratio;
+     
+    if (RandDouble(0, 1) < choose_best_chance) {
+        if (print_aco_trace)
+            std::cerr<<"choose_best, use fixed bais: "<<use_fixed_bias<<"\n";
+        pheremone_t max = -1;
+        Choice maxChoice;
+        for (auto choice : ready) {
+            if (Score(lastInst, choice) > max) {
+                max = Score(lastInst, choice);
+                maxChoice = choice;
+            }
+        }   
+        return maxChoice.inst;
     }
-    return maxChoice.inst;
-  }
-#endif
-  pheremone_t sum = 0;
-  for (auto choice : ready)
-    sum += Score(lastInst, choice);
-  pheremone_t point = RandDouble(0, sum);
-  for (auto choice : ready) {
-    point -= Score(lastInst, choice);
-    if (point <= 0)
-      return choice.inst;
-  }
-  std::cerr << "returning last instruction" << std::endl;
-  assert(point < 0.001); // floats should not be this inaccurate
-  return ready.back().inst;
+    #endif
+    if (use_tournament){
+        int POPULATION_SIZE = ready.size();
+        int r_pos = (int) (RandDouble(0, 1) *POPULATION_SIZE);
+        int s_pos = (int) (RandDouble(0, 1) *POPULATION_SIZE);
+    //    int t_pos = (int) (RandDouble(0, 1) *POPULATION_SIZE);
+        Choice r = ready[r_pos];
+        Choice s = ready[s_pos];
+    //    Choice t = ready[t_pos];
+        if (print_aco_trace) {
+            std::cerr << "tournament Start \n";
+            std::cerr << "array_size:"<<POPULATION_SIZE<<"\n";
+            std::cerr<<"r:\t"<<r_pos<<"\n";
+            std::cerr<<"s:\t"<<s_pos<<"\n";
+    //        std::cerr<<"t:\t"<<t_pos<<"\n";
+
+            std::cerr<<"Score r"<<Score(lastInst, r)<<"\n";
+            std::cerr<<"Score s"<<Score(lastInst, s)<<"\n";
+   //         std::cerr<<"Score t"<<Score(lastInst, t)<<"\n";
+        }
+        if (Score(lastInst, r) >= Score(lastInst, s)) //&& Score(lastInst, r) >= Score(lastInst, t))
+            return r.inst;
+   //     else if (Score(lastInst, s) >= Score(lastInst, r) && Score(lastInst, s) >= Score(lastInst, t))
+   //         return s.inst;
+        else
+            return s.inst;
+    }      
+    pheremone_t sum = 0;
+    for (auto choice : ready)
+        sum += Score(lastInst, choice);
+    pheremone_t point = RandDouble(0, sum);
+    for (auto choice : ready) {
+        point -= Score(lastInst, choice);
+        if (point <= 0)
+            return choice.inst;
+    }
+    std::cerr << "returning last instruction" << std::endl;
+    assert(point < 0.001); // floats should not be this inaccurate
+    return ready.back().inst;
 }
 
 InstSchedule *ACOScheduler::FindOneSchedule() {
@@ -131,21 +183,26 @@ InstSchedule *ACOScheduler::FindOneSchedule() {
     rdyLst_->ResetIterator();
 
     // print out the ready list for debugging
-    /* std::stringstream stream; */
-    /* stream << "Ready list: "; */
-    /* for (auto choice : ready) { */
-      /* stream << choice.inst->GetNum() << ", "; */
-    /* } */
-    /* Logger::Info(stream.str().c_str()); */
+    /*
+     std::stringstream stream; 
+     stream << "Ready list: "; 
+    for (auto choice : ready) { 
+      stream << choice.inst->GetNum() << ", "; 
+    } 
+    Logger::Info(stream.str().c_str()); 
+    */
 
     inst = NULL;
     if (!ready.empty())
       inst = SelectInstruction(ready, lastInst);
+	if (inst != NULL) {
 #ifdef USE_ACS
-    pheremone_t *pheremone = &Pheremone(lastInst, inst);
-    *pheremone = (1 - LOCAL_DECAY) * *pheremone + LOCAL_DECAY * initialValue_;
+ 		// local pheremone decay
+		pheremone_t *pheremone = &Pheremone(lastInst, inst);
+		*pheremone = (1 - local_decay) * *pheremone + local_decay * initialValue_;
 #endif
-    lastInst = inst;
+		lastInst = inst;
+	}
 
     // boilerplate, mostly copied from ListScheduler, try not to touch it
     InstCount instNum;
@@ -185,16 +242,16 @@ FUNC_RESULT ACOScheduler::FindSchedule(InstSchedule *schedule_out, SchedRegion *
   for (int i = 0; i < pheremone_size; i++)
     pheremone_[i] = 1;
   initialValue_ = 1;
-  InstCount heuristicCost = FindOneSchedule()->GetSpillCost() + 1; // prevent divide by zero
+  InstCount heuristicCost = FindOneSchedule()->GetCost() + 1; // prevent divide by zero
 
 #if USE_ACS
   initialValue_ = 2.0 / ((double) count_ * heuristicCost);
 #else
-  initialValue_ = (double) ANTS_PER_ITERATION / heuristicCost;
+  initialValue_ = (double) ants_per_iteration / heuristicCost;
 #endif
   for (int i = 0; i < pheremone_size; i++)
     pheremone_[i] = initialValue_;
-  /* std::cout<<initialValue_<<std::endl; */
+  std::cerr<<"initialValue_"<<initialValue_<<std::endl;
 
   InstSchedule *bestSchedule = NULL;
   Config &schedIni = SchedulerOptions::getInstance();
@@ -203,9 +260,10 @@ FUNC_RESULT ACOScheduler::FindSchedule(InstSchedule *schedule_out, SchedRegion *
   int iterations = 0;
   while (true) {
     InstSchedule *iterationBest = NULL;
-    for (int i = 0; i < ANTS_PER_ITERATION; i++) {
+    for (int i = 0; i < ants_per_iteration; i++) {
       InstSchedule *schedule = FindOneSchedule();
-      /* PrintSchedule(schedule); */
+      if(print_aco_trace)
+         PrintSchedule(schedule); 
       if (iterationBest == NULL || schedule->GetCost() < iterationBest->GetCost()) {
         delete iterationBest;
         iterationBest = schedule;
@@ -217,12 +275,12 @@ FUNC_RESULT ACOScheduler::FindSchedule(InstSchedule *schedule_out, SchedRegion *
     UpdatePheremone(iterationBest);
 #endif
     /* PrintSchedule(iterationBest); */
-    /* std::cout << iterationBest->GetSpillCost() << std::endl; */
+    /* std::cout << iterationBest->GetCost() << std::endl; */
     // TODO DRY
     if (bestSchedule == NULL || iterationBest->GetCost() < bestSchedule->GetCost()) {
       delete bestSchedule;
       bestSchedule = iterationBest;
-      Logger::Info("ACO found schedule with spill cost %d", bestSchedule->GetSpillCost());
+      Logger::Info("ACO found schedule with spill cost %d", bestSchedule->GetCost());
       noImprovement = 0;
     } else {
       delete iterationBest;
@@ -237,6 +295,7 @@ FUNC_RESULT ACOScheduler::FindSchedule(InstSchedule *schedule_out, SchedRegion *
 #endif
     iterations++;
   }
+  PrintSchedule(bestSchedule);
   schedule_out->Copy(bestSchedule);
   delete bestSchedule;
 
@@ -258,9 +317,9 @@ void ACOScheduler::UpdatePheremone(InstSchedule *schedule) {
 #if USE_ACS
     // ACS update rule includes decay
     // only the arcs on the current solution are decayed
-    *pheremone = (1 - DECAY_FACTOR) * *pheremone + DECAY_FACTOR / (schedule->GetSpillCost() + 1);
+    *pheremone = (1 - decay_factor) * *pheremone + decay_factor / (schedule->GetCost() + 1);
 #else
-    *pheremone = *pheremone + 1/(schedule->GetSpillCost() + 1);
+    *pheremone = *pheremone + 1/(schedule->GetCost() + 1);
 #endif
     lastInst = inst;
 
@@ -272,11 +331,12 @@ void ACOScheduler::UpdatePheremone(InstSchedule *schedule) {
   // decay pheremone
   for (int i = 0; i < count_; i++) {
     for (int j = 0; j < count_; j++) {
-      Pheremone(i, j) *= (1 - DECAY_FACTOR);
+      Pheremone(i, j) *= (1 - decay_factor);
     }
   }
 #endif
-  /* PrintPheremone(); */
+    if (print_aco_trace)
+        PrintPheremone(); 
 }
 
 // copied from Enumerator
@@ -308,14 +368,13 @@ inline void ACOScheduler::UpdtRdyLst_(InstCount cycleNum, int slotNum) {
 void ACOScheduler::PrintPheremone() {
   for (int i = 0; i < count_; i++) {
     for (int j = 0; j < count_; j++) {
-      std::cerr << std::fixed << std::setprecision(2) << Pheremone(i,j) << " ";
+      std::cerr << std::scientific << std::setprecision(8) << Pheremone(i,j) << " ";
     }
     std::cerr << std::endl;
   }
   std::cerr << std::endl;
 }
 
-/* Not Used
 static void PrintInstruction(SchedInstruction *inst) {
   std::cerr << std::setw(2) << inst->GetNum() << " ";
   std::cerr << std::setw(20) << std::left << inst->GetOpCode();
@@ -339,10 +398,9 @@ static void PrintInstruction(SchedInstruction *inst) {
   }
   std::cerr << std::endl;
 }
-*/
 
 void PrintSchedule(InstSchedule *schedule) {
-  std::cerr << schedule->GetSpillCost() << ": ";
+  std::cerr << schedule->GetCost() << ": ";
   InstCount instNum, cycleNum, slotNum;
   instNum = schedule->GetFrstInst(cycleNum, slotNum);
   while (instNum != INVALID_VALUE) {

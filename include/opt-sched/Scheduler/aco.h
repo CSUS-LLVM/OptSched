@@ -33,8 +33,16 @@ private:
   InstSchedule *FindOneSchedule();
   pheremone_t *pheremone_;
   pheremone_t initialValue_;
+  bool use_fixed_bias;
   int count_;
   int heuristicImportance_;
+  bool use_tournament;
+  int fixed_bias;
+  double bias_ratio;
+  double local_decay;
+  double decay_factor;
+  int ants_per_iteration;
+  bool print_aco_trace;
   std::vector<double> scores(std::vector<Choice> ready, SchedInstruction *last);
 };
 
