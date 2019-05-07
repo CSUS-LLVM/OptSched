@@ -17,7 +17,6 @@ import pdb
 # Dictionary for benchmark selection. Maps benchmark names and categories
 # to lists of specific benchmarks.
 benchDict = {}
-
 # Add all benchmarks individually.
 benchDict['perlbench'] = ['perlbench']
 benchDict['bzip2'] = ['bzip2']
@@ -69,8 +68,7 @@ benchDict['ALL'] = [
     'zeusmp',
     'gromacs',
     'cactus',
-    'leslie',
-    'namd',
+    'leslie', 'namd',
     'dealII',
     'soplex',
     'povray',
@@ -166,7 +164,6 @@ benchDict['MIXED'] = [
 
 # The FP benchmarks without FORTRAN. (ie no dragonegg)
 benchDict['FP_NO_F'] = list(set(benchDict['FP']) - set(benchDict['FORTRAN'] + benchDict['MIXED']))
-
 #List of log files
 logFile = {}
 
@@ -197,6 +194,7 @@ SETTING_REGEX = re.compile(r'\bUSE_OPT_SCHED\b.*')
 #SPILLS_REGEX = re.compile(r'Function: (.*?)\nEND FAST RA: Number of spills: (\d+)\n')
 SPILLS_REGEX = re.compile(r'Function: (.*?)\nGREEDY RA: Number of spilled live ranges: (\d+)')
 #SPILLS_REGEX = re.compile(r'Function: (.*?)\nTotal Simulated Spills: (\d+)')
+SPILLS_WEIGHTED_REGEX = re.compile(r'SC in Function (.*?) (-?\d+)')
 TIMES_REGEX = re.compile(r'(\d+) total seconds elapsed')
 BLOCK_NAME_AND_SIZE_REGEX = re.compile(r'Processing DAG (.*) with (\d+) insts')
 BLOCK_NOT_ENUMERATED_REGEX = re.compile(r'The list schedule .* is optimal')
@@ -212,7 +210,7 @@ BLOCK_PEAK_REG_PRESSURE_REGEX = re.compile(r'PeakRegPresAfter Index (\d+) Name (
 BLOCK_PEAK_REG_BLOCK_NAME = re.compile(r'LLVM max pressure after scheduling for BB (\S+)')
 REGION_OPTSCHED_SPILLS_REGEX = re.compile(r"OPT_SCHED LOCAL RA: DAG Name: (\S+) Number of spills: (\d+) \(Time")
 
-def writeStats(stats, spills, times, blocks, regp, trackOptSchedSpills):
+def writeStats(stats, spills, weighted, times, blocks, regp, trackOptSchedSpills):
     # Write times.
     if times:
         with open(times, 'w') as times_file:
@@ -231,7 +229,7 @@ def writeStats(stats, spills, times, blocks, regp, trackOptSchedSpills):
             for benchName in stats:
                 totalSpillsPerBenchmark = 0
                 spills_file.write('%s:\n' % benchName)
-                spills = stats[benchName]['spills']
+                spills = stats[benchName]['spills']['spills']
                 for functionName in spills:
                     spillCount = spills[functionName]
                     totalSpillsPerBenchmark += spillCount
@@ -242,6 +240,25 @@ def writeStats(stats, spills, times, blocks, regp, trackOptSchedSpills):
                 totalSpills += totalSpillsPerBenchmark
             spills_file.write('------------\n')
             spills_file.write('Total:%5d\n' % totalSpills)
+
+    # Write the weighted spill stats
+    if weighted:
+        with open(weighted, 'w') as weighted_file:
+	    totalWeightedSpills = 0
+            for benchName in stats:
+		totalWeightedSpillsPerBenchmark = 0
+                weighted_file.write('%s:\n' % benchName)
+		weightedSpills = stats[benchName]['spills']['weightedSpills']
+                for functionName in weightedSpills:
+		    weightedSpillCount = weightedSpills[functionName]
+		    totalWeightedSpillsPerBenchmark += weightedSpillCount
+                    weighted_file.write('      %5d %s\n' %
+                                      (weightedSpillCount, functionName))
+                weighted_file.write('  ---------\n')
+                weighted_file.write('  Sum:%5d\n\n' % totalWeightedSpillsPerBenchmark)
+		totalWeightedSpills += totalWeightedSpillsPerBenchmark
+            weighted_file.write('------------\n')
+            weighted_file.write('Total:%5d\n' % totalWeightedSpills)
 
     # write simulated region spill stats.
     # TODO Write simulated spills for all regions.
@@ -651,13 +668,45 @@ def calculateBlockStats(output, trackOptSchedSpills):
             for line in blocks[index].split('\n')[1:-1][:10]:
                 print '   ', line
 
+				
+				
     return stats
 
 
+"""
+calculateSpills(output)
+
+Get the number of spills and weighted spills from an input
+
+Input:
+Log file or input from terminal that contains spilling
+information from CPU2006.
+
+Output:
+Dictionary Variable
+{
+'spills', {'functionName', spills}
+'weightedSpills, {'functionName', weightedSpillCount}
+}
+"""
 def calculateSpills(output):
-    spills = {}
+    spills = {} # This dictionary variable will be return as the result
+    numOfSpills = {}
+    weightedSpills = {}
+
+    # Get and record the number of spills using a regular expression
     for functionName, spillCountString in SPILLS_REGEX.findall(output):
-        spills[functionName] = int(spillCountString)
+        numOfSpills[functionName] = int(spillCountString)
+		
+    # Get and record the number of weighted spills using a regular expression
+    for functionName, weightedSpillCount in SPILLS_WEIGHTED_REGEX.findall(output):
+	weightedSpills[functionName] = int(weightedSpillCount)
+
+    # Insert the spills and weighted spills into the spills dictionary variable
+    spills['spills'] = numOfSpills
+    spills['weightedSpills'] = weightedSpills
+    
+	
     return spills
 
 
@@ -745,6 +794,7 @@ def main(args):
 			results[log] = getBenchmarkResult(output, args.trackOptSchedSpills)
 
 		spills = os.path.join(args.outdir, args.spills)
+		weighted = os.path.join(args.outdir, args.weighted)
 	        times = os.path.join(args.outdir, args.times)
         	blocks = os.path.join(args.outdir, args.blocks)
 
@@ -754,7 +804,7 @@ def main(args):
             		regp = None
 
         	# Write out the results from the logfile.
-        	writeStats(results, spills, times, blocks, regp, args.trackOptSchedSpills)
+        	writeStats(results, spills, weighted, times, blocks, regp, args.trackOptSchedSpills)
 
 	# Run the benchmarks and collect results.
     else:
@@ -798,6 +848,7 @@ def main(args):
 
 
             spills = os.path.join(testOutDir, args.spills)
+            weighted = os.path.join(testOutDir, args.weighted)
             times = os.path.join(testOutDir, args.times)
             blocks = os.path.join(testOutDir, args.blocks)
             if args.regp:
@@ -806,7 +857,7 @@ def main(args):
                 regp = None
 
             # Write out the results for this test.
-            writeStats(results, spills, times, blocks, regp, args.trackOptSchedSpills)
+            writeStats(results, spills, weighted, times, blocks, regp, args.trackOptSchedSpills)
 
 
 if __name__ == '__main__':
@@ -820,6 +871,10 @@ if __name__ == '__main__':
                       metavar='filepath',
                       default='times.dat',
                       help='Where to write the run compile times (%default).')
+    parser.add_option('-u', '--weighted',
+                      metavar='filepath',
+                      default='weighted-spills.dat',
+                      help='Where to write the weighted spill counts (%default).')
     parser.add_option('-k', '--blocks',
                       metavar='filepath',
                       default='blocks.dat',
@@ -829,7 +884,7 @@ if __name__ == '__main__':
                       help='Where to write the reg pressure stats (%default).')
     parser.add_option('-c', '--config',
                       metavar='filepath',
-                      default='Intel_llvm_3.9.cfg',
+                      default='default.cfg',
                       help='The runspec config file (%default).')
     parser.add_option('-m', '--testruns',
                       metavar='number',
@@ -844,7 +899,7 @@ if __name__ == '__main__':
                       default=None,
                       help='Where to find OptSchedCfg for the test runs (%default).')
     parser.add_option('-b', '--bench',
-                      metavar='ALL|INT|FP|name1,name2...',
+                      metavar='ALL|INT_SPEED|FP_SPEED|C|C++|FORTRAN|...',
                       default='ALL',
                       help='Which benchmarks to run.')
     parser.add_option('-l', '--logfile',
@@ -866,3 +921,4 @@ if __name__ == '__main__':
                       help='Should the simulated number of spills per-block be tracked (%default).')
 
     main(parser.parse_args()[0])
+

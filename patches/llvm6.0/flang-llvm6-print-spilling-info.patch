@@ -1,0 +1,491 @@
+From 7161a90f679d8d52ab57a3166361a7ebd1ba5459 Mon Sep 17 00:00:00 2001
+From: vangthao95 <43257541+vangthao95@users.noreply.github.com>
+Date: Tue, 7 May 2019 13:28:55 -0700
+Subject: [PATCH] Print spilling information
+
+---
+ lib/CodeGen/InlineSpiller.cpp  | 179 ++++++++++++++++++++++-----------
+ lib/CodeGen/RegAllocGreedy.cpp |  37 +++++++
+ 2 files changed, 157 insertions(+), 59 deletions(-)
+
+diff --git a/lib/CodeGen/InlineSpiller.cpp b/lib/CodeGen/InlineSpiller.cpp
+index 86ce4b7a9464..afa2c868c234 100644
+--- a/lib/CodeGen/InlineSpiller.cpp
++++ b/lib/CodeGen/InlineSpiller.cpp
+@@ -63,18 +63,27 @@ using namespace llvm;
+ 
+ #define DEBUG_TYPE "regalloc"
+ 
+-STATISTIC(NumSpilledRanges,   "Number of spilled live ranges");
+-STATISTIC(NumSnippets,        "Number of spilled snippets");
+-STATISTIC(NumSpills,          "Number of spills inserted");
+-STATISTIC(NumSpillsRemoved,   "Number of spills removed");
+-STATISTIC(NumReloads,         "Number of reloads inserted");
+-STATISTIC(NumReloadsRemoved,  "Number of reloads removed");
+-STATISTIC(NumFolded,          "Number of folded stack accesses");
+-STATISTIC(NumFoldedLoads,     "Number of folded loads");
+-STATISTIC(NumRemats,          "Number of rematerialized defs for spilling");
++STATISTIC(NumSpilledRanges, "Number of spilled live ranges");
++STATISTIC(NumSnippets, "Number of spilled snippets");
++STATISTIC(NumSpills, "Number of spills inserted");
++STATISTIC(NumSpillsRemoved, "Number of spills removed");
++STATISTIC(NumReloads, "Number of reloads inserted");
++STATISTIC(NumReloadsRemoved, "Number of reloads removed");
++STATISTIC(NumFolded, "Number of folded stack accesses");
++STATISTIC(NumFoldedLoads, "Number of folded loads");
++STATISTIC(NumRemats, "Number of rematerialized defs for spilling");
+ 
+ static cl::opt<bool> DisableHoisting("disable-spill-hoist", cl::Hidden,
+                                      cl::desc("Disable inline spill hoisting"));
++int NumSpilledRegs = 0;
++int gNumSpilledRanges = 0;
++int gNumSpills = 0;
++int gNumWeightedSpills = 0;
++int gNumReloads = 0;
++int gNumSpillsNoCleanup = 0;
++int gNumReloadsNoCleanup = 0;
++float gWeightedSpills = 0;
++float gWeightedReloads = 0;
+ 
+ namespace {
+ 
+@@ -175,13 +184,13 @@ class InlineSpiller : public Spiller {
+ 
+   // All COPY instructions to/from snippets.
+   // They are ignored since both operands refer to the same stack slot.
+-  SmallPtrSet<MachineInstr*, 8> SnippetCopies;
++  SmallPtrSet<MachineInstr *, 8> SnippetCopies;
+ 
+   // Values that failed to remat at some point.
+-  SmallPtrSet<VNInfo*, 8> UsedValues;
++  SmallPtrSet<VNInfo *, 8> UsedValues;
+ 
+   // Dead defs generated during spilling.
+-  SmallVector<MachineInstr*, 8> DeadDefs;
++  SmallVector<MachineInstr *, 8> DeadDefs;
+ 
+   // Object records spills information and does the hoisting.
+   HoistSpillHelper HSpiller;
+@@ -213,7 +222,7 @@ class InlineSpiller : public Spiller {
+   bool hoistSpillInsideBB(LiveInterval &SpillLI, MachineInstr &CopyMI);
+   void eliminateRedundantSpills(LiveInterval &LI, VNInfo *VNI);
+ 
+-  void markValueUsed(LiveInterval*, VNInfo*);
++  void markValueUsed(LiveInterval *, VNInfo *);
+   bool reMaterializeFor(LiveInterval &, MachineInstr &MI);
+   void reMaterializeAll();
+ 
+@@ -234,8 +243,7 @@ Spiller::~Spiller() = default;
+ void Spiller::anchor() {}
+ 
+ Spiller *llvm::createInlineSpiller(MachineFunctionPass &pass,
+-                                   MachineFunction &mf,
+-                                   VirtRegMap &vrm) {
++                                   MachineFunction &mf, VirtRegMap &vrm) {
+   return new InlineSpiller(pass, mf, vrm);
+ }
+ 
+@@ -283,8 +291,9 @@ bool InlineSpiller::isSnippet(const LiveInterval &SnipLI) {
+ 
+   // Check that all uses satisfy our criteria.
+   for (MachineRegisterInfo::reg_instr_nodbg_iterator
+-       RI = MRI.reg_instr_nodbg_begin(SnipLI.reg),
+-       E = MRI.reg_instr_nodbg_end(); RI != E; ) {
++           RI = MRI.reg_instr_nodbg_begin(SnipLI.reg),
++           E = MRI.reg_instr_nodbg_end();
++       RI != E;) {
+     MachineInstr &MI = *RI++;
+ 
+     // Allow copies to/from Reg.
+@@ -322,8 +331,9 @@ void InlineSpiller::collectRegsToSpill() {
+   if (Original == Reg)
+     return;
+ 
+-  for (MachineRegisterInfo::reg_instr_iterator
+-       RI = MRI.reg_instr_begin(Reg), E = MRI.reg_instr_end(); RI != E; ) {
++  for (MachineRegisterInfo::reg_instr_iterator RI = MRI.reg_instr_begin(Reg),
++                                               E = MRI.reg_instr_end();
++       RI != E;) {
+     MachineInstr &MI = *RI++;
+     unsigned SnipReg = isFullCopyOf(MI, Reg);
+     if (!isSibling(SnipReg))
+@@ -342,7 +352,7 @@ void InlineSpiller::collectRegsToSpill() {
+ 
+ bool InlineSpiller::isSibling(unsigned Reg) {
+   return TargetRegisterInfo::isVirtualRegister(Reg) &&
+-           VRM.getOriginal(Reg) == Original;
++         VRM.getOriginal(Reg) == Original;
+ }
+ 
+ /// It is beneficial to spill to earlier place in the same BB in case
+@@ -387,8 +397,8 @@ bool InlineSpiller::hoistSpillInsideBB(LiveInterval &SpillLI,
+   LiveInterval &OrigLI = LIS.getInterval(Original);
+   VNInfo *OrigVNI = OrigLI.getVNInfoAt(Idx);
+   StackInt->MergeValueInAsValue(OrigLI, OrigVNI, StackInt->getValNumInfo(0));
+-  DEBUG(dbgs() << "\tmerged orig valno " << OrigVNI->id << ": "
+-               << *StackInt << '\n');
++  DEBUG(dbgs() << "\tmerged orig valno " << OrigVNI->id << ": " << *StackInt
++               << '\n');
+ 
+   // We are going to spill SrcVNI immediately after its def, so clear out
+   // any later spills of the same value.
+@@ -412,6 +422,11 @@ bool InlineSpiller::hoistSpillInsideBB(LiveInterval &SpillLI,
+   DEBUG(dbgs() << "\thoisted: " << SrcVNI->def << '\t' << *MII);
+ 
+   HSpiller.addToMergeableSpills(*MII, StackSlot, Original);
++  gWeightedSpills += LiveIntervals::getSpillWeight(
++      true, false, &MBFI, const_cast<const MachineInstr &>(*MII));
++  ++gNumSpills;
++  ++gNumSpillsNoCleanup;
++  ++NumSpilledRegs;
+   ++NumSpills;
+   return true;
+ }
+@@ -420,7 +435,7 @@ bool InlineSpiller::hoistSpillInsideBB(LiveInterval &SpillLI,
+ /// redundant spills of this value in SLI.reg and sibling copies.
+ void InlineSpiller::eliminateRedundantSpills(LiveInterval &SLI, VNInfo *VNI) {
+   assert(VNI && "Missing value");
+-  SmallVector<std::pair<LiveInterval*, VNInfo*>, 8> WorkList;
++  SmallVector<std::pair<LiveInterval *, VNInfo *>, 8> WorkList;
+   WorkList.push_back(std::make_pair(&SLI, VNI));
+   assert(StackInt && "No stack slot assigned yet.");
+ 
+@@ -428,8 +443,8 @@ void InlineSpiller::eliminateRedundantSpills(LiveInterval &SLI, VNInfo *VNI) {
+     LiveInterval *LI;
+     std::tie(LI, VNI) = WorkList.pop_back_val();
+     unsigned Reg = LI->reg;
+-    DEBUG(dbgs() << "Checking redundant spills for "
+-                 << VNI->id << '@' << VNI->def << " in " << *LI << '\n');
++    DEBUG(dbgs() << "Checking redundant spills for " << VNI->id << '@'
++                 << VNI->def << " in " << *LI << '\n');
+ 
+     // Regs to spill are taken care of.
+     if (isRegToSpill(Reg))
+@@ -441,8 +456,9 @@ void InlineSpiller::eliminateRedundantSpills(LiveInterval &SLI, VNInfo *VNI) {
+ 
+     // Find all spills and copies of VNI.
+     for (MachineRegisterInfo::use_instr_nodbg_iterator
+-         UI = MRI.use_instr_nodbg_begin(Reg), E = MRI.use_instr_nodbg_end();
+-         UI != E; ) {
++             UI = MRI.use_instr_nodbg_begin(Reg),
++             E = MRI.use_instr_nodbg_end();
++         UI != E;) {
+       MachineInstr &MI = *UI++;
+       if (!MI.isCopy() && !MI.mayStore())
+         continue;
+@@ -453,11 +469,11 @@ void InlineSpiller::eliminateRedundantSpills(LiveInterval &SLI, VNInfo *VNI) {
+       // Follow sibling copies down the dominator tree.
+       if (unsigned DstReg = isFullCopyOf(MI, Reg)) {
+         if (isSibling(DstReg)) {
+-           LiveInterval &DstLI = LIS.getInterval(DstReg);
+-           VNInfo *DstVNI = DstLI.getVNInfoAt(Idx.getRegSlot());
+-           assert(DstVNI && "Missing defined value");
+-           assert(DstVNI->def == Idx.getRegSlot() && "Wrong copy def slot");
+-           WorkList.push_back(std::make_pair(&DstLI, DstVNI));
++          LiveInterval &DstLI = LIS.getInterval(DstReg);
++          VNInfo *DstVNI = DstLI.getVNInfoAt(Idx.getRegSlot());
++          assert(DstVNI && "Missing defined value");
++          assert(DstVNI->def == Idx.getRegSlot() && "Wrong copy def slot");
++          WorkList.push_back(std::make_pair(&DstLI, DstVNI));
+         }
+         continue;
+       }
+@@ -470,8 +486,14 @@ void InlineSpiller::eliminateRedundantSpills(LiveInterval &SLI, VNInfo *VNI) {
+         MI.setDesc(TII.get(TargetOpcode::KILL));
+         DeadDefs.push_back(&MI);
+         ++NumSpillsRemoved;
+-        if (HSpiller.rmFromMergeableSpills(MI, StackSlot))
++        if (HSpiller.rmFromMergeableSpills(MI, StackSlot)) {
+           --NumSpills;
++          --gNumSpills;
++          gWeightedSpills -=
++              LiveIntervals::getSpillWeight(true, false, &MBFI, MI);
++          --NumSpilledRegs;
++          --NumSpills;
++        }
+       }
+     }
+   } while (!WorkList.empty());
+@@ -484,7 +506,7 @@ void InlineSpiller::eliminateRedundantSpills(LiveInterval &SLI, VNInfo *VNI) {
+ /// markValueUsed - Remember that VNI failed to rematerialize, so its defining
+ /// instruction cannot be eliminated. See through snippet copies
+ void InlineSpiller::markValueUsed(LiveInterval *LI, VNInfo *VNI) {
+-  SmallVector<std::pair<LiveInterval*, VNInfo*>, 8> WorkList;
++  SmallVector<std::pair<LiveInterval *, VNInfo *>, 8> WorkList;
+   WorkList.push_back(std::make_pair(LI, VNI));
+   do {
+     std::tie(LI, VNI) = WorkList.pop_back_val();
+@@ -561,8 +583,7 @@ bool InlineSpiller::reMaterializeFor(LiveInterval &VirtReg, MachineInstr &MI) {
+ 
+   // Before rematerializing into a register for a single instruction, try to
+   // fold a load into the instruction. That avoids allocating a new register.
+-  if (RM.OrigMI->canFoldAsLoad() &&
+-      foldMemoryOperand(Ops, RM.OrigMI)) {
++  if (RM.OrigMI->canFoldAsLoad() && foldMemoryOperand(Ops, RM.OrigMI)) {
+     Edit->markRematerialized(RM.ParentVNI);
+     ++NumFoldedLoads;
+     return true;
+@@ -611,8 +632,9 @@ void InlineSpiller::reMaterializeAll() {
+   for (unsigned Reg : RegsToSpill) {
+     LiveInterval &LI = LIS.getInterval(Reg);
+     for (MachineRegisterInfo::reg_bundle_iterator
+-           RegI = MRI.reg_bundle_begin(Reg), E = MRI.reg_bundle_end();
+-         RegI != E; ) {
++             RegI = MRI.reg_bundle_begin(Reg),
++             E = MRI.reg_bundle_end();
++         RegI != E;) {
+       MachineInstr &MI = *RegI++;
+ 
+       // Debug values are not allowed to affect codegen.
+@@ -698,9 +720,16 @@ bool InlineSpiller::coalesceStackAccess(MachineInstr *MI, unsigned Reg) {
+   if (IsLoad) {
+     ++NumReloadsRemoved;
+     --NumReloads;
++    --gNumReloads;
++    gWeightedReloads -= LiveIntervals::getSpillWeight(
++        true, false, &MBFI, const_cast<const MachineInstr &>(*MI));
+   } else {
+     ++NumSpillsRemoved;
+     --NumSpills;
++    --gNumSpills;
++    gWeightedSpills -= LiveIntervals::getSpillWeight(
++        true, false, &MBFI, const_cast<const MachineInstr &>(*MI));
++    --NumSpilledRegs;
+   }
+ 
+   return true;
+@@ -713,7 +742,7 @@ static void dumpMachineInstrRangeWithSlotIndex(MachineBasicBlock::iterator B,
+                                                MachineBasicBlock::iterator E,
+                                                LiveIntervals const &LIS,
+                                                const char *const header,
+-                                               unsigned VReg =0) {
++                                               unsigned VReg = 0) {
+   char NextLine = '\n';
+   char SlotIndent = '\t';
+ 
+@@ -747,9 +776,8 @@ static void dumpMachineInstrRangeWithSlotIndex(MachineBasicBlock::iterator B,
+ /// @param Ops    Operand indices from analyzeVirtReg().
+ /// @param LoadMI Load instruction to use instead of stack slot when non-null.
+ /// @return       True on success.
+-bool InlineSpiller::
+-foldMemoryOperand(ArrayRef<std::pair<MachineInstr *, unsigned>> Ops,
+-                  MachineInstr *LoadMI) {
++bool InlineSpiller::foldMemoryOperand(
++    ArrayRef<std::pair<MachineInstr *, unsigned>> Ops, MachineInstr *LoadMI) {
+   if (Ops.empty())
+     return false;
+   // Don't attempt folding in bundles.
+@@ -826,8 +854,14 @@ foldMemoryOperand(ArrayRef<std::pair<MachineInstr *, unsigned>> Ops,
+ 
+   int FI;
+   if (TII.isStoreToStackSlot(*MI, FI) &&
+-      HSpiller.rmFromMergeableSpills(*MI, FI))
++      HSpiller.rmFromMergeableSpills(*MI, FI)) {
+     --NumSpills;
++    --gNumSpills;
++    gWeightedSpills -= LiveIntervals::getSpillWeight(
++        true, false, &MBFI, const_cast<const MachineInstr &>(*MI));
++    ++NumSpillsRemoved;
++    --NumSpilledRegs;
++  }
+   LIS.ReplaceMachineInstrInMaps(*MI, *FoldMI);
+   MI->eraseFromParent();
+ 
+@@ -855,14 +889,23 @@ foldMemoryOperand(ArrayRef<std::pair<MachineInstr *, unsigned>> Ops,
+     ++NumFolded;
+   else if (Ops.front().second == 0) {
+     ++NumSpills;
++    ++gNumSpills;
++    ++gNumSpillsNoCleanup;
++    gWeightedSpills += LiveIntervals::getSpillWeight(
++        true, false, &MBFI, const_cast<const MachineInstr &>(*FoldMI));
++    ++NumSpilledRegs;
+     HSpiller.addToMergeableSpills(*FoldMI, StackSlot, Original);
+-  } else
++  } else {
+     ++NumReloads;
++    ++gNumReloads;
++    ++gNumReloadsNoCleanup;
++    gWeightedReloads += LiveIntervals::getSpillWeight(
++        true, false, &MBFI, const_cast<const MachineInstr &>(*FoldMI));
++  }
+   return true;
+ }
+ 
+-void InlineSpiller::insertReload(unsigned NewVReg,
+-                                 SlotIndex Idx,
++void InlineSpiller::insertReload(unsigned NewVReg, SlotIndex Idx,
+                                  MachineBasicBlock::iterator MI) {
+   MachineBasicBlock &MBB = *MI->getParent();
+ 
+@@ -893,7 +936,7 @@ static bool isFullUndefDef(const MachineInstr &Def) {
+ 
+ /// insertSpill - Insert a spill of NewVReg after MI.
+ void InlineSpiller::insertSpill(unsigned NewVReg, bool isKill,
+-                                 MachineBasicBlock::iterator MI) {
++                                MachineBasicBlock::iterator MI) {
+   MachineBasicBlock &MBB = *MI->getParent();
+ 
+   MachineInstrSpan MIS(MI);
+@@ -915,6 +958,11 @@ void InlineSpiller::insertSpill(unsigned NewVReg, bool isKill,
+   DEBUG(dumpMachineInstrRangeWithSlotIndex(std::next(MI), MIS.end(), LIS,
+                                            "spill"));
+   ++NumSpills;
++  ++gNumSpills;
++  ++gNumSpillsNoCleanup;
++  gWeightedSpills += LiveIntervals::getSpillWeight(
++      true, false, &MBFI, const_cast<const MachineInstr &>(*MI));
++  ++NumSpilledRegs;
+   if (IsRealSpill)
+     HSpiller.addToMergeableSpills(*std::next(MI), StackSlot, Original);
+ }
+@@ -926,8 +974,9 @@ void InlineSpiller::spillAroundUses(unsigned Reg) {
+ 
+   // Iterate over instructions using Reg.
+   for (MachineRegisterInfo::reg_bundle_iterator
+-       RegI = MRI.reg_bundle_begin(Reg), E = MRI.reg_bundle_end();
+-       RegI != E; ) {
++           RegI = MRI.reg_bundle_begin(Reg),
++           E = MRI.reg_bundle_end();
++       RegI != E;) {
+     MachineInstr *MI = &*(RegI++);
+ 
+     // Debug values are not allowed to affect codegen.
+@@ -949,7 +998,7 @@ void InlineSpiller::spillAroundUses(unsigned Reg) {
+       continue;
+ 
+     // Analyze instruction.
+-    SmallVector<std::pair<MachineInstr*, unsigned>, 8> Ops;
++    SmallVector<std::pair<MachineInstr *, unsigned>, 8> Ops;
+     MIBundleOperands::VirtRegInfo RI =
+         MIBundleOperands(*MI).analyzeVirtReg(Reg, &Ops);
+ 
+@@ -1048,9 +1097,9 @@ void InlineSpiller::spillAll() {
+ 
+   // Finally delete the SnippetCopies.
+   for (unsigned Reg : RegsToSpill) {
+-    for (MachineRegisterInfo::reg_instr_iterator
+-         RI = MRI.reg_instr_begin(Reg), E = MRI.reg_instr_end();
+-         RI != E; ) {
++    for (MachineRegisterInfo::reg_instr_iterator RI = MRI.reg_instr_begin(Reg),
++                                                 E = MRI.reg_instr_end();
++         RI != E;) {
+       MachineInstr &MI = *(RI++);
+       assert(SnippetCopies.count(&MI) && "Remaining use wasn't a snippet copy");
+       // FIXME: Do this with a LiveRangeEdit callback.
+@@ -1065,19 +1114,20 @@ void InlineSpiller::spillAll() {
+ }
+ 
+ void InlineSpiller::spill(LiveRangeEdit &edit) {
++  ++gNumSpilledRanges;
+   ++NumSpilledRanges;
+   Edit = &edit;
+-  assert(!TargetRegisterInfo::isStackSlot(edit.getReg())
+-         && "Trying to spill a stack slot.");
++  assert(!TargetRegisterInfo::isStackSlot(edit.getReg()) &&
++         "Trying to spill a stack slot.");
+   // Share a stack slot among all descendants of Original.
+   Original = VRM.getOriginal(edit.getReg());
+   StackSlot = VRM.getStackSlot(Original);
+   StackInt = nullptr;
+ 
+   DEBUG(dbgs() << "Inline spilling "
+-               << TRI.getRegClassName(MRI.getRegClass(edit.getReg()))
+-               << ':' << edit.getParent()
+-               << "\nFrom original " << printReg(Original) << '\n');
++               << TRI.getRegClassName(MRI.getRegClass(edit.getReg())) << ':'
++               << edit.getParent() << "\nFrom original " << printReg(Original)
++               << '\n');
+   assert(edit.getParent().isSpillable() &&
+          "Attempting to spill already spilled value.");
+   assert(DeadDefs.empty() && "Previous spill didn't remove dead defs");
+@@ -1342,7 +1392,7 @@ void HoistSpillHelper::runHoistSpills(
+     }
+ 
+     SmallPtrSet<MachineDomTreeNode *, 16> &SpillsInSubTree =
+-          SpillsInSubTreeMap[*RIt].first;
++        SpillsInSubTreeMap[*RIt].first;
+     BlockFrequency &SubTreeCost = SpillsInSubTreeMap[*RIt].second;
+     // No spills in subtree, simply continue.
+     if (SpillsInSubTree.empty())
+@@ -1470,11 +1520,22 @@ void HoistSpillHelper::hoistAllSpills() {
+                               MRI.getRegClass(LiveReg), &TRI);
+       LIS.InsertMachineInstrRangeInMaps(std::prev(MI), MI);
+       ++NumSpills;
++      ++gNumSpills;
++      ++NumSpilledRegs;
++      ++gNumSpillsNoCleanup;
++      if (MI != BB->end()) {
++        gWeightedSpills += LiveIntervals::getSpillWeight(
++            true, false, &MBFI, MI->getParent());
++      }
+     }
+ 
+     // Remove redundant spills or change them to dead instructions.
+     NumSpills -= SpillsToRm.size();
++    gNumSpills -= SpillsToRm.size();
++    NumSpilledRegs -= SpillsToRm.size();
+     for (auto const RMEnt : SpillsToRm) {
++      gWeightedSpills -= LiveIntervals::getSpillWeight(
++          true, false, &MBFI, const_cast<const MachineInstr &>(*RMEnt));
+       RMEnt->setDesc(TII.get(TargetOpcode::KILL));
+       for (unsigned i = RMEnt->getNumOperands(); i; --i) {
+         MachineOperand &MO = RMEnt->getOperand(i - 1);
+diff --git a/lib/CodeGen/RegAllocGreedy.cpp b/lib/CodeGen/RegAllocGreedy.cpp
+index e492c481a540..440bedb695fc 100644
+--- a/lib/CodeGen/RegAllocGreedy.cpp
++++ b/lib/CodeGen/RegAllocGreedy.cpp
+@@ -3069,10 +3069,31 @@ void RAGreedy::reportNumberOfSplillsReloads(MachineLoop *L, unsigned &Reloads,
+   }
+ }
+ 
++bool OPTSCHED_gPrintSpills;
++extern int NumSpilledRegs;
++extern int gNumSpilledRanges;
++extern int gNumSpills;
++extern int gNumWeightedSpills;
++extern int gNumReloads;
++extern int gNumSpillsNoCleanup;
++extern int gNumReloadsNoCleanup;
++extern bool gPrintSpills;
++extern float gWeightedSpills;
++extern float gWeightedReloads;
++
+ bool RAGreedy::runOnMachineFunction(MachineFunction &mf) {
+   DEBUG(dbgs() << "********** GREEDY REGISTER ALLOCATION **********\n"
+                << "********** Function: " << mf.getName() << '\n');
+ 
++  NumSpilledRegs = 0;
++  gNumSpills = 0;
++  gNumReloads = 0;
++  gNumSpillsNoCleanup = 0;
++  gNumReloadsNoCleanup = 0;
++  gNumSpilledRanges = 0;
++  gWeightedSpills = 0.0f;
++  gWeightedReloads = 0.0f;
++
+   MF = &mf;
+   TRI = MF->getSubtarget().getRegisterInfo();
+   TII = MF->getSubtarget().getInstrInfo();
+@@ -3124,5 +3145,21 @@ bool RAGreedy::runOnMachineFunction(MachineFunction &mf) {
+   reportNumberOfSplillsReloads();
+ 
+   releaseMemory();
++
++	if (OPTSCHED_gPrintSpills) {
++    std::string fxnName = MF->getFunction().getName().str();
++    long SpillCost = gWeightedSpills + gWeightedReloads;
++    long SpillCount = gNumSpills + gNumReloads;
++    long SpillCountNoCleanup = gNumSpillsNoCleanup + gNumReloadsNoCleanup;
++    dbgs() << "\n*************************************\n";
++    dbgs() << "Function: " << fxnName << "\n";
++    dbgs() << "GREEDY RA: Number of spilled live ranges: " << gNumSpilledRanges << "\n";
++    dbgs() << "\nStores: " << gNumSpills << " Reloads: " << gNumReloads << " Spill Count: " << SpillCount;
++    dbgs() << "\nStores without cleanup: " << gNumSpillsNoCleanup << " Reloads without cleanup: " << gNumReloadsNoCleanup << " Spill Count without cleanup: " << SpillCountNoCleanup;
++    dbgs() << "\nStore Cost: " << gWeightedSpills << " Load Cost: " << gWeightedReloads << " Spill Cost: " << SpillCost << "\n";
++    dbgs() << "\n SC in Function "<< fxnName << " " << SpillCost << "\n";
++    dbgs() << "*************************************\n\n";
++  }
++
+   return true;
+ }
