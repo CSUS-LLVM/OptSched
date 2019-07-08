@@ -74,7 +74,7 @@ void ScheduleTwoPassOptSched::finalizeSchedule() {
 void ScheduleTwoPassOptSched::runSchedPass(SchedPassStrategy S) {
   switch (S) {
   case OptSchedMinRP:
-    scheduleOptSchedMaxOcc();
+    scheduleOptSchedMinRP();
     break;
   case OptSchedBalanced:
     scheduleOptSchedBalanced();
