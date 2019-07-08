@@ -854,9 +854,7 @@ FUNC_RESULT BBWithSpill::Enumerate_(Milliseconds startTime,
     if (secondPassStatus == false) {
       CmputSchedUprBound_();
     }
-    /*if (checkIfUprBoundChange != schedUprBound_) {
-      Logger::Info("Upper bound has been changed from %d to %d", checkIfUprBoundChange, schedUprBound_);
-    }*/
+
     iterCnt++;
     costLwrBound += 1;
     lngthDeadline = Utilities::GetProcessorTime() + lngthTimeout;
