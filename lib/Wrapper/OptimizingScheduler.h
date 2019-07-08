@@ -1,4 +1,4 @@
-//===- OptimizingScheduler.h - Combinatorial scheudler ----------*- C++ -*-===//
+//===- OptimizingScheduler.h - Combinatorial scheduler ----------*- C++ -*-===//
 //
 // Integrates an alternative scheduler into LLVM which implements a
 // combinatorial scheduling algorithm.
@@ -41,6 +41,8 @@ protected:
 
   // Path to the machine model specification file for opt-sched.
   SmallString<128> PathCfgMM;
+
+  bool secondPass;
 
   // Region number uniquely identifies DAGs.
   unsigned RegionNumber = ~0u;
