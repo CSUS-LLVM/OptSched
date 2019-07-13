@@ -600,7 +600,7 @@ def calculatePeakPressureStats(output):
 
 
 def calculateBlockStats(output, trackOptSchedSpills):
-    blocks = output.split('********** Scheduling Region')[1:]
+    blocks = output.split('Opt Scheduling **********')[1:]
     stats = []
     for index, block in enumerate(blocks):
         lines = [line[6:]

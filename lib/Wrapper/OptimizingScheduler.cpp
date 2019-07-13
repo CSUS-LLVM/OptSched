@@ -252,6 +252,7 @@ void ScheduleDAGOptSched::schedule() {
     LLVM_DEBUG(dbgs() << "Skipping region " << RegionName << "\n");
     return;
   }
+  Logger::Info("********** Opt Scheduling **********");
   LLVM_DEBUG(dbgs() << "********** Scheduling Region " << RegionName
                     << " **********\n");
   LLVM_DEBUG(const auto *MBB = RegionBegin->getParent();
