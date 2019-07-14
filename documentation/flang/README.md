@@ -57,7 +57,7 @@ This directory contains specific instructions on how to build Flang.
 
 6. Build Flang LLVM
 
-`cmake -DCMAKE_BUILD_TYPE=Release '-DLLVM_TARGETS_TO_BUILD=X86' -DLLVM_BUILD_TOOLS=ON -DLLVM_INCLUDE_TESTS=ON -DLLVM_OPTIMIZED_TABLEGEN=ON -DCMAKE_INSTALL_PREFIX=$FLANG_INSTALL ..`
+`cmake -DCMAKE_BUILD_TYPE=Debug '-DLLVM_TARGETS_TO_BUILD=X86' -DLLVM_BUILD_TOOLS=ON -DLLVM_INCLUDE_TESTS=ON -DLLVM_OPTIMIZED_TABLEGEN=ON -DCMAKE_INSTALL_PREFIX=$FLANG_INSTALL ..`
 
 `make && make install`
 
@@ -123,11 +123,15 @@ This directory contains specific instructions on how to build Flang.
 
 `cd flang`
 
-If you are having issues with AVX-512 when building libpgmath, you may need to swap to commit 45d7aeb5886c5965a8e793ef3fa632e7e73de56c:
+If you are having issues with AVX-512 when building libpgmath, you may need to swap to an older commit
+
+For Ubuntu 16.04: [45d7aeb5886c5965a8e793ef3fa632e7e73de56c](https://github.com/flang-compiler/flang/issues/434#issuecomment-403449362)
 
 `git checkout 45d7aeb5886c5965a8e793ef3fa632e7e73de56c`
 
-Solution found [here](https://github.com/flang-compiler/flang/issues/434#issuecomment-403449362)
+For Ubuntu 18.04: [37e6062d969bf337b964fe8119767046fcbdcdfa](https://github.com/flang-compiler/flang/issues/685)
+
+`git checkout 37e6062d969bf337b964fe8119767046fcbdcdfa`
 
 3. Navigate to inside the libpgmath dircetory:
 

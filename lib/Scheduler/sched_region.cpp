@@ -297,9 +297,9 @@ FUNC_RESULT SchedRegion::FindOptimalSchedule(
 
   if (SchedulerOptions::getInstance().GetString(
           "SIMULATE_REGISTER_ALLOCATION") != "NO") {
-#ifdef IS_DEBUG
+//#ifdef IS_DEBUG
     RegAlloc_(bestSched, lstSched);
-#endif
+//#endif
   }
 
   enumTime = Utilities::GetProcessorTime() - enumStart;
