@@ -499,6 +499,7 @@ void ScheduleDAGOptSched::loadOptSchedConfig() {
   LatencyPrecision = fetchLatencyPrecision();
   TreatOrderAsDataDeps = schedIni.GetBool("TREAT_ORDER_DEPS_AS_DATA_DEPS");
 
+  UseLLVMScheduler = false;
   // should we print spills for the current function
   OPTSCHED_gPrintSpills = shouldPrintSpills();
   StaticNodeSup = schedIni.GetBool("STATIC_NODE_SUPERIORITY", false);
