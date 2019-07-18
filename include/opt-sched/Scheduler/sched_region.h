@@ -102,6 +102,9 @@ public:
   void UpdateScheduleCost(InstSchedule *sched);
   SPILL_COST_FUNCTION GetSpillCostFunc();
 
+  // Initialie variables for the second pass of the two-pass-optsched
+  void InitSecondPass();
+
 protected:
   // The dependence graph of this region.
   DataDepGraph *dataDepGraph_;
@@ -115,6 +118,9 @@ protected:
   bool vrfySched_;
   // What list scheduler should be used to find an initial feasible schedule.
   SchedulerType HeurSchedType_;
+
+  // Used for two-pass-optsched to enable second pass functionalies.
+  bool secondPassStatus;
 
   // The best results found so far.
   InstCount bestCost_;

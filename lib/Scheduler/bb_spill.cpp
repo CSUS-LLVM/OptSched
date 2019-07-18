@@ -831,12 +831,30 @@ FUNC_RESULT BBWithSpill::Enumerate_(Milliseconds startTime,
     HandlEnumrtrRslt_(rslt, trgtLngth);
 
     if (bestCost_ == 0 || rslt == RES_ERROR ||
-        (lngthDeadline == rgnDeadline && rslt == RES_TIMEOUT))
+        (lngthDeadline == rgnDeadline && rslt == RES_TIMEOUT) || 
+        (rslt == RES_SUCCESS && secondPassStatus)) {
+
+        // If doing two pass optsched and on the second pass then terminate if a 
+        // schedule is found with the same min-RP found in first pass.
+        if (rslt == RES_SUCCESS && secondPassStatus) {
+          LLVM_DEBUG(dbgs() << "Schedule found, terminating BB loop.");
+
+          if (enumCrntSched_->GetCrntLngth() < schedUprBound_)
+            LLVM_DEBUG(dbgs() << "Schedule with a shorter length found.");
+        }
+
       break;
+    }
+
+    
 
     enumrtr_->Reset();
     enumCrntSched_->Reset();
-    CmputSchedUprBound_();
+
+    if (secondPassStatus == false) {
+      CmputSchedUprBound_();
+    }
+
     iterCnt++;
     costLwrBound += 1;
     lngthDeadline = Utilities::GetProcessorTime() + lngthTimeout;
