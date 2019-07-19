@@ -837,10 +837,10 @@ FUNC_RESULT BBWithSpill::Enumerate_(Milliseconds startTime,
         // If doing two pass optsched and on the second pass then terminate if a 
         // schedule is found with the same min-RP found in first pass.
         if (rslt == RES_SUCCESS && secondPassStatus) {
-          LLVM_DEBUG(dbgs() << "Schedule found, terminating BB loop.");
+          Logger::Info("Schedule found in second pass, terminating BB loop.");
 
           if (enumCrntSched_->GetCrntLngth() < schedUprBound_)
-            LLVM_DEBUG(dbgs() << "Schedule with a shorter length found.");
+            Logger::Info("Schedule with a shorter length found.");
         }
 
       break;
