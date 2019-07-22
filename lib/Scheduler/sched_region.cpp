@@ -33,7 +33,7 @@ SchedRegion::SchedRegion(MachineModel *machMdl, DataDepGraph *dataDepGraph,
   vrfySched_ = vrfySched;
   prune_ = PruningStrategy;
   HeurSchedType_ = HeurSchedType;
-  secondPassStatus = false;
+  isSecondPass = false;
 
   totalSimSpills_ = INVALID_VALUE;
   bestCost_ = 0;
@@ -547,7 +547,7 @@ bool SchedRegion::CmputUprBounds_(InstSchedule *lstSched, bool useFileBounds) {
     schedUprBound_ = lstSched->GetCrntLngth();
     return true;
   }
-  else if (secondPassStatus) {
+  else if (isSecondPass) {
     // In the second pass, the upper bound is the length of the min-RP schedule
     // that was found in the first pass with stalls inserted.
     schedUprBound_ = lstSched->GetCrntLngth();
