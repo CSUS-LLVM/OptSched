@@ -120,7 +120,7 @@ protected:
   SchedulerType HeurSchedType_;
 
   // Used for two-pass-optsched to enable second pass functionalies.
-  bool secondPassStatus;
+  bool isSecondPass;
 
   // The best results found so far.
   InstCount bestCost_;

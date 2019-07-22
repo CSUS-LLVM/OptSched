@@ -832,11 +832,11 @@ FUNC_RESULT BBWithSpill::Enumerate_(Milliseconds startTime,
 
     if (bestCost_ == 0 || rslt == RES_ERROR ||
         (lngthDeadline == rgnDeadline && rslt == RES_TIMEOUT) || 
-        (rslt == RES_SUCCESS && secondPassStatus)) {
+        (rslt == RES_SUCCESS && isSecondPass)) {
 
         // If doing two pass optsched and on the second pass then terminate if a 
         // schedule is found with the same min-RP found in first pass.
-        if (rslt == RES_SUCCESS && secondPassStatus) {
+        if (rslt == RES_SUCCESS && isSecondPass) {
           Logger::Info("Schedule found in second pass, terminating BB loop.");
 
           if (enumCrntSched_->GetCrntLngth() < schedUprBound_)
@@ -846,14 +846,12 @@ FUNC_RESULT BBWithSpill::Enumerate_(Milliseconds startTime,
       break;
     }
 
-    
-
     enumrtr_->Reset();
     enumCrntSched_->Reset();
 
-    if (secondPassStatus == false) {
+    if (!isSecondPass)
       CmputSchedUprBound_();
-    }
+ 
 
     iterCnt++;
     costLwrBound += 1;

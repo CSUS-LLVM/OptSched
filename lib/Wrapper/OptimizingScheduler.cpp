@@ -382,9 +382,8 @@ void ScheduleDAGOptSched::schedule() {
   }
 
   // Used for two-pass-optsched to alter upper bound value.
-  if (secondPass) {
+  if (secondPass)
     region->InitSecondPass();
-  }
 
   // Setup time before scheduling
   Utilities::startTime = std::chrono::high_resolution_clock::now();

@@ -648,6 +648,6 @@ void SchedRegion::RegAlloc_(InstSchedule *&bestSched, InstSchedule *&lstSched) {
 }
 
 void SchedRegion::InitSecondPass() {
-  secondPassStatus = true;
+  isSecondPass = true;
 }
 

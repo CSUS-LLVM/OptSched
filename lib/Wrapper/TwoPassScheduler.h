@@ -27,7 +27,6 @@ private:
   SmallVector<std::pair<MachineBasicBlock::iterator,
                         MachineBasicBlock::iterator>, 32> Regions;
 	
-
 public:
   ScheduleTwoPassOptSched(llvm::MachineSchedContext *C,
                          std::unique_ptr<MachineSchedStrategy> S);
