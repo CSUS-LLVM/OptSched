@@ -84,6 +84,7 @@ void ScheduleTwoPassOptSched::scheduleOptSchedMinRP() {
   LLVM_DEBUG(dbgs() << "First pass through...\n");
   LatencyPrecision = LTP_UNITY;
   HeurSchedType = SCHED_LIST;
+
   ScheduleDAGOptSched::schedule();
 }
 
@@ -95,6 +96,7 @@ void ScheduleTwoPassOptSched::scheduleOptSchedBalanced() {
   // (hopefully) good max occupancy schedule. We don’t want the list scheduler
   // to mangle the input because of latency or resource constraints.
   HeurSchedType = SCHED_SEQ;
+
   ScheduleDAGOptSched::schedule();
 }
 
