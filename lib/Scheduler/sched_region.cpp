@@ -33,6 +33,7 @@ SchedRegion::SchedRegion(MachineModel *machMdl, DataDepGraph *dataDepGraph,
   vrfySched_ = vrfySched;
   prune_ = PruningStrategy;
   HeurSchedType_ = HeurSchedType;
+  isSecondPass = false;
 
   totalSimSpills_ = INVALID_VALUE;
   bestCost_ = 0;
@@ -545,7 +546,14 @@ bool SchedRegion::CmputUprBounds_(InstSchedule *lstSched, bool useFileBounds) {
     // If the heuristic schedule is optimal, we are done!
     schedUprBound_ = lstSched->GetCrntLngth();
     return true;
-  } else {
+  }
+  else if (isSecondPass) {
+    // In the second pass, the upper bound is the length of the min-RP schedule
+    // that was found in the first pass with stalls inserted.
+    schedUprBound_ = lstSched->GetCrntLngth();
+    return false;
+  }
+  else {
     CmputSchedUprBound_();
     return false;
   }
@@ -638,3 +646,8 @@ void SchedRegion::RegAlloc_(InstSchedule *&bestSched, InstSchedule *&lstSched) {
 #endif
     }
 }
+
+void SchedRegion::InitSecondPass() {
+  isSecondPass = true;
+}
+

@@ -187,6 +187,8 @@ ScheduleDAGOptSched::ScheduleDAGOptSched(
     : ScheduleDAGMILive(C, std::move(S)), C(C) {
   LLVM_DEBUG(dbgs() << "********** Optimizing Scheduler **********\n");
 
+  secondPass = false;
+
   // Find the native paths to the scheduler configuration files.
   getRealCfgPaths();
 
@@ -378,6 +380,10 @@ void ScheduleDAGOptSched::schedule() {
     RegionTimeout = schedIni.GetInt("REGION_TIMEOUT") * SUnits.size();
     LengthTimeout = schedIni.GetInt("LENGTH_TIMEOUT") * SUnits.size();
   }
+
+  // Used for two-pass-optsched to alter upper bound value.
+  if (secondPass)
+    region->InitSecondPass();
 
   // Setup time before scheduling
   Utilities::startTime = std::chrono::high_resolution_clock::now();
