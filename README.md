@@ -44,6 +44,8 @@ When using Clang, pass options to LLVM with `-mllvm`.
 
 ## New Student Quick Start Guide
 
+For MacOS instructions, see [README-MacOS.md](README-MacOS.md)
+
 #### Prerequisites
 
 Starting with a fresh install of Ubuntu 16.04 is recommended.

@@ -15,7 +15,7 @@ static const int INPFILE_OPENFLAGS = _O_BINARY | _O_RDONLY;
 #else
 #include <sys/uio.h>
 
-static const int INPFILE_OPENFLAGS = O_LARGEFILE | O_RDONLY;
+static const int INPFILE_OPENFLAGS = O_RDONLY;
 #endif
 
 static const char CR = '\r';
