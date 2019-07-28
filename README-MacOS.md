@@ -56,5 +56,8 @@ Select the `clang` scheme and then select `Product > Build` (or press `Cmd + B`)
 
 Wait for the build to complete, and repeat this with the `OptSched` scheme.
 
-[quick-start]: https://github.com/CSUS-LLVM/OptSched#build-optsched-with-llvm-6-and-clang
+### Test the build
 
+Return to [step 6](README.md#Test-the-build-ubuntu-and-macos) of the quick start guide to test the build.
+
+[quick-start]: README.md#build-optsched-with-llvm-6-and-clang-ubuntu-and-macos
