@@ -44,9 +44,12 @@ When using Clang, pass options to LLVM with `-mllvm`.
 
 ## New Student Quick Start Guide
 
-For MacOS instructions, see [README-MacOS.md](README-MacOS.md)
+## Ubuntu Basic Setup
 
 #### Prerequisites
+
+**Attention:** This section is only for building on your own machine. For building on Grace 2,
+please skip to the [build instructions](#build-optsched-with-llvm-6-and-clang-ubuntu-and-macos).
 
 Starting with a fresh install of Ubuntu 16.04 is recommended.
 
@@ -64,7 +67,7 @@ It is recommended to build LLVM using [Ninja](https://ninja-build.org/) to avoid
 
 `wget -q https://github.com/ninja-build/ninja/releases/download/v1.9.0/ninja-linux.zip && unzip -q ninja-linux.zip && sudo cp ninja /usr/bin && rm ninja ninja-linux.zip`
 
-#### Build OptSched with LLVM 6 and Clang
+## Build OptSched with LLVM 6 and Clang (Ubuntu and MacOS)
 
 1. Clone LLVM:
 
@@ -82,6 +85,10 @@ It is recommended to build LLVM using [Ninja](https://ninja-build.org/) to avoid
 
 `mkdir build && cd build`
 
+### MacOS: Follow the instructions in [README-MacOS.md]
+
+### Ubuntu only:
+
 5. Build LLVM/clang/OptSched. See [https://llvm.org/docs/CMake.html]( https://llvm.org/docs/CMake.html) for more build options:
 
 In debug builds, linking uses a lot of memory. Set LLVM_PARALLEL_LINK_JOBS=2 if you have >= 32G memory, otherwise use LLVM_PARALLEL_LINK_JOBS=1.
@@ -98,8 +105,11 @@ or if you want to use ‘make’:
 
 A debug build of LLVM on a single thread will take a long time.
 
-6. Test the build:
+## Test the build (Ubuntu and MacOS)
 
 `echo 'int main(){};' | ./bin/clang -xc - -O3 -fplugin=lib/OptSched.so -mllvm -misched=optsched -mllvm -enable-misched -mllvm -optsched-cfg=../OptSched/example/optsched-cfg -mllvm -debug-only=optsched`
 
 You can rebuild OptSched without building/linking LLVM libraries and binaries with `ninja OptSched` or `make OptSched` depending on which generator you used.
+
+[README-MacOS.md]: README-MacOS.md
+
