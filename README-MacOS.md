@@ -56,7 +56,7 @@ Select the `clang` scheme and then select `Product > Build` (or press `Cmd + B`)
 
 Wait for the build to complete, and repeat this with the `OptSched` scheme.
 
-## Test the build
+### Test the build
 
 Return to [step 6](README.md#Test-the-build-ubuntu-and-macos) of the quick start guide to test the build.
 
