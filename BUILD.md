@@ -49,15 +49,15 @@ _forward to the [command line build instructions][cli-build]._
 
 ###### This may not be necessary, but is often a good idea.
 
-```
+`
 sudo apt update && sudo apt upgrade
-```
+`
 
 #### Install [CMake] and [Git]
 
-```
+`
 sudo apt install cmake git
-```
+`
 
 #### Install [Ninja] (optional)
 
@@ -67,17 +67,17 @@ It is recommended to build LLVM using Ninja to avoid running out of memory durin
 
 ##### Downloading manually (recommended)
 
-```
+`
 wget -q https://github.com/ninja-build/ninja/releases/download/v1.9.0/ninja-linux.zip && unzip -q ninja-linux.zip && sudo cp ninja /usr/bin && rm ninja ninja-linux.zip
-```
+`
 
 ##### Using APT (Ubuntu 18.04 or later)
 
 ###### Note: On Ubuntu 16.04 the version of Ninja is too old and will not work.
 
-```
+`
 apt install ninja
-```
+`
 
 Proceed to the [build instructions][cli-build].
 
@@ -87,9 +87,9 @@ Proceed to the [build instructions][cli-build].
 
 Open `Terminal` and run
 
-```
+`
 xcode-select --install
-```
+`
 
 and select either `Install` or `Get Xcode`, if you want to install `Xcode` and have not already.
 
@@ -99,17 +99,17 @@ Homebrew is a package manager for MacOS - it provides a simple way to install an
 
 To install homebrew, open `Terminal` and run
 
-```
+`
 /usr/bin/ruby -e "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install)"
-```
+`
 
 #### Install [CMake]
 
 ##### Using Homebrew (preferred):
 
-```
+`
 brew install cmake
-```
+`
 
 ##### Using CMake Installer
 
@@ -123,17 +123,17 @@ It is recommended to build LLVM using Ninja to avoid running out of memory durin
 
 ##### Using Homebrew (preferred)
 
-```
+`
 brew install ninja
-```
+`
 
 ##### Downloading manually
 
 Download and install Ninja 1.9:
 
-```
+`
 wget -q https://github.com/ninja-build/ninja/releases/download/v1.9.0/ninja-mac.zip && unzip -q ninja-mac.zip && sudo cp ninja /usr/bin && rm ninja ninja-mac.zip
-```
+`
 
 #### Install [Xcode] (optional)
 
@@ -144,33 +144,33 @@ search for `Xcode`, and click `Get`.
 
 1. Clone the [LLVM source code] from GitHub.
 
-```
+`
 git clone https://github.com/llvm/llvm-project
-```
+`
 
 2. Checkout LLVM release 6.
 
-```
+`
 cd llvm-project && git checkout release/6.x
-```
+`
 
 3. Clone OptSched into the projects directory.
 
-```
+`
 cd llvm/projects && git clone https://github.com/CSUS-LLVM/OptSched
-```
+`
 
 4. Create a build directory.
 
-```
+`
 mkdir build && cd build
-```
+`
 
 5. Apply [this patch][spilling-info-patch] to print spilling info.
 
-```
+`
 git am ../OptSched/patches/llvm6.0/llvm6-print-spilling-info.patch
-```
+`
 
 ## Build
 
@@ -184,25 +184,25 @@ Build `LLVM` / `clang` / `OptSched`. _See [Building with CMake] for more build o
 
 ###### Note: In debug builds, linking uses a lot of memory. Set `LLVM_PARALLEL_LINK_JOBS=2` if you have >= 32G memory, otherwise use `LLVM_PARALLEL_LINK_JOBS=1`.
 
-```
+`
 cmake -GNinja -DLLVM_PARALLEL_LINK_JOBS=1 -DLLVM_ENABLE_PROJECTS='clang' -DCMAKE_BUILD_TYPE=Debug '-DLLVM_TARGETS_TO_BUILD=X86' -DLLVM_BUILD_TOOLS=ON -DLLVM_INCLUDE_TESTS=ON -DLLVM_OPTIMIZED_TABLEGEN=ON ../..
-```
+`
 
-```
+`
 ninja
-```
+`
 
 **Using Make:**
 
 ###### Note: Debug builds use a _lot_ of memory, and may cause your machine to run out of memory, causing the build to fail. If this happens, try using Ninja to build.
 
-```
+`
 cmake -DLLVM_ENABLE_PROJECTS='clang' -DCMAKE_BUILD_TYPE=Debug '-DLLVM_TARGETS_TO_BUILD=X86' -DLLVM_BUILD_TOOLS=ON -DLLVM_INCLUDE_TESTS=ON -DLLVM_OPTIMIZED_TABLEGEN=ON ../..
-```
+`
 
-```
+`
 make
-```
+`
 
 _A Debug build of LLVM on a single thread will take a long time._
 
@@ -212,9 +212,9 @@ _A Debug build of LLVM on a single thread will take a long time._
 
 1. Build an Xcode project
 
-```
+`
 cmake -G Xcode -DLLVM_ENABLE_PROJECTS='clang' -DCMAKE_BUILD_TYPE=Debug '-DLLVM_TARGETS_TO_BUILD=X86' -DLLVM_BUILD_TOOLS=ON -DLLVM_INCLUDE_TESTS=ON -DLLVM_OPTIMIZED_TABLEGEN=ON ../..
-```
+`
 
 This will create an Xcode project in `llvm-project/llvm/projects/build`.
 
@@ -268,17 +268,17 @@ Wait for the build to complete, and repeat this with the `OptSched` scheme.
 
 From the `llvm-project/llvm/projects/build` directory, run:
 
-```
+`
 echo 'int main(){};' | ./bin/clang -xc - -O3 -fplugin=lib/OptSched.so -mllvm -misched=optsched -mllvm -enable-misched -mllvm -optsched-cfg=../OptSched/example/optsched-cfg -mllvm -debug-only=optsched
-```
+`
 
 **MacOS Xcode Build**
 
 From the `llvm-project/llvm/projects/build` directory, run:
 
-```
+`
 echo 'int main(){};' | Debug/bin/clang -xc - -O3 -fplugin=lib/OptSched.so -mllvm -misched=optsched -mllvm -enable-misched -mllvm -optsched-cfg=../OptSched/example/optsched-cfg -mllvm -debug-only=optsched
-```
+`
 
 <!-- TODO: Show expected output of test command -->
 
