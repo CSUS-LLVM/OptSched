@@ -7,16 +7,15 @@ This plugin for the [LLVM](https://llvm.org/) compiler is an optional machine sc
 
 ## Requirements
 
-- Ubuntu 16.04 is recommended
+- Ubuntu 16.04 (recommended), or MacOS 10.14
 - CMake 3.4.3 or later
 - LLVM 6.0 or later
 
 ## Building
 
-1. Clone the repository to the [“llvm/projects”](https://github.com/llvm/llvm-project/tree/master/llvm/projects) directory in the [LLVM](https://llvm.org/) source tree.
-2. [Build](https://llvm.org/docs/CMake.html) LLVM with CMake. The OptSched plugin can be found in “llvm/lib” after building.
+**See [BUILD.md](BUILD.md) for build instructions.**
 
-See [Quick Start Guide](#New-Student-Quick-Start-Guide).
+The OptSched plugin can be found in “llvm/lib” after building.
 
 ## Configuration files
 
@@ -41,65 +40,3 @@ When using Clang, pass options to LLVM with `-mllvm`.
 | -optsched-cfg-hotfuncs=\<string\> | Path to the list of hot functions to schedule using opt-sched. |
 | -optsched-cfg-machine-model=\<string\> | Path to the machine model specification file for opt-sched. |
 | -optsched-cfg-sched=\<string\> | Path to the scheduler options configuration file for opt-sched. |
-
-## New Student Quick Start Guide
-
-For MacOS instructions, see [README-MacOS.md](README-MacOS.md)
-
-#### Prerequisites
-
-Starting with a fresh install of Ubuntu 16.04 is recommended.
-
-1. Install dependencies:
-
-`sudo apt update && sudo apt upgrade`
-
-`sudo apt install cmake git`
-
-#### Install Ninja (Optional)
-
-It is recommended to build LLVM using [Ninja](https://ninja-build.org/) to avoid running out of memory during linking. Using Ninja should also result in faster builds.
-
-1. Download and install Ninja 1.9:
-
-`wget -q https://github.com/ninja-build/ninja/releases/download/v1.9.0/ninja-linux.zip && unzip -q ninja-linux.zip && sudo cp ninja /usr/bin && rm ninja ninja-linux.zip`
-
-#### Build OptSched with LLVM 6 and Clang
-
-1. Clone LLVM:
-
-`git clone https://github.com/llvm/llvm-project.git`
-
-2. Checkout LLVM release 6:
-
-`cd llvm-project && git checkout release/6.x` 
-
-3. Clone OptSched in the projects directory:
-
-`cd llvm/projects && git clone https://github.com/CSUS-LLVM/OptSched.git`
-
-4. Create a build directory:
-
-`mkdir build && cd build`
-
-5. Build LLVM/clang/OptSched. See [https://llvm.org/docs/CMake.html]( https://llvm.org/docs/CMake.html) for more build options:
-
-In debug builds, linking uses a lot of memory. Set LLVM_PARALLEL_LINK_JOBS=2 if you have >= 32G memory, otherwise use LLVM_PARALLEL_LINK_JOBS=1.
-
-`cmake -GNinja -DLLVM_PARALLEL_LINK_JOBS=1 -DLLVM_ENABLE_PROJECTS='clang' -DCMAKE_BUILD_TYPE=Debug '-DLLVM_TARGETS_TO_BUILD=X86' -DLLVM_BUILD_TOOLS=ON -DLLVM_INCLUDE_TESTS=ON -DLLVM_OPTIMIZED_TABLEGEN=ON ../..` 
-
-`ninja -j32`
-
-or if you want to use ‘make’:
-
-`cmake -DLLVM_ENABLE_PROJECTS='clang' -DCMAKE_BUILD_TYPE=Debug '-DLLVM_TARGETS_TO_BUILD=X86' -DLLVM_BUILD_TOOLS=ON -DLLVM_INCLUDE_TESTS=ON -DLLVM_OPTIMIZED_TABLEGEN=ON ../..`
-
-`make`
-
-A debug build of LLVM on a single thread will take a long time.
-
-6. Test the build:
-
-`echo 'int main(){};' | ./bin/clang -xc - -O3 -fplugin=lib/OptSched.so -mllvm -misched=optsched -mllvm -enable-misched -mllvm -optsched-cfg=../OptSched/example/optsched-cfg -mllvm -debug-only=optsched`
-
-You can rebuild OptSched without building/linking LLVM libraries and binaries with `ninja OptSched` or `make OptSched` depending on which generator you used.
