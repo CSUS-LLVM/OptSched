@@ -4,33 +4,33 @@
 
 + **[Setup]**
 
-  + **[Ubuntu][ubuntu-setup]**
+  + **[Ubuntu][setup-ubuntu]**
 
-    + **[Update Packages]**
+    + **[Update Packages][setup-ubuntu-update]**
 
-    + **[Install CMake and Git]**
+    + **[Install CMake and Git][setup-ubuntu-cmake-git]**
 
-    + **[Install Ninja (optional)][install-ninja-ubuntu]**
+    + **[Install Ninja (optional)][setup-ubuntu-ninja]**
 
-  + **[MacOS][macos-setup]**
+  + **[MacOS][setup-macos]**
 
-    + **[Install Command Line Developer Tools]**
+    + **[Install Command Line Developer Tools][setup-macos-dev-tools]**
 
-    + **[Install Homebrew (optional)]**
+    + **[Install Homebrew (optional)][setup-macos-homebrew]**
 
-    + **[Install Cmake]**
+    + **[Install Cmake][setup-macos-cmake]**
 
-    + **[Install Ninja (optional)][install-ninja-macos]**
+    + **[Install Ninja (optional)][setup-macos-ninja]**
 
-+ **[Clone LLVM and OptSched]**
++ **[Download the Source Code][download-source]**
 
-+ **[Build]**
++ **[Build LLVM, Clang and OptSched][build]**
 
-  + **[Command Line Build (Ubuntu and MacOS)][cli-build]**
+  + **[Command Line Build (Ubuntu and MacOS)][build-cli]**
 
-  + **[MacOS Xcode Build]**
+  + **[MacOS Xcode Build][build-xcode]**
 
-+ **[Test the Build]**
++ **[Test the Build][test]**
 
 ---
 
@@ -41,7 +41,7 @@
 ### Ubuntu
 
 _**Attention:** Please only run these instructions on your own machine. If you are building on **Grace 2**, please skip_
-_forward to the [command line build instructions][cli-build]._
+_forward to [Download the Source Code][download-source]._
 
 ###### Starting with a fresh install of [Ubuntu 16.04] is recommended.
 
@@ -73,13 +73,13 @@ wget -q https://github.com/ninja-build/ninja/releases/download/v1.9.0/ninja-linu
 
 ##### Using APT (Ubuntu 18.04 or later)
 
-###### Note: On Ubuntu 16.04 the version of Ninja is too old and will not work.
+###### Note: On Ubuntu 16.04 the version of Ninja installed by APT is too old and will not work.
 
 `
 apt install ninja
 `
 
-Proceed to the [build instructions][cli-build].
+Proceed to [Download the Source Code][download-source].
 
 ### MacOS
 
@@ -105,7 +105,7 @@ To install homebrew, open `Terminal` and run
 
 #### Install [CMake]
 
-##### Using Homebrew (preferred):
+##### Using Homebrew (preferred)
 
 `
 brew install cmake
@@ -140,47 +140,45 @@ wget -q https://github.com/ninja-build/ninja/releases/download/v1.9.0/ninja-mac.
 If you would like to use Xcode to build LLVM, and do not already have it installed, go to the Mac App Store,
 search for `Xcode`, and click `Get`.
 
-## Clone LLVM and OptSched
+## Download the Source Code
 
-1. Clone the [LLVM source code] from GitHub.
+**1. Clone the [LLVM source code] from GitHub.**
 
 `
 git clone https://github.com/llvm/llvm-project
 `
 
-2. Checkout LLVM release 6.
+**2. Checkout LLVM release 6.**
 
 `
 cd llvm-project && git checkout release/6.x
 `
 
-3. Clone OptSched into the projects directory.
+**3. Clone OptSched into the projects directory.**
 
 `
 cd llvm/projects && git clone https://github.com/CSUS-LLVM/OptSched
 `
 
-4. Create a build directory.
+**4. Create a build directory.**
 
 `
 mkdir build && cd build
 `
 
-5. Apply [this patch][spilling-info-patch] to print spilling info.
+**5. Apply [this patch][spilling-info-patch] to print spilling info.**
 
 `
 git am ../OptSched/patches/llvm6.0/llvm6-print-spilling-info.patch
 `
 
-## Build
+## Build LLVM, Clang and OptSched
 
 ### Command Line Build (Ubuntu and MacOS)
 
-###### These instructions follow after [Clone LLVM and OptSched], and so assume that you are in the `llvm-project/llvm/projects/build` directory.
+###### These instructions follow after [Download the Source Code][download-source], and so assume that you are in the `llvm-project/llvm/projects/build` directory.
 
-Build `LLVM` / `clang` / `OptSched`. _See [Building with CMake] for more build options._
-
-**Using Ninja:**
+**Using Ninja (recommended)**
 
 ###### Note: In debug builds, linking uses a lot of memory. Set `LLVM_PARALLEL_LINK_JOBS=2` if you have >= 32G memory, otherwise use `LLVM_PARALLEL_LINK_JOBS=1`.
 
@@ -192,9 +190,9 @@ cmake -GNinja -DLLVM_PARALLEL_LINK_JOBS=1 -DLLVM_ENABLE_PROJECTS='clang' -DCMAKE
 ninja
 `
 
-**Using Make:**
+**Using Make**
 
-###### Note: Debug builds use a _lot_ of memory, and may cause your machine to run out of memory, causing the build to fail. If this happens, try using Ninja to build.
+###### Note: Debug builds use a lot of memory. The build will fail if you do not have enough. If this happens, try using Ninja to build.
 
 `
 cmake -DLLVM_ENABLE_PROJECTS='clang' -DCMAKE_BUILD_TYPE=Debug '-DLLVM_TARGETS_TO_BUILD=X86' -DLLVM_BUILD_TOOLS=ON -DLLVM_INCLUDE_TESTS=ON -DLLVM_OPTIMIZED_TABLEGEN=ON ../..
@@ -206,11 +204,13 @@ make
 
 _A Debug build of LLVM on a single thread will take a long time._
 
+_See [Building with CMake] for more build options._
+
 ### MacOS Xcode Build
 
-###### These instructions follow after [Clone LLVM and OptSched], and so assume that you are in the `llvm-project/llvm/projects` directory.
+###### These instructions follow after [Download the Source Code][download-source], and so assume that you are in the `llvm-project/llvm/projects` directory.
 
-1. Build an Xcode project
+**1. Build an Xcode project**
 
 `
 cmake -G Xcode -DLLVM_ENABLE_PROJECTS='clang' -DCMAKE_BUILD_TYPE=Debug '-DLLVM_TARGETS_TO_BUILD=X86' -DLLVM_BUILD_TOOLS=ON -DLLVM_INCLUDE_TESTS=ON -DLLVM_OPTIMIZED_TABLEGEN=ON ../..
@@ -218,13 +218,13 @@ cmake -G Xcode -DLLVM_ENABLE_PROJECTS='clang' -DCMAKE_BUILD_TYPE=Debug '-DLLVM_T
 
 This will create an Xcode project in `llvm-project/llvm/projects/build`.
 
-2. Open the project in Xcode
+**2. Open the project in Xcode**
 
 Open Xcode, and go to `File > Open...` (or press `Cmd+O`).
 
 Navigate to `llvm-projects/llvm/projects/build` and click `Open`.
 
-3. Create `clang` and `OptSched` schemes
+**3. Create `clang` and `OptSched` schemes**
 
 Upon opening the project, Xcode will prompt you to create schemes. We want to create them manually - this will prevent you from having to sort through tons of build targets later.
 
@@ -236,7 +236,7 @@ Repeat this step, selecting `OptSched` from the list.
 
 You should now have two schemes - `clang` and `OptSched`. Press `Close`.
 
-4. Change the language standard to C++14
+**4. Change the language standard to C++14**
 
 In the file navigation window on the left, scroll to the very top and select the `LLVM`
 project file, under which all other files should be listed. It has a blue icon.
@@ -254,7 +254,7 @@ From the text box that pops up, double-click on `-std=c++11` and change it to `-
 
 ###### Note: If you want to compile in `Release` mode, or any of the others, you will have to make the same change for that mode.
 
-5. Build `clang` and `OptSched`
+**5. Build `clang` and `OptSched`**
 
 At the top left, there is a "Run" (►) button and a "Stop" (■) button. To the right of those is where you can chose your scheme.
 
@@ -285,20 +285,20 @@ echo 'int main(){};' | Debug/bin/clang -xc - -O3 -fplugin=lib/OptSched.so -mllvm
 
 [table of contents]: #table-of-contents
 [setup]: #setup
-[ubuntu-setup]: #ubuntu
-[update packages]: #update-packages
-[install cmake and git]: #install-cmake-and-git
-[install-ninja-ubuntu]: #install-ninja-optional
-[macos-setup]: #macos
-[install command line developer tools]: #install-command-line-developer-tools
-[install homebrew (optional)]: #install-homebrew-optional
-[install cmake]: #install-cmake
-[install-ninja-macos]: #install-ninja-optional-1
-[clone llvm and optsched]: #clone-llvm-and-optsched
-[build]: #build
-[cli-build]: #command-line-build-ubuntu-and-macos
-[macos xcode build]: #macos-xcode-build
-[test the build]: #test-the-build
+[setup-ubuntu]: #ubuntu
+[setup-ubuntu-update]: #update-packages
+[setup-ubuntu-cmake-git]: #install-cmake-and-git
+[setup-ubuntu-ninja]: #install-ninja-optional
+[setup-macos]: #macos
+[setup-macos-dev-tools]: #install-command-line-developer-tools
+[setup-macos-homebrew]: #install-homebrew-optional
+[setup-macos-cmake]: #install-cmake
+[setup-macos-ninja]: #install-ninja-optional-1
+[download-source]: #download-the-source-code
+[build]: #build-llvm-clang-and-optsched
+[build-cli]: #command-line-build-ubuntu-and-macos
+[build-xcode]: #macos-xcode-build
+[test]: #test-the-build
 
 <!-- Outside links -->
 [ubuntu 16.04]: http://releases.ubuntu.com/16.04/
