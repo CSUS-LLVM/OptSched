@@ -183,7 +183,7 @@ cmake -DLLVM_ENABLE_PROJECTS='clang' -DCMAKE_BUILD_TYPE=Debug '-DLLVM_TARGETS_TO
 ```
 
 ```
-make -j 32
+make
 ```
 
 _A Debug build of LLVM on a single thread will take a long time._
