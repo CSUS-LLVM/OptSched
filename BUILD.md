@@ -61,12 +61,22 @@ sudo apt install cmake git
 
 #### Install [Ninja] (optional)
 
+
 It is recommended to build LLVM using Ninja to avoid running out of memory during linking. Using Ninja should also result in faster builds.
 
-Download and install Ninja 1.9:
+
+##### Downloading manually (recommended)
 
 ```
 wget -q https://github.com/ninja-build/ninja/releases/download/v1.9.0/ninja-linux.zip && unzip -q ninja-linux.zip && sudo cp ninja /usr/bin && rm ninja ninja-linux.zip
+```
+
+##### Using APT (Ubuntu 18.04 or later)
+
+###### Note: On Ubuntu 16.04 the version of Ninja is too old and will not work.
+
+```
+apt install ninja
 ```
 
 Proceed to the [build instructions][cli-build].
@@ -110,6 +120,14 @@ Open the downloaded image, and drag the `CMake` application into the `Applicatio
 #### Install [Ninja] (optional)
 
 It is recommended to build LLVM using Ninja to avoid running out of memory during linking. Using Ninja should also result in faster builds.
+
+##### Using Homebrew (preferred)
+
+```
+brew install ninja
+```
+
+##### Downloading manually
 
 Download and install Ninja 1.9:
 
@@ -171,7 +189,7 @@ cmake -GNinja -DLLVM_PARALLEL_LINK_JOBS=1 -DLLVM_ENABLE_PROJECTS='clang' -DCMAKE
 ```
 
 ```
-ninja -j 32
+ninja
 ```
 
 **Using Make:**
