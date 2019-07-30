@@ -1,5 +1,7 @@
 cmake_minimum_required(VERSION 3.4.3)
 
+set (CMAKE_CXX_STANDARD 14)
+
 # Exit if attempting to build as a standalone project.
 IF (CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
   message(FATAL_ERROR "You cannot build opt-sched as a standalone project. Place opt-sched in the llvm tree under the \"projects\" directory.")
