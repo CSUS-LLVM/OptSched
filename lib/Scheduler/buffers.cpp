@@ -31,9 +31,12 @@ static inline bool IsWhitespace(const char &c) { return c == SPC || c == TAB; }
 static inline bool IsLineEnd(const char &c) { return c == CR || c == LF; }
 static inline bool IsCommentStart(const char &c) { return c == CMNT_STRT; }
 
+// FIXME: Constructor does not initialize: loadByts, crntOfst, lineEndOfst,
+// crntChar, prevChar, lastChnk, cmnt,
+// FIXME: lineStrt, nxtLineRchd, fullPath
 InputBuffer::InputBuffer() {
   fileHndl = FILEOPEN_ERROR;
-  buf = NULL;
+  buf = nullptr;
   totSize = DFLT_INPBUF_SIZE;
   crntLineNum = 0;
   crntLineOfst = 0;
@@ -46,6 +49,8 @@ InputBuffer::~InputBuffer() {
 
 FUNC_RESULT InputBuffer::Load(char const *const fileName,
                               char const *const path, long maxByts) {
+  // FIXME: Declaration shadows InputBuffer.fullPath - Is this intentional?
+  // If so, its name should be changed to avoid confusion.
   char fullPath[MAX_NAMESIZE];
   strcpy(fullPath, path);
   strcat(fullPath, "\\");
@@ -69,13 +74,11 @@ FUNC_RESULT InputBuffer::Load(char const *const _fullPath, long maxByts) {
     return RES_ERROR;
   }
 
-  if (buf != NULL) {
-    delete[] buf;
-  }
+  delete[] buf;
 
   // Allocate an extra byte for possible null termination.
   buf = new char[totSize + 1];
-  if (buf == NULL)
+  if (buf == nullptr)
     Logger::Fatal("Out of memory.");
   if ((loadedByts = read(fileHndl, buf, totSize)) == 0) {
     Logger::Fatal("Empty input file: %s.", fullPath);
@@ -85,7 +88,7 @@ FUNC_RESULT InputBuffer::Load(char const *const _fullPath, long maxByts) {
   crntLineNum = 1;
   crntLineOfst = 0;
   lineEndOfst = -1;
-  lastChnk = loadedByts < totSize ? true : false;
+  lastChnk = loadedByts < totSize;
   cmnt = false;
   lineStrt = true;
 
@@ -96,6 +99,7 @@ FUNC_RESULT InputBuffer::Load(char const *const _fullPath, long maxByts) {
   return RES_SUCCESS;
 }
 
+// FIXME: Dead code
 FUNC_RESULT InputBuffer::SetBuf(char *_buf, long size) {
   strcpy(fullPath, "NONE");
   fileHndl = FILEOPEN_ERROR;
@@ -108,7 +112,7 @@ FUNC_RESULT InputBuffer::SetBuf(char *_buf, long size) {
 
   buf = _buf;
 
-  if (buf == NULL) {
+  if (buf == nullptr) {
     Logger::Error("Invalid input buffer.");
     return RES_ERROR;
   }
@@ -156,7 +160,7 @@ int InputBuffer::Reload() {
   }
 
   loadedByts += bytsNeeded;
-  lastChnk = (loadedByts < totSize) ? true : false;
+  lastChnk = loadedByts < totSize;
   crntLineOfst = 0;
   crntOfst = 0;
   return RES_SUCCESS;
@@ -176,6 +180,9 @@ NXTLINE_TYPE InputBuffer::skipSpaceAndCmnts() {
   bool emptyLineEncountered = false;
   // Line that starts with blank.
   bool blankedLine = false;
+
+  // FIXME: Declaration shadows InputBuffer::crntChar - Is this intentional?
+  // If so, its name should be changed to avoid confusion.
   char crntChar;
 
   while (true) {
@@ -310,7 +317,7 @@ NXTLINE_TYPE InputBuffer::GetNxtVldLine_(int &pieceCnt, char *strng[],
 void InputBuffer::Clean() {
   if (buf) {
     delete[] buf;
-    buf = NULL;
+    buf = nullptr;
   }
 }
 
@@ -346,14 +353,16 @@ bool InputBuffer::IsWhiteSpaceOrLineEnd(char ch) {
   }
 }
 
-void InputBuffer::ReportError(char *msg, char *lineStrt, int frstLngth) {
+// FIXME: Dead code
+void InputBuffer::ReportError(char *msg, char *lineStart, int frstLngth) {
   Logger::Error("%s on line %d of input file: %.*s. Line starts with: %s", msg,
-                crntLineNum, fullPath, frstLngth, lineStrt);
+                crntLineNum, fullPath, frstLngth, lineStart);
 }
 
-void InputBuffer::ReportFatalError(char *msg, char *lineStrt, int frstLngth) {
+// FIXME: Dead code
+void InputBuffer::ReportFatalError(char *msg, char *lineStart, int frstLngth) {
   Logger::Fatal("%s on line %d of input file: %.*s. Line starts with: %s", msg,
-                crntLineNum, fullPath, frstLngth, lineStrt);
+                crntLineNum, fullPath, frstLngth, lineStart);
 }
 
 void SpecsBuffer::ReadSpec(char const *const title, char *value) {
@@ -434,10 +443,11 @@ void SpecsBuffer::readLstElmnt(char *value) {
   value[lngth[0]] = 0;
 }
 
+// FIXME: Dead code
 int SpecsBuffer::readIntLstElmnt() {
   char strVal[INBUF_MAX_LINESIZE];
   readLstElmnt(strVal);
-  return atoi(strVal);
+  return strtol(strVal, nullptr, 10);
 }
 
 void SpecsBuffer::readLine(char *value, int maxPieceCnt) {
@@ -485,19 +495,21 @@ bool SpecsBuffer::ReadFlagSpec(char const *const title, bool dfltValue) {
   return dfltValue;
 }
 
+// FIXME: Dead code
 unsigned long SpecsBuffer::ReadUlongSpec(char const *const title) {
   char tmpStrng[MAX_NAMESIZE];
   ReadSpec(title, tmpStrng);
-  return strtoul(tmpStrng, NULL, 10);
+  return strtoul(tmpStrng, nullptr, 10);
 }
 
 float SpecsBuffer::ReadFloatSpec(char const *const title) {
   char tmpStrng[MAX_NAMESIZE];
 
   ReadSpec(title, tmpStrng);
-  return (float)atof(tmpStrng);
+  return (float)strtod(tmpStrng, nullptr);
 }
 
+// FIXME: Dead code
 uint64_t SpecsBuffer::readUInt64Spec(char const *const title) {
   char tmpStrng[MAX_NAMESIZE];
   // Most sig piece and least sig piece.
@@ -518,35 +530,37 @@ uint64_t SpecsBuffer::readUInt64Spec(char const *const title) {
 
   MSUlongSize = (lngth <= 8) ? 0 : (int16_t)lngth - 8;
   LSOfst = ofst + MSUlongSize;
-  LSUlong = strtoul(tmpStrng + LSOfst, NULL, 16);
+  LSUlong = strtoul(tmpStrng + LSOfst, nullptr, 16);
   MSUlong = 0;
 
   if (MSUlongSize > 0) {
     // We have already read the LS part.
     tmpStrng[ofst + MSUlongSize] = 0;
-    MSUlong = strtoul(tmpStrng + ofst, NULL, 16);
+    MSUlong = strtoul(tmpStrng + ofst, nullptr, 16);
   }
 
   // If MSUlong is zero these two lines will have no effect.
   fullNum = MSUlong;
-  fullNum <<= 32;
+  fullNum <<= (unsigned)32;
 
   fullNum += LSUlong;
   return fullNum;
 }
 
+// FIXME: Dead code
 int16_t SpecsBuffer::ReadShortSpec(char const *const title) {
   char tmpStrng[MAX_NAMESIZE];
   ReadSpec(title, tmpStrng);
-  return atoi(tmpStrng);
+  return strtol(tmpStrng, nullptr, 10);
 }
 
 int SpecsBuffer::ReadIntSpec(char const *const title) {
   char tmpStrng[MAX_NAMESIZE];
   ReadSpec(title, tmpStrng);
-  return (int16_t)atoi(tmpStrng);
+  return (int16_t)strtol(tmpStrng, nullptr, 10);
 }
 
+// FIXME: Dead code
 void SpecsBuffer::ErrorHandle(char *value) {
   Logger::Fatal("Invalid parameter or spec (%s) in specs file.", value);
 }

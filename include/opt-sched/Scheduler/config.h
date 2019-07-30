@@ -36,11 +36,14 @@ public:
   int64_t GetInt(const string &name) const;
   int64_t GetInt(const string &name, int64_t default_) const;
   float GetFloat(const string &name) const;
+  // FIXME: Unused method
   float GetFloat(const string &name, float default_) const;
   bool GetBool(const string &name) const;
   bool GetBool(const string &name, bool default_) const;
   list<string> GetStringList(const string &name) const;
+  // FIXME: Unused method
   list<int64_t> GetIntList(const string &name) const;
+  // FIXME: Unused method
   list<float> GetFloatList(const string &name) const;
 
 protected:
@@ -59,7 +62,7 @@ public:
   void operator=(SchedulerOptions const &) = delete;
 
 private:
-  SchedulerOptions() {}
+  SchedulerOptions() = default;
 };
 
 } // namespace opt_sched
