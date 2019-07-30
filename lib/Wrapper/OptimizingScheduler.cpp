@@ -45,7 +45,7 @@ bool OPTSCHED_gPrintSpills;
 
 // An array of possible OptSched heuristic names
 #define LSHPair std::pair<const char *, LISTSCHED_HEURISTIC>
-static constexpr LSHPair HeuristicNames[] = {
+static LSHPair HeuristicNames[] = {
     LSHPair("CP", LSH_CP),    LSHPair("LUC", LSH_LUC),
     LSHPair("UC", LSH_UC),    LSHPair("NID", LSH_NID),
     LSHPair("CPR", LSH_CPR),  LSHPair("ISO", LSH_ISO),
