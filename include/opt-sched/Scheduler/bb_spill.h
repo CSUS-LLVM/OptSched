@@ -31,6 +31,7 @@ private:
   LengthCostEnumerator *enumrtr_;
 
   InstCount crntSpillCost_;
+  // FIXME: Unused variable
   InstCount optmlSpillCost_;
 
   // The target machine
@@ -64,7 +65,9 @@ private:
   // calculated.
   InstCount dynamicSlilLowerBound_ = 0;
 
+  // FIXME: Unused variable
   int entryInstCnt_;
+  // FIXME: Unused variable
   int exitInstCnt_;
   int schduldEntryInstCnt_;
   int schduldExitInstCnt_;
@@ -78,36 +81,41 @@ private:
   InstCount peakSpillCost_;
   InstCount totSpillCost_;
   InstCount slilSpillCost_;
+  // FIXME: Unused variable
   bool trackLiveRangeLngths_;
 
   // Virtual Functions:
   // Given a schedule, compute the cost function value
   InstCount CmputNormCost_(InstSchedule *sched, COST_COMP_MODE compMode,
-                           InstCount &execCost, bool trackCnflcts);
+                           InstCount &execCost, bool trackCnflcts) override;
   InstCount CmputCost_(InstSchedule *sched, COST_COMP_MODE compMode,
-                       InstCount &execCost, bool trackCnflcts);
-  void CmputSchedUprBound_();
-  Enumerator *AllocEnumrtr_(Milliseconds timeout);
+                       InstCount &execCost, bool trackCnflcts) override;
+  void CmputSchedUprBound_() override;
+  Enumerator *AllocEnumrtr_(Milliseconds timeout) override;
   FUNC_RESULT Enumerate_(Milliseconds startTime, Milliseconds rgnDeadline,
-                         Milliseconds lngthDeadline);
-  void SetupForSchdulng_();
-  void FinishHurstc_();
-  void FinishOptml_();
-  void CmputAbslutUprBound_();
-  ConstrainedScheduler *AllocHeuristicScheduler_();
-  bool EnableEnum_();
+                         Milliseconds lngthDeadline) override;
+  void SetupForSchdulng_() override;
+  void FinishHurstc_() override;
+  void FinishOptml_() override;
+  void CmputAbslutUprBound_() override;
+  ConstrainedScheduler *AllocHeuristicScheduler_() override;
+  bool EnableEnum_() override;
 
   // BBWithSpill-specific Functions:
+  // FIXME: Not implemented
   InstCount CmputCostLwrBound_(InstCount schedLngth);
+  // FIXME: Not implemented
   InstCount CmputCostLwrBound_();
   void InitForCostCmputtn_();
+  // FIXME: Not implemented
   InstCount CmputDynmcCost_();
 
   void UpdateSpillInfoForSchdul_(SchedInstruction *inst, bool trackCnflcts);
   void UpdateSpillInfoForUnSchdul_(SchedInstruction *inst);
   void SetupPhysRegs_();
   void CmputCrntSpillCost_();
-  bool ChkSchedule_(InstSchedule *bestSched, InstSchedule *lstSched);
+  bool ChkSchedule_(InstSchedule *bestSched, InstSchedule *lstSched) override;
+  // FIXME: Unused method
   void CmputCnflcts_(InstSchedule *sched);
 
 public:
@@ -117,24 +125,24 @@ public:
               bool vrfySched, Pruning PruningStrategy, bool SchedForRPOnly,
               bool enblStallEnum, int SCW, SPILL_COST_FUNCTION spillCostFunc,
               SchedulerType HeurSchedType);
-  ~BBWithSpill();
+  ~BBWithSpill() override;
 
-  int CmputCostLwrBound();
+  int CmputCostLwrBound() override;
 
   InstCount UpdtOptmlSched(InstSchedule *crntSched,
-                           LengthCostEnumerator *enumrtr);
-  bool ChkCostFsblty(InstCount trgtLngth, EnumTreeNode *treeNode);
+                           LengthCostEnumerator *enumrtr) override;
+  bool ChkCostFsblty(InstCount trgtLngth, EnumTreeNode *treeNode) override;
   void SchdulInst(SchedInstruction *inst, InstCount cycleNum, InstCount slotNum,
-                  bool trackCnflcts);
+                  bool trackCnflcts) override;
   void UnschdulInst(SchedInstruction *inst, InstCount cycleNum,
-                    InstCount slotNum, EnumTreeNode *trgtNode);
-  void SetSttcLwrBounds(EnumTreeNode *node);
-  bool ChkInstLglty(SchedInstruction *inst);
-  void InitForSchdulng();
+                    InstCount slotNum, EnumTreeNode *trgtNode) override;
+  void SetSttcLwrBounds(EnumTreeNode *node) override;
+  bool ChkInstLglty(SchedInstruction *inst) override;
+  void InitForSchdulng() override;
 
 protected:
   // (Chris)
-  inline virtual const std::vector<int> &GetSLIL_() const {
+  inline const std::vector<int> &GetSLIL_() const override {
     return sumOfLiveIntervalLengths_;
   }
 };

@@ -18,9 +18,9 @@ struct Choice {
 class ACOScheduler : public ConstrainedScheduler {
 public:
   ACOScheduler(DataDepGraph *dataDepGraph, MachineModel *machineModel, InstCount upperBound, SchedPriorities priorities);
-  virtual ~ACOScheduler();
-  FUNC_RESULT FindSchedule(InstSchedule *schedule, SchedRegion *region);
-  inline void UpdtRdyLst_(InstCount cycleNum, int slotNum);
+  ~ACOScheduler() override;
+  FUNC_RESULT FindSchedule(InstSchedule *schedule, SchedRegion *region) override;
+  inline void UpdtRdyLst_(InstCount cycleNum, int slotNum) override;
 private:
   pheremone_t &Pheremone(SchedInstruction *from, SchedInstruction *to);
   pheremone_t &Pheremone(InstCount from, InstCount to);
@@ -32,7 +32,7 @@ private:
   void UpdatePheremone(InstSchedule *schedule);
   InstSchedule *FindOneSchedule();
   pheremone_t *pheremone_;
-  pheremone_t initialValue_;
+  pheremone_t initialValue_{};
   bool use_fixed_bias;
   int count_;
   int heuristicImportance_;
@@ -43,7 +43,8 @@ private:
   double decay_factor;
   int ants_per_iteration;
   bool print_aco_trace;
-  std::vector<double> scores(std::vector<Choice> ready, SchedInstruction *last);
+  // FIXME: Unused method
+  std::vector<double> scores(const std::vector<Choice>& ready, SchedInstruction *last);
 };
 
 } // namespace opt_sched

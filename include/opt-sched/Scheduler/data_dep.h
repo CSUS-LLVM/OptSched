@@ -81,16 +81,13 @@ enum SUB_GRAPH_TYPE {
 };
 
 // TODO(max): Document.
+// Fixme: Unused variable
 const size_t MAX_INSTNAME_LNGTH = 160;
-
-// An extra to be added to the absolute upper bound. This is a hack to fix some
-// elusive legacy bug which may or may not exist anymore.
-// TODO(ghassan): Eliminate.
-const int SCHED_UB_EXTRA = 20;
 
 const int MAX_LATENCY_VALUE = 10;
 
 // The total number of possible graph transformations.
+// Fixme: Unused variable
 const int NUM_GRAPH_TRANS = 1;
 
 // Forward declarations used to reduce the number of #includes.
@@ -108,11 +105,12 @@ class GraphTrans;
 class DataDepStruct {
 public:
   // TODO(max): Document.
-  DataDepStruct(MachineModel *machMdl);
+  explicit DataDepStruct(MachineModel *machMdl);
   // TODO(max): Document.
   virtual ~DataDepStruct();
 
   virtual InstCount GetInstCnt();
+    // Fixme: Unused method
   virtual InstCount GetOrgnlInstCnt();
   virtual SchedInstruction *GetInstByIndx(InstCount instIndx) = 0;
   virtual SchedInstruction *GetInstByTplgclOrdr(InstCount ordr) = 0;
@@ -133,6 +131,7 @@ public:
                             InstCount *&bkwrdLwrBounds);
   virtual InstCount GetRltvCrtclPath(SchedInstruction *ref,
                                      SchedInstruction *inst, DIRECTION dir) = 0;
+    // Fixme: Unused method
   virtual InstCount GetDistFrmLeaf(SchedInstruction *inst) = 0;
 
 protected:
@@ -172,26 +171,30 @@ protected:
 class DataDepGraph : public llvm::opt_sched::OptSchedDDGWrapperBase, public DirAcycGraph, public DataDepStruct {
 public:
   DataDepGraph(MachineModel *machMdl, LATENCY_PRECISION ltncyPcsn);
-  virtual ~DataDepGraph();
+  ~DataDepGraph() override;
 
   // Reads the data dependence graph from a text file.
+  // FIXME: Unused method
   FUNC_RESULT ReadFrmFile(SpecsBuffer *buf, bool &endOfFileReached);
   // Continues reading until the end of the current graph definition,
   // discarding the data.
+  // FIXME: Unused method
   FUNC_RESULT SkipGraph(SpecsBuffer *buf, bool &endOfFileReached);
   // Writes the data dependence graph to a text file.
+  // FIXME: Unused method
   FUNC_RESULT WriteToFile(FILE *file, FUNC_RESULT rslt, InstCount imprvmnt,
                           long number);
   // Returns the string ID of the graph as read from the input file.
   const char *GetDagID() const;
   // Returns the weight of the graph, as read from the input file.
+  // FIXME: Unused method
   float GetWeight() const;
 
   // Given an instruction number, return a pointer to the instruction object.
-  SchedInstruction *GetInstByIndx(InstCount instIndx);
+  SchedInstruction *GetInstByIndx(InstCount instIndx) override;
 
-  SchedInstruction *GetInstByTplgclOrdr(InstCount ordr);
-  SchedInstruction *GetInstByRvrsTplgclOrdr(InstCount ordr);
+  SchedInstruction *GetInstByTplgclOrdr(InstCount ordr) override;
+  SchedInstruction *GetInstByRvrsTplgclOrdr(InstCount ordr) override;
 
   // Setup the Dep. Graph for scheduling by doing a topological sort
   // followed by critical path computation
@@ -205,6 +208,7 @@ public:
   void EnableBackTracking();
 
   void GetCrntLwrBounds(DIRECTION dir, InstCount crntlwrBounds[]);
+    // FIXME: Unused method
   void SetCrntLwrBounds(DIRECTION dir, InstCount crntlwrBounds[]);
 
   SchedInstruction *GetRootInst();
@@ -221,13 +225,17 @@ public:
   // Get the lower and upper bounds read from the input file
   void GetFileSchedBounds(InstCount &lwrBound, InstCount &uprBound) const;
 
+    // FIXME: Unused method
   InstCount GetFileSchedLngth() { return fileSchedLngth_; }
+    // FIXME: Unused method
   InstCount GetAdjustedFileSchedCycle(InstCount instNum);
 
   // Get the target upper bound from the input file
+  // FIXME: Unused method
   InstCount GetFileSchedTrgtUprBound();
 
   // Get the final lower and upper bounds
+  // FIXME: Unused method
   void GetFinalBounds(InstCount &lwrBound, InstCount &uprBound);
 
   // Set the final lower and upper bounds
@@ -237,46 +245,60 @@ public:
 
   // Add edges to enforce the original program order, assuming that
   // it is represented by the instruction numbers
+  // FIXME: Unused method
   void EnforceProgOrder();
 
   bool UseFileBounds();
   void PrintLwrBounds(DIRECTION dir, std::ostream &out,
-                      char const *const title);
+                      char const *title);
+    // FIXME: Unused method
   void RestoreAbsoluteBounds();
 
+    // FIXME: Unused method
   void PrintInstTypeInfo(FILE *file);
 
   // Count dependences and cross-dependences
+  // FIXME: Unused method
   void CountDeps(InstCount &totDepCnt, InstCount &crossDepCnt);
 
+    // FIXME: Unused method
   int GetBscBlkCnt();
-  bool IsInGraph(SchedInstruction *inst);
-  InstCount GetInstIndx(SchedInstruction *inst);
+  bool IsInGraph(SchedInstruction *inst) override;
+  InstCount GetInstIndx(SchedInstruction *inst) override;
   InstCount GetRltvCrtclPath(SchedInstruction *ref, SchedInstruction *inst,
-                             DIRECTION dir);
+                             DIRECTION dir) override;
   void SetCrntFrwrdLwrBound(SchedInstruction *inst);
   void SetSttcLwrBounds();
   void SetDynmcLwrBounds();
   void CreateEdge(SchedInstruction *frmNode, SchedInstruction *toNode,
                   int ltncy, DependenceType depType);
-  InstCount GetDistFrmLeaf(SchedInstruction *inst);
+  InstCount GetDistFrmLeaf(SchedInstruction *inst) override;
 
+    // FIXME: Unused method
   void SetPrblmtc();
+    // FIXME: Unused method
   bool IsPrblmtc();
 
+    // FIXME: Unused method
   bool IncludesUnsupported();
+    // FIXME: Unused method
   bool IncludesNonStandardBlock();
+    // FIXME: Unused method
   bool IncludesCall();
 
+    // FIXME: Unused method
   InstCount GetRealInstCnt();
+    // FIXME: Unused method
   InstCount GetCodeSize();
   void SetHard(bool isHard);
+    // FIXME: Unused method
   bool IsHard() { return isHard_; }
 
   int GetEntryInstCnt() { return entryInstCnt_; }
   int GetExitInstCnt() { return exitInstCnt_; }
 
   InstCount GetMaxFileSchedOrder() { return maxFileSchedOrder_; }
+    // FIXME: Unused method
   void PrintEdgeCntPerLtncyInfo();
 
   int16_t GetMaxUseCnt() { return maxUseCnt_; }
@@ -323,6 +345,7 @@ protected:
 
   // The length of some known schedule that has been computed by some other
   // program ,e.g., gcc when the input DAGs come from gcc
+  // FIXME: Unused variable
   InstCount knwnSchedLngth_;
 
   // A list of DDG mutations
@@ -330,6 +353,7 @@ protected:
 
   MachineModel *machMdl_;
 
+    // FIXME: Unused variable
   bool backTrackEnbl_;
 
   char dagID_[MAX_NAMESIZE];
@@ -383,6 +407,7 @@ protected:
                                 int nodeID, InstCount fileSchedOrder,
                                 InstCount fileSchedCycle, InstCount fileLB,
                                 InstCount fileUB, int blkNum);
+    // FIXME: Unused variable
   void AddNode_(SchedInstruction *instPtr, InstCount instNum);
   FUNC_RESULT FinishNode_(InstCount nodeNum, InstCount edgeCnt = -1);
   void CreateEdge_(InstCount frmInstNum, InstCount toInstNum, int ltncy,
@@ -411,6 +436,7 @@ protected:
 
   InstCount maxInstCnt_;
   InstCount extrnlInstCnt_;
+    // FIXME: Unused variable
   InstCount cmpnstdInstCnt_;
   bool instsChngd_;
   bool instAdded_;
@@ -435,6 +461,7 @@ protected:
   bool dynmcLwrBoundsSet_;
   InstCount *dynmcFrwrdLwrBounds_;
   InstCount *dynmcBkwrdLwrBounds_;
+    // FIXME: Unused variable
   LinkedList<SchedInstruction> *fxdLst_;
 
   typedef struct {
@@ -447,9 +474,11 @@ protected:
   // The total lower bound that also includes the gap size
   InstCount totLwrBound_;
   InstCount unstsfidLtncy_;
+    // FIXME: Unused variable
   InstCount rejoinCycle_;
 
 #ifdef IS_DEBUG
+    // FIXME: Unused variable
   int errorCnt_;
 #endif
 
@@ -461,6 +490,7 @@ protected:
   void DelRootAndLeafInsts_(bool isFinal);
   void Clear_();
   void InitForLwrBounds_();
+        // FIXME: Unused method
   void InitForDynmcLwrBounds_();
   void UpdtSttcLwrBounds_();
   void RmvExtrnlInsts_();
@@ -468,14 +498,18 @@ protected:
   void SetRootsAndLeaves_();
   bool IsRoot_(SchedInstruction *inst);
   bool IsLeaf_(SchedInstruction *inst);
+        // FIXME: Unimplemented method
   InstCount CmputCrtclPath_();
   void CreateEdge_(SchedInstruction *frmInst, SchedInstruction *toInst);
+        // FIXME: Unused method
   void RmvEdge_(SchedInstruction *frmInst, SchedInstruction *toInst);
   void CmputCrtclPaths_(DIRECTION dir);
   void CmputCrtclPaths_();
+        // FIXME: Unused method
   void FindFrstCycleRange_(InstCount &minFrstCycle, InstCount &maxFrstCycle);
   InstCount GetRealInstCnt_();
 
+        // FIXME: Unused method
   bool TightnDynmcLwrBound_(InstCount frstCycle, InstCount minLastCycle,
                             InstCount maxLastCycle, InstCount trgtLwrBound,
                             InstCount &dynmcLwrBound);
@@ -490,6 +524,7 @@ protected:
   bool ChkInstRanges_(InstCount lastCycle);
   bool ChkInstRange_(SchedInstruction *inst, InstCount indx,
                      InstCount lastCycle);
+        // FIXME: Unused method
   bool CmputSmplDynmcLwrBound_(InstCount &dynmcLwrBound, InstCount trgtLwrBound,
                                bool &trgtFsbl);
   InstCount CmputTwoInstDynmcLwrBound_();
@@ -497,7 +532,9 @@ protected:
 
   void AddRoot_(SchedInstruction *inst);
   void AddLeaf_(SchedInstruction *inst);
+        // FIXME: Unused method
   void RmvLastRoot_(SchedInstruction *inst);
+        // FIXME: Unused method
   void RmvLastLeaf_(SchedInstruction *inst);
 
   void PropagateFrwrdLwrBounds_(InstCount frmIndx, InstCount toIndx,
@@ -507,8 +544,10 @@ protected:
   void TightnLwrBound_(DIRECTION dir, InstCount indx, InstCount lwrBounds[]);
   void AllocSttcData_();
   void AllocDynmcData_();
+        // FIXME: Unused method
   InstCount CmputMaxReleaseTime_();
   InstCount CmputMaxDeadline_();
+        // FIXME: Unused method
   bool CmputEntTrmnlDynmcLwrBound_(InstCount &dynmcLwrBound,
                                    InstCount trgtLwrBound);
   InstCount GetLostInstCnt_();
@@ -523,13 +562,16 @@ protected:
   void AllocRlxdSchdulr_(LB_ALG lbAlg, RelaxedScheduler *&rlxdSchdulr,
                          RelaxedScheduler *&rvrsRlxdSchdulr);
   void FreeRlxdSchdulr_(LB_ALG lbAlg);
-  InstCount CmputAbslutUprBound_();
+  InstCount CmputAbslutUprBound_() override;
 
 public:
+        // FIXME: Unused method
   DataDepSubGraph(DataDepGraph *fullGraph, InstCount maxInstCnt,
                   MachineModel *machMdl);
-  virtual ~DataDepSubGraph();
+  ~DataDepSubGraph() override;
+        // FIXME: Unused method
   void InitForSchdulng(bool clearAll);
+        // FIXME: Unused method
   void SetupForDynmcLwrBounds(InstCount schedUprBound);
   void AddInst(SchedInstruction *inst);
   void RmvInst(SchedInstruction *inst);
@@ -538,31 +580,38 @@ public:
                           InstCount rejoinCycle, SchedInstruction *inst,
                           InstCount &instGapSize);
 
+        // FIXME: Unused method
   void CmputTotLwrBound(LB_ALG lbAlg, InstCount rejoinCycle,
                         SchedInstruction *inst, InstCount &lwrBound,
                         InstCount &unstsfidLtncy, bool &crtnRejoin,
                         InstCount &instGapSize);
 
+        // FIXME: Unused method
   InstCount GetLwrBound();
-  SchedInstruction *GetInstByIndx(InstCount instIndx);
-  SchedInstruction *GetInstByTplgclOrdr(InstCount ordr);
-  SchedInstruction *GetInstByRvrsTplgclOrdr(InstCount ordr);
+  SchedInstruction *GetInstByIndx(InstCount instIndx) override;
+  SchedInstruction *GetInstByTplgclOrdr(InstCount ordr) override;
+  SchedInstruction *GetInstByRvrsTplgclOrdr(InstCount ordr) override;
 
-  SchedInstruction *GetRootInst();
-  SchedInstruction *GetLeafInst();
-  bool IsInGraph(SchedInstruction *inst);
-  InstCount GetInstIndx(SchedInstruction *inst);
+  SchedInstruction *GetRootInst() override;
+  SchedInstruction *GetLeafInst() override;
+  bool IsInGraph(SchedInstruction *inst) override;
+  InstCount GetInstIndx(SchedInstruction *inst) override;
   InstCount GetRltvCrtclPath(SchedInstruction *ref, SchedInstruction *inst,
-                             DIRECTION dir);
+                             DIRECTION dir) override;
 
+        // FIXME: Unused method
   void AddExtrnlInst(SchedInstruction *inst);
+        // FIXME: Unused method
   void RmvExtrnlInst(SchedInstruction *inst);
-  InstCount GetDistFrmLeaf(SchedInstruction *inst);
-  void GetLwrBounds(InstCount *&frwrdLwrBounds, InstCount *&bkwrdLwrBounds);
-  InstCount GetOrgnlInstCnt();
+  InstCount GetDistFrmLeaf(SchedInstruction *inst) override;
+  void GetLwrBounds(InstCount *&frwrdLwrBounds, InstCount *&bkwrdLwrBounds) override;
+  InstCount GetOrgnlInstCnt() override;
 
+        // FIXME: Unused method
   void InstLost(SchedInstruction *inst);
+        // FIXME: Unused method
   void UndoInstLost(SchedInstruction *inst);
+        // FIXME: Unused method
   InstCount GetAvlblSlots(IssueType issuType);
 };
 /*****************************************************************************/
@@ -656,6 +705,7 @@ public:
   // If the current slot contains a fixed instruction this function fails
   bool AppendInst(InstCount instNum);
 
+    // FIXME: Unused method
   bool AppendInst(SchedInstruction *inst);
 
   // Remove the last instruction scheduled
@@ -668,6 +718,7 @@ public:
   void SetCost(InstCount cost);
   InstCount GetCost() const;
   void SetExecCost(InstCount cost);
+    // FIXME: Unused method
   InstCount GetExecCost() const;
   void SetSpillCost(InstCount cost);
   InstCount GetSpillCost() const;
@@ -685,16 +736,23 @@ public:
   void SetPeakRegPressures(InstCount *regPressures);
   InstCount GetPeakRegPressures(const InstCount *&regPressures) const;
   InstCount GetSpillCost(InstCount stepNum);
+    // FIXME: Unused method
   InstCount GetTotSpillCost();
+    // FIXME: Unused method
   int GetConflictCount();
   void SetConflictCount(int cnflctCnt);
+    // FIXME: Unused method
   int GetSpillCandidateCount();
+    // FIXME: Unused method
   void SetSpillCandidateCount(int cnflctCnt);
 
-  void Print(std::ostream &out, char const *const title);
+  void Print(std::ostream &out, char const *title);
+    // FIXME: Unused method
   void PrintInstList(FILE *file, DataDepGraph *dataDepGraph, const char *title) const;
+    // FIXME: Unimplemented method
   void PrintRegPressures() const;
   bool Verify(MachineModel *machMdl, DataDepGraph *dataDepGraph);
+    // FIXME: Unused method
   void PrintClassData();
 };
 /*****************************************************************************/

@@ -27,6 +27,7 @@ using namespace llvm::opt_sched;
 // The denominator used when calculating cost weight.
 static const int COST_WGHT_BASE = 10;
 
+// FIXME: Constructor does not initialize fields crntStepNum_, peakSpillCost_, totSpillCost_, slilSpillCost_
 BBWithSpill::BBWithSpill(const OptSchedTarget *OST_, DataDepGraph *dataDepGraph,
                          long rgnNum, int16_t sigHashSize, LB_ALG lbAlg,
                          SchedPriorities hurstcPrirts,
@@ -40,7 +41,7 @@ BBWithSpill::BBWithSpill(const OptSchedTarget *OST_, DataDepGraph *dataDepGraph,
                   HeurSchedType),
       OST(OST_) {
   costLwrBound_ = 0;
-  enumrtr_ = NULL;
+  enumrtr_ = nullptr;
   optmlSpillCost_ = INVALID_VALUE;
 
   crntCycleNum_ = INVALID_VALUE;
@@ -73,9 +74,9 @@ BBWithSpill::BBWithSpill(const OptSchedTarget *OST_, DataDepGraph *dataDepGraph,
 /****************************************************************************/
 
 BBWithSpill::~BBWithSpill() {
-  if (enumrtr_ != NULL) {
+
     delete enumrtr_;
-  }
+
 
   delete[] liveRegs_;
   delete[] livePhysRegs_;
@@ -236,7 +237,7 @@ static InstCount ComputeSLILStaticLowerBound(int64_t regTypeCnt_,
       Register *reg = usedRegisters[j];
       assert(reg->GetDefList().size() == 1 &&
              "Number of defs for register is not 1!");
-      usedInsts.push_back(std::make_pair(*(reg->GetDefList().begin()), reg));
+      usedInsts.emplace_back(*(reg->GetDefList().begin()), reg);
     }
 
 #if defined(IS_DEBUG_SLIL_COMMON_USE_LB)
@@ -465,7 +466,7 @@ void BBWithSpill::UpdateSpillInfoForSchdul_(SchedInstruction *inst,
     regNum = use->GetNum();
     physRegNum = use->GetPhysicalNumber();
 
-    if (use->IsLive() == false)
+    if (!use->IsLive())
       Logger::Fatal("Reg %d of type %d is used without being defined", regNum,
                     regType);
 
@@ -476,7 +477,7 @@ void BBWithSpill::UpdateSpillInfoForSchdul_(SchedInstruction *inst,
 
     use->AddCrntUse();
 
-    if (use->IsLive() == false) {
+    if (!use->IsLive()) {
       // (Chris): The SLIL calculation below the def and use for-loops doesn't
       // consider the last use of a register. Thus, an additional increment must
       // happen here.
@@ -700,7 +701,7 @@ void BBWithSpill::UpdateSpillInfoForUnSchdul_(SchedInstruction *inst) {
     use->DelCrntUse();
     assert(use->IsLive());
 
-    if (isLive == false) {
+    if (!isLive) {
       // (Chris): Since this was the last use, the above SLIL calculation didn't
       // take this instruction into account.
       if (spillCostFunc_ == SCF_SLIL) {
@@ -742,9 +743,9 @@ void BBWithSpill::SchdulInst(SchedInstruction *inst, InstCount cycleNum,
                              InstCount slotNum, bool trackCnflcts) {
   crntCycleNum_ = cycleNum;
   crntSlotNum_ = slotNum;
-  if (inst == NULL)
+  if (inst == nullptr)
     return;
-  assert(inst != NULL);
+  assert(inst != nullptr);
   UpdateSpillInfoForSchdul_(inst, trackCnflcts);
 }
 /*****************************************************************************/
@@ -759,7 +760,7 @@ void BBWithSpill::UnschdulInst(SchedInstruction *inst, InstCount cycleNum,
     crntSlotNum_ = slotNum - 1;
   }
 
-  if (inst == NULL) {
+  if (inst == nullptr) {
     return;
   }
 
@@ -796,7 +797,7 @@ Enumerator *BBWithSpill::AllocEnumrtr_(Milliseconds timeout) {
   enumrtr_ = new LengthCostEnumerator(
       dataDepGraph_, machMdl_, schedUprBound_, sigHashSize_, enumPrirts_,
       prune_, SchedForRPOnly_, enblStallEnum, timeout, spillCostFunc_, 0, NULL);
-  if (enumrtr_ == NULL)
+  if (enumrtr_ == nullptr)
     Logger::Fatal("Out of memory.");
 
   return enumrtr_;

@@ -17,7 +17,7 @@ template <class T> T Convert(const string &value) {
 
 template <class T> list<T> Split(const string &value) {
   list<T> values;
-  if (value == "")
+  if (value.empty())
     return values;
 
   istringstream ss(value);
@@ -44,23 +44,23 @@ void Config::Load(std::istream &file) {
   while (!file.eof()) {
     string name, value, comment;
     file >> name;
-    while (!file.fail() && name.size() && name[0] == '#') {
+    while (!file.fail() && !name.empty() && name[0] == '#') {
       std::getline(file, comment);
       file >> name;
     }
     file >> value;
-    while (!file.fail() && value.size() && value[0] == '#') {
+    while (!file.fail() && !value.empty() && value[0] == '#') {
       std::getline(file, comment);
       file >> value;
     }
-    if (file.fail() || name == "" || value == "")
+    if (file.fail() || name.empty() || value.empty())
       break;
     settings[name] = value;
   }
 }
 
 string Config::GetString(const string &name) const {
-  std::map<string, string>::const_iterator it = settings.find(name);
+  auto it = settings.find(name);
   if (it == settings.end()) {
     Logger::Fatal("No value found for setting %s.", name.c_str());
     return "";
@@ -70,7 +70,7 @@ string Config::GetString(const string &name) const {
 }
 
 string Config::GetString(const string &name, const string &default_) const {
-  std::map<string, string>::const_iterator it = settings.find(name);
+  auto it = settings.find(name);
   if (it == settings.end()) {
     return default_;
   } else {
@@ -94,6 +94,7 @@ float Config::GetFloat(const string &name) const {
   return Convert<float>(GetString(name));
 }
 
+// FIXME: Unused method
 float Config::GetFloat(const string &name, float default_) const {
   if (settings.find(name) == settings.end()) {
     return default_;
@@ -125,7 +126,7 @@ bool Config::GetBool(const string &name, bool default_) const {
 list<string> Config::GetStringList(const string &name) const {
   list<string> values;
   string line = GetString(name, "");
-  if (line == "")
+  if (line.empty())
     return values;
 
   istringstream ss(line);
@@ -138,10 +139,12 @@ list<string> Config::GetStringList(const string &name) const {
   return values;
 }
 
+// FIXME: Unused method
 list<int64_t> Config::GetIntList(const string &name) const {
   return Split<int64_t>(GetString(name, ""));
 }
 
+// FIXME: Unused method
 list<float> Config::GetFloatList(const string &name) const {
   return Split<float>(GetString(name, ""));
 }

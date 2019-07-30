@@ -1,3 +1,5 @@
+#include <memory>
+
 #include <algorithm>
 #include <memory>
 #include <utility>
@@ -40,8 +42,8 @@ SchedRegion::SchedRegion(MachineModel *machMdl, DataDepGraph *dataDepGraph,
   bestSchedLngth_ = 0;
   hurstcCost_ = 0;
   hurstcSchedLngth_ = 0;
-  enumCrntSched_ = NULL;
-  enumBestSched_ = NULL;
+  enumCrntSched_ = nullptr;
+  enumBestSched_ = nullptr;
 
   schedLwrBound_ = 0;
   schedUprBound_ = INVALID_VALUE;
@@ -63,7 +65,7 @@ void SchedRegion::UseFileBounds_() {
 InstSchedule *SchedRegion::AllocNewSched_() {
   InstSchedule *newSched =
       new InstSchedule(machMdl_, dataDepGraph_, vrfySched_);
-  if (newSched == NULL)
+  if (newSched == nullptr)
     Logger::Fatal("Out of memory.");
   return newSched;
 }
@@ -78,16 +80,16 @@ FUNC_RESULT SchedRegion::FindOptimalSchedule(
     InstCount &hurstcSchedLngth, InstSchedule *&bestSched, bool filterByPerp,
     const BLOCKS_TO_KEEP blocksToKeep) {
   ConstrainedScheduler *lstSchdulr;
-  InstSchedule *lstSched = NULL;
+  InstSchedule *lstSched = nullptr;
   FUNC_RESULT rslt = RES_SUCCESS;
   Milliseconds hurstcTime = 0;
   Milliseconds boundTime = 0;
   Milliseconds enumTime = 0;
   Milliseconds vrfyTime = 0;
 
-  enumCrntSched_ = NULL;
-  enumBestSched_ = NULL;
-  bestSched = bestSched_ = NULL;
+  enumCrntSched_ = nullptr;
+  enumBestSched_ = nullptr;
+  bestSched = bestSched_ = nullptr;
 
   Logger::Info("---------------------------------------------------------------"
                "------------");
@@ -128,7 +130,7 @@ FUNC_RESULT SchedRegion::FindOptimalSchedule(
   schedLwrBound_ = dataDepGraph_->GetSchedLwrBound();
   Milliseconds hurstcStart = Utilities::GetProcessorTime();
   lstSched = new InstSchedule(machMdl_, dataDepGraph_, vrfySched_);
-  if (lstSched == NULL)
+  if (lstSched == nullptr)
     Logger::Fatal("Out of memory.");
 
   lstSchdulr = AllocHeuristicScheduler_();
@@ -239,7 +241,7 @@ FUNC_RESULT SchedRegion::FindOptimalSchedule(
     }
   }
 #endif
-  if (EnableEnum_() == false) {
+  if (!EnableEnum_()) {
     delete lstSchdulr;
     return RES_FAIL;
   }
@@ -251,10 +253,10 @@ FUNC_RESULT SchedRegion::FindOptimalSchedule(
   Logger::Info("Sched LB = %d, Sched UB = %d", schedLwrBound_, schedUprBound_);
 #endif
 
-  if (isLstOptml == false) {
+  if (!isLstOptml) {
     dataDepGraph_->SetHard(true);
     rslt = Optimize_(enumStart, rgnTimeout, lngthTimeout);
-    Milliseconds enumTime = Utilities::GetProcessorTime() - enumStart;
+    enumTime = Utilities::GetProcessorTime() - enumStart;
 
     if (hurstcTime > 0) {
       enumTime /= hurstcTime;
@@ -262,7 +264,7 @@ FUNC_RESULT SchedRegion::FindOptimalSchedule(
     }
 
     if (bestCost_ < hurstcCost_) {
-      assert(enumBestSched_ != NULL);
+      assert(enumBestSched_ != nullptr);
       bestSched = bestSched_ = enumBestSched_;
 #ifdef IS_DEBUG_PRINT_SCHEDS
       enumBestSched_->Print(Logger::GetLogStream(), "Optimal");
@@ -303,7 +305,8 @@ FUNC_RESULT SchedRegion::FindOptimalSchedule(
 //#endif
   }
 
-  enumTime = Utilities::GetProcessorTime() - enumStart;
+  // FIXME: Unused expression result - is this supposed to do something? Should the result be assigned?
+    Utilities::GetProcessorTime() - enumStart;
   stats::enumerationTime.Record(enumTime);
 
   Milliseconds vrfyStart = Utilities::GetProcessorTime();
@@ -311,7 +314,7 @@ FUNC_RESULT SchedRegion::FindOptimalSchedule(
   if (vrfySched_) {
     bool isValidSchdul = bestSched->Verify(machMdl_, dataDepGraph_);
 
-    if (isValidSchdul == false) {
+    if (!isValidSchdul) {
       stats::invalidSchedules++;
     }
   }
@@ -329,7 +332,7 @@ FUNC_RESULT SchedRegion::FindOptimalSchedule(
   FinishOptml_();
 
   bool tookBest = ChkSchedule_(bestSched, lstSched);
-  if (tookBest == false) {
+  if (!tookBest) {
     bestCost_ = hurstcCost_;
     bestSchedLngth_ = hurstcSchedLngth_;
   }
@@ -337,9 +340,9 @@ FUNC_RESULT SchedRegion::FindOptimalSchedule(
   delete lstSchdulr;
   if (bestSched != lstSched)
     delete lstSched;
-  if (enumBestSched_ != NULL && bestSched != enumBestSched_)
+  if (enumBestSched_ != nullptr && bestSched != enumBestSched_)
     delete enumBestSched_;
-  if (enumCrntSched_ != NULL)
+  if (enumCrntSched_ != nullptr)
     delete enumCrntSched_;
 
   bestCost = bestCost_;
@@ -352,7 +355,7 @@ FUNC_RESULT SchedRegion::FindOptimalSchedule(
     if ((blocksToKeep == BLOCKS_TO_KEEP::ZERO_COST && bestCost != 0) ||
         (blocksToKeep == BLOCKS_TO_KEEP::OPTIMAL && !optimal) ||
         (blocksToKeep == BLOCKS_TO_KEEP::IMPROVED &&
-         !(bestCost < hurstcCost)) ||
+         bestCost >= hurstcCost) ||
         (blocksToKeep == BLOCKS_TO_KEEP::IMPROVED_OR_OPTIMAL &&
          !(optimal || bestCost < hurstcCost))) {
       delete bestSched;
@@ -483,8 +486,8 @@ FUNC_RESULT SchedRegion::Optimize_(Milliseconds startTime,
 }
 
 void SchedRegion::CmputLwrBounds_(bool useFileBounds) {
-  RelaxedScheduler *rlxdSchdulr = NULL;
-  RelaxedScheduler *rvrsRlxdSchdulr = NULL;
+  RelaxedScheduler *rlxdSchdulr = nullptr;
+  RelaxedScheduler *rvrsRlxdSchdulr = nullptr;
   InstCount rlxdUprBound = dataDepGraph_->GetAbslutSchedUprBound();
 
   switch (lbAlg_) {
@@ -502,7 +505,7 @@ void SchedRegion::CmputLwrBounds_(bool useFileBounds) {
     break;
   }
 
-  if (rlxdSchdulr == NULL || rvrsRlxdSchdulr == NULL) {
+  if (rlxdSchdulr == nullptr || rvrsRlxdSchdulr == nullptr) {
     Logger::Fatal("Out of memory.");
   }
 
@@ -607,8 +610,7 @@ void SchedRegion::RegAlloc_(InstSchedule *&bestSched, InstSchedule *&lstSched) {
       SchedulerOptions::getInstance().GetString(
           "SIMULATE_REGISTER_ALLOCATION") == "TAKE_SCHED_WITH_LEAST_SPILLS") {
     // Simulate register allocation using the heuristic schedule.
-    u_regAllocList = std::unique_ptr<LocalRegAlloc>(
-        new LocalRegAlloc(lstSched, dataDepGraph_));
+    u_regAllocList = std::make_unique<LocalRegAlloc>(lstSched, dataDepGraph_);
 
     u_regAllocList->SetupForRegAlloc();
     u_regAllocList->AllocRegs();
@@ -626,8 +628,7 @@ void SchedRegion::RegAlloc_(InstSchedule *&bestSched, InstSchedule *&lstSched) {
       SchedulerOptions::getInstance().GetString(
           "SIMULATE_REGISTER_ALLOCATION") == "TAKE_SCHED_WITH_LEAST_SPILLS") {
     // Simulate register allocation using the best schedule.
-    u_regAllocBest = std::unique_ptr<LocalRegAlloc>(
-        new LocalRegAlloc(bestSched, dataDepGraph_));
+    u_regAllocBest = std::make_unique<LocalRegAlloc>(bestSched, dataDepGraph_);
 
     u_regAllocBest->SetupForRegAlloc();
     u_regAllocBest->AllocRegs();
@@ -650,4 +651,3 @@ void SchedRegion::RegAlloc_(InstSchedule *&bestSched, InstSchedule *&lstSched) {
 void SchedRegion::InitSecondPass() {
   isSecondPass = true;
 }
-

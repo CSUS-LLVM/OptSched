@@ -18,6 +18,7 @@ namespace llvm {
 namespace opt_sched {
 
 const int INBUF_MAX_PIECES_PERLINE = 30;
+// FIXME: Unused variable
 const int INBUF_MAX_LINESIZE = 10000;
 const int DFLT_INPBUF_SIZE = 1000000;
 
@@ -46,9 +47,9 @@ public:
   void Unload();
   char *GetBuf() { return buf; }
   char const *GetFullPath() const { return fullPath; }
-  FUNC_RESULT Load(char const *const fileName, char const *const path,
+  FUNC_RESULT Load(char const *fileName, char const *path,
                    long maxByts = DFLT_INPBUF_SIZE);
-  FUNC_RESULT Load(char const *const fullPath, long maxByts = DFLT_INPBUF_SIZE);
+  FUNC_RESULT Load(char const *fullPath, long maxByts = DFLT_INPBUF_SIZE);
   FUNC_RESULT SetBuf(char *buf, long size);
 
   // This function skips all comments and white spaces (tabs are not taken
@@ -85,8 +86,8 @@ protected:
   NXTLINE_TYPE GetNxtVldLine_(int &pieceCnt, char *str[], int lngth[],
                               int maxPieceCnt = INBUF_MAX_PIECES_PERLINE);
   bool IsWhiteSpaceOrLineEnd(char ch);
-  void ReportError(char *msg, char *lineStrt, int frstLngth);
-  void ReportFatalError(char *msg, char *lineStrt, int frstLngth);
+  void ReportError(char *msg, char *lineStart, int frstLngth);
+  void ReportFatalError(char *msg, char *lineStart, int frstLngth);
 };
 
 // A specs buffer is an input buffer for parsing a typical input specification
@@ -96,22 +97,26 @@ protected:
 class SpecsBuffer : public InputBuffer {
 public:
   SpecsBuffer();
-  void ReadSpec(char const *const title, char *value);
+  void ReadSpec(char const *title, char *value);
   void readLine(char *value, int maxPieceCnt);
   void readLstElmnt(char *value);
+    // FIXME: Unused method
   int readIntLstElmnt();
-  bool ReadFlagSpec(char const *const title, bool dfltValue);
-  unsigned long ReadUlongSpec(char const *const title);
-  float ReadFloatSpec(char const *const title);
-  uint64_t readUInt64Spec(char const *const title);
-  int ReadIntSpec(char const *const title);
-  int16_t ReadShortSpec(char const *const title);
-  FUNC_RESULT checkTitle(char const *const title);
+  bool ReadFlagSpec(char const *title, bool dfltValue);
+    // FIXME: Unused method
+  unsigned long ReadUlongSpec(char const *title);
+  float ReadFloatSpec(char const *title);
+    // FIXME: Unused method
+  uint64_t readUInt64Spec(char const *title);
+  int ReadIntSpec(char const *title);
+    // FIXME: Unused method
+  int16_t ReadShortSpec(char const *title);
+  FUNC_RESULT checkTitle(char const *title);
   void ErrorHandle(char *value);
 
 protected:
   NXTLINE_TYPE nxtLineType;
-  void CombinePieces_(int lngths[], char *strngs[], int startPiece,
+  static void CombinePieces_(int lngths[], char *strngs[], int startPiece,
                       int endPiece, char *target, int &totLngth);
 };
 
