@@ -17,10 +17,12 @@ struct Choice {
 
 class ACOScheduler : public ConstrainedScheduler {
 public:
-  ACOScheduler(DataDepGraph *dataDepGraph, MachineModel *machineModel, InstCount upperBound, SchedPriorities priorities);
+  ACOScheduler(DataDepGraph *dataDepGraph, MachineModel *machineModel,
+               InstCount upperBound, SchedPriorities priorities);
   virtual ~ACOScheduler();
   FUNC_RESULT FindSchedule(InstSchedule *schedule, SchedRegion *region);
   inline void UpdtRdyLst_(InstCount cycleNum, int slotNum);
+
 private:
   pheremone_t &Pheremone(SchedInstruction *from, SchedInstruction *to);
   pheremone_t &Pheremone(InstCount from, InstCount to);
@@ -28,7 +30,8 @@ private:
 
   void PrintPheremone();
 
-  SchedInstruction *SelectInstruction(std::vector<Choice> ready, SchedInstruction *lastInst);
+  SchedInstruction *SelectInstruction(std::vector<Choice> ready,
+                                      SchedInstruction *lastInst);
   void UpdatePheremone(InstSchedule *schedule);
   InstSchedule *FindOneSchedule();
   pheremone_t *pheremone_;

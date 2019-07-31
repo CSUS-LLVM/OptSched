@@ -9,10 +9,10 @@ Last Update:  Mar. 2011
 #ifndef OPTSCHED_BASIC_DATA_DEP_H
 #define OPTSCHED_BASIC_DATA_DEP_H
 
-#include "opt-sched/Scheduler/sched_basic_data.h"
+#include "opt-sched/Scheduler/OptSchedDDGWrapperBase.h"
 #include "opt-sched/Scheduler/buffers.h"
 #include "opt-sched/Scheduler/defines.h"
-#include "opt-sched/Scheduler/OptSchedDDGWrapperBase.h"
+#include "opt-sched/Scheduler/sched_basic_data.h"
 #include "llvm/ADT/SmallVector.h"
 #include <memory>
 
@@ -169,7 +169,9 @@ protected:
 // TODO(max): Find out what this really is.
 // The Data Dependence Graph is a sepcial case of a DAG and a special case of
 // a Data Dependence Structure as well
-class DataDepGraph : public llvm::opt_sched::OptSchedDDGWrapperBase, public DirAcycGraph, public DataDepStruct {
+class DataDepGraph : public llvm::opt_sched::OptSchedDDGWrapperBase,
+                     public DirAcycGraph,
+                     public DataDepStruct {
 public:
   DataDepGraph(MachineModel *machMdl, LATENCY_PRECISION ltncyPcsn);
   virtual ~DataDepGraph();
@@ -200,7 +202,9 @@ public:
   FUNC_RESULT UpdateSetupForSchdulng(bool cmputTrnstvClsr);
 
   // Returns transformations that we will apply to the graph
-  SmallVector<std::unique_ptr<GraphTrans>, 0> *GetGraphTrans() { return &graphTrans_; }
+  SmallVector<std::unique_ptr<GraphTrans>, 0> *GetGraphTrans() {
+    return &graphTrans_;
+  }
 
   void EnableBackTracking();
 
@@ -281,7 +285,9 @@ public:
 
   int16_t GetMaxUseCnt() { return maxUseCnt_; }
   int16_t GetRegTypeCnt() { return machMdl_->GetRegTypeCnt(); }
-  int GetPhysRegCnt(int16_t regType) { return machMdl_->GetPhysRegCnt(regType); }
+  int GetPhysRegCnt(int16_t regType) {
+    return machMdl_->GetPhysRegCnt(regType);
+  }
 
   RegisterFile *getRegFiles() { return RegFiles.get(); }
 
@@ -692,7 +698,8 @@ public:
   void SetSpillCandidateCount(int cnflctCnt);
 
   void Print(std::ostream &out, char const *const title);
-  void PrintInstList(FILE *file, DataDepGraph *dataDepGraph, const char *title) const;
+  void PrintInstList(FILE *file, DataDepGraph *dataDepGraph,
+                     const char *title) const;
   void PrintRegPressures() const;
   bool Verify(MachineModel *machMdl, DataDepGraph *dataDepGraph);
   void PrintClassData();

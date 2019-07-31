@@ -2,17 +2,17 @@
 #include <memory>
 #include <utility>
 
-#include "opt-sched/Scheduler/graph_trans.h"
-#include "opt-sched/Scheduler/reg_alloc.h"
+#include "opt-sched/Scheduler/bb_spill.h"
 #include "opt-sched/Scheduler/config.h"
+#include "opt-sched/Scheduler/graph_trans.h"
+#include "opt-sched/Scheduler/list_sched.h"
 #include "opt-sched/Scheduler/logger.h"
 #include "opt-sched/Scheduler/random.h"
-#include "opt-sched/Scheduler/stats.h"
-#include "opt-sched/Scheduler/utilities.h"
-#include "opt-sched/Scheduler/list_sched.h"
+#include "opt-sched/Scheduler/reg_alloc.h"
 #include "opt-sched/Scheduler/relaxed_sched.h"
 #include "opt-sched/Scheduler/sched_region.h"
-#include "opt-sched/Scheduler/bb_spill.h"
+#include "opt-sched/Scheduler/stats.h"
+#include "opt-sched/Scheduler/utilities.h"
 
 extern bool OPTSCHED_gPrintSpills;
 
@@ -191,7 +191,7 @@ FUNC_RESULT SchedRegion::FindOptimalSchedule(
   Logger::Info(
       "The list schedule is of length %d and spill cost %d. Tot cost = %d",
       bestSchedLngth_, lstSched->GetSpillCost(), bestCost_);
-//  #endif
+  //  #endif
 
 #ifdef IS_DEBUG_PRINT_SCHEDS
   lstSched->Print(Logger::GetLogStream(), "Heuristic");
@@ -286,21 +286,21 @@ FUNC_RESULT SchedRegion::FindOptimalSchedule(
   }
 
 #ifdef IS_DEBUG_PRINT_PERP_AT_EACH_STEP
-    Logger::Info("Printing PERP at each step in the schedule.");
+  Logger::Info("Printing PERP at each step in the schedule.");
 
-    int costSum = 0;
-    for (int i = 0; i < dataDepGraph_->GetInstCnt(); ++i) {
-      Logger::Info("Cycle: %lu Cost: %lu", i, bestSched_->GetSpillCost(i));
-      costSum += bestSched_->GetSpillCost(i);
-    }
-    Logger::Info("Cost Sum: %lu", costSum);
+  int costSum = 0;
+  for (int i = 0; i < dataDepGraph_->GetInstCnt(); ++i) {
+    Logger::Info("Cycle: %lu Cost: %lu", i, bestSched_->GetSpillCost(i));
+    costSum += bestSched_->GetSpillCost(i);
+  }
+  Logger::Info("Cost Sum: %lu", costSum);
 #endif
 
   if (SchedulerOptions::getInstance().GetString(
           "SIMULATE_REGISTER_ALLOCATION") != "NO") {
-//#ifdef IS_DEBUG
+    //#ifdef IS_DEBUG
     RegAlloc_(bestSched, lstSched);
-//#endif
+    //#endif
   }
 
   enumTime = Utilities::GetProcessorTime() - enumStart;
@@ -546,14 +546,12 @@ bool SchedRegion::CmputUprBounds_(InstSchedule *lstSched, bool useFileBounds) {
     // If the heuristic schedule is optimal, we are done!
     schedUprBound_ = lstSched->GetCrntLngth();
     return true;
-  }
-  else if (isSecondPass) {
+  } else if (isSecondPass) {
     // In the second pass, the upper bound is the length of the min-RP schedule
     // that was found in the first pass with stalls inserted.
     schedUprBound_ = lstSched->GetCrntLngth();
     return false;
-  }
-  else {
+  } else {
     CmputSchedUprBound_();
     return false;
   }
@@ -647,7 +645,4 @@ void SchedRegion::RegAlloc_(InstSchedule *&bestSched, InstSchedule *&lstSched) {
     }
 }
 
-void SchedRegion::InitSecondPass() {
-  isSecondPass = true;
-}
-
+void SchedRegion::InitSecondPass() { isSecondPass = true; }

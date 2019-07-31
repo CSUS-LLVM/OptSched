@@ -23,7 +23,7 @@ Milliseconds GetProcessorTime();
 // Returns a reference to an object that is supposed to initialized with the
 // start time of the process
 extern std::chrono::high_resolution_clock::time_point startTime;
-}
+} // namespace Utilities
 
 inline uint16_t Utilities::clcltBitsNeededToHoldNum(uint64_t value) {
   uint16_t bitsNeeded = 0;

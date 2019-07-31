@@ -1,8 +1,8 @@
-#include "opt-sched/Scheduler/data_dep.h"
 #include "opt-sched/Scheduler/reg_alloc.h"
+#include "opt-sched/Scheduler/data_dep.h"
+#include "opt-sched/Scheduler/logger.h"
 #include "opt-sched/Scheduler/register.h"
 #include "opt-sched/Scheduler/sched_basic_data.h"
-#include "opt-sched/Scheduler/logger.h"
 #include <climits>
 #include <utility>
 

@@ -11,6 +11,7 @@
 #include "opt-sched/Scheduler/relaxed_sched.h"
 #include "opt-sched/Scheduler/stats.h"
 #include "opt-sched/Scheduler/utilities.h"
+#include <algorithm>
 #include <cstdio>
 #include <iostream>
 #include <map>
@@ -18,7 +19,6 @@
 #include <set>
 #include <sstream>
 #include <utility>
-#include <algorithm>
 
 extern bool OPTSCHED_gPrintSpills;
 
@@ -314,8 +314,8 @@ InstCount BBWithSpill::CmputCostLwrBound() {
 #if defined(IS_DEBUG_STATIC_LOWER_BOUND)
   Logger::Info(
       "DAG %s spillCostLB %d scFactor %d lengthLB %d lenFactor %d staticLB %d",
-      dataDepGraph_->GetDagID(), spillCostLwrBound, SCW_,
-      schedLwrBound_, schedCostFactor_, staticLowerBound);
+      dataDepGraph_->GetDagID(), spillCostLwrBound, SCW_, schedLwrBound_,
+      schedCostFactor_, staticLowerBound);
 #endif
 
   return staticLowerBound;
@@ -350,8 +350,8 @@ void BBWithSpill::InitForCostCmputtn_() {
     liveRegs_[i].Reset();
     if (regFiles_[i].GetPhysRegCnt() > 0)
       livePhysRegs_[i].Reset();
-//    if (chkCnflcts_)
-//      regFiles_[i].ResetConflicts();
+    //    if (chkCnflcts_)
+    //      regFiles_[i].ResetConflicts();
     peakRegPressures_[i] = 0;
     regPressures_[i] = 0;
   }
@@ -585,23 +585,26 @@ void BBWithSpill::UpdateSpillInfoForSchdul_(SchedInstruction *inst,
 
   } else if (spillCostFunc_ == SCF_PEAK_PER_TYPE) {
     for (int i = 0; i < regTypeCnt_; i++)
-      newSpillCost += std::max(0, peakRegPressures_[i] - machMdl_->GetPhysRegCnt(i));
+      newSpillCost +=
+          std::max(0, peakRegPressures_[i] - machMdl_->GetPhysRegCnt(i));
 
   } else {
     // Default is PERP (Some SCF like SUM rely on PERP being the default here)
     int i = 0;
-    std::for_each(regPressures_.begin(), regPressures_.end(),
-        [&](InstCount RP) { newSpillCost += std::max(0, RP - machMdl_->GetPhysRegCnt(i++)); });
+    std::for_each(
+        regPressures_.begin(), regPressures_.end(), [&](InstCount RP) {
+          newSpillCost += std::max(0, RP - machMdl_->GetPhysRegCnt(i++));
+        });
   }
 
 #ifdef IS_DEBUG_SLIL_CORRECT
   if (OPTSCHED_gPrintSpills) {
-      Logger::Info(
-          "Printing live range lengths for instruction AFTER calculation.");
-      for (int j = 0; j < sumOfLiveIntervalLengths_.size(); j++) {
-        Logger::Info("SLIL for regType %d is currently %d", j,
-                     sumOfLiveIntervalLengths_[j]);
-      }
+    Logger::Info(
+        "Printing live range lengths for instruction AFTER calculation.");
+    for (int j = 0; j < sumOfLiveIntervalLengths_.size(); j++) {
+      Logger::Info("SLIL for regType %d is currently %d", j,
+                   sumOfLiveIntervalLengths_[j]);
+    }
   }
 #endif
 
@@ -831,17 +834,17 @@ FUNC_RESULT BBWithSpill::Enumerate_(Milliseconds startTime,
     HandlEnumrtrRslt_(rslt, trgtLngth);
 
     if (bestCost_ == 0 || rslt == RES_ERROR ||
-        (lngthDeadline == rgnDeadline && rslt == RES_TIMEOUT) || 
+        (lngthDeadline == rgnDeadline && rslt == RES_TIMEOUT) ||
         (rslt == RES_SUCCESS && isSecondPass)) {
 
-        // If doing two pass optsched and on the second pass then terminate if a 
-        // schedule is found with the same min-RP found in first pass.
-        if (rslt == RES_SUCCESS && isSecondPass) {
-          Logger::Info("Schedule found in second pass, terminating BB loop.");
+      // If doing two pass optsched and on the second pass then terminate if a
+      // schedule is found with the same min-RP found in first pass.
+      if (rslt == RES_SUCCESS && isSecondPass) {
+        Logger::Info("Schedule found in second pass, terminating BB loop.");
 
-          if (enumCrntSched_->GetCrntLngth() < schedUprBound_)
-            Logger::Info("Schedule with a shorter length found.");
-        }
+        if (enumCrntSched_->GetCrntLngth() < schedUprBound_)
+          Logger::Info("Schedule with a shorter length found.");
+      }
 
       break;
     }
@@ -851,7 +854,6 @@ FUNC_RESULT BBWithSpill::Enumerate_(Milliseconds startTime,
 
     if (!isSecondPass)
       CmputSchedUprBound_();
- 
 
     iterCnt++;
     costLwrBound += 1;
@@ -934,8 +936,7 @@ bool BBWithSpill::ChkCostFsblty(InstCount trgtLngth, EnumTreeNode *node) {
   bool fsbl = true;
   InstCount crntCost, dynmcCostLwrBound;
   if (spillCostFunc_ == SCF_SLIL) {
-    crntCost = dynamicSlilLowerBound_ * SCW_ +
-               trgtLngth * schedCostFactor_;
+    crntCost = dynamicSlilLowerBound_ * SCW_ + trgtLngth * schedCostFactor_;
   } else {
     crntCost = crntSpillCost_ * SCW_ + trgtLngth * schedCostFactor_;
   }

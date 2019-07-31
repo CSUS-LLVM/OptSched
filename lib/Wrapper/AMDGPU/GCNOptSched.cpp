@@ -33,8 +33,7 @@ static MachineSchedRegistry
 #if !defined(NDEBUG) || defined(LLVM_ENABLE_DUMP)
 static void getRealRegionPressure(MachineBasicBlock::const_iterator Begin,
                                   MachineBasicBlock::const_iterator End,
-                                  const LiveIntervals *LIS,
-                                  StringRef Label) {
+                                  const LiveIntervals *LIS, StringRef Label) {
   GCNDownwardRPTracker RP(*LIS);
   RP.advance(Begin, End, nullptr);
   dbgs() << "Dumping real RP " << Label << "\n";
@@ -51,11 +50,11 @@ void ScheduleDAGOptSchedGCN::initSchedulers() {
 
   addMutation(createLoadClusterDAGMutation(TII, TRI));
   addMutation(createStoreClusterDAGMutation(TII, TRI));
-  //addMutation(createAMDGPUMacroFusionDAGMutation());
+  // addMutation(createAMDGPUMacroFusionDAGMutation());
 
   // Add passes
 
-  //SchedPasses.push_back(GCNMaxOcc);
+  // SchedPasses.push_back(GCNMaxOcc);
 
   // First
   SchedPasses.push_back(OptSchedMaxOcc);

@@ -21,8 +21,8 @@ Last Update:  Mar. 2011
 namespace llvm {
 namespace opt_sched {
 
-using std::string;
 using std::list;
+using std::string;
 
 class Config {
 public:
@@ -49,18 +49,18 @@ protected:
 
 class SchedulerOptions : public Config {
 public:
-  // Since the scheduler flags should only be loaded once we are safe implementing
-  // it as a singelton.
-  static SchedulerOptions& getInstance();
+  // Since the scheduler flags should only be loaded once we are safe
+  // implementing it as a singelton.
+  static SchedulerOptions &getInstance();
 
-  // Make sure there is no way for a second config object to be accidentally created.
-  SchedulerOptions(SchedulerOptions const&) = delete;
-  void operator=(SchedulerOptions const&) = delete;
+  // Make sure there is no way for a second config object to be accidentally
+  // created.
+  SchedulerOptions(SchedulerOptions const &) = delete;
+  void operator=(SchedulerOptions const &) = delete;
 
 private:
   SchedulerOptions() {}
 };
-
 
 } // namespace opt_sched
 } // namespace llvm

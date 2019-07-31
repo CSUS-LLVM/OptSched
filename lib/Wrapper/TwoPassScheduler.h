@@ -15,22 +15,20 @@ namespace opt_sched {
 
 class ScheduleTwoPassOptSched : public ScheduleDAGOptSched {
 private:
-  enum SchedPassStrategy {
-    OptSchedMinRP,
-    OptSchedBalanced
-  };
+  enum SchedPassStrategy { OptSchedMinRP, OptSchedBalanced };
 
   // Vector of scheduling passes to execute.
   SmallVector<SchedPassStrategy, 4> SchedPasses;
 
   // Vector of regions recorded for later rescheduling
-  SmallVector<std::pair<MachineBasicBlock::iterator,
-                        MachineBasicBlock::iterator>, 32> Regions;
-	
+  SmallVector<
+      std::pair<MachineBasicBlock::iterator, MachineBasicBlock::iterator>, 32>
+      Regions;
+
 public:
   ScheduleTwoPassOptSched(llvm::MachineSchedContext *C,
-                         std::unique_ptr<MachineSchedStrategy> S);
-						 
+                          std::unique_ptr<MachineSchedStrategy> S);
+
   // Rely on the machine scheduler to split the MBB into scheduling regions. In
   // the first pass record the regions here, but don't do any actual scheduling
   // until finalizeSchedule is called.
@@ -48,7 +46,7 @@ public:
 
   // Execute a scheduling pass on the function.
   void runSchedPass(SchedPassStrategy S);
-  
+
   // Run OptSched in RP only configuration.
   void scheduleOptSchedMinRP();
 

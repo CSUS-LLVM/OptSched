@@ -1,10 +1,10 @@
 #include "opt-sched/Scheduler/enumerator.h"
+#include "opt-sched/Scheduler/bb_spill.h"
 #include "opt-sched/Scheduler/hist_table.h"
 #include "opt-sched/Scheduler/logger.h"
 #include "opt-sched/Scheduler/random.h"
 #include "opt-sched/Scheduler/stats.h"
 #include "opt-sched/Scheduler/utilities.h"
-#include "opt-sched/Scheduler/bb_spill.h"
 #include <algorithm>
 #include <iterator>
 #include <memory>
@@ -847,7 +847,7 @@ void AppendAndCheckSuffixSchedules(
   for (auto inst : *matchingHistNodeWithSuffix->GetSuffix())
     concatSched->AppendInst((inst == nullptr) ? SCHD_STALL : inst->GetNum());
 
-// Update and check.
+    // Update and check.
 
 #if defined(IS_DEBUG_SUFFIX_SCHED)
   if (concatSched->GetCrntLngth() != trgtSchedLngth_) {
@@ -1016,7 +1016,7 @@ bool Enumerator::FindNxtFsblBrnch_(EnumTreeNode *&newNode) {
   InstCount rdyInstCnt = rdyLst_->GetInstCnt();
 #endif
   assert(crntNode_->IsLeaf() || (brnchCnt != rdyInstCnt) ? 1 : rdyInstCnt);
-// brnchCnt == rdyInstCnt == 0 ? 1 : rdyInstCnt);
+  // brnchCnt == rdyInstCnt == 0 ? 1 : rdyInstCnt);
 
 #ifdef IS_DEBUG_READY_LIST
   Logger::Info("Ready List Size is %d", rdyInstCnt);
@@ -1425,12 +1425,12 @@ void SetTotalCostsAndSuffixes(EnumTreeNode *const currentNode,
 #if defined(IS_DEBUG_SUFFIX_SCHED)
   if (suffixConcatenationEnabled) {
 
-  void printVector(const std::vector<InstCount> &v, const char *label) {
-    std::stringstream s;
-    for (auto i : v)
-    s << i << ' ';
-    Logger::Info("%s: %s", label, s.str().c_str());
-  }
+    void printVector(const std::vector<InstCount> &v, const char *label) {
+      std::stringstream s;
+      for (auto i : v)
+        s << i << ' ';
+      Logger::Info("%s: %s", label, s.str().c_str());
+    }
 
     std::vector<InstCount> prefix;
     for (auto n = currentNode; n != nullptr; n = n->GetParent()) {
@@ -1906,8 +1906,8 @@ LengthEnumerator::LengthEnumerator(
     bool SchedForRPOnly, bool enblStallEnum, Milliseconds timeout,
     InstCount preFxdInstCnt, SchedInstruction *preFxdInsts[])
     : Enumerator(dataDepGraph, machMdl, schedUprBound, sigHashSize, prirts,
-                 PruningStrategy, SchedForRPOnly, enblStallEnum, timeout, preFxdInstCnt,
-                 preFxdInsts) {
+                 PruningStrategy, SchedForRPOnly, enblStallEnum, timeout,
+                 preFxdInstCnt, preFxdInsts) {
   SetupAllocators_();
   tmpHstryNode_ = new HistEnumTreeNode;
 
@@ -1999,8 +1999,8 @@ LengthCostEnumerator::LengthCostEnumerator(
     SPILL_COST_FUNCTION spillCostFunc, InstCount preFxdInstCnt,
     SchedInstruction *preFxdInsts[])
     : Enumerator(dataDepGraph, machMdl, schedUprBound, sigHashSize, prirts,
-                 PruningStrategy, SchedForRPOnly, enblStallEnum, timeout, preFxdInstCnt,
-                 preFxdInsts) {
+                 PruningStrategy, SchedForRPOnly, enblStallEnum, timeout,
+                 preFxdInstCnt, preFxdInsts) {
   SetupAllocators_();
 
   costChkCnt_ = 0;

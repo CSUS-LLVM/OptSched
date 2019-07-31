@@ -52,7 +52,7 @@ void Fatal(const char *format_string, ...);
 void Error(const char *format_string, ...);
 void Info(const char *format_string, ...);
 void Summary(const char *format_string, ...);
-}
+} // namespace Logger
 
 } // namespace opt_sched
 } // namespace llvm
