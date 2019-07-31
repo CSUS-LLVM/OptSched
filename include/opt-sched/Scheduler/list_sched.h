@@ -13,46 +13,46 @@ Last Update:  Sept. 2013
 #include "opt-sched/Scheduler/gen_sched.h"
 
 namespace llvm {
-    namespace opt_sched {
+namespace opt_sched {
 
-        class ListScheduler : public ConstrainedScheduler {
-        public:
-            // Creates a list scheduler for the given dependence graph, machine and
-            // schedule upper bound, using the specified heuristic.
-            ListScheduler(DataDepGraph *dataDepGraph, MachineModel *machMdl,
-                          InstCount schedUprBound, SchedPriorities prirts);
-            virtual ~ListScheduler();
+class ListScheduler : public ConstrainedScheduler {
+public:
+  // Creates a list scheduler for the given dependence graph, machine and
+  // schedule upper bound, using the specified heuristic.
+  ListScheduler(DataDepGraph *dataDepGraph, MachineModel *machMdl,
+                InstCount schedUprBound, SchedPriorities prirts);
+  virtual ~ListScheduler();
 
-            // Calculates the schedule and returns it in the passed argument.
-            FUNC_RESULT FindSchedule(InstSchedule *sched, SchedRegion *rgn);
+  // Calculates the schedule and returns it in the passed argument.
+  FUNC_RESULT FindSchedule(InstSchedule *sched, SchedRegion *rgn);
 
-        protected:
-            bool isDynmcPrirty_;
-            // Adds the instructions that have just become ready at this cycle to the
-            // ready list.
-            void UpdtRdyLst_(InstCount cycleNum, int slotNum);
+protected:
+  bool isDynmcPrirty_;
+  // Adds the instructions that have just become ready at this cycle to the
+  // ready list.
+  void UpdtRdyLst_(InstCount cycleNum, int slotNum);
 
-            // Pick next instruction to be scheduled. Returns NULL if no instructions are
-            // ready.
-            virtual SchedInstruction *PickInst() const;
-        };
+  // Pick next instruction to be scheduled. Returns NULL if no instructions are
+  // ready.
+  virtual SchedInstruction *PickInst() const;
+};
 
 // Force the list scheduler to maintain the source ordering of the instructions
 // regardless of latency or machine model constraints.
-        class SequentialListScheduler : public ListScheduler {
-        public:
-            SequentialListScheduler(DataDepGraph *dataDepGraph, MachineModel *machMdl,
-                                    InstCount schedUprBound, SchedPriorities prirts);
+class SequentialListScheduler : public ListScheduler {
+public:
+  SequentialListScheduler(DataDepGraph *dataDepGraph, MachineModel *machMdl,
+                          InstCount schedUprBound, SchedPriorities prirts);
 
-        private:
-            // Does this instruction come next in the source ordering after all currently
-            // scheduled instructions, e.g. 0, 1, 2, 3, 4.
-            bool IsSequentialInstruction(const SchedInstruction *Inst) const;
+private:
+  // Does this instruction come next in the source ordering after all currently
+  // scheduled instructions, e.g. 0, 1, 2, 3, 4.
+  bool IsSequentialInstruction(const SchedInstruction *Inst) const;
 
-            bool ChkInstLglty_(SchedInstruction *inst) const override;
-        };
+  bool ChkInstLglty_(SchedInstruction *inst) const override;
+};
 
-    } // namespace opt_sched
+} // namespace opt_sched
 } // namespace llvm
 
 #endif

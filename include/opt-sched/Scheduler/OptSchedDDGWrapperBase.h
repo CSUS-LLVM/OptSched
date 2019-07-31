@@ -8,18 +8,18 @@
 #define LLVM_OPT_SCHED_DDG_WRAPPER_BASE_H
 
 namespace llvm {
-    namespace opt_sched {
+namespace opt_sched {
 
-        class OptSchedDDGWrapperBase {
-        public:
-            virtual ~OptSchedDDGWrapperBase() = default;
+class OptSchedDDGWrapperBase {
+public:
+  virtual ~OptSchedDDGWrapperBase() = default;
 
-            virtual void convertSUnits() = 0;
+  virtual void convertSUnits() = 0;
 
-            virtual void convertRegFiles() = 0;
-        };
+  virtual void convertRegFiles() = 0;
+};
 
-    } // namespace opt_sched
+} // namespace opt_sched
 } // namespace llvm
 
 #endif // LLVM_OPT_SCHED_DDG_WRAPPER_BASE_H

@@ -15,17 +15,17 @@ Last Update:  Mar. 2011
 #include "opt-sched/Scheduler/defines.h"
 
 namespace llvm {
-    namespace opt_sched {
+namespace opt_sched {
 
-        const int INBUF_MAX_PIECES_PERLINE = 30;
+const int INBUF_MAX_PIECES_PERLINE = 30;
 // FIXME: Unused variable
-        const int INBUF_MAX_LINESIZE = 10000;
-        const int DFLT_INPBUF_SIZE = 1000000;
+const int INBUF_MAX_LINESIZE = 10000;
+const int DFLT_INPBUF_SIZE = 1000000;
 
 // String buffer size limits for file/sample names.
-        const int MAX_NAMESIZE = 1000;
+const int MAX_NAMESIZE = 1000;
 
-        enum NXTLINE_TYPE { NXT_EOF, NXT_SPC, NXT_DATA, NXT_ERR };
+enum NXTLINE_TYPE { NXT_EOF, NXT_SPC, NXT_DATA, NXT_ERR };
 
 // This is an input buffer class for loading, buffering and parsing an input
 // file using system level I/O, where the application program is responsible for
@@ -38,89 +38,89 @@ namespace llvm {
 //     control character (\r, \n, #, \t or space), it is a valid data character.
 //   - Comments on data lines should be preceded by at least one space character
 //   - All files are scanned linewise
-        class InputBuffer {
-        public:
-            InputBuffer();
-            ~InputBuffer();
-            int Reload();
-            void Clean();
-            void Unload();
-            char *GetBuf() { return buf; }
-            char const *GetFullPath() const { return fullPath; }
-            FUNC_RESULT Load(char const *fileName, char const *path,
-                             long maxByts = DFLT_INPBUF_SIZE);
-            FUNC_RESULT Load(char const *fullPath, long maxByts = DFLT_INPBUF_SIZE);
-            FUNC_RESULT SetBuf(char *buf, long size);
+class InputBuffer {
+public:
+  InputBuffer();
+  ~InputBuffer();
+  int Reload();
+  void Clean();
+  void Unload();
+  char *GetBuf() { return buf; }
+  char const *GetFullPath() const { return fullPath; }
+  FUNC_RESULT Load(char const *fileName, char const *path,
+                   long maxByts = DFLT_INPBUF_SIZE);
+  FUNC_RESULT Load(char const *fullPath, long maxByts = DFLT_INPBUF_SIZE);
+  FUNC_RESULT SetBuf(char *buf, long size);
 
-            // This function skips all comments and white spaces (tabs are not taken
-            // into account), and does not return until it reaches a valid data line or
-            // end of file. If at least one line starting with space is encountered on
-            // the way, the return value will be NXT_SPC. It should always be called
-            // when the current offset is at the first character of a line
-            // (lineStrt==true).
-            NXTLINE_TYPE skipSpaceAndCmnts();
-            NXTLINE_TYPE GetNxtVldLine(int &pieceCnt, char *strngs[], int lngths[]);
+  // This function skips all comments and white spaces (tabs are not taken
+  // into account), and does not return until it reaches a valid data line or
+  // end of file. If at least one line starting with space is encountered on
+  // the way, the return value will be NXT_SPC. It should always be called
+  // when the current offset is at the first character of a line
+  // (lineStrt==true).
+  NXTLINE_TYPE skipSpaceAndCmnts();
+  NXTLINE_TYPE GetNxtVldLine(int &pieceCnt, char *strngs[], int lngths[]);
 
-        protected:
-            char *buf;
+protected:
+  char *buf;
 
-            long totSize,     // total size of the buffer
-                    loadedByts,   // number of bytes loaded
-                    crntOfst,     // current offset within the buffer
-                    lineEndOfst,  // the offset of the last LF or CR character seen
-                    crntLineOfst, // the offset of the current line
-                    crntLineNum;  // the current line number
+  long totSize,     // total size of the buffer
+      loadedByts,   // number of bytes loaded
+      crntOfst,     // current offset within the buffer
+      lineEndOfst,  // the offset of the last LF or CR character seen
+      crntLineOfst, // the offset of the current line
+      crntLineNum;  // the current line number
 
-            int fileHndl;
-            char crntChar, prevChar;
-            bool lastChnk, cmnt, lineStrt, nxtLineRchd;
-            char fullPath[MAX_NAMESIZE];
+  int fileHndl;
+  char crntChar, prevChar;
+  bool lastChnk, cmnt, lineStrt, nxtLineRchd;
+  char fullPath[MAX_NAMESIZE];
 
-            // Keeps going until it encounters a data character or a line start.
-            int skipSpace();
-            // Keeps going until it encounters a new line (assume no embedded comments).
-            int skipCmnt();
-            // Checks if reloading is necessary and does it or detects end of file.
-            int chckReload();
+  // Keeps going until it encounters a data character or a line start.
+  int skipSpace();
+  // Keeps going until it encounters a new line (assume no embedded comments).
+  int skipCmnt();
+  // Checks if reloading is necessary and does it or detects end of file.
+  int chckReload();
 
-            NXTLINE_TYPE GetNxtVldLine_(int &pieceCnt, char *str[], int lngth[],
-                                        int maxPieceCnt = INBUF_MAX_PIECES_PERLINE);
-            bool IsWhiteSpaceOrLineEnd(char ch);
-            void ReportError(char *msg, char *lineStart, int frstLngth);
-            void ReportFatalError(char *msg, char *lineStart, int frstLngth);
-        };
+  NXTLINE_TYPE GetNxtVldLine_(int &pieceCnt, char *str[], int lngth[],
+                              int maxPieceCnt = INBUF_MAX_PIECES_PERLINE);
+  bool IsWhiteSpaceOrLineEnd(char ch);
+  void ReportError(char *msg, char *lineStart, int frstLngth);
+  void ReportFatalError(char *msg, char *lineStart, int frstLngth);
+};
 
 // A specs buffer is an input buffer for parsing a typical input specification
 // or configurartion file whose format is line based, i.e., includes one spec
 // or setting per line. This class includes one method for parsing one type
 // of specs
-        class SpecsBuffer : public InputBuffer {
-        public:
-            SpecsBuffer();
-            void ReadSpec(char const *title, char *value);
-            void readLine(char *value, int maxPieceCnt);
-            void readLstElmnt(char *value);
-            // FIXME: Unused method
-            int readIntLstElmnt();
-            bool ReadFlagSpec(char const *title, bool dfltValue);
-            // FIXME: Unused method
-            unsigned long ReadUlongSpec(char const *title);
-            float ReadFloatSpec(char const *title);
-            // FIXME: Unused method
-            uint64_t readUInt64Spec(char const *title);
-            int ReadIntSpec(char const *title);
-            // FIXME: Unused method
-            int16_t ReadShortSpec(char const *title);
-            FUNC_RESULT checkTitle(char const *title);
-            void ErrorHandle(char *value);
+class SpecsBuffer : public InputBuffer {
+public:
+  SpecsBuffer();
+  void ReadSpec(char const *title, char *value);
+  void readLine(char *value, int maxPieceCnt);
+  void readLstElmnt(char *value);
+  // FIXME: Unused method
+  int readIntLstElmnt();
+  bool ReadFlagSpec(char const *title, bool dfltValue);
+  // FIXME: Unused method
+  unsigned long ReadUlongSpec(char const *title);
+  float ReadFloatSpec(char const *title);
+  // FIXME: Unused method
+  uint64_t readUInt64Spec(char const *title);
+  int ReadIntSpec(char const *title);
+  // FIXME: Unused method
+  int16_t ReadShortSpec(char const *title);
+  FUNC_RESULT checkTitle(char const *title);
+  void ErrorHandle(char *value);
 
-        protected:
-            NXTLINE_TYPE nxtLineType;
-            static void CombinePieces_(int lngths[], char *strngs[], int startPiece,
-                                       int endPiece, char *target, int &totLngth);
-        };
+protected:
+  NXTLINE_TYPE nxtLineType;
+  static void CombinePieces_(int lngths[], char *strngs[], int startPiece,
+                             int endPiece, char *target, int &totLngth);
+};
 
-    } // namespace opt_sched
+} // namespace opt_sched
 } // namespace llvm
 
 #endif
