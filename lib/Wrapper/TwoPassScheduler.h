@@ -11,52 +11,52 @@
 #include "OptimizingScheduler.h"
 
 namespace llvm {
-namespace opt_sched {
+    namespace opt_sched {
 
-class ScheduleTwoPassOptSched : public ScheduleDAGOptSched {
-private:
-  enum SchedPassStrategy {
-    OptSchedMinRP,
-    OptSchedBalanced
-  };
+        class ScheduleTwoPassOptSched : public ScheduleDAGOptSched {
+        private:
+            enum SchedPassStrategy {
+                OptSchedMinRP,
+                OptSchedBalanced
+            };
 
-  // Vector of scheduling passes to execute.
-  SmallVector<SchedPassStrategy, 4> SchedPasses;
+            // Vector of scheduling passes to execute.
+            SmallVector<SchedPassStrategy, 4> SchedPasses;
 
-  // Vector of regions recorded for later rescheduling
-  SmallVector<std::pair<MachineBasicBlock::iterator,
-                        MachineBasicBlock::iterator>, 32> Regions;
-	
-public:
-  ScheduleTwoPassOptSched(llvm::MachineSchedContext *C,
-                         std::unique_ptr<MachineSchedStrategy> S);
-						 
-  // Rely on the machine scheduler to split the MBB into scheduling regions. In
-  // the first pass record the regions here, but don't do any actual scheduling
-  // until finalizeSchedule is called.
-  void schedule() override;
+            // Vector of regions recorded for later rescheduling
+            SmallVector<std::pair<MachineBasicBlock::iterator,
+                    MachineBasicBlock::iterator>, 32> Regions;
 
-  // After the scheduler is initialized and the scheduling regions have been
-  // recorded, execute the actual scheduling passes here.
-  void finalizeSchedule() override;
+        public:
+            ScheduleTwoPassOptSched(llvm::MachineSchedContext *C,
+                                    std::unique_ptr<MachineSchedStrategy> S);
 
-  // Setup and select schedulers.
-  void initSchedulers();
+            // Rely on the machine scheduler to split the MBB into scheduling regions. In
+            // the first pass record the regions here, but don't do any actual scheduling
+            // until finalizeSchedule is called.
+            void schedule() override;
 
-  // TODO: After we refactor OptSched scheduler options put each scheduling
-  // pass into its own class.
+            // After the scheduler is initialized and the scheduling regions have been
+            // recorded, execute the actual scheduling passes here.
+            void finalizeSchedule() override;
 
-  // Execute a scheduling pass on the function.
-  void runSchedPass(SchedPassStrategy S);
-  
-  // Run OptSched in RP only configuration.
-  void scheduleOptSchedMinRP();
+            // Setup and select schedulers.
+            void initSchedulers();
 
-  // Run OptSched in ILP/RP balanced mode.
-  void scheduleOptSchedBalanced();
-};
+            // TODO: After we refactor OptSched scheduler options put each scheduling
+            // pass into its own class.
 
-} // namespace opt_sched
+            // Execute a scheduling pass on the function.
+            void runSchedPass(SchedPassStrategy S);
+
+            // Run OptSched in RP only configuration.
+            void scheduleOptSchedMinRP();
+
+            // Run OptSched in ILP/RP balanced mode.
+            void scheduleOptSchedBalanced();
+        };
+
+    } // namespace opt_sched
 } // namespace llvm
 
 #endif // LLVM_OPT_SCHED_TWO_PASS_SCHEDULER_H

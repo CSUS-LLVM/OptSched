@@ -4,4 +4,4 @@
 using namespace llvm::opt_sched;
 
 std::chrono::high_resolution_clock::time_point Utilities::startTime =
-    std::chrono::high_resolution_clock::now();
+        std::chrono::high_resolution_clock::now();
