@@ -85,34 +85,36 @@ namespace llvm {
                     SCF_TARGET
         };
 
-// The type of instruction signatures, used by the enumerator's history table to
-// keep track of partial schedules.
+        // The type of instruction signatures, used by the enumerator's history table to
+        // keep track of partial schedules.
         typedef UDT_HASHKEY InstSignature;
 
-// The cycle or slot number of an instruction node which has not been scheduled.
+        // The cycle or slot number of an instruction node which has not been scheduled.
+        // FIXME: Unused variable
         const int SCHD_UNSCHDULD = -1;
-// TODO(ghassan): Document.
+        // TODO(ghassan): Document.
+        // FIXME: Unused variable
         const int SCHD_STALL = -2;
 
-// TODO(max): Eliminate these limits.
-// The maximum number of register definition per instruction node.
+        // TODO(max): Eliminate these limits.
+        // The maximum number of register definition per instruction node.
         const int MAX_DEFS_PER_INSTR = 4096;
-// The maximum number of register usages per instruction node.
+        // The maximum number of register usages per instruction node.
         const int MAX_USES_PER_INSTR = 4096;
 
-// Forward declarations used to reduce the number of #includes.
+        // Forward declarations used to reduce the number of #includes.
         class DataDepGraph;
         class Register;
 
-// There is a circular dependence between SchedInstruction and SchedRange.
+        // There is a circular dependence between SchedInstruction and SchedRange.
         class SchedRange;
 
-// An object of this class contains all the information that a scheduler
-// needs to keep track of for an instruction. This class is derived from
-// GraphNode, since, from the scheduler's point of view, an instruction is a
-// node in the data dependence graph. During scheduling it is critical for each
-// instruction object to be linked to its predecessors and successors in the
-// graph so that it can receive/propagate scheduling information from/to them.
+        // An object of this class contains all the information that a scheduler
+        // needs to keep track of for an instruction. This class is derived from
+        // GraphNode, since, from the scheduler's point of view, an instruction is a
+        // node in the data dependence graph. During scheduling it is critical for each
+        // instruction object to be linked to its predecessors and successors in the
+        // graph so that it can receive/propagate scheduling information from/to them.
         class SchedInstruction : public GraphNode {
         public:
             // Creates a new instruction node for scheduling. Parameters are as follows:
@@ -154,7 +156,7 @@ namespace llvm {
             // early infeasibility might get detected by this function, in which case it
             // returns false. Otherwise, returns true.
             bool InitForSchdulng(InstCount schedLngth = INVALID_VALUE,
-                                 LinkedList<SchedInstruction> *fxdLst = NULL);
+                                 LinkedList<SchedInstruction> *fxdLst = nullptr);
 
             // Returns the name of the instruction.
             const char *GetName() const;
@@ -177,8 +179,10 @@ namespace llvm {
             InstCount GetLwrBound(DIRECTION dir) const;
 
             // Returns the number of predecessors of this instruction.
+            // FIXME: Hides a non-virtual method
             InstCount GetPrdcsrCnt() const;
             // Returns the number of successors of this instruction node.
+            // FIXME: Hides a non-virtual method
             InstCount GetScsrCnt() const;
             // Returns the number of predecessors in this instructions transitive
             // closure (i.e. total number of ancestors).
@@ -197,14 +201,14 @@ namespace llvm {
             //     successor list.
             //   ltncy: the latency from the predecessor to this instruction.
             //   depType: the type of dependence between this node and the predecessor.
-            SchedInstruction *GetFrstPrdcsr(InstCount *scsrNum = NULL,
-                                            UDT_GLABEL *ltncy = NULL,
-                                            DependenceType *depType = NULL);
+            SchedInstruction *GetFrstPrdcsr(InstCount *scsrNum = nullptr,
+                                            UDT_GLABEL *ltncy = nullptr,
+                                            DependenceType *depType = nullptr);
             // Returns the next predecessor of this instruction node and moves the
             // predecessor iterator forward. Fills parameters as above.
-            SchedInstruction *GetNxtPrdcsr(InstCount *scsrNum = NULL,
-                                           UDT_GLABEL *ltncy = NULL,
-                                           DependenceType *depType = NULL);
+            SchedInstruction *GetNxtPrdcsr(InstCount *scsrNum = nullptr,
+                                           UDT_GLABEL *ltncy = nullptr,
+                                           DependenceType *depType = nullptr);
 
             // Returns the first successor of this instruction node and resets the
             // successor iterator. Writes edge properties into the parameters if
@@ -213,34 +217,35 @@ namespace llvm {
             //     predecessor list.
             //   ltncy: the latency from this instruction to the successor.
             //   depType: the type of dependence between this node and the successor.
-            SchedInstruction *GetFrstScsr(InstCount *prdcsrNum = NULL,
-                                          UDT_GLABEL *ltncy = NULL,
-                                          DependenceType *depType = NULL);
+            SchedInstruction *GetFrstScsr(InstCount *prdcsrNum = nullptr,
+                                          UDT_GLABEL *ltncy = nullptr,
+                                          DependenceType *depType = nullptr);
             // Returns the next successor of this instruction node and moves the
             // successor iterator forward. Fills parameters as above.
-            SchedInstruction *GetNxtScsr(InstCount *prdcsrNum = NULL,
-                                         UDT_GLABEL *ltncy = NULL,
-                                         DependenceType *depType = NULL);
+            // FIXME: Unimplemented method
+            SchedInstruction *GetNxtScsr(InstCount *prdcsrNum = nullptr,
+                                         UDT_GLABEL *ltncy = nullptr,
+                                         DependenceType *depType = nullptr);
 
             // Returns the last successor of this instruction node and moves the
             // successor iterator to the end of the list. If prdcsrNum is provided, this
             // instruction's number (order) in the successor's predecessor list is
             // written to it.
-            SchedInstruction *GetLastScsr(InstCount *prdcsrNum = NULL);
+            SchedInstruction *GetLastScsr(InstCount *prdcsrNum = nullptr);
             // Returns the previous predecessor of this instruction node and moves the
             // predecessor iterator backward. Fills prdcsrNum as above.
-            SchedInstruction *GetPrevScsr(InstCount *prdcsrNum = NULL);
+            SchedInstruction *GetPrevScsr(InstCount *prdcsrNum = nullptr);
 
             // Returns the first predecessor or successor of this instruction node,
             // depending on the value of dir, filling in the latency from the
             // predecessor to this instruction into ltncy, if provided. Resets the
             // predecessor or successor iterator (the two iterator are independent).
-            SchedInstruction *GetFrstNghbr(DIRECTION dir, UDT_GLABEL *ltncy = NULL);
+            SchedInstruction *GetFrstNghbr(DIRECTION dir, UDT_GLABEL *ltncy = nullptr);
             // Returns the next predecessor or successor of this instruction node,
             // depending on the value of dir, filling in the latency from the
             // predecessor to this instruction into ltncy, if provided. Moves the
             // predecessor iterator forward (the two iterator are independent).
-            SchedInstruction *GetNxtNghbr(DIRECTION dir, UDT_GLABEL *ltncy = NULL);
+            SchedInstruction *GetNxtNghbr(DIRECTION dir, UDT_GLABEL *ltncy = nullptr);
             /***************************************************************************/
 
             // Sets the instruction's current forward and backward lower bounds to the
@@ -284,6 +289,7 @@ namespace llvm {
 
             // Notifies this instruction that one of its successors has been scheduled.
             // Returns true if that was the last successor to schedule.
+            // FIXME: Unused method
             bool ScsrSchduld();
 
             // Schedules the instruction to a given cycle and clot number.
@@ -292,6 +298,8 @@ namespace llvm {
             void UnSchedule();
 
             // Sets the instruction type to a given value.
+
+            // FIXME: Unused method
             void SetInstType(InstType type);
             // Returns the type of the instruction.
             InstType GetInstType() const;
@@ -303,7 +311,7 @@ namespace llvm {
             // Returns whether the instruction has been scheduled. If the cycle argument
             // is provided, it is filled with the cycle to which this instruction has
             // been scheduled.
-            bool IsSchduld(InstCount *cycle = NULL) const;
+            bool IsSchduld(InstCount *cycle = nullptr) const;
 
             // Returns the cycle to which this instruction has been scheduled.
             InstCount GetSchedCycle() const;
@@ -316,6 +324,7 @@ namespace llvm {
             InstCount GetCrntReleaseTime() const;
             // Returns the relaxed cycle number for this instruction.
             // TODO(ghassan): Elaborate.
+            // FIXME: Unused method
             InstCount GetRlxdCycle() const;
             // Sets the relaxed cycle number for this instruction.
             // TODO(ghassan): Elaborate.
@@ -331,6 +340,7 @@ namespace llvm {
             // is added to the given list to be used for efficient untightening. This
             // function returns with false as soon as infeasiblity (w.r.t the given
             // schedule length) is detected, otherwise it returns true.
+            // FIXME: Unused method
             bool TightnLwrBound(DIRECTION dir, InstCount newLwrBound,
                                 LinkedList<SchedInstruction> *tightndLst,
                                 LinkedList<SchedInstruction> *fxdLst, bool enforce);
@@ -402,6 +412,7 @@ namespace llvm {
             // Add a register usage to this instruction node.
             void AddUse(Register *reg);
             // Returns whether this instruction defines the specified register.
+            // FIXME: Unused method
             bool FindDef(Register *reg) const;
             // Returns whether this instruction uses the specified register.
             bool FindUse(Register *reg) const;
@@ -411,18 +422,20 @@ namespace llvm {
             // Retrieves the list of registers used by this node. The array is put
             // into uses and the number of elements is returned.
             int16_t GetUses(Register **&uses);
-
+            // FIXME: Unused method
             int16_t GetDefCnt() { return defCnt_; }
             int16_t GetUseCnt() { return useCnt_; }
 
             // Return the adjusted use count. The number of uses minus live-out uses.
             int16_t GetAdjustedUseCnt() { return adjustedUseCnt_; }
             // Computer the adjusted use count. Update "adjustedUseCnt_".
+            // FIXME: Unimplemented method
             void ComputeAdjustedUseCnt(SchedInstruction *inst);
 
             int16_t CmputLastUseCnt();
             int16_t GetLastUseCnt() { return lastUseCnt_; }
 
+            // FIXME: Unused method
             InstType GetCrtclPathFrmRoot() { return crtclPathFrmRoot_; }
 
             friend class SchedRange;
@@ -593,15 +606,15 @@ namespace llvm {
             void ComputeAdjustedUseCnt_();
         };
 
-// A class to keep track of dynamic SchedInstruction lower bounds, i.e. lower
-// bounds which are tightened during enumeration based on the constraints
-// imposed by the enumerator's decisions. This differs from bounds defined in
-// SchedInstruction, which are static lower bounds computed before enumerations
-// starts.
+        // A class to keep track of dynamic SchedInstruction lower bounds, i.e. lower
+        // bounds which are tightened during enumeration based on the constraints
+        // imposed by the enumerator's decisions. This differs from bounds defined in
+        // SchedInstruction, which are static lower bounds computed before enumerations
+        // starts.
         class SchedRange {
         public:
             // Creates a scheduling range for a given instruction.
-            SchedRange(SchedInstruction *inst);
+            explicit SchedRange(SchedInstruction *inst);
 
             // Sets the range's boudns to the given values. If the range is then
             // "fixed" with respect to schedLngth, adds its instruction to fxdLst.
