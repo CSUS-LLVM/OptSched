@@ -51,8 +51,7 @@ createCortexA7MMGenerator(const llvm::ScheduleDAGInstrs *dag,
 } // end anonymous namespace
 
 OptSchedMachineModel::OptSchedMachineModel(const char *configFile)
-    : MachineModel(configFile), shouldGenerateMM(false),
-      MMGen(nullptr) {}
+    : MachineModel(configFile), shouldGenerateMM(false), MMGen(nullptr) {}
 
 void OptSchedMachineModel::convertMachineModel(
     const ScheduleDAGInstrs &dag, const RegisterClassInfo *regClassInfo) {
@@ -110,8 +109,7 @@ void OptSchedMachineModel::convertMachineModel(
     registerTypes_.push_back(VGPR32);
   } else {
     const auto *TRI = dag.TRI;
-    for (unsigned pSet = 0; pSet < TRI->getNumRegPressureSets();
-         ++pSet) {
+    for (unsigned pSet = 0; pSet < TRI->getNumRegPressureSets(); ++pSet) {
       RegTypeInfo regType;
       regType.name = TRI->getRegPressureSetName(pSet);
       int pressureLimit = regClassInfo->getRegPressureSetLimit(pSet);

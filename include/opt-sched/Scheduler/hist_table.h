@@ -8,9 +8,9 @@ Last Update:  Mar. 2011
 #ifndef OPTSCHED_ENUM_HIST_TABLE_H
 #define OPTSCHED_ENUM_HIST_TABLE_H
 
-#include "opt-sched/Scheduler/gen_sched.h"
-#include "opt-sched/Scheduler/enumerator.h"
 #include "opt-sched/Scheduler/defines.h"
+#include "opt-sched/Scheduler/enumerator.h"
+#include "opt-sched/Scheduler/gen_sched.h"
 #include "opt-sched/Scheduler/hash_table.h"
 #include "opt-sched/Scheduler/mem_mngr.h"
 #include <cstdio>

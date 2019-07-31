@@ -146,7 +146,7 @@ list<float> Config::GetFloatList(const string &name) const {
   return Split<float>(GetString(name, ""));
 }
 
-SchedulerOptions& SchedulerOptions::getInstance() {
+SchedulerOptions &SchedulerOptions::getInstance() {
   static SchedulerOptions instance; // The instance will always be destroyed.
   return instance;
 }

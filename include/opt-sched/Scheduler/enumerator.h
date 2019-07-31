@@ -9,10 +9,10 @@ Last Update:  Jun. 2017
 #define OPTSCHED_ENUM_ENUMERATOR_H
 
 #include "opt-sched/Scheduler/data_dep.h"
-#include "opt-sched/Scheduler/gen_sched.h"
-#include "opt-sched/Scheduler/ready_list.h"
 #include "opt-sched/Scheduler/defines.h"
+#include "opt-sched/Scheduler/gen_sched.h"
 #include "opt-sched/Scheduler/mem_mngr.h"
+#include "opt-sched/Scheduler/ready_list.h"
 #include "opt-sched/Scheduler/relaxed_sched.h"
 #include <iostream>
 #include <vector>
@@ -506,8 +506,8 @@ protected:
 public:
   Enumerator(DataDepGraph *dataDepGraph, MachineModel *machMdl,
              InstCount schedUprBound, int16_t sigHashSize,
-             SchedPriorities prirts, Pruning PruningStrategy, bool SchedForRPOnly,
-             bool enblStallEnum, Milliseconds timeout,
+             SchedPriorities prirts, Pruning PruningStrategy,
+             bool SchedForRPOnly, bool enblStallEnum, Milliseconds timeout,
              InstCount preFxdInstCnt = 0,
              SchedInstruction *preFxdInsts[] = NULL);
   virtual ~Enumerator();
@@ -526,7 +526,9 @@ public:
   inline bool IsSchedForRPOnly() const { return SchedForRPOnly_; }
 
   // Calculates the schedule and returns it in the passed argument.
-  FUNC_RESULT FindSchedule(InstSchedule *sched, SchedRegion *rgn) { return RES_ERROR; }
+  FUNC_RESULT FindSchedule(InstSchedule *sched, SchedRegion *rgn) {
+    return RES_ERROR;
+  }
 };
 /*****************************************************************************/
 
@@ -549,9 +551,9 @@ private:
 public:
   LengthEnumerator(DataDepGraph *dataDepGraph, MachineModel *machMdl,
                    InstCount schedUprBound, int16_t sigHashSize,
-                   SchedPriorities prirts, Pruning PruningStrategy, bool SchedForRPOnly,
-                   bool enblStallEnum, Milliseconds timeout,
-                   InstCount preFxdInstCnt = 0,
+                   SchedPriorities prirts, Pruning PruningStrategy,
+                   bool SchedForRPOnly, bool enblStallEnum,
+                   Milliseconds timeout, InstCount preFxdInstCnt = 0,
                    SchedInstruction *preFxdInsts[] = NULL);
   virtual ~LengthEnumerator();
   void Reset();

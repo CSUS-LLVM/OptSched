@@ -9,9 +9,9 @@ Last Update:  Apr. 2011
 #ifndef OPTSCHED_SPILL_BB_SPILL_H
 #define OPTSCHED_SPILL_BB_SPILL_H
 
+#include "opt-sched/Scheduler/OptSchedTarget.h"
 #include "opt-sched/Scheduler/defines.h"
 #include "opt-sched/Scheduler/sched_region.h"
-#include "opt-sched/Scheduler/OptSchedTarget.h"
 #include "llvm/ADT/SmallVector.h"
 #include <map>
 #include <set>

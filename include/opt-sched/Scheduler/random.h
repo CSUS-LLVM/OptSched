@@ -26,7 +26,7 @@ uint64_t GetRand64();
 // Fill a buffer with a specified number of random bits, rounded to the
 // nearest byte boundary.
 void GetRandBits(uint16_t bitCnt, unsigned char *dest);
-}
+} // namespace RandomGen
 
 } // namespace opt_sched
 } // namespace llvm

@@ -482,8 +482,8 @@ bool CostHistEnumTreeNode::ChkCostDmntnForBBSpill_(EnumTreeNode *Node,
     // pruning conditions that are specific to the current cost function.
     if (SpillCostFunc == SCF_TARGET || SpillCostFunc == SCF_PRP ||
         SpillCostFunc == SCF_PERP)
-      ShouldPrune = doesHistoryPeakCostDominate(Node->GetCostLwrBound(),
-                                                totalCost_, LCE);
+      ShouldPrune =
+          doesHistoryPeakCostDominate(Node->GetCostLwrBound(), totalCost_, LCE);
 
     else if (SpillCostFunc == SCF_SLIL)
       ShouldPrune = doesHistorySLILCostDominate(Node->GetCostLwrBound(),

@@ -4,8 +4,8 @@
 // for setiosflags(), setprecision().
 #include "opt-sched/Scheduler/buffers.h"
 #include "opt-sched/Scheduler/logger.h"
-#include <iomanip>
 #include <cassert>
+#include <iomanip>
 
 using namespace llvm::opt_sched;
 
@@ -105,7 +105,8 @@ int16_t MachineModel::GetRegTypeByName(char const *const regTypeName) const {
       break;
     }
   }
-  assert(Type != INVALID_VALUE && "No register type with that name in machine model");
+  assert(Type != INVALID_VALUE &&
+         "No register type with that name in machine model");
   return Type;
 }
 

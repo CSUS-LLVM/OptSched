@@ -15,18 +15,15 @@ namespace opt_sched {
 
 class ScheduleDAGOptSchedGCN : public ScheduleDAGOptSched {
 private:
-  enum SchedPassStrategy {
-    GCNMaxOcc,
-    OptSchedMaxOcc,
-    OptSchedBalanced
-  };
+  enum SchedPassStrategy { GCNMaxOcc, OptSchedMaxOcc, OptSchedBalanced };
 
   // Vector of scheduling passes to execute.
   SmallVector<SchedPassStrategy, 4> SchedPasses;
 
-	// Vector of regions recorded for later rescheduling
-  SmallVector<std::pair<MachineBasicBlock::iterator,
-                        MachineBasicBlock::iterator>, 32> Regions;
+  // Vector of regions recorded for later rescheduling
+  SmallVector<
+      std::pair<MachineBasicBlock::iterator, MachineBasicBlock::iterator>, 32>
+      Regions;
 
 public:
   ScheduleDAGOptSchedGCN(llvm::MachineSchedContext *C,
@@ -54,7 +51,7 @@ public:
   void scheduleGCNMaxOcc();
 
   // Run OptSched in RP only (max occupancy) configuration.
-	void scheduleOptSchedMaxOcc();
+  void scheduleOptSchedMaxOcc();
 
   // Run OptSched in ILP/RP balanced mode.
   void scheduleOptSchedBalanced();

@@ -16,7 +16,6 @@
 #include "opt-sched/Scheduler/register.h"
 #include "opt-sched/Scheduler/sched_region.h"
 #include "opt-sched/Scheduler/utilities.h"
-#include "opt-sched/Scheduler/graph_trans.h"
 #include "llvm/ADT/StringMap.h"
 #include "llvm/CodeGen/LiveIntervals.h"
 #include "llvm/CodeGen/MachineRegisterInfo.h"
@@ -176,10 +175,12 @@ createStaticNodeSupTrans(DataDepGraph *DataDepGraph, bool IsMultiPass = false) {
   return llvm::make_unique<StaticNodeSupTrans>(DataDepGraph, IsMultiPass);
 }
 
-void ScheduleDAGOptSched::addGraphTransformations(OptSchedDDGWrapperBasic *BDDG) {
+void ScheduleDAGOptSched::addGraphTransformations(
+    OptSchedDDGWrapperBasic *BDDG) {
   auto *GraphTransfomations = BDDG->GetGraphTrans();
   if (StaticNodeSup)
-    GraphTransfomations->push_back(createStaticNodeSupTrans(BDDG, MultiPassStaticNodeSup));
+    GraphTransfomations->push_back(
+        createStaticNodeSupTrans(BDDG, MultiPassStaticNodeSup));
 }
 
 ScheduleDAGOptSched::ScheduleDAGOptSched(
@@ -351,12 +352,12 @@ void ScheduleDAGOptSched::schedule() {
   SetupLLVMDag();
   OST->initRegion(this, MM.get());
   // Convert graph
-  auto DDG = OST->createDDGWrapper(C, this, MM.get(), LatencyPrecision,
-                                   RegionName);
+  auto DDG =
+      OST->createDDGWrapper(C, this, MM.get(), LatencyPrecision, RegionName);
   DDG->convertSUnits();
   DDG->convertRegFiles();
 
-  auto *BDDG = static_cast<OptSchedDDGWrapperBasic*>(DDG.get());
+  auto *BDDG = static_cast<OptSchedDDGWrapperBasic *>(DDG.get());
   addGraphTransformations(BDDG);
 
   // create region
@@ -398,7 +399,7 @@ void ScheduleDAGOptSched::schedule() {
         Logger::Info("OptSched run failed: rslt=%d, sched=%p. Falling back.",
                      Rslt, (void *)Sched));
     // Scheduling with opt-sched failed.
-    //fallbackScheduler();
+    // fallbackScheduler();
     return;
   }
 
@@ -509,7 +510,8 @@ void ScheduleDAGOptSched::loadOptSchedConfig() {
   // should we print spills for the current function
   OPTSCHED_gPrintSpills = shouldPrintSpills();
   StaticNodeSup = schedIni.GetBool("STATIC_NODE_SUPERIORITY", false);
-  MultiPassStaticNodeSup = schedIni.GetBool("MULTI_PASS_NODE_SUPERIORITY", false);
+  MultiPassStaticNodeSup =
+      schedIni.GetBool("MULTI_PASS_NODE_SUPERIORITY", false);
   // setup pruning
   PruningStrategy.rlxd = schedIni.GetBool("APPLY_RELAXED_PRUNING");
   PruningStrategy.nodeSup = schedIni.GetBool("DYNAMIC_NODE_SUPERIORITY");
@@ -609,8 +611,7 @@ static LISTSCHED_HEURISTIC GetNextHeuristicName(const std::string &Str,
   llvm_unreachable("Unknown heuristic.");
 }
 
-SchedPriorities
-ScheduleDAGOptSched::parseHeuristic(const std::string &Str) {
+SchedPriorities ScheduleDAGOptSched::parseHeuristic(const std::string &Str) {
   SchedPriorities Priorities;
   size_t StartIndex = 0;
   Priorities.cnt = 0;
@@ -619,15 +620,15 @@ ScheduleDAGOptSched::parseHeuristic(const std::string &Str) {
     LISTSCHED_HEURISTIC LSH = GetNextHeuristicName(Str, StartIndex);
     Priorities.vctr[Priorities.cnt++] = LSH;
     switch (LSH) {
-      // Is LUC still the only dynamic heuristic?
-      case LSH_LUC:
-        Priorities.isDynmc = true;
-        break;
-      case LSH_LLVM:
-        UseLLVMScheduler = true;
-        break;
-      default:
-        break;
+    // Is LUC still the only dynamic heuristic?
+    case LSH_LUC:
+      Priorities.isDynmc = true;
+      break;
+    case LSH_LLVM:
+      UseLLVMScheduler = true;
+      break;
+    default:
+      break;
     }
   } while (!(StartIndex > Str.length()));
 

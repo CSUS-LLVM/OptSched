@@ -216,4 +216,3 @@ public:
 } // namespace llvm
 
 #endif // LLVM_OPT_SCHED_OPTIMIZING_SCHEDULER_H
-

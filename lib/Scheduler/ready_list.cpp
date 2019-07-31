@@ -91,24 +91,30 @@ ReadyList::ReadyList(DataDepGraph *dataDepGraph, SchedPriorities prirts) {
     switch (prirts_.vctr[i]) {
     case LSH_CP:
     case LSH_CPR:
-      AddPrirtyToKey_(maxPriority_, keySize, crtclPathBits_, maxCrtclPath_, maxCrtclPath_);
+      AddPrirtyToKey_(maxPriority_, keySize, crtclPathBits_, maxCrtclPath_,
+                      maxCrtclPath_);
       break;
     case LSH_LUC:
     case LSH_UC:
-      AddPrirtyToKey_(maxPriority_, keySize, useCntBits_, maxUseCnt_, maxUseCnt_);
+      AddPrirtyToKey_(maxPriority_, keySize, useCntBits_, maxUseCnt_,
+                      maxUseCnt_);
       break;
     case LSH_NID:
     case LSH_LLVM:
-      AddPrirtyToKey_(maxPriority_, keySize, nodeID_Bits_, maxNodeID_, maxNodeID_);
+      AddPrirtyToKey_(maxPriority_, keySize, nodeID_Bits_, maxNodeID_,
+                      maxNodeID_);
       break;
     case LSH_ISO:
-      AddPrirtyToKey_(maxPriority_, keySize, inptSchedOrderBits_, maxInptSchedOrder_, maxInptSchedOrder_);
+      AddPrirtyToKey_(maxPriority_, keySize, inptSchedOrderBits_,
+                      maxInptSchedOrder_, maxInptSchedOrder_);
       break;
     case LSH_SC:
-      AddPrirtyToKey_(maxPriority_, keySize, scsrCntBits_, maxScsrCnt_, maxScsrCnt_);
+      AddPrirtyToKey_(maxPriority_, keySize, scsrCntBits_, maxScsrCnt_,
+                      maxScsrCnt_);
       break;
     case LSH_LS:
-      AddPrirtyToKey_(maxPriority_, keySize, ltncySumBits_, maxLtncySum_, maxLtncySum_);
+      AddPrirtyToKey_(maxPriority_, keySize, ltncySumBits_, maxLtncySum_,
+                      maxLtncySum_);
       break;
     }
   }
@@ -162,7 +168,7 @@ unsigned long ReadyList::CmputKey_(SchedInstruction *inst, bool isUpdate,
         changed = true;
 
       AddPrirtyToKey_(key, keySize, useCntBits_, newLastUseCnt, maxUseCnt_);
-    break;
+      break;
 
     case LSH_UC:
       AddPrirtyToKey_(key, keySize, useCntBits_, inst->GetUseCnt(), maxUseCnt_);
@@ -206,8 +212,8 @@ void ReadyList::AddLatestSubLists(LinkedList<SchedInstruction> *lst1,
 
 void ReadyList::Print(std::ostream &out) {
   out << "Ready List: ";
-  for (const auto *crntInst = prirtyLst_->GetFrstElmnt();
-       crntInst != NULL; crntInst = prirtyLst_->GetNxtElmnt()) {
+  for (const auto *crntInst = prirtyLst_->GetFrstElmnt(); crntInst != NULL;
+       crntInst = prirtyLst_->GetNxtElmnt()) {
     out << " " << crntInst->GetNum();
   }
   out << '\n';
@@ -328,6 +334,4 @@ void ReadyList::AddPrirtyToKey_(unsigned long &key, int16_t &keySize,
   keySize += bitCnt;
 }
 
-unsigned long ReadyList::MaxPriority() {
-  return maxPriority_;
-}
+unsigned long ReadyList::MaxPriority() { return maxPriority_; }

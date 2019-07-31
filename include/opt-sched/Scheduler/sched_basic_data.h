@@ -11,10 +11,10 @@ Last Update:  Sept. 2013
 // For class string.
 #include <string>
 // For class ostream.
-#include "opt-sched/Scheduler/machine_model.h"
 #include "opt-sched/Scheduler/defines.h"
 #include "opt-sched/Scheduler/graph.h"
 #include "opt-sched/Scheduler/hash_table.h"
+#include "opt-sched/Scheduler/machine_model.h"
 #include <iostream>
 
 namespace llvm {

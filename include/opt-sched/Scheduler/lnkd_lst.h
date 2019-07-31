@@ -449,7 +449,7 @@ template <class T> Entry<T> *LinkedList<T>::AllocEntry_(T *element) {
 
 template <class T> void LinkedList<T>::AllocEntries_() {
   assert(maxSize_ != INVALID_VALUE);
-  allocEntries_ = new Entry<T>[ maxSize_ ];
+  allocEntries_ = new Entry<T>[maxSize_];
   if (allocEntries_ == NULL)
     Logger::Fatal("Out of memory.");
   crntAllocIndx_ = 0;
@@ -505,7 +505,7 @@ template <class T, class K>
 PriorityList<T, K>::PriorityList(int maxSize) : LinkedList<T>(maxSize) {
   if (LinkedList<T>::maxSize_ != INVALID_VALUE) {
     delete[] LinkedList<T>::allocEntries_;
-    LinkedList<T>::allocEntries_ = new Entry<T>[ 0 ];
+    LinkedList<T>::allocEntries_ = new Entry<T>[0];
     AllocEntries_();
   } else {
     allocKeyEntries_ = NULL;
@@ -655,7 +655,7 @@ KeyedEntry<T, K> *PriorityList<T, K>::AllocEntry_(T *element, K key) {
 }
 
 template <class T, class K> void PriorityList<T, K>::AllocEntries_() {
-  allocKeyEntries_ = new KeyedEntry<T, K>[ LinkedList<T>::maxSize_ ];
+  allocKeyEntries_ = new KeyedEntry<T, K>[LinkedList<T>::maxSize_];
   if (allocKeyEntries_ == NULL)
     Logger::Fatal("Out of memory.");
   LinkedList<T>::crntAllocIndx_ = 0;

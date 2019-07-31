@@ -9,9 +9,9 @@ Last Update:  Apr. 2011
 #ifndef OPTSCHED_SCHED_REGION_SCHED_REGION_H
 #define OPTSCHED_SCHED_REGION_SCHED_REGION_H
 
-#include "opt-sched/Scheduler/sched_basic_data.h"
 #include "opt-sched/Scheduler/defines.h"
 #include "opt-sched/Scheduler/lnkd_lst.h"
+#include "opt-sched/Scheduler/sched_basic_data.h"
 // For DataDepGraph, LB_ALG.
 #include "opt-sched/Scheduler/data_dep.h"
 // For Enumerator, LengthCostEnumerator, EnumTreeNode and Pruning.
@@ -45,8 +45,8 @@ public:
   // TODO(max): Document.
   SchedRegion(MachineModel *machMdl, DataDepGraph *dataDepGraph, long rgnNum,
               int16_t sigHashSize, LB_ALG lbAlg, SchedPriorities hurstcPrirts,
-              SchedPriorities enumPrirts, bool vrfySched, Pruning PruningStrategy,
-              SchedulerType HeurSchedType);
+              SchedPriorities enumPrirts, bool vrfySched,
+              Pruning PruningStrategy, SchedulerType HeurSchedType);
   // Destroys the region. Must be overriden by child classes.
   virtual ~SchedRegion() {}
 

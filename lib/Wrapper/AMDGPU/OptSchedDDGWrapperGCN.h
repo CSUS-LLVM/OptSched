@@ -62,12 +62,9 @@ private:
                      const LaneBitmask &LiveMask, bool LiveOut = false);
 
 public:
-  // FIXME: Track VGPR/SGPR tuples or refactor Scheduler to use LLVM/GCN RP tracker.
-  enum SubRegKind {
-    SGPR32,
-    VGPR32,
-    TOTAL_KINDS
-  };
+  // FIXME: Track VGPR/SGPR tuples or refactor Scheduler to use LLVM/GCN RP
+  // tracker.
+  enum SubRegKind { SGPR32, VGPR32, TOTAL_KINDS };
 
   OptSchedDDGWrapperGCN(llvm::MachineSchedContext *Context,
                         ScheduleDAGOptSched *DAG, OptSchedMachineModel *MM,

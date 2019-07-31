@@ -1,8 +1,8 @@
 #include "opt-sched/Scheduler/gen_sched.h"
 #include "opt-sched/Scheduler/data_dep.h"
+#include "opt-sched/Scheduler/logger.h"
 #include "opt-sched/Scheduler/machine_model.h"
 #include "opt-sched/Scheduler/ready_list.h"
-#include "opt-sched/Scheduler/logger.h"
 #include "opt-sched/Scheduler/sched_region.h"
 
 using namespace llvm::opt_sched;
@@ -280,7 +280,8 @@ void ConstrainedScheduler::CleanupCycle_(InstCount cycleNum) {
   }
 }
 
-bool ConstrainedScheduler::IsTriviallyLegal_(const SchedInstruction *inst) const {
+bool ConstrainedScheduler::IsTriviallyLegal_(
+    const SchedInstruction *inst) const {
   // Scheduling a stall is always legal.
   if (inst == NULL)
     return true;

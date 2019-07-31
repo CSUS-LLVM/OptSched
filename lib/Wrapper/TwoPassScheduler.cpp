@@ -5,15 +5,15 @@
 using namespace llvm::opt_sched;
 
 static ScheduleDAGInstrs *createTwoPassOptSched(MachineSchedContext *C) {
-  return new ScheduleTwoPassOptSched(
-      C, llvm::make_unique<GenericScheduler>(C));
+  return new ScheduleTwoPassOptSched(C, llvm::make_unique<GenericScheduler>(C));
 }
 
 // Register the machine scheduler.
 static MachineSchedRegistry
-    OptSchedMIRegistry("two-pass-optsched", "Use the Two Pass OptSched scheduler.",
+    OptSchedMIRegistry("two-pass-optsched",
+                       "Use the Two Pass OptSched scheduler.",
                        createTwoPassOptSched);
-					   
+
 ScheduleTwoPassOptSched::ScheduleTwoPassOptSched(
     llvm::MachineSchedContext *C, std::unique_ptr<MachineSchedStrategy> S)
     : ScheduleDAGOptSched(C, std::move(S)) {}
@@ -99,4 +99,3 @@ void ScheduleTwoPassOptSched::scheduleOptSchedBalanced() {
 
   ScheduleDAGOptSched::schedule();
 }
-

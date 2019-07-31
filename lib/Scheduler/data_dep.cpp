@@ -5,13 +5,13 @@
 
 #include "opt-sched/Scheduler/data_dep.h"
 #include "opt-sched/Scheduler/graph_trans.h"
+#include "opt-sched/Scheduler/logger.h"
 #include "opt-sched/Scheduler/machine_model.h"
 #include "opt-sched/Scheduler/register.h"
-#include "opt-sched/Scheduler/logger.h"
-#include "opt-sched/Scheduler/stats.h"
 #include "opt-sched/Scheduler/relaxed_sched.h"
-#include "llvm/Support/Debug.h"
+#include "opt-sched/Scheduler/stats.h"
 #include "llvm/ADT/STLExtras.h"
+#include "llvm/Support/Debug.h"
 
 // only print pressure if enabled by sched.ini
 extern bool OPTSCHED_gPrintSpills;
@@ -1198,8 +1198,7 @@ void DataDepGraph::CmputCrtclPathsFrmRcrsvScsr_(SchedInstruction *ref) {
 
   // The backward CP of the root relative to this exit must be
   // equal to the forward CP of th exit relative to the root
-  assert(inst->CmputCrtclPathFrmRcrsvScsr(ref) ==
-         ref->GetCrtclPath(DIR_FRWRD));
+  assert(inst->CmputCrtclPathFrmRcrsvScsr(ref) == ref->GetCrtclPath(DIR_FRWRD));
 }
 
 void DataDepGraph::PrintLwrBounds(DIRECTION dir, std::ostream &out,
@@ -1309,13 +1308,13 @@ void DataDepGraph::AddOutputEdges() {
 
 void DataDepGraph::PrintEdgeCntPerLtncyInfo() {
   int totEdgeCnt = 0;
-    Logger::Info("Latency Distribution:");
-    for (int i = 0; i<= MAX_LATENCY_VALUE; i++) {
-      if (edgeCntPerLtncy_[i] > 0)
-        Logger::Info("Latency %d: %d edges", i, edgeCntPerLtncy_[i]);
-      totEdgeCnt += edgeCntPerLtncy_[i];
-    }
-    Logger::Info("Total edge count: %d", totEdgeCnt);
+  Logger::Info("Latency Distribution:");
+  for (int i = 0; i <= MAX_LATENCY_VALUE; i++) {
+    if (edgeCntPerLtncy_[i] > 0)
+      Logger::Info("Latency %d: %d edges", i, edgeCntPerLtncy_[i]);
+    totEdgeCnt += edgeCntPerLtncy_[i];
+  }
+  Logger::Info("Total edge count: %d", totEdgeCnt);
 }
 
 InstCount DataDepGraph::GetRltvCrtclPath(SchedInstruction *ref,
@@ -2888,15 +2887,13 @@ void InstSchedule::Print(std::ostream &out, char const *const label) {
   }
 }
 
-#if defined(IS_DEBUG_PEAK_PRESSURE) || defined (IS_DEBUG_OPTSCHED_PRESSURES)
+#if defined(IS_DEBUG_PEAK_PRESSURE) || defined(IS_DEBUG_OPTSCHED_PRESSURES)
 void InstSchedule::PrintRegPressures() const {
   Logger::Info("OptSched max reg pressures:");
   InstCount i;
   for (i = 0; i < machMdl_->GetRegTypeCnt(); i++) {
-    Logger::Info("%s: Peak %d Limit %d",
-                 machMdl_->GetRegTypeName(i).c_str(),              
-                 peakRegPressures_[i],
-                 machMdl_->GetPhysRegCnt(i));
+    Logger::Info("%s: Peak %d Limit %d", machMdl_->GetRegTypeName(i).c_str(),
+                 peakRegPressures_[i], machMdl_->GetPhysRegCnt(i));
   }
 }
 #endif
@@ -2946,7 +2943,7 @@ bool InstSchedule::Verify(MachineModel *machMdl, DataDepGraph *dataDepGraph) {
   if (!VerifyDataDeps_(dataDepGraph))
     return false;
 
-#if defined(IS_DEBUG_PEAK_PRESSURE) || defined (IS_DEBUG_OPTSCHED_PRESSURES)
+#if defined(IS_DEBUG_PEAK_PRESSURE) || defined(IS_DEBUG_OPTSCHED_PRESSURES)
   PrintRegPressures();
 #endif
 

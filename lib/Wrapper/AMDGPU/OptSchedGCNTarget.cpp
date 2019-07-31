@@ -51,8 +51,10 @@ static unsigned getOccupancyWeight(unsigned Occupancy) {
 
 static unsigned getAdjustedOccupancy(const GCNSubtarget *ST, unsigned VGPRCount,
                                      unsigned SGPRCount, unsigned MaxOccLDS) {
-  unsigned MaxOccVGPR = ST->getOccupancyWithNumVGPRs(VGPRCount + GPRErrorMargin);
-  unsigned MaxOccSGPR = ST->getOccupancyWithNumSGPRs(SGPRCount + GPRErrorMargin);
+  unsigned MaxOccVGPR =
+      ST->getOccupancyWithNumVGPRs(VGPRCount + GPRErrorMargin);
+  unsigned MaxOccSGPR =
+      ST->getOccupancyWithNumSGPRs(SGPRCount + GPRErrorMargin);
   return std::min(MaxOccLDS, std::min(MaxOccVGPR, MaxOccSGPR));
 }
 

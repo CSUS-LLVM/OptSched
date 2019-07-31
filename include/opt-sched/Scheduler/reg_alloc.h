@@ -1,7 +1,7 @@
 /*******************************************************************************
 Description:  Defines register allocation classes. By looking at the effect
-              of scheduling decisions on the number of spills added during simulated
-              register allocation, we can evaluate the performance of the scheduler.
+              of scheduling decisions on the number of spills added during
+simulated register allocation, we can evaluate the performance of the scheduler.
 
 Author:       Austin Kerbow
 Created:      Oct. 2017
@@ -45,7 +45,7 @@ public:
   virtual void SetupForRegAlloc();
   // Print information about the amount of spilling in the region after register
   // allocation.
-  virtual void PrintSpillInfo(const char* dagName);
+  virtual void PrintSpillInfo(const char *dagName);
   // Return the spill cost of region after register allocation.
   virtual int GetCost();
 
@@ -61,18 +61,19 @@ private:
   // For each virtual register, track the next use and the currently assigned
   // physical register.
   vector<map<int, RegMap>> regMaps_;
-  // For each register type, we have a list of physical registers and the current
-  // virtual register that is loaded. If the regsiter is free, set to -1.
+  // For each register type, we have a list of physical registers and the
+  // current virtual register that is loaded. If the regsiter is free, set to
+  // -1.
   vector<vector<int>> physRegs_;
 
   // Find all instructions that use each register.
   void ScanUses_();
   void AllocateReg_(int16_t regType, int virtRegNum);
   // Find a candidate physical register to spill.
-  int FindSpillCand_(std::map<int, RegMap>& regMaps, vector<int>& physRegs);
+  int FindSpillCand_(std::map<int, RegMap> &regMaps, vector<int> &physRegs);
   // Load live-in virtual registers. Live-in registers are defined by the
   // artificial entry instruction.
-  void AddLiveIn_(SchedInstruction* artificialEntry);
+  void AddLiveIn_(SchedInstruction *artificialEntry);
   // Spill all dirty registers.
   void SpillAll_();
 };

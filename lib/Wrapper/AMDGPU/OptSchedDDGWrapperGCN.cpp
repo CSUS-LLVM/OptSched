@@ -43,8 +43,9 @@ LaneBitmask getDefRegMask(const MachineOperand &MO,
   // tracking it isn't set correctly yet. This works correctly however since
   // use mask has been tracked before using LIS.
   return MO.getSubReg() == 0
-    ? MRI.getMaxLaneMaskForVReg(MO.getReg())
-    : MRI.getTargetRegisterInfo()->getSubRegIndexLaneMask(MO.getSubReg());
+             ? MRI.getMaxLaneMaskForVReg(MO.getReg())
+             : MRI.getTargetRegisterInfo()->getSubRegIndexLaneMask(
+                   MO.getSubReg());
 }
 
 // Copied from Target/AMDGPU/GCNRegPressure.cpp
@@ -167,8 +168,7 @@ void OptSchedDDGWrapperGCN::convertRegFiles() {
 
   // Add live-out subregs
   for (const auto &MaskPair : collectLiveSubRegsAtInstr(
-                                SUnits[SUnits.size() - 1].getInstr(),
-                                LIS, MRI, true))
+           SUnits[SUnits.size() - 1].getInstr(), LIS, MRI, true))
     addSubRegUses(GetLeafInst(), MaskPair.RegUnit, MaskPair.LaneMask,
                   /*LiveOut=*/true);
 

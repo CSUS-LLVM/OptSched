@@ -1,7 +1,7 @@
 #include "opt-sched/Scheduler/graph_trans.h"
-#include "opt-sched/Scheduler/register.h"
 #include "opt-sched/Scheduler/bit_vector.h"
 #include "opt-sched/Scheduler/logger.h"
+#include "opt-sched/Scheduler/register.h"
 #include "llvm/ADT/STLExtras.h"
 #include <list>
 
@@ -71,9 +71,9 @@ bool StaticNodeSupTrans::TryAddingSuperiorEdge_(SchedInstruction *nodeA,
   } else if (NodeIsSuperior_(nodeB, nodeA)) {
     AddSuperiorEdge_(nodeB, nodeA);
     // Swap nodeIDs
-    //int tmp = nodeA->GetNodeID();
-    //nodeA->SetNodeID(nodeB->GetNodeID());
-    //nodeB->SetNodeID(tmp);
+    // int tmp = nodeA->GetNodeID();
+    // nodeA->SetNodeID(nodeB->GetNodeID());
+    // nodeB->SetNodeID(tmp);
     edgeWasAdded = true;
   }
 
@@ -122,7 +122,7 @@ FUNC_RESULT StaticNodeSupTrans::ApplyTrans() {
       }
     }
   }
-  
+
   if (IsMultiPass)
     nodeMultiPass_(indepNodes);
 
@@ -183,7 +183,7 @@ bool StaticNodeSupTrans::NodeIsSuperior_(SchedInstruction *nodeA,
   // registers.
   Register **usesA;
   Register **usesB;
-  //Register **usesC;
+  // Register **usesC;
   int useCntA = nodeA->GetUses(usesA);
   int useCntB = nodeB->GetUses(usesB);
   // Register used by B but not by A.
@@ -197,7 +197,7 @@ bool StaticNodeSupTrans::NodeIsSuperior_(SchedInstruction *nodeA,
   std::fill(lengthenedByB.begin(), lengthenedByB.end(), 0);
   // The total number of live ranges that could be lengthened by
   // scheduling B after A.
-  //InstCount totalLengthenedByB = 0;
+  // InstCount totalLengthenedByB = 0;
 
   for (int i = 0; i < useCntB; i++) {
     Register *useB = usesB[i];
@@ -231,45 +231,45 @@ bool StaticNodeSupTrans::NodeIsSuperior_(SchedInstruction *nodeA,
                      "scheduling B after A");
 #endif
         return false;
-        //lengthenedByB[useB->GetType()]++;
-        //totalLengthenedByB++;
+        // lengthenedByB[useB->GetType()]++;
+        // totalLengthenedByB++;
       }
     }
   }
-/*
-  for (int j = 0; j < useCntA && totalLengthenedByB > 0; j++) {
-    Register *useA = usesA[j];
+  /*
+    for (int j = 0; j < useCntA && totalLengthenedByB > 0; j++) {
+      Register *useA = usesA[j];
 
-    if (lengthenedByB[useA->GetType()] < 1)
-      continue;
+      if (lengthenedByB[useA->GetType()] < 1)
+        continue;
 
-    // Try to find an instruction that must be scheduled after A
-    // that uses register "useA".
-    bool foundLaterUse = false;
-    for (const SchedInstruction *user : useA->GetUseList()) {
-      // If "nodeA" is not a recursive predecessor of "user" nodeA is not the
-      // last
-      // user of this register.
-      if (user != nodeA &&
-          !nodeA->IsRcrsvPrdcsr(const_cast<SchedInstruction *>(user))) {
-        foundLaterUse = true;
-        break;
+      // Try to find an instruction that must be scheduled after A
+      // that uses register "useA".
+      bool foundLaterUse = false;
+      for (const SchedInstruction *user : useA->GetUseList()) {
+        // If "nodeA" is not a recursive predecessor of "user" nodeA is not the
+        // last
+        // user of this register.
+        if (user != nodeA &&
+            !nodeA->IsRcrsvPrdcsr(const_cast<SchedInstruction *>(user))) {
+          foundLaterUse = true;
+          break;
+        }
+      }
+
+      if (!foundLaterUse) {
+        lengthenedByB[useA->GetType()]--;
+        totalLengthenedByB--;
       }
     }
 
-    if (!foundLaterUse) {
-      lengthenedByB[useA->GetType()]--;
-      totalLengthenedByB--;
+    if (totalLengthenedByB > 0) {
+  #ifdef IS_DEBUG_GRAPH_TRANS
+      Logger::Info("Live range condition 1 failed");
+  #endif
+      return false;
     }
-  }
-
-  if (totalLengthenedByB > 0) {
-#ifdef IS_DEBUG_GRAPH_TRANS
-    Logger::Info("Live range condition 1 failed");
-#endif
-    return false;
-  }
-*/
+  */
 
   // For each register type, the number of registers defined by A is less than
   // or equal to the number of registers defined by B.
@@ -301,9 +301,10 @@ bool StaticNodeSupTrans::NodeIsSuperior_(SchedInstruction *nodeA,
   return true;
 }
 
-void StaticNodeSupTrans::nodeMultiPass_(std::list<std::pair<SchedInstruction *, SchedInstruction *>> indepNodes) {
+void StaticNodeSupTrans::nodeMultiPass_(
+    std::list<std::pair<SchedInstruction *, SchedInstruction *>> indepNodes) {
 #ifdef IS_DEBUG_GRAPH_TRANS
-      Logger::Info("Applying multi-pass node superiority");
+  Logger::Info("Applying multi-pass node superiority");
 #endif
   // Try to add superior edges until there are no more independent nodes or no
   // edges can be added.

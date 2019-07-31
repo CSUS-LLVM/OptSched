@@ -377,7 +377,7 @@ extern IndexedIntSetStat dependenceTypeLatencies;
 extern IntStat legalListSchedulerInstructionHits;
 extern IntStat illegalListSchedulerInstructionHits;
 
-} // namespce stats
+} // namespace stats
 } // namespace opt_sched
 } // namespace llvm
 

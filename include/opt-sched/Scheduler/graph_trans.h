@@ -99,8 +99,10 @@ private:
   // Add an edge from node A to B and update the graph.
   void AddSuperiorEdge_(SchedInstruction *nodeA, SchedInstruction *nodeB);
 
-  // Keep trying to find superior nodes until none can be found or there are no more independent nodes.
-  void nodeMultiPass_(std::list<std::pair<SchedInstruction *, SchedInstruction *>>);
+  // Keep trying to find superior nodes until none can be found or there are no
+  // more independent nodes.
+  void
+  nodeMultiPass_(std::list<std::pair<SchedInstruction *, SchedInstruction *>>);
 };
 
 } // namespace opt_sched
