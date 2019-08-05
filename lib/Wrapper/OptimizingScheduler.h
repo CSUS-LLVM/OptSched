@@ -29,6 +29,18 @@ namespace opt_sched {
 class OptSchedDDGWrapperBasic;
 
 class ScheduleDAGOptSched : public ScheduleDAGMILive {
+
+private:
+  enum SchedPassStrategy { OptSchedMinRP, OptSchedBalanced };
+
+  // Vector of scheduling passes to execute.
+  SmallVector<SchedPassStrategy, 4> SchedPasses;
+
+  // Vector of regions recorded for later rescheduling
+  SmallVector<
+      std::pair<MachineBasicBlock::iterator, MachineBasicBlock::iterator>, 32>
+      Regions;
+
 protected:
   // Path to opt-sched config options directory.
   SmallString<128> PathCfg;
@@ -42,7 +54,9 @@ protected:
   // Path to the machine model specification file for opt-sched.
   SmallString<128> PathCfgMM;
 
-  bool secondPass;
+  // Bool value indicating that the scheduler is in the second
+  // pass. Used for the two pass scheduling approach.
+  bool SecondPass;
 
   // Region number uniquely identifies DAGs.
   unsigned RegionNumber = ~0u;
@@ -69,6 +83,14 @@ protected:
   // function
   bool OptSchedEnabled;
 
+  // Flag indicating whether the two pass scheduling approach should be used
+  // instead of the original one pass scheduling.
+  bool TwoPassEnabled;
+
+  // Flag indicating whether or not the two pass scheduling approach
+  // has started. The two pass scheduling approach starts in finalizeSchedule.
+  bool TwoPassSchedulingStarted;
+
   // Precision of latency info
   LATENCY_PRECISION LatencyPrecision;
 
@@ -78,6 +100,13 @@ protected:
 
   // A time limit for each schedule length in milliseconds.
   int LengthTimeout;
+
+  // Time limits for two pass scheduling. Same as the above time limits
+  // but for each individual pass.
+  int FirstPassRegionTimeout;
+  int FirstPassLengthTimeout;
+  int SecondPassRegionTimeout;
+  int SecondPassLengthTimeout;
 
   // How to interpret the timeout value? Timeout per instruction or
   // timout per block
@@ -127,6 +156,9 @@ protected:
 
   // The heuristic used for the enumerator.
   SchedPriorities EnumPriorities;
+  
+  // The heuristic used for the second pass enumerator in the two-pass scheduling approach.
+  SchedPriorities SecondPassEnumPriorities;
 
   // Static node superiority RP only graph transformation.
   bool StaticNodeSup;
@@ -156,6 +188,9 @@ protected:
   // Return true if the OptScheduler should be enabled for the function this
   // ScheduleDAG was created for
   bool isOptSchedEnabled() const;
+
+  // Return true if the two pass scheduling approach should be enabled
+  bool isTwoPassEnabled() const;
 
   // get latency precision setting
   LATENCY_PRECISION fetchLatencyPrecision() const;
@@ -196,6 +231,18 @@ public:
 
   // Schedule the current region using the OptScheduler
   void schedule() override;
+
+  // Setup and select schedulers for the two pass scheduling approach.
+  void initSchedulers();
+
+  // Execute a scheduling pass on the function.
+  void runSchedPass(SchedPassStrategy S);
+
+  // Run OptSched in RP only configuration.
+  void scheduleOptSchedMinRP();
+
+  // Run OptSched in ILP/RP balanced mode.
+  void scheduleOptSchedBalanced();
 
   // Print info for all LLVM registers that are used or defined in the region.
   void dumpLLVMRegisters() const;

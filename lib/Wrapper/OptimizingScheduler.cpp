@@ -188,8 +188,6 @@ ScheduleDAGOptSched::ScheduleDAGOptSched(
     : ScheduleDAGMILive(C, std::move(S)), C(C) {
   LLVM_DEBUG(dbgs() << "********** Optimizing Scheduler **********\n");
 
-  secondPass = false;
-
   // Find the native paths to the scheduler configuration files.
   getRealCfgPaths();
 
@@ -241,6 +239,16 @@ void ScheduleDAGOptSched::SetupLLVMDag() {
   }
 }
 
+// Add the two passes used for the two pass scheduling approach
+void ScheduleDAGOptSched::initSchedulers() {
+  // Add passes
+
+  // First
+  SchedPasses.push_back(OptSchedMinRP);
+  // Second
+  SchedPasses.push_back(OptSchedBalanced);
+}
+
 // schedule called for each basic block
 void ScheduleDAGOptSched::schedule() {
   ShouldTrackPressure = true;
@@ -255,6 +263,16 @@ void ScheduleDAGOptSched::schedule() {
     LLVM_DEBUG(dbgs() << "Skipping region " << RegionName << "\n");
     return;
   }
+
+  // If two pass scheduling is enabled then
+  // first just record the scheduling region.
+  if (TwoPassEnabled && (!TwoPassSchedulingStarted)) {
+    Regions.push_back(std::make_pair(RegionBegin, RegionEnd));
+    Logger::Info("Recording scheduling region before scheduling with two pass "
+                 "scheduler...\n");
+    return;
+  }
+
   Logger::Info("********** Opt Scheduling **********");
   LLVM_DEBUG(dbgs() << "********** Scheduling Region " << RegionName
                     << " **********\n");
@@ -375,21 +393,23 @@ void ScheduleDAGOptSched::schedule() {
   FUNC_RESULT Rslt;
   bool FilterByPerp = schedIni.GetBool("FILTER_BY_PERP");
 
+  int CurrentRegionTimeout = RegionTimeout;
+  int CurrentLengthTimeout = LengthTimeout;
   if (IsTimeoutPerInst) {
     // Re-calculate timeout values if timeout setting is per instruction
-    // becuase we want a unique value per DAG size
-    RegionTimeout = schedIni.GetInt("REGION_TIMEOUT") * SUnits.size();
-    LengthTimeout = schedIni.GetInt("LENGTH_TIMEOUT") * SUnits.size();
+    // because we want a unique value per DAG size
+    CurrentRegionTimeout = RegionTimeout * SUnits.size();
+    CurrentLengthTimeout = LengthTimeout * SUnits.size();
   }
 
   // Used for two-pass-optsched to alter upper bound value.
-  if (secondPass)
+  if (SecondPass)
     region->InitSecondPass();
 
   // Setup time before scheduling
   Utilities::startTime = std::chrono::high_resolution_clock::now();
   // Schedule region.
-  Rslt = region->FindOptimalSchedule(RegionTimeout, LengthTimeout, IsEasy,
+  Rslt = region->FindOptimalSchedule(CurrentRegionTimeout, CurrentLengthTimeout, IsEasy,
                                      NormBestCost, BestSchedLngth,
                                      NormHurstcCost, HurstcSchedLngth, Sched,
                                      FilterByPerp, blocksToKeep(schedIni));
@@ -503,6 +523,9 @@ void ScheduleDAGOptSched::loadOptSchedConfig() {
   SchedulerOptions &schedIni = SchedulerOptions::getInstance();
   // setup OptScheduler configuration options
   OptSchedEnabled = isOptSchedEnabled();
+  TwoPassEnabled = isTwoPassEnabled();
+  TwoPassSchedulingStarted = false;
+  SecondPass = false;
   LatencyPrecision = fetchLatencyPrecision();
   TreatOrderAsDataDeps = schedIni.GetBool("TREAT_ORDER_DEPS_AS_DATA_DEPS");
 
@@ -530,9 +553,14 @@ void ScheduleDAGOptSched::loadOptSchedConfig() {
   LowerBoundAlgorithm = parseLowerBoundAlgorithm();
   HeuristicPriorities = parseHeuristic(schedIni.GetString("HEURISTIC"));
   EnumPriorities = parseHeuristic(schedIni.GetString("ENUM_HEURISTIC"));
+  SecondPassEnumPriorities = parseHeuristic(schedIni.GetString("SECOND_PASS_ENUM_HEURISTIC"));
   SCF = parseSpillCostFunc();
   RegionTimeout = schedIni.GetInt("REGION_TIMEOUT");
+  FirstPassRegionTimeout = schedIni.GetInt("FIRST_PASS_REGION_TIMEOUT");
+  SecondPassRegionTimeout = schedIni.GetInt("SECOND_PASS_REGION_TIMEOUT");
   LengthTimeout = schedIni.GetInt("LENGTH_TIMEOUT");
+  FirstPassLengthTimeout = schedIni.GetInt("FIRST_PASS_LENGTH_TIMEOUT");
+  SecondPassLengthTimeout = schedIni.GetInt("SECOND_PASS_LENGTH_TIMEOUT");
   if (schedIni.GetString("TIMEOUT_PER") == "INSTR")
     IsTimeoutPerInst = true;
   else
@@ -559,6 +587,21 @@ bool ScheduleDAGOptSched::isOptSchedEnabled() const {
     return false;
   } else {
     LLVM_DEBUG(dbgs() << "Invalid value for USE_OPT_SCHED" << optSchedOption
+                      << "Assuming NO.\n");
+    return false;
+  }
+}
+
+bool ScheduleDAGOptSched::isTwoPassEnabled() const {
+  // check scheduler ini file to see if two pass scheduling is enabled
+  auto twoPassOption =
+      SchedulerOptions::getInstance().GetString("USE_TWO_PASS");
+  if (twoPassOption == "YES") {
+    return true;
+  } else if (twoPassOption == "NO") {
+    return false;
+  } else {
+    LLVM_DEBUG(dbgs() << "Invalid value for USE_TWO_PASS" << twoPassOption
                       << "Assuming NO.\n");
     return false;
   }
@@ -697,6 +740,43 @@ bool ScheduleDAGOptSched::rpMismatch(InstSchedule *sched) {
 }
 
 void ScheduleDAGOptSched::finalizeSchedule() {
+  if (TwoPassEnabled && OptSchedEnabled) {
+    initSchedulers();
+
+    Logger::Info("Starting two pass scheduling approach...\n");
+    TwoPassSchedulingStarted = true;
+    for (const SchedPassStrategy &S : SchedPasses) {
+      MachineBasicBlock *MBB = nullptr;
+      // Reset
+      RegionNumber = ~0u;
+
+      for (auto &Region : Regions) {
+        RegionBegin = Region.first;
+        RegionEnd = Region.second;
+
+        if (RegionBegin->getParent() != MBB) {
+          if (MBB)
+            finishBlock();
+          MBB = RegionBegin->getParent();
+          startBlock(MBB);
+        }
+        unsigned NumRegionInstrs = std::distance(begin(), end());
+        enterRegion(MBB, begin(), end(), NumRegionInstrs);
+
+        // Skip empty scheduling regions (0 or 1 schedulable instructions).
+        if (begin() == end() || begin() == std::prev(end())) {
+          exitRegion();
+          continue;
+        }
+        runSchedPass(S);
+        Region = std::make_pair(RegionBegin, RegionEnd);
+        exitRegion();
+      }
+      finishBlock();
+    }
+    Logger::Info("Two pass scheduling was successful.\n");
+  }
+
   ScheduleDAGMILive::finalizeSchedule();
 
   LLVM_DEBUG(if (isSimRegAllocEnabled()) {
@@ -705,6 +785,42 @@ void ScheduleDAGOptSched::finalizeSchedule() {
            << "\nTotal Simulated Spills: " << SimulatedSpills << "\n";
     dbgs() << "*************************************\n";
   });
+}
+
+void ScheduleDAGOptSched::runSchedPass(SchedPassStrategy S) {
+  switch (S) {
+  case OptSchedMinRP:
+    scheduleOptSchedMinRP();
+    break;
+  case OptSchedBalanced:
+    scheduleOptSchedBalanced();
+    break;
+  }
+}
+
+void ScheduleDAGOptSched::scheduleOptSchedMinRP() {
+  Logger::Info("First pass through...\n");
+  LatencyPrecision = LTP_UNITY;
+  RegionTimeout = FirstPassRegionTimeout;
+  LengthTimeout = FirstPassLengthTimeout;
+  HeurSchedType = SCHED_LIST;
+
+  schedule();
+}
+
+void ScheduleDAGOptSched::scheduleOptSchedBalanced() {
+  Logger::Info("Second pass through...\n");
+  SecondPass = true;
+  LatencyPrecision = LTP_ROUGH;
+  RegionTimeout = SecondPassRegionTimeout;
+  LengthTimeout = SecondPassLengthTimeout;
+  EnumPriorities = SecondPassEnumPriorities;
+  // Force the input to the balanced scheduler to be the sequential order of the
+  // (hopefully) good max occupancy schedule. We don’t want the list scheduler
+  // to mangle the input because of latency or resource constraints.
+  HeurSchedType = SCHED_SEQ;
+
+  schedule();
 }
 
 bool ScheduleDAGOptSched::isSimRegAllocEnabled() const {
