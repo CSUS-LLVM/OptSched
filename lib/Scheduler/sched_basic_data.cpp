@@ -698,7 +698,7 @@ bool SchedInstruction::ProbeScsrsCrntLwrBounds(InstCount cycle) {
 void SchedInstruction::ComputeAdjustedUseCnt_() {
   Register **uses;
   int useCnt = GetUses(uses);
-  adjustedUseCnt_ = GetUses(uses);
+  adjustedUseCnt_ = useCnt;
 
   for (int i = 0; i < useCnt; i++) {
     if (uses[i]->IsLiveOut())
