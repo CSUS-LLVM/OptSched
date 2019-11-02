@@ -3260,16 +3260,16 @@ bool DataDepGraph::DoesFeedUser(SchedInstruction *inst) {
     SchedInstruction *succInst = static_cast<SchedInstruction *>(succ);
     
     int curInstAdjUseCnt = succInst->GetAdjustedUseCnt();
-    // Ignore successor instructions that does not close registers
+    // Ignore successor instructions that does not close live intervals
     if (curInstAdjUseCnt == 0)
       continue;
-    // Ignore instructions that define more registers than it closes
-    // because it will increase register pressure instead.
+    // Ignore instructions that open more live intervals than
+    // it closes because it will increase register pressure instead.
     else if (curInstAdjUseCnt < succInst->GetDefCnt())
       continue;
 
-    // If there is an adjusted use and it decreases register pressure
-    // or it does not increase register pressure, then return true.
+    // If there is a successor instruction that decreases live intervals
+    // or one that does not increase live intervals, then return true.
     return true;
 
   }
