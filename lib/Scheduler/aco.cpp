@@ -11,7 +11,9 @@
 
 using namespace llvm::opt_sched;
 
+#ifndef NDEBUG
 static void PrintInstruction(SchedInstruction *inst);
+#endif
 void PrintSchedule(InstSchedule *schedule);
 
 double RandDouble(double min, double max) {
@@ -391,6 +393,7 @@ void ACOScheduler::PrintPheremone() {
   std::cerr << std::endl;
 }
 
+#ifndef NDEBUG
 static void PrintInstruction(SchedInstruction *inst) {
   std::cerr << std::setw(2) << inst->GetNum() << " ";
   std::cerr << std::setw(20) << std::left << inst->GetOpCode();
@@ -414,6 +417,7 @@ static void PrintInstruction(SchedInstruction *inst) {
   }
   std::cerr << std::endl;
 }
+#endif
 
 void PrintSchedule(InstSchedule *schedule) {
   std::cerr << schedule->GetCost() << ": ";
