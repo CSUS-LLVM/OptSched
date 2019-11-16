@@ -743,7 +743,7 @@ void ScheduleDAGOptSched::finalizeSchedule() {
   if (TwoPassEnabled && OptSchedEnabled) {
     initSchedulers();
 
-    Logger::Info("Starting two pass scheduling approach...\n");
+    LLVM_DEBUG(dbgs() << "Starting two pass scheduling approach\n");
     TwoPassSchedulingStarted = true;
     for (const SchedPassStrategy &S : SchedPasses) {
       MachineBasicBlock *MBB = nullptr;
@@ -774,7 +774,6 @@ void ScheduleDAGOptSched::finalizeSchedule() {
       }
       finishBlock();
     }
-    Logger::Info("Two pass scheduling was successful.\n");
   }
 
   ScheduleDAGMILive::finalizeSchedule();
@@ -799,8 +798,9 @@ void ScheduleDAGOptSched::runSchedPass(SchedPassStrategy S) {
 }
 
 void ScheduleDAGOptSched::scheduleOptSchedMinRP() {
-  Logger::Info("First pass through...\n");
+  LLVM_DEBUG(dbgs() << "Starting first pass through\n");
   LatencyPrecision = LTP_UNITY;
+  // Set times for the first pass
   RegionTimeout = FirstPassRegionTimeout;
   LengthTimeout = FirstPassLengthTimeout;
   HeurSchedType = SCHED_LIST;
@@ -809,11 +809,13 @@ void ScheduleDAGOptSched::scheduleOptSchedMinRP() {
 }
 
 void ScheduleDAGOptSched::scheduleOptSchedBalanced() {
-  Logger::Info("Second pass through...\n");
+  LLVM_DEBUG(dbgs() << "Starting second pass through\n");
   SecondPass = true;
   LatencyPrecision = LTP_ROUGH;
+  // Set times for the second pass
   RegionTimeout = SecondPassRegionTimeout;
   LengthTimeout = SecondPassLengthTimeout;
+  // Set the heuristic for the enumerator in the second pass.
   EnumPriorities = SecondPassEnumPriorities;
   // Force the input to the balanced scheduler to be the sequential order of the
   // (hopefully) good max occupancy schedule. We don’t want the list scheduler
