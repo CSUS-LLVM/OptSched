@@ -698,12 +698,12 @@ bool SchedInstruction::ProbeScsrsCrntLwrBounds(InstCount cycle) {
 void SchedInstruction::ComputeAdjustedUseCnt_() {
   Register **uses;
   int useCnt = GetUses(uses);
+  adjustedUseCnt_ = useCnt;
 
   for (int i = 0; i < useCnt; i++) {
     if (uses[i]->IsLiveOut())
-      useCnt--;
+      adjustedUseCnt_--;
   }
-  adjustedUseCnt_ = useCnt;
 }
 
 InstCount SchedInstruction::GetFileSchedOrder() const {

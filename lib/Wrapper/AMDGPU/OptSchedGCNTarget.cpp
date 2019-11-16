@@ -24,6 +24,7 @@ using namespace llvm::opt_sched;
 // of each type that will be allocated.
 static const unsigned GPRErrorMargin = 3;
 
+#ifndef NDEBUG
 static unsigned getOccupancyWeight(unsigned Occupancy) {
   if (Occupancy == 1)
     return 100;
@@ -48,6 +49,7 @@ static unsigned getOccupancyWeight(unsigned Occupancy) {
 
   llvm_unreachable("Occupancy must be between 1 and 10");
 }
+#endif
 
 static unsigned getAdjustedOccupancy(const GCNSubtarget *ST, unsigned VGPRCount,
                                      unsigned SGPRCount, unsigned MaxOccLDS) {
