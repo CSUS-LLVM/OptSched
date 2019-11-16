@@ -820,6 +820,10 @@ void ScheduleDAGOptSched::scheduleOptSchedBalanced() {
   // to mangle the input because of latency or resource constraints.
   HeurSchedType = SCHED_SEQ;
 
+  // Force disable LLVM scheduler so that it doesn't re-order schedule
+  // from first pass.
+  UseLLVMScheduler = false;
+
   schedule();
 }
 
