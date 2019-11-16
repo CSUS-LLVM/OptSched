@@ -156,7 +156,7 @@ protected:
 
   // The heuristic used for the enumerator.
   SchedPriorities EnumPriorities;
-  
+
   // The heuristic used for the second pass enumerator in the two-pass scheduling approach.
   SchedPriorities SecondPassEnumPriorities;
 
@@ -233,16 +233,16 @@ public:
   void schedule() override;
 
   // Setup and select schedulers for the two pass scheduling approach.
-  void initSchedulers();
+  virtual void initSchedulers();
 
   // Execute a scheduling pass on the function.
-  void runSchedPass(SchedPassStrategy S);
+  virtual void runSchedPass(SchedPassStrategy S);
 
   // Run OptSched in RP only configuration.
   void scheduleOptSchedMinRP();
 
   // Run OptSched in ILP/RP balanced mode.
-  void scheduleOptSchedBalanced();
+  virtual void scheduleOptSchedBalanced();
 
   // Print info for all LLVM registers that are used or defined in the region.
   void dumpLLVMRegisters() const;
