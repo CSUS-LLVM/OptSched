@@ -137,7 +137,7 @@ static bool skipRegion(const StringRef RegionName, const Config &SchedIni) {
 
   const std::list<std::string> regionList =
       SchedIni.GetStringList("REGIONS_TO_SCHEDULE");
-  return std::find(std::begin(regionList), std::end(regionList), RegionName) !=
+  return std::find(std::begin(regionList), std::end(regionList), RegionName) ==
          std::end(regionList);
 }
 
