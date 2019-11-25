@@ -138,9 +138,9 @@ void ScheduleDAGOptSchedGCN::scheduleGCNMaxOcc() {
 }
 
 void ScheduleDAGOptSchedGCN::scheduleOptSchedMaxOcc() {
-  scheduleOptSchedMinRP();
+  ScheduleDAGOptSched::scheduleOptSchedMinRP();
 }
 
 void ScheduleDAGOptSchedGCN::scheduleOptSchedBalanced() {
-  scheduleOptSchedBalanced();
+  ScheduleDAGOptSched::scheduleOptSchedBalanced();
 }
