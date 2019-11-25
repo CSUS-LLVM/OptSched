@@ -268,7 +268,7 @@ void ScheduleDAGOptSched::schedule() {
   // first just record the scheduling region.
   if (TwoPassEnabled && (!TwoPassSchedulingStarted)) {
     Regions.push_back(std::make_pair(RegionBegin, RegionEnd));
-    Logger::Info("Recording scheduling region before scheduling with two pass "
+   LLVM_DEBUG(dbgs() << "Recording scheduling region before scheduling with two pass "
                  "scheduler...\n");
     return;
   }
