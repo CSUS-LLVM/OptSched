@@ -29,11 +29,6 @@ public:
   ScheduleDAGOptSchedGCN(llvm::MachineSchedContext *C,
                          std::unique_ptr<MachineSchedStrategy> S);
 
-  // Rely on the machine scheduler to split the MBB into scheduling regions. In
-  // the first pass record the regions here, but don't do any actual scheduling
-  // until finalizeSchedule is called.
-  void schedule() override;
-
   // After the scheduler is initialized and the scheduling regions have been
   // recorded, execute the actual scheduling passes here.
   void finalizeSchedule() override;
