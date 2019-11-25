@@ -236,7 +236,7 @@ public:
   virtual void initSchedulers();
 
   // Execute a scheduling pass on the function.
-  virtual void runSchedPass(SchedPassStrategy S);
+  void runSchedPass(SchedPassStrategy S);
 
   // Run OptSched in RP only configuration.
   void scheduleOptSchedMinRP();

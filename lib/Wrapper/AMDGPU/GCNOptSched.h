@@ -45,7 +45,7 @@ public:
   // pass into its own class.
 
   // Execute a scheduling pass on the function.
-  void runSchedPass(SchedPassStrategy S) override;
+  void runSchedPass(SchedPassStrategy S);
 
   // Run GCN max occupancy scheduler.
   void scheduleGCNMaxOcc();
