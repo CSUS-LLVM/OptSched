@@ -39,13 +39,13 @@ public:
   void finalizeSchedule() override;
 
   // Setup and select schedulers.
-  void initSchedulers();
+  void initSchedulers() override;
 
   // TODO: After we refactor OptSched scheduler options put each scheduling
   // pass into its own class.
 
   // Execute a scheduling pass on the function.
-  void runSchedPass(SchedPassStrategy S);
+  void runSchedPass(SchedPassStrategy S) override;
 
   // Run GCN max occupancy scheduler.
   void scheduleGCNMaxOcc();
@@ -54,7 +54,7 @@ public:
   void scheduleOptSchedMaxOcc();
 
   // Run OptSched in ILP/RP balanced mode.
-  void scheduleOptSchedBalanced();
+  void scheduleOptSchedBalanced() override;
 };
 
 } // namespace opt_sched

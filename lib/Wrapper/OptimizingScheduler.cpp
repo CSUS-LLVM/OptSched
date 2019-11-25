@@ -825,6 +825,9 @@ void ScheduleDAGOptSched::scheduleOptSchedBalanced() {
   // Force disable LLVM scheduler so that it doesn't re-order schedule
   // from first pass.
   UseLLVMScheduler = false;
+  // Disable RP-only for 2nd pass.
+  SchedForRPOnly = false;
+
 
   schedule();
 }
