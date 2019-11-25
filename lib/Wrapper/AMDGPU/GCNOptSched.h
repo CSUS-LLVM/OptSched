@@ -20,11 +20,6 @@ private:
   // Vector of scheduling passes to execute.
   SmallVector<SchedPassStrategy, 4> SchedPasses;
 
-  // Vector of regions recorded for later rescheduling
-  SmallVector<
-      std::pair<MachineBasicBlock::iterator, MachineBasicBlock::iterator>, 32>
-      Regions;
-
 public:
   ScheduleDAGOptSchedGCN(llvm::MachineSchedContext *C,
                          std::unique_ptr<MachineSchedStrategy> S);

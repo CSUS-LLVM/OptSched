@@ -36,12 +36,13 @@ private:
   // Vector of scheduling passes to execute.
   SmallVector<SchedPassStrategy, 4> SchedPasses;
 
+protected:
+
   // Vector of regions recorded for later rescheduling
   SmallVector<
       std::pair<MachineBasicBlock::iterator, MachineBasicBlock::iterator>, 32>
       Regions;
 
-protected:
   // Path to opt-sched config options directory.
   SmallString<128> PathCfg;
 
