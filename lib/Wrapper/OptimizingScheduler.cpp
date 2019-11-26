@@ -137,7 +137,7 @@ static bool skipRegion(const StringRef RegionName, const Config &SchedIni) {
 
   const std::list<std::string> regionList =
       SchedIni.GetStringList("REGIONS_TO_SCHEDULE");
-  return std::find(std::begin(regionList), std::end(regionList), RegionName) !=
+  return std::find(std::begin(regionList), std::end(regionList), RegionName) ==
          std::end(regionList);
 }
 
@@ -694,7 +694,7 @@ SPILL_COST_FUNCTION ScheduleDAGOptSched::parseSpillCostFunc() const {
     return SCF_PEAK_PLUS_AVG;
   } else if (name == "SLIL") {
     return SCF_SLIL;
-  } else if (name == "OCC" || name == "Target") {
+  } else if (name == "OCC" || name == "TARGET") {
     return SCF_TARGET;
   } else {
     LLVM_DEBUG(
