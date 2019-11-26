@@ -651,7 +651,7 @@ SPILL_COST_FUNCTION ScheduleDAGOptSched::parseSpillCostFunc() const {
     return SCF_PEAK_PLUS_AVG;
   } else if (name == "SLIL") {
     return SCF_SLIL;
-  } else if (name == "OCC" || name == "Target") {
+  } else if (name == "OCC" || name == "TARGET") {
     return SCF_TARGET;
   } else {
     LLVM_DEBUG(
