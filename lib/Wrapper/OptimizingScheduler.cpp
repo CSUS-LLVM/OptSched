@@ -596,15 +596,11 @@ bool ScheduleDAGOptSched::isTwoPassEnabled() const {
   // check scheduler ini file to see if two pass scheduling is enabled
   auto twoPassOption =
       SchedulerOptions::getInstance().GetString("USE_TWO_PASS");
-  if (twoPassOption == "YES") {
+  if (twoPassOption == "YES") 
     return true;
-  } else if (twoPassOption == "NO") {
+  else if (twoPassOption == "NO") 
     return false;
-  } else {
-    LLVM_DEBUG(dbgs() << "Invalid value for USE_TWO_PASS" << twoPassOption
-                      << "Assuming NO.\n");
-    return false;
-  }
+  llvm_unreachable("Unrecognized option for USE_TWO_PASS setting.");
 }
 
 LATENCY_PRECISION ScheduleDAGOptSched::fetchLatencyPrecision() const {
@@ -818,7 +814,7 @@ void ScheduleDAGOptSched::scheduleOptSchedBalanced() {
   // Set the heuristic for the enumerator in the second pass.
   EnumPriorities = SecondPassEnumPriorities;
   // Force the input to the balanced scheduler to be the sequential order of the
-  // (hopefully) good max occupancy schedule. We don’t want the list scheduler
+  // (hopefully) good register pressure schedule. We don’t want the list scheduler
   // to mangle the input because of latency or resource constraints.
   HeurSchedType = SCHED_SEQ;
 
