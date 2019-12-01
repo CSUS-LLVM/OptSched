@@ -50,8 +50,7 @@ SET(OPT_SCHED_SRCS Scheduler/aco.cpp
   Wrapper/OptimizingScheduler.cpp
   Wrapper/OptSchedMachineWrapper.cpp
   Wrapper/OptSchedDDGWrapperBasic.cpp
-  Wrapper/OptSchedGenericTarget.cpp
-  Wrapper/TwoPassScheduler.cpp)
+  Wrapper/OptSchedGenericTarget.cpp)
 
 SET(OPT_SCHED_INCLUDE_DIRS ${CMAKE_CURRENT_SOURCE_DIR}/include)
 SET (OPT_SCHED_TARGET_DEPS "LLVMCodeGen")
