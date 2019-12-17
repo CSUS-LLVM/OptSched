@@ -794,7 +794,6 @@ void ScheduleDAGOptSched::runSchedPass(SchedPassStrategy S) {
 }
 
 void ScheduleDAGOptSched::scheduleOptSchedMinRP() {
-  LLVM_DEBUG(dbgs() << "Starting first pass through\n");
   LatencyPrecision = LTP_UNITY;
   // Set times for the first pass
   RegionTimeout = FirstPassRegionTimeout;
@@ -802,10 +801,10 @@ void ScheduleDAGOptSched::scheduleOptSchedMinRP() {
   HeurSchedType = SCHED_LIST;
 
   schedule();
+  Logger::("End of first pass through\n");
 }
 
 void ScheduleDAGOptSched::scheduleOptSchedBalanced() {
-  LLVM_DEBUG(dbgs() << "Starting second pass through\n");
   SecondPass = true;
   LatencyPrecision = LTP_ROUGH;
   // Set times for the second pass
@@ -826,6 +825,7 @@ void ScheduleDAGOptSched::scheduleOptSchedBalanced() {
 
 
   schedule();
+  Logger::("End of second pass through");
 }
 
 bool ScheduleDAGOptSched::isSimRegAllocEnabled() const {

@@ -138,13 +138,9 @@ void ScheduleDAGOptSchedGCN::scheduleGCNMaxOcc() {
 }
 
 void ScheduleDAGOptSchedGCN::scheduleOptSchedMaxOcc() {
-  Logger::Info("Starting first pass");
   ScheduleDAGOptSched::scheduleOptSchedMinRP();
-  Logger::Info("End of first pass");
 }
 
 void ScheduleDAGOptSchedGCN::scheduleOptSchedBalanced() {
-  Logger::Info("Starting second pass");
   ScheduleDAGOptSched::scheduleOptSchedBalanced();
-  Logger::Info("End of second pass");
 }
