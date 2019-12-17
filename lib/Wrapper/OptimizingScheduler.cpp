@@ -801,7 +801,7 @@ void ScheduleDAGOptSched::scheduleOptSchedMinRP() {
   HeurSchedType = SCHED_LIST;
 
   schedule();
-  Logger::("End of first pass through\n");
+  Logger::Info("End of first pass through\n");
 }
 
 void ScheduleDAGOptSched::scheduleOptSchedBalanced() {
@@ -825,7 +825,7 @@ void ScheduleDAGOptSched::scheduleOptSchedBalanced() {
 
 
   schedule();
-  Logger::("End of second pass through");
+  Logger::Info("End of second pass through");
 }
 
 bool ScheduleDAGOptSched::isSimRegAllocEnabled() const {
