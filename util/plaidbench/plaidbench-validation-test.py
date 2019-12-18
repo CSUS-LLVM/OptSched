@@ -1,8 +1,8 @@
 #/usr/bin/python3
 '''*******************************************************************************
 Description:    Validation script for OptSched with the plaidbench benchmarking
-                suite. This script is meant to be used with the run-plaidbench.sh
-                script.
+                suite. This script is meant to be used together with the
+                run-plaidbench.sh script.
 Modified by:    Vang Thao  
 Last Update:    December 17, 2019
 *******************************************************************************'''

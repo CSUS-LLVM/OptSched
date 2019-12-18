@@ -1,5 +1,6 @@
 '''*******************************************************************************
-Description:  Extract data from plaidbench runs.
+Description:  Extract data from plaidbench runs. This script is meant to be used
+              together with the run-plaidbench.sh script.
 Author:       Vang Thao
 Created:      November 26, 2019
 Last Update:  November 27, 2019
