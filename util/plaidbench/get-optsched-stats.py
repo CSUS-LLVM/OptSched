@@ -109,38 +109,38 @@ for folderName in subfolders:
 
         # Contain the stats for this run
         benchPassesStats = {}
-        benchPassesStats["First"] = {}
-        benchPassesStats["Second"] = {}
+        benchPassesStats["first"] = {}
+        benchPassesStats["second"] = {}
 
         # Initialize stats variables
-        benchPassesStats["First"]["regionsProcessed"] = 0
-        benchPassesStats["First"]["enumCnt"] = 0
-        benchPassesStats["First"]["OptImprov"] = 0
-        benchPassesStats["First"]["OptNotImprov"] = 0
-        benchPassesStats["First"]["TimeoutImprov"] = 0
-        benchPassesStats["First"]["TimeoutNotImprov"] = 0
-        benchPassesStats["First"]["timeoutCnt"] = 0
-        benchPassesStats["First"]["largestOptimalRegion"] = -1
-        benchPassesStats["First"]["largestImprovedRegion"] = -1
-        benchPassesStats["First"]["totalInstr"] = 0
+        benchPassesStats["first"]["regionsProcessed"] = 0
+        benchPassesStats["first"]["enumCnt"] = 0
+        benchPassesStats["first"]["OptImprov"] = 0
+        benchPassesStats["first"]["OptNotImprov"] = 0
+        benchPassesStats["first"]["TimeoutImprov"] = 0
+        benchPassesStats["first"]["TimeoutNotImprov"] = 0
+        benchPassesStats["first"]["timeoutCnt"] = 0
+        benchPassesStats["first"]["largestOptimalRegion"] = -1
+        benchPassesStats["first"]["largestImprovedRegion"] = -1
+        benchPassesStats["first"]["totalInstr"] = 0
         
-        benchPassesStats["Second"]["regionsProcessed"] = 0
-        benchPassesStats["Second"]["enumCnt"] = 0
-        benchPassesStats["Second"]["OptImprov"] = 0
-        benchPassesStats["Second"]["OptNotImprov"] = 0
-        benchPassesStats["Second"]["TimeoutImprov"] = 0
-        benchPassesStats["Second"]["TimeoutNotImprov"] = 0
-        benchPassesStats["Second"]["timeoutCnt"] = 0
-        benchPassesStats["Second"]["largestOptimalRegion"] = -1
-        benchPassesStats["Second"]["largestImprovedRegion"] = -1
-        benchPassesStats["Second"]["totalInstr"] = 0
+        benchPassesStats["second"]["regionsProcessed"] = 0
+        benchPassesStats["second"]["enumCnt"] = 0
+        benchPassesStats["second"]["OptImprov"] = 0
+        benchPassesStats["second"]["OptNotImprov"] = 0
+        benchPassesStats["second"]["TimeoutImprov"] = 0
+        benchPassesStats["second"]["TimeoutNotImprov"] = 0
+        benchPassesStats["second"]["timeoutCnt"] = 0
+        benchPassesStats["second"]["largestOptimalRegion"] = -1
+        benchPassesStats["second"]["largestImprovedRegion"] = -1
+        benchPassesStats["second"]["totalInstr"] = 0
         
         # First check if log file exists.
         if (os.path.exists(currentLogFile)):
             benchStats[bench] = {}
             # Open log file if it exists.
             with open(currentLogFile) as file:
-                inputFile = file.read()
+                log = file.read()
                 blocks = log.split("********** Opt Scheduling **********")[1:]
                 for block in blocks:
                     # Get pass num
@@ -189,48 +189,54 @@ for folderName in subfolders:
         else:
             print("Cannot find log file for {} run {} benchmark {}.".format(nameOfRun, runNumber, bench))
 
-        firstPassTotalProcessed += benchPassesStats["First"]["regionsProcessed"]
-        firstPassEnumCnt += benchPassesStats["First"]["enumCnt"]
-        firstPassOptImpr += benchPassesStats["First"]["OptImprov"]
-        firstPassOptNotImpr += benchPassesStats["First"]["OptNotImprov"]
-        firstPassTimeoutImpr += benchPassesStats["First"]["TimeoutImprov"]
-        firstPassTimeoutNotImpr += benchPassesStats["First"]["TimeoutNotImprov"]
-        firstPassTimeoutCnt += benchPassesStats["First"]["timeoutCnt"]
-        if (firstPassLargestOptimalRegion < benchPassesStats["First"]["largestOptimalRegion"]):
-            firstPassLargestOptimalRegion = benchPassesStats["First"]["largestOptimalRegion"]
-        if (firstPassLargestImprovedRegion < benchPassesStats["First"]["largestImprovedRegion"]):
-            firstPassLargestImprovedRegion = benchPassesStats["First"]["largestImprovedRegion"]
-        firstPassTotalInstr += benchPassesStats["First"]["totalInstr"]
+        firstPassTotalProcessed += benchPassesStats["first"]["regionsProcessed"]
+        firstPassEnumCnt += benchPassesStats["first"]["enumCnt"]
+        firstPassOptImpr += benchPassesStats["first"]["OptImprov"]
+        firstPassOptNotImpr += benchPassesStats["first"]["OptNotImprov"]
+        firstPassTimeoutImpr += benchPassesStats["first"]["TimeoutImprov"]
+        firstPassTimeoutNotImpr += benchPassesStats["first"]["TimeoutNotImprov"]
+        firstPassTimeoutCnt += benchPassesStats["first"]["timeoutCnt"]
+        if (firstPassLargestOptimalRegion < benchPassesStats["first"]["largestOptimalRegion"]):
+            firstPassLargestOptimalRegion = benchPassesStats["first"]["largestOptimalRegion"]
+        if (firstPassLargestImprovedRegion < benchPassesStats["first"]["largestImprovedRegion"]):
+            firstPassLargestImprovedRegion = benchPassesStats["first"]["largestImprovedRegion"]
+        firstPassTotalInstr += benchPassesStats["first"]["totalInstr"]
 
-        secondPassTotalProcessed += benchPassesStats["Second"]["regionsProcessed"]
-        secondPassEnumCnt += benchPassesStats["Second"]["enumCnt"]
-        secondPassOptImpr += benchPassesStats["Second"]["OptImprov"]
-        secondPassOptNotImpr += benchPassesStats["Second"]["OptNotImprov"]
-        secondPassTimeoutImpr += benchPassesStats["Second"]["TimeoutImprov"]
-        secondPassTimeoutNotImpr += benchPassesStats["Second"]["TimeoutNotImprov"]
-        secondPassTimeoutCnt += benchPassesStats["Second"]["timeoutCnt"]
-        if (secondPassLargestOptimalRegion < benchPassesStats["Second"]["largestOptimalRegion"]):
-            secondPassLargestOptimalRegion = benchPassesStats["Second"]["largestOptimalRegion"]
-        if (secondPassLargestImprovedRegion < benchPassesStats["Second"]["largestImprovedRegion"]):
-            secondPassLargestImprovedRegion = benchPassesStats["Second"]["largestImprovedRegion"]
-        secondPassTotalInstr += benchPassesStats["Second"]["totalInstr"]
+        secondPassTotalProcessed += benchPassesStats["second"]["regionsProcessed"]
+        secondPassEnumCnt += benchPassesStats["second"]["enumCnt"]
+        secondPassOptImpr += benchPassesStats["second"]["OptImprov"]
+        secondPassOptNotImpr += benchPassesStats["second"]["OptNotImprov"]
+        secondPassTimeoutImpr += benchPassesStats["second"]["TimeoutImprov"]
+        secondPassTimeoutNotImpr += benchPassesStats["second"]["TimeoutNotImprov"]
+        secondPassTimeoutCnt += benchPassesStats["second"]["timeoutCnt"]
+        if (secondPassLargestOptimalRegion < benchPassesStats["second"]["largestOptimalRegion"]):
+            secondPassLargestOptimalRegion = benchPassesStats["second"]["largestOptimalRegion"]
+        if (secondPassLargestImprovedRegion < benchPassesStats["second"]["largestImprovedRegion"]):
+            secondPassLargestImprovedRegion = benchPassesStats["second"]["largestImprovedRegion"]
+        secondPassTotalInstr += benchPassesStats["second"]["totalInstr"]
 
     print("{}".format(folderName))
-    print("    First pass total regions processed: {}".format(firstPassTotalProcessed))
-    print("    Regions passed to B&B: {} ({:.1f}%)".format(firstPassEnumCnt, float(firstPassEnumCnt)/firstPassTotalProcessed*100.0))
-    print("    Regions optimal and improved: {} ({:.1f}%)".format(firstPassOptImpr, float(firstPassOptImpr)/firstPassEnumCnt*100.0))
-    print("    Regions optimal and not improved: {} ({:.1f}%)".format(firstPassOptNotImpr, float(firstPassOptNotImpr)/firstPassEnumCnt*100.0))
-    print("    Regions timed out and improved: {} ({:.1f}%)".format(firstPassTimeoutImpr, float(firstPassTimeoutImpr)/firstPassEnumCnt*100.0))
-    print("    Regions timed out and not improved: {} ({:.1f}%)".format(firstPassTimeoutNotImpr, float(firstPassTimeoutNotImpr)/firstPassEnumCnt*100.0))
-    print("    Avg. region size passed to B&B: {:.1f}".format(firstPassTotalInstr/firstPassEnumCnt))
-    print("    Largest optimal region: {}".format(firstPassLargestOptimalRegion))
-    print("    Largest improved region: {}".format(firstPassLargestImprovedRegion))
-    print("      Second pass total regions processed: {}".format(secondPassTotalProcessed))
-    print("      Regions passed to B&B: {} ({:.1f}%)".format(secondPassEnumCnt, float(secondPassEnumCnt)/secondPassTotalProcessed*100.0))
-    print("      Regions optimal and improved: {} ({:.1f}%)".format(secondPassOptImpr, float(secondPassOptImpr)/secondPassEnumCnt*100.0))
-    print("      Regions optimal and not improved: {} ({:.1f}%)".format(secondPassOptNotImpr, float(secondPassOptNotImpr)/secondPassEnumCnt*100.0))
-    print("      Regions timed out and improved: {} ({:.1f}%)".format(secondPassTimeoutImpr, float(secondPassTimeoutImpr)/secondPassEnumCnt*100.0))
-    print("      Regions timed out and not improved: {} ({:.1f}%)".format(secondPassTimeoutNotImpr, float(secondPassTimeoutNotImpr)/secondPassEnumCnt*100.0))
-    print("      Avg. region size passed to B&B: {:.1f}".format(secondPassTotalInstr/secondPassEnumCnt))
-    print("      Largest optimal region: {}".format(secondPassLargestOptimalRegion))
-    print("      Largest improved region: {}".format(secondPassLargestImprovedRegion))
+    if (firstPassEnumCnt > 0):
+        print("    First pass total regions processed: {}".format(firstPassTotalProcessed))
+        print("    Regions passed to B&B: {} ({:.1f}%)".format(firstPassEnumCnt, float(firstPassEnumCnt)/firstPassTotalProcessed*100.0))
+        print("    Regions optimal and improved: {} ({:.1f}%)".format(firstPassOptImpr, float(firstPassOptImpr)/firstPassEnumCnt*100.0))
+        print("    Regions optimal and not improved: {} ({:.1f}%)".format(firstPassOptNotImpr, float(firstPassOptNotImpr)/firstPassEnumCnt*100.0))
+        print("    Regions timed out and improved: {} ({:.1f}%)".format(firstPassTimeoutImpr, float(firstPassTimeoutImpr)/firstPassEnumCnt*100.0))
+        print("    Regions timed out and not improved: {} ({:.1f}%)".format(firstPassTimeoutNotImpr, float(firstPassTimeoutNotImpr)/firstPassEnumCnt*100.0))
+        print("    Avg. region size passed to B&B: {:.1f}".format(firstPassTotalInstr/firstPassEnumCnt))
+        print("    Largest optimal region: {}".format(firstPassLargestOptimalRegion))
+        print("    Largest improved region: {}".format(firstPassLargestImprovedRegion))
+    else:
+        print("    First pass did not pass any regions to B&B enumerator")
+    if (secondPassEnumCnt > 0):
+        print("      Second pass total regions processed: {}".format(secondPassTotalProcessed))
+        print("      Regions passed to B&B: {} ({:.1f}%)".format(secondPassEnumCnt, float(secondPassEnumCnt)/secondPassTotalProcessed*100.0))
+        print("      Regions optimal and improved: {} ({:.1f}%)".format(secondPassOptImpr, float(secondPassOptImpr)/secondPassEnumCnt*100.0))
+        print("      Regions optimal and not improved: {} ({:.1f}%)".format(secondPassOptNotImpr, float(secondPassOptNotImpr)/secondPassEnumCnt*100.0))
+        print("      Regions timed out and improved: {} ({:.1f}%)".format(secondPassTimeoutImpr, float(secondPassTimeoutImpr)/secondPassEnumCnt*100.0))
+        print("      Regions timed out and not improved: {} ({:.1f}%)".format(secondPassTimeoutNotImpr, float(secondPassTimeoutNotImpr)/secondPassEnumCnt*100.0))
+        print("      Avg. region size passed to B&B: {:.1f}".format(secondPassTotalInstr/secondPassEnumCnt))
+        print("      Largest optimal region: {}".format(secondPassLargestOptimalRegion))
+        print("      Largest improved region: {}".format(secondPassLargestImprovedRegion))
+    else:
+        print("      Second pass did not pass any regions to B&B enumerator")
