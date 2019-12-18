@@ -9,7 +9,7 @@ Last Update:	November 27, 2019
 *******************************************************************************'''
 
 '''
-OUTPUT: (To termina)
+OUTPUT: (To terminal)
     1.) Stats about the first pass
         1.) Regions processed
         2.) Regions passed to B&B enumerator
