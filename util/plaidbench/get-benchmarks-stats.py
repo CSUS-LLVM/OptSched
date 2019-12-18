@@ -9,6 +9,14 @@ Last Update:	November 27, 2019
 *******************************************************************************'''
 
 '''
+OUTPUT: (To terminal)
+    1.) Total number of benchmarks
+    2.) Total number of kernels from all the benchmarks
+    3.) Total number of regions
+    4.) Total number of instructions
+    5.) Average region size
+    6.) Biggest region size
+    
 HOW TO USE:
     1.) Run a plaidbench benchmarks with run-plaidbench.sh to generate a
         directory containing the results for the run.

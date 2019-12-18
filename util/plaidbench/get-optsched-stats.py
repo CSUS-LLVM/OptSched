@@ -9,6 +9,20 @@ Last Update:	November 27, 2019
 *******************************************************************************'''
 
 '''
+OUTPUT: (To termina)
+    1.) Stats about the first pass
+        1.) Regions processed
+        2.) Regions passed to B&B enumerator
+        3.) Regions optimal and improved
+        4.) Regions optimal and not improved
+        5.) Regions timed out and improved
+        6.) Regions timed out and not improved
+        7.) Average region size passed to B&B enumerator
+        8.) Largest optimal region
+        9.) Largest improved region
+    2.) Stats about the second pass
+        - Same as above
+
 HOW TO USE:
     1.) Run a plaidbench benchmarks with run-plaidbench.sh to generate a
         directory containing the results for the run.

@@ -6,11 +6,12 @@ Last Update:  November 27, 2019
 *******************************************************************************'''
 
 '''
-This script takes in data from plaidbench runs and output 4 spreadsheets.
-    Spreadsheet 1: Compile times
-    Spreadsheet 2: Examples-per-second
-    Spreadsheet 3: Tiles-per-second (FPS)
-    Spreadsheet 4: Execution times
+OUTPUT:
+    This script takes in data from plaidbench runs and output 4 spreadsheets.
+        Spreadsheet 1: Compile times
+        Spreadsheet 2: Examples-per-second
+        Spreadsheet 3: Tiles-per-second (FPS)
+        Spreadsheet 4: Execution times
 
 Requirements:
     - python3

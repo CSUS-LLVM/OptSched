@@ -8,6 +8,10 @@
 #**************************************************************************************
 # Requires write permission in the current directory.
 # Note: DirectoryName can be changed after each run to output to a different directory.
+#
+# OUTPUT:
+#   1.) Directories containing the log for each benchmark located in their own
+#       directory.
 
 declare -a Networks=("densenet121" "densenet169" "densenet201" "inception_resnet_v2" "inception_v3" "mobilenet" "nasnet_large" "nasnet_mobile" "resnet50" "vgg16" "vgg19" "xception" "imdb_lstm")
 Examples=4096
