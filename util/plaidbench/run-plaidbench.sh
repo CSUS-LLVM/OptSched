@@ -19,13 +19,30 @@ BatchSize=16
 Command="plaidbench --examples $Examples --batch-size $BatchSize --results "
 # Note: The run number at the end such as "01" should be kept. This number is used
 # in other scripts. 
-DirectoryName="plaidbench-optsched-01"
+DirectoryBasePath="plaidbench-optsched-"
 Keras="keras --no-fp16 --no-train"
 
-for i in 1
+NumArgs="$#"
+NumIterations=1
+
+print_usage() {
+  printf "Usage:\n -n <number of iterations>\n"
+}
+
+while getopts n: flag
+do
+  case ${flag} in
+    n) NumIterations=${OPTARG};;
+    ?) print_usage
+           exit 1 ;;
+  esac
+done
+
+for ((i = 0 ; i < NumIterations ; i++));
 do
   for Network in "${Networks[@]}"
   do
+    DirectoryName="${DirectoryBasePath}${i}"
     mkdir -p $DirectoryName/$Network
     $Command$DirectoryName/$Network $Keras $Network &> $DirectoryName/$Network/$Network.log
   done
