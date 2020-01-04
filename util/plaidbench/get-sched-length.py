@@ -1,3 +1,4 @@
+#!/usr/bin/python3
 '''
 **********************************************************************************
 Description:  Extract schedule length stats from plaidbench runs.
@@ -35,7 +36,6 @@ Example:
         plaidbench-amd-01/
         ...
 '''
-#!/usr/bin/python3
 
 import os
 import re

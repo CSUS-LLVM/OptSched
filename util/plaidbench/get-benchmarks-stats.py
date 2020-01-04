@@ -1,3 +1,4 @@
+#!/usr/bin/python3
 '''
 **********************************************************************************
 Description:    This script is meant to be used with the OptSched scheduler and
@@ -32,7 +33,6 @@ Example:
         ...
         ...
 '''
-#!/usr/bin/python3
 
 import os       # Used for scanning directories, getting paths, and checking files.
 import re       # Used for parsing log file

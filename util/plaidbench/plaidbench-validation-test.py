@@ -1,3 +1,4 @@
+#/usr/bin/python3
 '''
 **********************************************************************************
 Description:    Validation script for OptSched with the plaidbench benchmarking
@@ -23,7 +24,6 @@ HOW TO USE:
         two directories containing the results for each run.
     2.) Enter in the path to those directories as arguments to this script
 '''
-#/usr/bin/python3
 
 import sys
 import re

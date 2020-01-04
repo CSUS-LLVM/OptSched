@@ -1,3 +1,4 @@
+#!/usr/bin/python3
 '''
 **********************************************************************************
 Description:  Extract data from plaidbench runs. This script is meant to be used
@@ -37,7 +38,6 @@ Example:
         plaidbench-amd-01/
         ...
 '''
-#!/usr/bin/python3
 
 import os       # Used for scanning directories, getting paths, and checking files.
 import xlwt     # Used to create excel spreadsheets.
