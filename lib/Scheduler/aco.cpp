@@ -33,9 +33,9 @@ double RandDouble(double min, double max) {
 
 ACOScheduler::ACOScheduler(DataDepGraph *dataDepGraph,
                            MachineModel *machineModel, InstCount upperBound,
-                           SchedPriorities priorities, InstSchedule* initialSchedule,
-                           bool vrfySched)
+                           SchedPriorities priorities, bool vrfySched)
     : ConstrainedScheduler(dataDepGraph, machineModel, upperBound) {
+  vrfySched_ = vrfySched;
   prirts_ = priorities;
   rdyLst_ = new ReadyList(dataDepGraph_, priorities);
   count_ = dataDepGraph->GetInstCnt();
@@ -62,13 +62,7 @@ ACOScheduler::ACOScheduler(DataDepGraph *dataDepGraph,
   */
   int pheremone_size = (count_ + 1) * count_;
   pheremone_ = new pheremone_t[pheremone_size];
-
   this->initialSchedule_ = NULL;
-  if (initialSchedule)
-  {
-    this->initialSchedule_ = new InstSchedule(machineModel, dataDepGraph, vrfySched);
-    this->initialSchedule_->Copy(initialSchedule);
-  }
 }
 
 ACOScheduler::~ACOScheduler() {
@@ -436,4 +430,11 @@ void PrintSchedule(InstSchedule *schedule) {
   }
   std::cerr << std::endl;
   schedule->ResetInstIter();
+}
+
+void ACOScheduler::setInitialSched(InstSchedule *sched) {
+  if (sched) {
+    this->initialSchedule_ = new InstSchedule(machMdl_, dataDepGraph_, vrfySched_);
+    this->initialSchedule_->Copy(sched);
+  }
 }

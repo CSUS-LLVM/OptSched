@@ -1,4 +1,10 @@
-// Ant colony optimizing scheduler
+/*******************************************************************************
+Description:  Implements an Ant colony optimizing scheduler
+Author:       Theodore Dubois
+Created:      Nov. 2017
+Updated By:   Ciprian Elies and Vang Thao
+Last Update:  Jan. 2020
+*******************************************************************************/
 
 #ifndef OPTSCHED_ACO_H
 #define OPTSCHED_ACO_H
@@ -19,11 +25,14 @@ class ACOScheduler : public ConstrainedScheduler {
 public:
   ACOScheduler(DataDepGraph *dataDepGraph, MachineModel *machineModel,
                InstCount upperBound, SchedPriorities priorities,
-               InstSchedule* initialSchedule, bool vrfySched);
+               bool vrfySched);
   virtual ~ACOScheduler();
   FUNC_RESULT FindSchedule(InstSchedule *schedule, SchedRegion *region);
   inline void UpdtRdyLst_(InstCount cycleNum, int slotNum);
-
+  // Set the initial schedule for ACO 
+  // Default is NULL if none are set.
+  void setInitialSched(InstSchedule *sched);
+  
 private:
   pheremone_t &Pheremone(SchedInstruction *from, SchedInstruction *to);
   pheremone_t &Pheremone(InstCount from, InstCount to);
@@ -49,6 +58,7 @@ private:
   bool print_aco_trace;
   std::vector<double> scores(std::vector<Choice> ready, SchedInstruction *last);
   InstSchedule* initialSchedule_;
+  bool vrfySched_;
 };
 
 } // namespace opt_sched

@@ -3,7 +3,8 @@ Description:  Implements an abstract base class for representing scheduling
               regions.
 Author:       Ghassan Shobaki
 Created:      Apr. 2005
-Last Update:  Apr. 2011
+Updated By:   Ciprian Elies and Vang Thao
+Last Update:  Jan. 2020
 *******************************************************************************/
 
 #ifndef OPTSCHED_SCHED_REGION_SCHED_REGION_H
@@ -130,8 +131,6 @@ protected:
   InstCount hurstcSchedLngth_;
   InstCount acoScheduleLength_; //TODO: CHIPPIE: Is this really needed? Confirm please!
   InstCount acoScheduleCost_; //TODO: CHIPPIE: Is this really needed? Confirm please!
-  InstCount initialScheduleCost_;
-  InstCount initialScheduleLength_;
 
   // The schedule currently used by the enumerator
   InstSchedule *enumCrntSched_;
@@ -186,7 +185,7 @@ protected:
   // TODO(max): Document.
   void CmputLwrBounds_(bool useFileBounds);
   // TODO(max): Document.
-  bool CmputUprBounds_(InstSchedule *schedule, bool useFileBounds, InstCount& scheduleCost, InstCount scheduleLength);
+  bool CmputUprBounds_(InstSchedule *schedule, bool useFileBounds);
   // Handle the enumerator's result
   void HandlEnumrtrRslt_(FUNC_RESULT rslt, InstCount trgtLngth);
 
@@ -226,6 +225,11 @@ protected:
 
   // (Chris) Get the SLIL for each set
   virtual const std::vector<int> &GetSLIL_() const = 0;
+  
+  FUNC_RESULT runACO(InstSchedule *returnSched, InstSchedule *initSched);
+  // Compare first and second schedule and put the best in third.
+  void compareSchedules(InstSchedule *first, InstSchedule *second, InstSchedule *&third);
+  
 };
 
 } // namespace opt_sched
