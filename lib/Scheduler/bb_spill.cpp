@@ -382,7 +382,7 @@ InstCount BBWithSpill::CmputCost_(InstSchedule *sched, COST_COMP_MODE compMode,
   InstCount cycleNum;
   InstCount slotNum;
   SchedInstruction *inst;
-
+/* ACO Doesn't need to re-calculate spill cost anymore.
   if (compMode == CCM_STTC) {
     if (spillCostFunc_ != SCF_SPILLS) {
       InitForCostCmputtn_();
@@ -399,7 +399,7 @@ InstCount BBWithSpill::CmputCost_(InstSchedule *sched, COST_COMP_MODE compMode,
       regAlloc.AllocRegs();
       crntSpillCost_ = regAlloc.GetCost();
     }
-  }
+  }*/
 
   assert(sched->IsComplete());
   InstCount cost = sched->GetCrntLngth() * schedCostFactor_;

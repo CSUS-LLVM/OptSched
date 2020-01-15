@@ -174,6 +174,7 @@ InstSchedule *ACOScheduler::FindOneSchedule() {
   if (maxPriority == 0)
     maxPriority = 1; // divide by 0 is bad
   Initialize_();
+  rgn_->InitForSchdulng();
 
   while (!IsSchedComplete_()) {
     // convert the ready list from a custom priority queue to a std::vector,
