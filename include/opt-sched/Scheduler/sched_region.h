@@ -126,8 +126,12 @@ protected:
   InstCount bestCost_;
   InstCount bestSchedLngth_;
   // The nomal heuristic scheduling results.
-  InstCount hurstcCost_;
+  InstCount hurstcCost_; //TODO: CHIPPIE: This should ONLY be used for the heuristic stuff. NOT for initial schedule stuff...
   InstCount hurstcSchedLngth_;
+  InstCount acoScheduleLength_; //TODO: CHIPPIE: Is this really needed? Confirm please!
+  InstCount acoScheduleCost_; //TODO: CHIPPIE: Is this really needed? Confirm please!
+  InstCount initialScheduleCost_;
+  InstCount initialScheduleLength_;
 
   // The schedule currently used by the enumerator
   InstSchedule *enumCrntSched_;
@@ -182,7 +186,7 @@ protected:
   // TODO(max): Document.
   void CmputLwrBounds_(bool useFileBounds);
   // TODO(max): Document.
-  bool CmputUprBounds_(InstSchedule *lstSched, bool useFileBounds);
+  bool CmputUprBounds_(InstSchedule *schedule, bool useFileBounds, InstCount& scheduleCost, InstCount scheduleLength);
   // Handle the enumerator's result
   void HandlEnumrtrRslt_(FUNC_RESULT rslt, InstCount trgtLngth);
 

@@ -18,7 +18,8 @@ struct Choice {
 class ACOScheduler : public ConstrainedScheduler {
 public:
   ACOScheduler(DataDepGraph *dataDepGraph, MachineModel *machineModel,
-               InstCount upperBound, SchedPriorities priorities);
+               InstCount upperBound, SchedPriorities priorities,
+               InstSchedule* initialSchedule, bool vrfySched);
   virtual ~ACOScheduler();
   FUNC_RESULT FindSchedule(InstSchedule *schedule, SchedRegion *region);
   inline void UpdtRdyLst_(InstCount cycleNum, int slotNum);
@@ -47,6 +48,7 @@ private:
   int ants_per_iteration;
   bool print_aco_trace;
   std::vector<double> scores(std::vector<Choice> ready, SchedInstruction *last);
+  InstSchedule* initialSchedule_;
 };
 
 } // namespace opt_sched

@@ -103,10 +103,6 @@ ConstrainedScheduler *BBWithSpill::AllocHeuristicScheduler_() {
     return new ListScheduler(dataDepGraph_, machMdl_, abslutSchedUprBound_,
                              hurstcPrirts_);
     break;
-  case SCHED_ACO:
-    return new ACOScheduler(dataDepGraph_, machMdl_, abslutSchedUprBound_,
-                            hurstcPrirts_);
-    break;
   case SCHED_SEQ:
     return new SequentialListScheduler(dataDepGraph_, machMdl_,
                                        abslutSchedUprBound_, hurstcPrirts_);
@@ -772,7 +768,7 @@ void BBWithSpill::UnschdulInst(SchedInstruction *inst, InstCount cycleNum,
 }
 /*****************************************************************************/
 
-void BBWithSpill::FinishHurstc_() {
+void BBWithSpill::FinishHurstc_() { //TODO: CHIPPIE: Should this be added for ACO as well?
 
 #ifdef IS_DEBUG_BBSPILL_COST
   stats::traceCostLowerBound.Record(costLwrBound_);
