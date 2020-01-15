@@ -443,8 +443,8 @@ FUNC_RESULT SchedRegion::FindOptimalSchedule( //TODO: CHIPPIE: Add helper functi
 
   // Step 5: Run ACO if schedule from enumerator is not optimal
   if (bestCost_ != 0 && acoAfterEnum) {
-  /*  Logger::Info("Final cost is not optimal, running ACO.");
-    InstSchedule acoAfterEnumSchedule = new InstSchedule(machMdl_, dataDepGraph_, vrfySched_);
+    Logger::Info("Final cost is not optimal, running ACO.");
+    InstSchedule *acoAfterEnumSchedule = new InstSchedule(machMdl_, dataDepGraph_, vrfySched_);
     if (acoAfterEnumSchedule == NULL)
       Logger::Fatal("Out of memory");
 
@@ -452,11 +452,19 @@ FUNC_RESULT SchedRegion::FindOptimalSchedule( //TODO: CHIPPIE: Add helper functi
     if (acoRslt != RES_SUCCESS) {
       Logger::Info("Running final ACO failed");
       delete acoAfterEnumSchedule;
-    {*/
+    }
 
-   // CmputNormCost_(acoSchedule, CCM_STTC, ACOExecCost, false);
-    //acoAfterEnumCost = acoAfterEnumSchedule->
-  //  acoAfterEnumLength = 
+    InstCount acoAfterEnumCost = acoAfterEnumSchedule->GetCost();
+    if (acoAfterEnumCost < bestCost_) {
+      InstCount acoAfterEnumLength = acoAfterEnumSchedule->GetCrntLngth();
+      InstCount imprvmnt = bestCost_ - acoAfterEnumCost;
+      Logger::Info("ACO found better schedule with length=%d, spill cost = %d, tot cost = %d, cost imp=%d.",
+                    acoAfterEnumLength, acoAfterEnumSchedule->GetSpillCost(), acoAfterEnumCost, imprvmnt);
+      bestSched_ = bestSched = acoAfterEnumSchedule;
+      bestCost_ = acoAfterEnumCost;
+      bestSchedLngth_ = acoAfterEnumLength;
+    } else
+      delete acoAfterEnumSchedule;
   }
   
   
@@ -828,21 +836,8 @@ void SchedRegion::compareSchedules(InstSchedule *first, InstSchedule *second, In
 
   // Instances where costs are equal, take sched. length into account
   if (firstCost == secondCost) {
-    InstCount firstLength = first->GetCrntLngth();
-    InstCount secondLength = second->GetCrntLngth();
-    // Instances where both costs and length are equal,
-    // just take first
-    if (firstLength == secondLength) {
-      third = first;
-    }
-    else if (firstLength < secondLength) {
-      Logger::Info("The first schedule was better than the second!");
-      third = first;
-    }
-    else if (firstLength > secondLength) {
-      Logger::Info("The second schedule was better than the second!");
-      third = second;
-    }
+    Logger::Info("Both schedule had equal cost. Taking first sched!");
+    third = first;
   }
   // First has better cost than second
   else if (firstCost < secondCost) {
