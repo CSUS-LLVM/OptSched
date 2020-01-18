@@ -115,19 +115,9 @@ FUNC_RESULT SchedRegion::FindOptimalSchedule( //TODO: CHIPPIE: Add helper functi
 
   if (false == heuristicSchedulerEnabled && false == acoBeforeEnum) {
     //Abort if ACO and heuristic algorithms are disabled.
-    cout << "TODO: Descriptive error message here saying that there must be at least one of the ACO or Heuristic scheduler enabled before the enumerator.\n";
+    Logger::Fatal("Heuristic list scheduler or ACO must be enabled before enumerator.");
     return RES_ERROR;
   }
-
-  /*
-    * Algorithm run order:
-    * 1) Heuristic
-    * 2) ACO
-    * 3) Branch & Bound
-    * 4) ACO (TODO)
-    * 
-    * Each of these 3 algorithms can be individually disabled, but one of the heuristic or ACO must be enabled. (TODO: CHIPPIE)
-    */
 
   Logger::Info("---------------------------------------------------------------"
                "------------");
@@ -179,7 +169,6 @@ FUNC_RESULT SchedRegion::FindOptimalSchedule( //TODO: CHIPPIE: Add helper functi
   // to use the sequential list scheduler which inserts stalls into
   // the schedule found in the first pass.
   if (heuristicSchedulerEnabled || isSecondPass) {
-    cout << "TODO: Heuristic Scheduler is enabled.\n"; //TODO: Remove this debugging line when done.
     Milliseconds hurstcStart = Utilities::GetProcessorTime();
     lstSched = new InstSchedule(machMdl_, dataDepGraph_, vrfySched_);
     if (lstSched == NULL)
@@ -190,7 +179,7 @@ FUNC_RESULT SchedRegion::FindOptimalSchedule( //TODO: CHIPPIE: Add helper functi
     rslt = lstSchdulr->FindSchedule(lstSched, this);
    
     if (rslt != RES_SUCCESS) {
-      Logger::Info("List scheduling failed");
+      Logger::Fatal("List scheduling failed");
       delete lstSchdulr;
       delete lstSched;
       return rslt;
@@ -207,19 +196,17 @@ FUNC_RESULT SchedRegion::FindOptimalSchedule( //TODO: CHIPPIE: Add helper functi
     // calling GetCost() on the InstSchedule instance.
     CmputNormCost_(lstSched, CCM_DYNMC, hurstcExecCost, true);
     hurstcCost_ = lstSched->GetCost();
-    cout << "[CHIPPIE: DEBUG] Right after lstSched->GetCost(): return value was " << hurstcCost_ << "\n";
    
     // This schedule is optimal so ACO will not be run
     // so set bestSched here.
     if (hurstcCost_ == 0) {
-      cout << "[CHIPPIE: DEBUG] ***** HEURISTIC SCHEDULE IS OPTIMAL *****\n"; //TODO: CHIPPIE: REMOVE DEBUGGING STATEMENT.
       isLstOptml = true;
       bestSched = bestSched_ = lstSched;
       bestSchedLngth_ = hurstcSchedLngth_;
       bestCost_ = hurstcCost_;
     }
    
-    FinishHurstc_(); //TODO: CHIPPIE: Need one for ACO. Will need to also add some new statistic for the ACO counterparts.
+    FinishHurstc_();
 
     //  #ifdef IS_DEBUG_SOLN_DETAILS_1
     Logger::Info(
@@ -236,12 +223,8 @@ FUNC_RESULT SchedRegion::FindOptimalSchedule( //TODO: CHIPPIE: Add helper functi
 #endif
   }
 
-  // Step #2: Use ACO to find a schedule if enabled.
-  if (acoBeforeEnum && false == isLstOptml) { //If the Heuristic algorithm already produced the optimal result, don't run ACO or B&B.
-    //TODO: CHIPPIE: If ACO's schedule is optimal, set the best schedule to that (and don't run B&B).
-    //TODO: CHIPPIE: If neither ACO's or the Heuristic's schedule is optimal, compare ACO's result with the heuristic's and then set the initial_schedule to that.
-
-    cout << "TODO: ACO Scheduler is enabled & running.\n"; //TODO: Remove this debugging line when done.
+  // Step #2: Use ACO to find a schedule if enabled and no optimal schedule is yet to be found.
+  if (acoBeforeEnum && false == isLstOptml) {
     acoStart = Utilities::GetProcessorTime();
     acoSchedule = new InstSchedule(machMdl_, dataDepGraph_, vrfySched_);
     if (acoSchedule == NULL)
@@ -249,7 +232,7 @@ FUNC_RESULT SchedRegion::FindOptimalSchedule( //TODO: CHIPPIE: Add helper functi
 
     rslt = runACO(acoSchedule, lstSched);
     if (rslt != RES_SUCCESS) {
-      Logger::Info("ACO scheduling failed");
+      Logger::Fatal("ACO scheduling failed");
       if (lstSchdulr) 
         delete lstSchdulr;
       if (lstSched) 
@@ -265,11 +248,7 @@ FUNC_RESULT SchedRegion::FindOptimalSchedule( //TODO: CHIPPIE: Add helper functi
       Logger::Info("ACO_Time %d", acoTime);
 
     acoScheduleLength_ = acoSchedule->GetCrntLngth();
-    InstCount ACOExecCost;
-    // Compute cost for ACO scheduler, this must be called before
-    // calling GetCost() on the InstSchedule instance.
     acoScheduleCost_ = acoSchedule->GetCost();
-    Logger::Info("[CHIPPIE: DEBUG] Just finished ACO! Here's the ACO schedule cost: %d, and length: %d", acoScheduleCost_, acoScheduleLength_);
 
     // If ACO is run then that means either:
     // 1.) Heuristic was not run
@@ -277,7 +256,6 @@ FUNC_RESULT SchedRegion::FindOptimalSchedule( //TODO: CHIPPIE: Add helper functi
     // In both cases, the current best will be ACO if
     // ACO is optimal so set bestSched here.
     if (acoScheduleCost_ == 0) {
-      Logger::Info("[CHIPPIE: DEBUG] ***** ACO SCHEDULE IS OPTIMAL *****"); //TODO: CHIPPIE: REMOVE DEBUGGING STATEMENT.
       isLstOptml  = true;
       bestSched = bestSched_ = acoSchedule;
       bestSchedLngth_ = acoScheduleLength_;
@@ -310,14 +288,13 @@ FUNC_RESULT SchedRegion::FindOptimalSchedule( //TODO: CHIPPIE: Add helper functi
       bestCost_ = bestSched_->GetCost();
     }
   }
-  // Step #2: Compute the cost upper bound.
+  // Step #3: Compute the cost upper bound.
   Milliseconds boundStart = Utilities::GetProcessorTime();
   assert(bestSchedLngth_ >= schedLwrBound_);
   assert(schedLwrBound_ <= bestSched_->GetCrntLngth());
 
-  // Only used to calculate upper bounds
-  // Was previously used to check for optimality.
-  CmputUprBounds_(lstSched, false);
+  // Calculate upper bounds with the best schedule found
+  CmputUprBounds_(bestSched_, false);
   boundTime = Utilities::GetProcessorTime() - boundStart;
   stats::boundComputationTime.Record(boundTime);
 
@@ -330,7 +307,7 @@ FUNC_RESULT SchedRegion::FindOptimalSchedule( //TODO: CHIPPIE: Add helper functi
 #endif
 
   if (rgnTimeout == 0)
-    isLstOptml = true; //TODO: CHIPPIE: NOTE: This was a hack to disable B&B before these scheduler enabling flags tasks.
+    isLstOptml = true; 
 
   // (Chris): If the cost function is SLIL, then the list schedule is considered
   // optimal if PERP is 0.
@@ -380,20 +357,16 @@ FUNC_RESULT SchedRegion::FindOptimalSchedule( //TODO: CHIPPIE: Add helper functi
   initialScheduleCost = bestCost_;
   initialScheduleLength = bestSchedLngth_;
   
-// Step #4: Find the optimal schedule if the heuristc was not optimal.
+// Step #4: Find the optimal schedule if the heuristc and ACO was not optimal.
   if (bbSchedulerEnabled) {
     Milliseconds enumStart = Utilities::GetProcessorTime();
-    cout << "TODO: BB scheduler is enabled.\n";
-    //isLstOptml = false; //TODO: CHIPPIE: Remove this when done debugging. //Yes, this flow works correctly.
     if (false == isLstOptml) { 
-      cout << "TODO: Running BB scheduler...\n"; //TODO: CHIPPIE: Remove this when done debugging.
       dataDepGraph_->SetHard(true);
       rslt = Optimize_(enumStart, rgnTimeout, lngthTimeout);
       Milliseconds enumTime = Utilities::GetProcessorTime() - enumStart;
       
-      // TODO: Implement one for ACO also. Maybe also Heuristic + ACO? 
-      // Priority: Low
-      if (hurstcTime > 0) { //TODO: CHIPPIE: This shouldn't use the heuristic time...what should this now use? initialScheduleTime?
+      // TODO: Implement this stat for ACO also.
+      if (hurstcTime > 0) {
         enumTime /= hurstcTime;
         stats::enumerationToHeuristicTimeRatio.Record(enumTime);
       }
@@ -466,10 +439,11 @@ FUNC_RESULT SchedRegion::FindOptimalSchedule( //TODO: CHIPPIE: Add helper functi
       bestSched_ = bestSched = acoAfterEnumSchedule;
       bestCost_ = acoAfterEnumCost;
       bestSchedLngth_ = acoAfterEnumLength;
-    } else
+    } else {
+      Logger::Info("ACO was unable to find a better schedule.");
       delete acoAfterEnumSchedule;
+    }
   }
-  
   
   Milliseconds vrfyStart = Utilities::GetProcessorTime();
   if (vrfySched_) {
@@ -483,18 +457,13 @@ FUNC_RESULT SchedRegion::FindOptimalSchedule( //TODO: CHIPPIE: Add helper functi
   vrfyTime = Utilities::GetProcessorTime() - vrfyStart;
   stats::verificationTime.Record(vrfyTime);
 
-  // VANG: Is this still needed? It is only used in
-  // DataDepGraph::WriteToFile. I don't think we write 
-  // to file anymore.
   InstCount finalLwrBound = costLwrBound_;
   InstCount finalUprBound = costLwrBound_ + bestCost_;
   if (rslt == RES_SUCCESS)
     finalLwrBound = finalUprBound;
 
   dataDepGraph_->SetFinalBounds(finalLwrBound, finalUprBound);
-  ///////////////////////////////////////////////////////
 
-  // May need to be updated for ACO running after BB
   FinishOptml_();
 
   bool tookBest = ChkSchedule_(bestSched, initialSchedule);
@@ -537,9 +506,8 @@ FUNC_RESULT SchedRegion::FindOptimalSchedule( //TODO: CHIPPIE: Add helper functi
     }
   }
   
-  // TODO: Update this
-  // Priority: Low
-#if defined(IS_DEBUG_COMPARE_SLIL_BB) //TODO: CHIPPIE: This block will likewise need to be updated...I note that there are some references to isLstOptml, which will need to be updated if the heuristic scheduler is disabled, and also may need to be changed to account for ACO.
+  // TODO: Update this to account for using heuristic scheduler and ACO.
+#if defined(IS_DEBUG_COMPARE_SLIL_BB)
   {
     const auto &status = [&]() {
       switch (rslt) {
@@ -551,7 +519,7 @@ FUNC_RESULT SchedRegion::FindOptimalSchedule( //TODO: CHIPPIE: Add helper functi
         return "failed";
       }
     }();
-    if (!isLstOptml) { //TODO: CHIPPIE: What to do about this? initialScheduleOptimal?
+    if (!isLstOptml) { 
       Logger::Info("Dag %s %s cost %d time %lld", dataDepGraph_->GetDagID(),
                    status, bestCost_, enumTime);
       Logger::Info("Dag %s %s absolute cost %d time %lld",
@@ -565,10 +533,10 @@ FUNC_RESULT SchedRegion::FindOptimalSchedule( //TODO: CHIPPIE: Add helper functi
       // bestCost_: total cost of the best schedule relative to static lower
       // bound
 
-      auto isEnumerated = [&]() { return (!isLstOptml) ? "True" : "False"; }(); //TODO: CHIPPIE: What to do about this? initialScheduleOptimal?
+      auto isEnumerated = [&]() { return (!isLstOptml) ? "True" : "False"; }();
 
       auto isOptimal = [&]() {
-        return (isLstOptml || (rslt == RES_SUCCESS)) ? "True" : "False"; //TODO: CHIPPIE: What to do about this? initialScheduleOptimal?
+        return (isLstOptml || (rslt == RES_SUCCESS)) ? "True" : "False";
       }();
 
       auto isPerpHigherThanHeuristic = [&]() {
@@ -584,7 +552,7 @@ FUNC_RESULT SchedRegion::FindOptimalSchedule( //TODO: CHIPPIE: Add helper functi
           return sumPerp;
         };
 
-        if (lstSched == bestSched) //TODO: CHIPPIE: What to do about this? Just check against the initial schedule?
+        if (lstSched == bestSched)
           return "False";
 
         auto heuristicPerp = getSumPerp(lstSched);
@@ -712,9 +680,8 @@ void SchedRegion::CmputLwrBounds_(bool useFileBounds) {
   delete rvrsRlxdSchdulr;
 }
 
-//TODO: CHIPPIE: This function needs to not use hurstcCost_? Because what if ACO is happening right now...?
 bool SchedRegion::CmputUprBounds_(InstSchedule *schedule, bool useFileBounds) {
-  if (useFileBounds) { //TODO: CHIPPIE: Why?
+  if (useFileBounds) {
     hurstcCost_ = dataDepGraph_->GetFileCostUprBound();
     hurstcCost_ -= GetCostLwrBound();
   }

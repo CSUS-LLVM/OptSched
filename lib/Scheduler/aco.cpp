@@ -268,7 +268,7 @@ FUNC_RESULT ACOScheduler::FindSchedule(InstSchedule *schedule_out,
   std::cerr << "initialValue_" << initialValue_ << std::endl;
 
   InstSchedule *bestSchedule = initialSchedule_;
-  if (bestSchedule) { //TODO: CHIPPIE: Should it use a sched ini option to make ACO consider an initial schedule, or not?
+  if (bestSchedule) {
     UpdatePheremone(bestSchedule);
   }
   Config &schedIni = SchedulerOptions::getInstance();
@@ -433,7 +433,7 @@ void PrintSchedule(InstSchedule *schedule) {
   schedule->ResetInstIter();
 }
 
-void ACOScheduler::setInitialSched(InstSchedule *sched) {
+void ACOScheduler::SetInitialSched(InstSchedule *sched) {
   if (sched) {
     this->initialSchedule_ = new InstSchedule(machMdl_, dataDepGraph_, vrfySched_);
     this->initialSchedule_->Copy(sched);

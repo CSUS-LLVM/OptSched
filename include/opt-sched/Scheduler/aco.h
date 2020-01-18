@@ -31,7 +31,7 @@ public:
   inline void UpdtRdyLst_(InstCount cycleNum, int slotNum);
   // Set the initial schedule for ACO 
   // Default is NULL if none are set.
-  void setInitialSched(InstSchedule *sched);
+  void SetInitialSched(InstSchedule *sched);
   
 private:
   pheremone_t &Pheremone(SchedInstruction *from, SchedInstruction *to);

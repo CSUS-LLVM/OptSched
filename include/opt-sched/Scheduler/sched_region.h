@@ -127,10 +127,10 @@ protected:
   InstCount bestCost_;
   InstCount bestSchedLngth_;
   // The nomal heuristic scheduling results.
-  InstCount hurstcCost_; //TODO: CHIPPIE: This should ONLY be used for the heuristic stuff. NOT for initial schedule stuff...
+  InstCount hurstcCost_;
   InstCount hurstcSchedLngth_;
-  InstCount acoScheduleLength_; //TODO: CHIPPIE: Is this really needed? Confirm please!
-  InstCount acoScheduleCost_; //TODO: CHIPPIE: Is this really needed? Confirm please!
+  InstCount acoScheduleLength_;
+  InstCount acoScheduleCost_;
 
   // The schedule currently used by the enumerator
   InstSchedule *enumCrntSched_;
