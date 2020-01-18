@@ -800,7 +800,7 @@ void SchedRegion::InitSecondPass() { isSecondPass = true; }
 FUNC_RESULT SchedRegion::runACO(InstSchedule *ReturnSched,
                                 InstSchedule *InitSched) {
   InitForSchdulng();
-  AcoScheduler *AcoSchdulr = new AcoScheduler(
+  ACOScheduler *AcoSchdulr = new ACOScheduler(
       dataDepGraph_, machMdl_, abslutSchedUprBound_, hurstcPrirts_, vrfySched_);
   AcoSchdulr->setInitialSched(InitSched);
   FUNC_RESULT Rslt = AcoSchdulr->FindSchedule(ReturnSched, this);
@@ -811,7 +811,7 @@ FUNC_RESULT SchedRegion::runACO(InstSchedule *ReturnSched,
 void SchedRegion::compareSchedules(InstSchedule *First, InstSchedule *Second,
                                    InstSchedule *&Third) {
   InstCount FirstCost = First->GetCost();
-  InstCount SecondCost = second->GetCost();
+  InstCount SecondCost = Second->GetCost();
 
   // Instances where costs are equal, take sched. length into account
   if (FirstCost == SecondCost)
