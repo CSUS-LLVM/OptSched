@@ -174,8 +174,11 @@ FUNC_RESULT SchedRegion::FindOptimalSchedule( //TODO: CHIPPIE: Add helper functi
   else
     CmputLwrBounds_(false);
 
-  // Step #1: Find the heuristic schedule if enabled.
-  if (heuristicSchedulerEnabled) {
+  // Step #1: Find the heuristic schedule if enabled. 
+  // Note: Heuristic scheduler is required for the two-pass scheduler
+  // to use the sequential list scheduler which inserts stalls into
+  // the schedule found in the first pass.
+  if (heuristicSchedulerEnabled || isSecondPass) {
     cout << "TODO: Heuristic Scheduler is enabled.\n"; //TODO: Remove this debugging line when done.
     Milliseconds hurstcStart = Utilities::GetProcessorTime();
     lstSched = new InstSchedule(machMdl_, dataDepGraph_, vrfySched_);
