@@ -82,7 +82,7 @@ FUNC_RESULT SchedRegion::FindOptimalSchedule(
     InstCount &hurstcSchedLngth, InstSchedule *&bestSched, bool filterByPerp,
     const BLOCKS_TO_KEEP blocksToKeep) {
   ConstrainedScheduler *lstSchdulr = NULL;
-  InstSchedule *initialSchedule = nullptr;
+  InstSchedule *InitialSchedule = nullptr;
   InstSchedule *lstSched = NULL;
   InstSchedule *AcoSchedule = nullptr;
   InstCount InitialScheduleLength = 0;
@@ -356,7 +356,7 @@ FUNC_RESULT SchedRegion::FindOptimalSchedule(
   Logger::Info("Sched LB = %d, Sched UB = %d", schedLwrBound_, schedUprBound_);
 #endif
 
-  initialSchedule = bestSched_;
+  InitialSchedule = bestSched_;
   InitialScheduleCost = bestCost_;
   InitialScheduleLength = bestSchedLngth_;
 
@@ -412,7 +412,7 @@ FUNC_RESULT SchedRegion::FindOptimalSchedule(
     if (SchedulerOptions::getInstance().GetString(
             "SIMULATE_REGISTER_ALLOCATION") != "NO") {
       //#ifdef IS_DEBUG
-      RegAlloc_(bestSched, initialSchedule);
+      RegAlloc_(bestSched, InitialSchedule);
       //#endif
     }
 
@@ -472,7 +472,7 @@ FUNC_RESULT SchedRegion::FindOptimalSchedule(
 
   FinishOptml_();
 
-  bool tookBest = ChkSchedule_(bestSched, initialSchedule);
+  bool tookBest = ChkSchedule_(bestSched, InitialSchedule);
   if (tookBest == false) {
     bestCost_ = InitialScheduleCost;
     bestSchedLngth_ = InitialScheduleLength;

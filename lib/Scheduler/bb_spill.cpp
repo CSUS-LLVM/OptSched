@@ -382,24 +382,25 @@ InstCount BBWithSpill::CmputCost_(InstSchedule *sched, COST_COMP_MODE compMode,
   InstCount cycleNum;
   InstCount slotNum;
   SchedInstruction *inst;
-/* ACO Doesn't need to re-calculate spill cost anymore.
+  
   if (compMode == CCM_STTC) {
-    if (spillCostFunc_ != SCF_SPILLS) {
-      InitForCostCmputtn_();
+    // ACO doesn't need to re-calculate spill cost.
+    // if (spillCostFunc_ != SCF_SPILLS) {
+    //   InitForCostCmputtn_();
 
-      for (instNum = sched->GetFrstInst(cycleNum, slotNum);
-           instNum != INVALID_VALUE;
-           instNum = sched->GetNxtInst(cycleNum, slotNum)) {
-        inst = dataDepGraph_->GetInstByIndx(instNum);
-        SchdulInst(inst, cycleNum, slotNum, trackCnflcts);
-      }
-    } else {
+    //  for (instNum = sched->GetFrstInst(cycleNum, slotNum);
+    //       instNum != INVALID_VALUE;
+    //       instNum = sched->GetNxtInst(cycleNum, slotNum)) {
+    //    inst = dataDepGraph_->GetInstByIndx(instNum);
+    //    SchdulInst(inst, cycleNum, slotNum, trackCnflcts);
+    //  }
+    if (spillCostFunc_ == SCF_SPILLS) {
       LocalRegAlloc regAlloc(sched, dataDepGraph_);
       regAlloc.SetupForRegAlloc();
       regAlloc.AllocRegs();
       crntSpillCost_ = regAlloc.GetCost();
     }
-  }*/
+  }
 
   assert(sched->IsComplete());
   InstCount cost = sched->GetCrntLngth() * schedCostFactor_;
@@ -768,7 +769,7 @@ void BBWithSpill::UnschdulInst(SchedInstruction *inst, InstCount cycleNum,
 }
 /*****************************************************************************/
 
-void BBWithSpill::FinishHurstc_() { //TODO: CHIPPIE: Should this be added for ACO as well?
+void BBWithSpill::FinishHurstc_() {
 
 #ifdef IS_DEBUG_BBSPILL_COST
   stats::traceCostLowerBound.Record(costLwrBound_);
