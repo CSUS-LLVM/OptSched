@@ -433,7 +433,7 @@ void PrintSchedule(InstSchedule *schedule) {
   schedule->ResetInstIter();
 }
 
-void ACOScheduler::SetInitialSched(InstSchedule *Sched) {
+void ACOScheduler::setInitialSched(InstSchedule *Sched) {
   if (Sched) {
     InitialSchedule = new InstSchedule(machMdl_, dataDepGraph_, VrfySched_);
     InitialSchedule->Copy(Sched);
