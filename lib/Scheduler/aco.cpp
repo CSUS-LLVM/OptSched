@@ -35,7 +35,7 @@ ACOScheduler::ACOScheduler(DataDepGraph *dataDepGraph,
                            MachineModel *machineModel, InstCount upperBound,
                            SchedPriorities priorities, bool vrfySched)
     : ConstrainedScheduler(dataDepGraph, machineModel, upperBound) {
-  vrfySched_ = vrfySched;
+  VrfySched_ = vrfySched;
   prirts_ = priorities;
   rdyLst_ = new ReadyList(dataDepGraph_, priorities);
   count_ = dataDepGraph->GetInstCnt();
@@ -62,7 +62,7 @@ ACOScheduler::ACOScheduler(DataDepGraph *dataDepGraph,
   */
   int pheremone_size = (count_ + 1) * count_;
   pheremone_ = new pheremone_t[pheremone_size];
-  this->initialSchedule_ = NULL;
+  InitialSchedule = nullptr;
 }
 
 ACOScheduler::~ACOScheduler() {
@@ -267,7 +267,7 @@ FUNC_RESULT ACOScheduler::FindSchedule(InstSchedule *schedule_out,
     pheremone_[i] = initialValue_;
   std::cerr << "initialValue_" << initialValue_ << std::endl;
 
-  InstSchedule *bestSchedule = initialSchedule_;
+  InstSchedule *bestSchedule = InitialSchedule;
   if (bestSchedule) {
     UpdatePheremone(bestSchedule);
   }
@@ -433,9 +433,9 @@ void PrintSchedule(InstSchedule *schedule) {
   schedule->ResetInstIter();
 }
 
-void ACOScheduler::SetInitialSched(InstSchedule *sched) {
-  if (sched) {
-    this->initialSchedule_ = new InstSchedule(machMdl_, dataDepGraph_, vrfySched_);
-    this->initialSchedule_->Copy(sched);
+void ACOScheduler::SetInitialSched(InstSchedule *Sched) {
+  if (Sched) {
+    InitialSchedule = new InstSchedule(machMdl_, dataDepGraph_, VrfySched_);
+    InitialSchedule->Copy(Sched);
   }
 }

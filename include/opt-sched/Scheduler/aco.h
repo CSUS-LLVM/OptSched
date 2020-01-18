@@ -31,7 +31,7 @@ public:
   inline void UpdtRdyLst_(InstCount cycleNum, int slotNum);
   // Set the initial schedule for ACO 
   // Default is NULL if none are set.
-  void SetInitialSched(InstSchedule *sched);
+  void setInitialSched(InstSchedule *Sched);
   
 private:
   pheremone_t &Pheremone(SchedInstruction *from, SchedInstruction *to);
@@ -57,8 +57,8 @@ private:
   int ants_per_iteration;
   bool print_aco_trace;
   std::vector<double> scores(std::vector<Choice> ready, SchedInstruction *last);
-  InstSchedule* initialSchedule_;
-  bool vrfySched_;
+  InstSchedule* InitialSchedule_;
+  bool VrfySched_;
 };
 
 } // namespace opt_sched

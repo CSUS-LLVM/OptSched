@@ -129,8 +129,8 @@ protected:
   // The nomal heuristic scheduling results.
   InstCount hurstcCost_;
   InstCount hurstcSchedLngth_;
-  InstCount acoScheduleLength_;
-  InstCount acoScheduleCost_;
+  InstCount AcoScheduleLength_;
+  InstCount AcoScheduleCost_;
 
   // The schedule currently used by the enumerator
   InstSchedule *enumCrntSched_;
@@ -225,11 +225,11 @@ protected:
 
   // (Chris) Get the SLIL for each set
   virtual const std::vector<int> &GetSLIL_() const = 0;
-  
-  FUNC_RESULT runACO(InstSchedule *returnSched, InstSchedule *initSched);
+
+  FUNC_RESULT runACO(InstSchedule *ReturnSched, InstSchedule *InitSched);
   // Compare first and second schedule and put the best in third.
-  void compareSchedules(InstSchedule *first, InstSchedule *second, InstSchedule *&third);
-  
+  void compareSchedules(InstSchedule *First, InstSchedule *Second,
+                        InstSchedule *&Third);
 };
 
 } // namespace opt_sched
