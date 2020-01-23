@@ -74,8 +74,6 @@ void SchedRegion::CmputAbslutUprBound_() {
   abslutSchedUprBound_ = dataDepGraph_->GetAbslutSchedUprBound();
 }
 
-// FIXME: Heuristic cost and length is being returned by reference
-// which may cause an issue when heuristic is disabled.
 FUNC_RESULT SchedRegion::FindOptimalSchedule(
     Milliseconds rgnTimeout, Milliseconds lngthTimeout, bool &isLstOptml,
     InstCount &bestCost, InstCount &bestSchedLngth, InstCount &hurstcCost,
@@ -102,6 +100,14 @@ FUNC_RESULT SchedRegion::FindOptimalSchedule(
   bool AcoBeforeEnum = false;
   bool AcoAfterEnum = false;
 
+  // Algorithm run order:
+  // 1) Heuristic Scheduler
+  // 2) ACO
+  // 3) Branch & Bound Enumerator
+  // 4) ACO
+  // Each of these 4 algorithms can be individually disabled, but either the
+  // heuristic scheduler or ACO before the branch & bound enumerator must be
+  // enabled.
   Config &schedIni = SchedulerOptions::getInstance();
   bool HeuristicSchedulerEnabled = schedIni.GetBool("HEUR_ENABLED");
   bool AcoSchedulerEnabled = schedIni.GetBool("ACO_ENABLED");
@@ -432,22 +438,23 @@ FUNC_RESULT SchedRegion::FindOptimalSchedule(
     if (acoRslt != RES_SUCCESS) {
       Logger::Info("Running final ACO failed");
       delete AcoAfterEnumSchedule;
-    }
-
-    InstCount AcoAfterEnumCost = AcoAfterEnumSchedule->GetCost();
-    if (AcoAfterEnumCost < bestCost_) {
-      InstCount AcoAfterEnumLength = AcoAfterEnumSchedule->GetCrntLngth();
-      InstCount imprvmnt = bestCost_ - AcoAfterEnumCost;
-      Logger::Info("ACO found better schedule with length=%d, spill cost = %d, "
-                   "tot cost = %d, cost imp=%d.",
-                   AcoAfterEnumLength, AcoAfterEnumSchedule->GetSpillCost(),
-                   AcoAfterEnumCost, imprvmnt);
-      bestSched_ = bestSched = AcoAfterEnumSchedule;
-      bestCost_ = AcoAfterEnumCost;
-      bestSchedLngth_ = AcoAfterEnumLength;
     } else {
-      Logger::Info("ACO was unable to find a better schedule.");
-      delete AcoAfterEnumSchedule;
+      InstCount AcoAfterEnumCost = AcoAfterEnumSchedule->GetCost();
+      if (AcoAfterEnumCost < bestCost_) {
+        InstCount AcoAfterEnumLength = AcoAfterEnumSchedule->GetCrntLngth();
+        InstCount imprvmnt = bestCost_ - AcoAfterEnumCost;
+        Logger::Info(
+            "ACO found better schedule with length=%d, spill cost = %d, "
+            "tot cost = %d, cost imp=%d.",
+            AcoAfterEnumLength, AcoAfterEnumSchedule->GetSpillCost(),
+            AcoAfterEnumCost, imprvmnt);
+        bestSched_ = bestSched = AcoAfterEnumSchedule;
+        bestCost_ = AcoAfterEnumCost;
+        bestSchedLngth_ = AcoAfterEnumLength;
+      } else {
+        Logger::Info("ACO was unable to find a better schedule.");
+        delete AcoAfterEnumSchedule;
+      }
     }
   }
 
