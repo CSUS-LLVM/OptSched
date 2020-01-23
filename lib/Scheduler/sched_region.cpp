@@ -37,12 +37,12 @@ SchedRegion::SchedRegion(MachineModel *machMdl, DataDepGraph *dataDepGraph,
   isSecondPass = false;
 
   totalSimSpills_ = INVALID_VALUE;
-  bestCost_ = 0;
-  bestSchedLngth_ = 0;
-  hurstcCost_ = 0;
-  hurstcSchedLngth_ = 0;
-  AcoScheduleCost_ = 0;
-  AcoScheduleLength_ = 0;
+  bestCost_ = INVALID_VALUE;
+  bestSchedLngth_ = INVALID_VALUE;
+  hurstcCost_ = INVALID_VALUE;
+  hurstcSchedLngth_ = INVALID_VALUE;
+  AcoScheduleCost_ = INVALID_VALUE;
+  AcoScheduleLength_ = INVALID_VALUE;
   enumCrntSched_ = NULL;
   enumBestSched_ = NULL;
   schedLwrBound_ = 0;
