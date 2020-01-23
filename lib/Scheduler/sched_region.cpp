@@ -309,9 +309,6 @@ FUNC_RESULT SchedRegion::FindOptimalSchedule(
                                 "CP Lower Bounds");
 #endif
 
-  if (rgnTimeout == 0)
-    isLstOptml = true;
-
   // (Chris): If the cost function is SLIL, then the list schedule is considered
   // optimal if PERP is 0.
   if (filterByPerp && !isLstOptml && spillCostFunc_ == SCF_SLIL) {
@@ -359,6 +356,9 @@ FUNC_RESULT SchedRegion::FindOptimalSchedule(
   InitialSchedule = bestSched_;
   InitialScheduleCost = bestCost_;
   InitialScheduleLength = bestSchedLngth_;
+
+  if (rgnTimeout == 0)
+    BbSchedulerEnabled = false;
 
   // Step #4: Find the optimal schedule if the heuristc and ACO was not optimal.
   if (BbSchedulerEnabled) {
