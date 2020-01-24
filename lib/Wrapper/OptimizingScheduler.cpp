@@ -420,13 +420,16 @@ void ScheduleDAGOptSched::schedule() {
                      Rslt, (void *)Sched));
     // Scheduling with opt-sched failed.
     // fallbackScheduler();
+    delete region;
     return;
   }
 
   LLVM_DEBUG(Logger::Info("OptSched succeeded."));
   OST->finalizeRegion(Sched);
-  if (!OST->shouldKeepSchedule())
+  if (!OST->shouldKeepSchedule()) {
+    delete region;
     return;
+  }
 
   // Count simulated spills.
   if (isSimRegAllocEnabled()) {
