@@ -379,10 +379,12 @@ void ScheduleDAGOptSched::schedule() {
   addGraphTransformations(BDDG);
 
   // create region
-  SchedRegion *region = new BBWithSpill(
-      OST.get(), static_cast<DataDepGraph *>(DDG.get()), 0, HistTableHashBits,
-      LowerBoundAlgorithm, HeuristicPriorities, EnumPriorities, VerifySchedule,
-      PruningStrategy, SchedForRPOnly, EnumStalls, SCW, SCF, HeurSchedType);
+  std::unique_ptr<SchedRegion> region =
+      std::unique_ptr<BBWithSpill>(new BBWithSpill(
+          OST.get(), static_cast<DataDepGraph *>(DDG.get()), 0,
+          HistTableHashBits, LowerBoundAlgorithm, HeuristicPriorities,
+          EnumPriorities, VerifySchedule, PruningStrategy, SchedForRPOnly,
+          EnumStalls, SCW, SCF, HeurSchedType));
 
   bool IsEasy = false;
   InstCount NormBestCost = 0;
@@ -420,16 +422,13 @@ void ScheduleDAGOptSched::schedule() {
                      Rslt, (void *)Sched));
     // Scheduling with opt-sched failed.
     // fallbackScheduler();
-    delete region;
     return;
   }
 
   LLVM_DEBUG(Logger::Info("OptSched succeeded."));
   OST->finalizeRegion(Sched);
-  if (!OST->shouldKeepSchedule()) {
-    delete region;
+  if (!OST->shouldKeepSchedule())
     return;
-  }
 
   // Count simulated spills.
   if (isSimRegAllocEnabled()) {
@@ -461,8 +460,6 @@ void ScheduleDAGOptSched::schedule() {
   Logger::Info("Register pressure after");
   RPTracker.dump();
 #endif
-
-  delete region;
 }
 
 void ScheduleDAGOptSched::ScheduleNode(SUnit *SU, unsigned CurCycle) {
