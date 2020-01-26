@@ -60,50 +60,57 @@ void ScheduleDAGOptSchedGCN::initSchedulers() {
   SchedPasses.push_back(OptSchedMaxOcc);
   // Second
   SchedPasses.push_back(OptSchedBalanced);
-}
-
-// Record scheduling regions.
-void ScheduleDAGOptSchedGCN::schedule() {
-  Regions.push_back(std::make_pair(RegionBegin, RegionEnd));
-  return;
-}
+}   
 
 // Execute scheduling passes.
 // Partially copied GCNScheduleDAGMILive::finalizeSchedule
 void ScheduleDAGOptSchedGCN::finalizeSchedule() {
-  initSchedulers();
+  if (TwoPassEnabled && OptSchedEnabled) {
+    initSchedulers();
 
-  for (const SchedPassStrategy &S : SchedPasses) {
-    MachineBasicBlock *MBB = nullptr;
-    // Reset
-    RegionNumber = ~0u;
+    LLVM_DEBUG(dbgs() << "Starting two pass scheduling approach\n");
+    TwoPassSchedulingStarted = true;
+    for (const SchedPassStrategy &S : SchedPasses) {
+      MachineBasicBlock *MBB = nullptr;
+      // Reset
+      RegionNumber = ~0u;
 
-    for (auto &Region : Regions) {
-      RegionBegin = Region.first;
-      RegionEnd = Region.second;
+      for (auto &Region : Regions) {
+        RegionBegin = Region.first;
+        RegionEnd = Region.second;
 
-      if (RegionBegin->getParent() != MBB) {
-        if (MBB)
-          finishBlock();
-        MBB = RegionBegin->getParent();
-        startBlock(MBB);
-      }
-      unsigned NumRegionInstrs = std::distance(begin(), end());
-      enterRegion(MBB, begin(), end(), NumRegionInstrs);
+        if (RegionBegin->getParent() != MBB) {
+          if (MBB)
+            finishBlock();
+          MBB = RegionBegin->getParent();
+          startBlock(MBB);
+        }
+        unsigned NumRegionInstrs = std::distance(begin(), end());
+        enterRegion(MBB, begin(), end(), NumRegionInstrs);
 
-      // Skip empty scheduling regions (0 or 1 schedulable instructions).
-      if (begin() == end() || begin() == std::prev(end())) {
+        // Skip empty scheduling regions (0 or 1 schedulable instructions).
+        if (begin() == end() || begin() == std::prev(end())) {
+          exitRegion();
+          continue;
+        }
+        LLVM_DEBUG(getRealRegionPressure(RegionBegin, RegionEnd, LIS, "Before"));
+        runSchedPass(S);
+        LLVM_DEBUG(getRealRegionPressure(RegionBegin, RegionEnd, LIS, "After"));
+        Region = std::make_pair(RegionBegin, RegionEnd);
         exitRegion();
-        continue;
       }
-      LLVM_DEBUG(getRealRegionPressure(RegionBegin, RegionEnd, LIS, "Before"));
-      runSchedPass(S);
-      LLVM_DEBUG(getRealRegionPressure(RegionBegin, RegionEnd, LIS, "After"));
-      Region = std::make_pair(RegionBegin, RegionEnd);
-      exitRegion();
+      finishBlock();
     }
-    finishBlock();
   }
+
+  ScheduleDAGMILive::finalizeSchedule();
+
+  LLVM_DEBUG(if (isSimRegAllocEnabled()) {
+    dbgs() << "*************************************\n";
+    dbgs() << "Function: " << MF.getName()
+           << "\nTotal Simulated Spills: " << SimulatedSpills << "\n";
+    dbgs() << "*************************************\n";
+  });
 }
 
 void ScheduleDAGOptSchedGCN::runSchedPass(SchedPassStrategy S) {
@@ -131,20 +138,9 @@ void ScheduleDAGOptSchedGCN::scheduleGCNMaxOcc() {
 }
 
 void ScheduleDAGOptSchedGCN::scheduleOptSchedMaxOcc() {
-  LatencyPrecision = LTP_UNITY;
-  HeurSchedType = SCHED_LIST;
-  SCF = SCF_TARGET;
-
-  ScheduleDAGOptSched::schedule();
+  ScheduleDAGOptSched::scheduleOptSchedMinRP();
 }
 
 void ScheduleDAGOptSchedGCN::scheduleOptSchedBalanced() {
-  LatencyPrecision = LTP_ROUGH;
-  // Force the input to the balanced scheduler to be the sequential order of the
-  // (hopefully) good max occupancy schedule. We don’t want the list scheduler
-  // to mangle the input because of latency or resource constraints.
-  HeurSchedType = SCHED_SEQ;
-  SCF = SCF_TARGET;
-
-  ScheduleDAGOptSched::schedule();
+  ScheduleDAGOptSched::scheduleOptSchedBalanced();
 }

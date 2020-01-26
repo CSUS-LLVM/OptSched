@@ -839,8 +839,8 @@ FUNC_RESULT BBWithSpill::Enumerate_(Milliseconds startTime,
       if (rslt == RES_SUCCESS && isSecondPass) {
         Logger::Info("Schedule found in second pass, terminating BB loop.");
 
-        if (enumCrntSched_->GetCrntLngth() < schedUprBound_)
-          Logger::Info("Schedule with a shorter length found.");
+        if (trgtLngth  < schedUprBound_)
+          Logger::Info("Schedule found with length %d is shorter than current schedule with length %d.", trgtLngth, schedUprBound_);
       }
 
       break;
