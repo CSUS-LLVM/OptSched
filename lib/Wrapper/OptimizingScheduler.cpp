@@ -379,12 +379,10 @@ void ScheduleDAGOptSched::schedule() {
   addGraphTransformations(BDDG);
 
   // create region
-  std::unique_ptr<SchedRegion> region =
-      std::unique_ptr<BBWithSpill>(new BBWithSpill(
-          OST.get(), static_cast<DataDepGraph *>(DDG.get()), 0,
-          HistTableHashBits, LowerBoundAlgorithm, HeuristicPriorities,
-          EnumPriorities, VerifySchedule, PruningStrategy, SchedForRPOnly,
-          EnumStalls, SCW, SCF, HeurSchedType));
+  auto region = llvm::make_unique<BBWithSpill>(
+      OST.get(), static_cast<DataDepGraph *>(DDG.get()), 0, HistTableHashBits,
+      LowerBoundAlgorithm, HeuristicPriorities, EnumPriorities, VerifySchedule,
+      PruningStrategy, SchedForRPOnly, EnumStalls, SCW, SCF, HeurSchedType);
 
   bool IsEasy = false;
   InstCount NormBestCost = 0;
