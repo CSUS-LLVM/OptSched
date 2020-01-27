@@ -227,9 +227,6 @@ protected:
   virtual const std::vector<int> &GetSLIL_() const = 0;
 
   FUNC_RESULT runACO(InstSchedule *ReturnSched, InstSchedule *InitSched);
-  // Compare first and second schedule and put the best in third.
-  void compareSchedules(InstSchedule *First, InstSchedule *Second,
-                        InstSchedule *&Third);
 };
 
 } // namespace opt_sched

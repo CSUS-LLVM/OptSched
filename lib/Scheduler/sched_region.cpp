@@ -117,7 +117,7 @@ FUNC_RESULT SchedRegion::FindOptimalSchedule(
     AcoAfterEnum = schedIni.GetBool("ACO_AFTER_ENUM");
   }
 
-  if (false == HeuristicSchedulerEnabled && false == AcoBeforeEnum) {
+  if (!HeuristicSchedulerEnabled && !AcoBeforeEnum) {
     // Abort if ACO and heuristic algorithms are disabled.
     Logger::Fatal(
         "Heuristic list scheduler or ACO must be enabled before enumerator.");
@@ -230,7 +230,7 @@ FUNC_RESULT SchedRegion::FindOptimalSchedule(
 
   // Step #2: Use ACO to find a schedule if enabled and no optimal schedule is
   // yet to be found.
-  if (AcoBeforeEnum && false == isLstOptml) {
+  if (AcoBeforeEnum && !isLstOptml) {
     AcoStart = Utilities::GetProcessorTime();
     AcoSchedule = new InstSchedule(machMdl_, dataDepGraph_, vrfySched_);
     if (AcoSchedule == NULL)
@@ -291,7 +291,7 @@ FUNC_RESULT SchedRegion::FindOptimalSchedule(
       // schedules and use the one that's better as the input (initialSched) for
       // B&B.
     } else {
-      compareSchedules(lstSched, AcoSchedule, bestSched_);
+      bestSched_ = AcoSchedule->GetCost() < lstSched->GetCost() ? AcoSchedule : lstSched;
       bestSched = bestSched_;
       bestSchedLngth_ = bestSched_->GetCrntLngth();
       bestCost_ = bestSched_->GetCost();
@@ -369,7 +369,7 @@ FUNC_RESULT SchedRegion::FindOptimalSchedule(
   // Step #4: Find the optimal schedule if the heuristc and ACO was not optimal.
   if (BbSchedulerEnabled) {
     Milliseconds enumStart = Utilities::GetProcessorTime();
-    if (false == isLstOptml) {
+    if (!isLstOptml) {
       dataDepGraph_->SetHard(true);
       rslt = Optimize_(enumStart, rgnTimeout, lngthTimeout);
       Milliseconds enumTime = Utilities::GetProcessorTime() - enumStart;
@@ -813,20 +813,4 @@ FUNC_RESULT SchedRegion::runACO(InstSchedule *ReturnSched,
   FUNC_RESULT Rslt = AcoSchdulr->FindSchedule(ReturnSched, this);
   delete AcoSchdulr;
   return Rslt;
-}
-
-void SchedRegion::compareSchedules(InstSchedule *First, InstSchedule *Second,
-                                   InstSchedule *&Third) {
-  InstCount FirstCost = First->GetCost();
-  InstCount SecondCost = Second->GetCost();
-
-  // Instances where costs are equal, take sched. length into account
-  if (FirstCost == SecondCost)
-    Third = First;
-  // First has better cost than Second
-  else if (FirstCost < SecondCost)
-    Third = First;
-  // Second has better cost than First
-  else if (FirstCost > SecondCost)
-    Third = Second;
 }
