@@ -379,7 +379,7 @@ void ScheduleDAGOptSched::schedule() {
   addGraphTransformations(BDDG);
 
   // create region
-  SchedRegion *region = new BBWithSpill(
+  auto region = llvm::make_unique<BBWithSpill>(
       OST.get(), static_cast<DataDepGraph *>(DDG.get()), 0, HistTableHashBits,
       LowerBoundAlgorithm, HeuristicPriorities, EnumPriorities, VerifySchedule,
       PruningStrategy, SchedForRPOnly, EnumStalls, SCW, SCF, HeurSchedType);
@@ -458,8 +458,6 @@ void ScheduleDAGOptSched::schedule() {
   Logger::Info("Register pressure after");
   RPTracker.dump();
 #endif
-
-  delete region;
 }
 
 void ScheduleDAGOptSched::ScheduleNode(SUnit *SU, unsigned CurCycle) {
