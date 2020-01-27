@@ -3258,19 +3258,20 @@ bool DataDepGraph::DoesFeedUser(SchedInstruction *inst) {
   for (GraphNode *succ = rcrsvSuccs->GetFrstElmnt(); succ != NULL;
        succ = rcrsvSuccs->GetNxtElmnt()) {
     SchedInstruction *succInst = static_cast<SchedInstruction *>(succ);
-    Register **uses;
-    int numUses = succInst->GetUses(uses);
+    
+    int curInstAdjUseCnt = succInst->GetAdjustedUseCnt();
+    // Ignore successor instructions that does not close live intervals
+    if (curInstAdjUseCnt == 0)
+      continue;
+    // Ignore instructions that open more live intervals than
+    // it closes because it will increase register pressure instead.
+    else if (curInstAdjUseCnt < succInst->GetDefCnt())
+      continue;
 
-    for (int i = 0; i < numUses; i++) {
-#ifdef IS_DEBUG_RP_ONLY
-      Logger::Info("inst %d has reg %d which has flag live/not-live: %d",
-                   succInst->GetNum(), uses[i]->GetNum(), uses[i]->IsLive());
-#endif
-      if (uses[i]->IsLive())
-        // If a register is live-in and live-out don't count it as a user.
-        if (!uses[i]->IsLiveOut())
-          return true;
-    }
+    // If there is a successor instruction that decreases live intervals
+    // or one that does not increase live intervals, then return true.
+    return true;
+
   }
 // Return false if there is no recursive successor of inst
 // that uses a live register.

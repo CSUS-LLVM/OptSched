@@ -4,11 +4,6 @@
 
 using namespace llvm::opt_sched::stats;
 
-ostream &operator<<(ostream &out, const Stat &stat) {
-  stat.Print(out);
-  return out;
-}
-
 template <class T>
 DistributionStat<T>::DistributionStat(const string name) : Stat(name) {
   sum_ = 0;
@@ -121,6 +116,11 @@ template <class T> void IndexedNumericStat<T>::Print(std::ostream &out) const {
 namespace llvm {
 namespace opt_sched {
 namespace stats {
+    
+ostream &operator<<(ostream &out, const Stat &stat) {
+  stat.Print(out);
+  return out;
+}   
 
 // Make sure we explicitly instantiate the allowed template parameters.
 template class DistributionStat<int64_t>;
