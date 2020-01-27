@@ -291,7 +291,7 @@ FUNC_RESULT SchedRegion::FindOptimalSchedule(
       // schedules and use the one that's better as the input (initialSched) for
       // B&B.
     } else {
-      bestSched_ = AcoSchedule->GetCost() < lstSched->GetCost() ? AcoSchedule : lstSched;
+      bestSched_ = AcoScheduleCost_ < hurstcCost_ ? AcoSchedule : lstSched;
       bestSched = bestSched_;
       bestSchedLngth_ = bestSched_->GetCrntLngth();
       bestCost_ = bestSched_->GetCost();
