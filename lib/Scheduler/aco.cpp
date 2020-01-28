@@ -35,8 +35,9 @@ double RandDouble(double min, double max) {
 
 ACOScheduler::ACOScheduler(DataDepGraph *dataDepGraph,
                            MachineModel *machineModel, InstCount upperBound,
-                           SchedPriorities priorities)
+                           SchedPriorities priorities, bool vrfySched)
     : ConstrainedScheduler(dataDepGraph, machineModel, upperBound) {
+  VrfySched_ = vrfySched;
   prirts_ = priorities;
   rdyLst_ = new ReadyList(dataDepGraph_, priorities);
   count_ = dataDepGraph->GetInstCnt();
@@ -63,6 +64,7 @@ ACOScheduler::ACOScheduler(DataDepGraph *dataDepGraph,
   */
   int pheremone_size = (count_ + 1) * count_;
   pheremone_ = new pheremone_t[pheremone_size];
+  InitialSchedule = nullptr;
 }
 
 ACOScheduler::~ACOScheduler() {
@@ -174,6 +176,7 @@ InstSchedule *ACOScheduler::FindOneSchedule() {
   if (maxPriority == 0)
     maxPriority = 1; // divide by 0 is bad
   Initialize_();
+  rgn_->InitForSchdulng();
 
   while (!IsSchedComplete_()) {
     // convert the ready list from a custom priority queue to a std::vector,
@@ -266,7 +269,10 @@ FUNC_RESULT ACOScheduler::FindSchedule(InstSchedule *schedule_out,
     pheremone_[i] = initialValue_;
   std::cerr << "initialValue_" << initialValue_ << std::endl;
 
-  InstSchedule *bestSchedule = NULL;
+  InstSchedule *bestSchedule = InitialSchedule;
+  if (bestSchedule) {
+    UpdatePheremone(bestSchedule);
+  }
   Config &schedIni = SchedulerOptions::getInstance();
   int noImprovementMax = schedIni.GetInt("ACO_STOP_ITERATIONS");
   int noImprovement = 0; // how many iterations with no improvement
@@ -429,4 +435,11 @@ void PrintSchedule(InstSchedule *schedule) {
   }
   std::cerr << std::endl;
   schedule->ResetInstIter();
+}
+
+void ACOScheduler::setInitialSched(InstSchedule *Sched) {
+  if (Sched) {
+    InitialSchedule = new InstSchedule(machMdl_, dataDepGraph_, VrfySched_);
+    InitialSchedule->Copy(Sched);
+  }
 }

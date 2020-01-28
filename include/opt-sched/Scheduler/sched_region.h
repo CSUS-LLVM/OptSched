@@ -3,7 +3,8 @@ Description:  Implements an abstract base class for representing scheduling
               regions.
 Author:       Ghassan Shobaki
 Created:      Apr. 2005
-Last Update:  Apr. 2011
+Updated By:   Ciprian Elies and Vang Thao
+Last Update:  Jan. 2020
 *******************************************************************************/
 
 #ifndef OPTSCHED_SCHED_REGION_SCHED_REGION_H
@@ -128,6 +129,8 @@ protected:
   // The nomal heuristic scheduling results.
   InstCount hurstcCost_;
   InstCount hurstcSchedLngth_;
+  InstCount AcoScheduleLength_;
+  InstCount AcoScheduleCost_;
 
   // The schedule currently used by the enumerator
   InstSchedule *enumCrntSched_;
@@ -182,7 +185,7 @@ protected:
   // TODO(max): Document.
   void CmputLwrBounds_(bool useFileBounds);
   // TODO(max): Document.
-  bool CmputUprBounds_(InstSchedule *lstSched, bool useFileBounds);
+  bool CmputUprBounds_(InstSchedule *schedule, bool useFileBounds);
   // Handle the enumerator's result
   void HandlEnumrtrRslt_(FUNC_RESULT rslt, InstCount trgtLngth);
 
@@ -222,6 +225,8 @@ protected:
 
   // (Chris) Get the SLIL for each set
   virtual const std::vector<int> &GetSLIL_() const = 0;
+
+  FUNC_RESULT runACO(InstSchedule *ReturnSched, InstSchedule *InitSched);
 };
 
 } // namespace opt_sched

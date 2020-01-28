@@ -33,9 +33,7 @@ enum SchedulerType {
   // List scheduler.
   SCHED_LIST,
   // Sequential list scheduler.
-  SCHED_SEQ,
-  // Ant colony scheduler.
-  SCHED_ACO
+  SCHED_SEQ
 };
 
 // Forward declarations used to reduce the number of #includes.

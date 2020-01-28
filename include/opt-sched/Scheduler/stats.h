@@ -286,6 +286,7 @@ extern IntDistributionStat traceOptimalScheduleLength;
 
 extern IntDistributionStat regionBuildTime;
 extern IntDistributionStat heuristicTime;
+extern IntDistributionStat AcoTime;
 extern IntDistributionStat boundComputationTime;
 extern IntDistributionStat enumerationTime;
 extern IntDistributionStat enumerationToHeuristicTimeRatio;

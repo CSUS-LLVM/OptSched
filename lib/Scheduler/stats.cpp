@@ -164,6 +164,7 @@ IntDistributionStat traceOptimalScheduleLength("Trace optimal schedule length");
 
 IntDistributionStat regionBuildTime("Region build time");
 IntDistributionStat heuristicTime("Heuristic time");
+IntDistributionStat AcoTime("ACO time");
 IntDistributionStat boundComputationTime("Bound computation time");
 IntDistributionStat enumerationTime("Enumeration time");
 IntDistributionStat

@@ -103,10 +103,6 @@ ConstrainedScheduler *BBWithSpill::AllocHeuristicScheduler_() {
     return new ListScheduler(dataDepGraph_, machMdl_, abslutSchedUprBound_,
                              hurstcPrirts_);
     break;
-  case SCHED_ACO:
-    return new ACOScheduler(dataDepGraph_, machMdl_, abslutSchedUprBound_,
-                            hurstcPrirts_);
-    break;
   case SCHED_SEQ:
     return new SequentialListScheduler(dataDepGraph_, machMdl_,
                                        abslutSchedUprBound_, hurstcPrirts_);
@@ -386,18 +382,9 @@ InstCount BBWithSpill::CmputCost_(InstSchedule *sched, COST_COMP_MODE compMode,
   InstCount cycleNum;
   InstCount slotNum;
   SchedInstruction *inst;
-
+  
   if (compMode == CCM_STTC) {
-    if (spillCostFunc_ != SCF_SPILLS) {
-      InitForCostCmputtn_();
-
-      for (instNum = sched->GetFrstInst(cycleNum, slotNum);
-           instNum != INVALID_VALUE;
-           instNum = sched->GetNxtInst(cycleNum, slotNum)) {
-        inst = dataDepGraph_->GetInstByIndx(instNum);
-        SchdulInst(inst, cycleNum, slotNum, trackCnflcts);
-      }
-    } else {
+    if (spillCostFunc_ == SCF_SPILLS) {
       LocalRegAlloc regAlloc(sched, dataDepGraph_);
       regAlloc.SetupForRegAlloc();
       regAlloc.AllocRegs();

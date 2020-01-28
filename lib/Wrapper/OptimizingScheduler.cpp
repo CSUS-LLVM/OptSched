@@ -162,8 +162,6 @@ static SchedulerType parseListSchedType() {
     return SCHED_LIST;
   if (SchedTypeString == "SEQ")
     return SCHED_SEQ;
-  if (SchedTypeString == "ACO")
-    return SCHED_ACO;
 
   Logger::Info("Unknown heuristic scheduler type selected defaulting to basic "
                "list scheduler.");

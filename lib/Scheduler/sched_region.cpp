@@ -2,6 +2,7 @@
 #include <memory>
 #include <utility>
 
+#include "opt-sched/Scheduler/aco.h"
 #include "opt-sched/Scheduler/bb_spill.h"
 #include "opt-sched/Scheduler/config.h"
 #include "opt-sched/Scheduler/graph_trans.h"
@@ -36,13 +37,14 @@ SchedRegion::SchedRegion(MachineModel *machMdl, DataDepGraph *dataDepGraph,
   isSecondPass = false;
 
   totalSimSpills_ = INVALID_VALUE;
-  bestCost_ = 0;
-  bestSchedLngth_ = 0;
-  hurstcCost_ = 0;
-  hurstcSchedLngth_ = 0;
+  bestCost_ = INVALID_VALUE;
+  bestSchedLngth_ = INVALID_VALUE;
+  hurstcCost_ = INVALID_VALUE;
+  hurstcSchedLngth_ = INVALID_VALUE;
+  AcoScheduleCost_ = INVALID_VALUE;
+  AcoScheduleLength_ = INVALID_VALUE;
   enumCrntSched_ = NULL;
   enumBestSched_ = NULL;
-
   schedLwrBound_ = 0;
   schedUprBound_ = INVALID_VALUE;
 
@@ -77,17 +79,50 @@ FUNC_RESULT SchedRegion::FindOptimalSchedule(
     InstCount &bestCost, InstCount &bestSchedLngth, InstCount &hurstcCost,
     InstCount &hurstcSchedLngth, InstSchedule *&bestSched, bool filterByPerp,
     const BLOCKS_TO_KEEP blocksToKeep) {
-  ConstrainedScheduler *lstSchdulr;
+  ConstrainedScheduler *lstSchdulr = NULL;
+  InstSchedule *InitialSchedule = nullptr;
   InstSchedule *lstSched = NULL;
+  InstSchedule *AcoSchedule = nullptr;
+  InstCount InitialScheduleLength = 0;
+  InstCount InitialScheduleCost = 0;
   FUNC_RESULT rslt = RES_SUCCESS;
   Milliseconds hurstcTime = 0;
   Milliseconds boundTime = 0;
   Milliseconds enumTime = 0;
   Milliseconds vrfyTime = 0;
+  Milliseconds AcoTime = 0;
+  Milliseconds AcoStart = 0;
 
   enumCrntSched_ = NULL;
   enumBestSched_ = NULL;
   bestSched = bestSched_ = NULL;
+
+  bool AcoBeforeEnum = false;
+  bool AcoAfterEnum = false;
+
+  // Algorithm run order:
+  // 1) Heuristic Scheduler
+  // 2) ACO
+  // 3) Branch & Bound Enumerator
+  // 4) ACO
+  // Each of these 4 algorithms can be individually disabled, but either the
+  // heuristic scheduler or ACO before the branch & bound enumerator must be
+  // enabled.
+  Config &schedIni = SchedulerOptions::getInstance();
+  bool HeuristicSchedulerEnabled = schedIni.GetBool("HEUR_ENABLED");
+  bool AcoSchedulerEnabled = schedIni.GetBool("ACO_ENABLED");
+  bool BbSchedulerEnabled = schedIni.GetBool("ENUM_ENABLED");
+  if (AcoSchedulerEnabled) {
+    AcoBeforeEnum = schedIni.GetBool("ACO_BEFORE_ENUM");
+    AcoAfterEnum = schedIni.GetBool("ACO_AFTER_ENUM");
+  }
+
+  if (!HeuristicSchedulerEnabled && !AcoBeforeEnum) {
+    // Abort if ACO and heuristic algorithms are disabled.
+    Logger::Fatal(
+        "Heuristic list scheduler or ACO must be enabled before enumerator.");
+    return RES_ERROR;
+  }
 
   Logger::Info("---------------------------------------------------------------"
                "------------");
@@ -126,72 +161,151 @@ FUNC_RESULT SchedRegion::FindOptimalSchedule(
   SetupForSchdulng_();
   CmputAbslutUprBound_();
   schedLwrBound_ = dataDepGraph_->GetSchedLwrBound();
-  Milliseconds hurstcStart = Utilities::GetProcessorTime();
-  lstSched = new InstSchedule(machMdl_, dataDepGraph_, vrfySched_);
-  if (lstSched == NULL)
-    Logger::Fatal("Out of memory.");
 
-  lstSchdulr = AllocHeuristicScheduler_();
-
-  // Step #1: Find the heuristic schedule.
-  rslt = lstSchdulr->FindSchedule(lstSched, this);
-
-  if (rslt != RES_SUCCESS) {
-    Logger::Info("List scheduling failed");
-    delete lstSchdulr;
-    delete lstSched;
-    return rslt;
-  }
-
-  hurstcTime = Utilities::GetProcessorTime() - hurstcStart;
-  stats::heuristicTime.Record(hurstcTime);
-  if (hurstcTime > 0)
-    Logger::Info("Heuristic_Time %d", hurstcTime);
-
-#ifdef IS_DEBUG_SLIL_PRINTOUT
-  if (OPTSCHED_gPrintSpills) {
-    const auto &slilVector = this->GetSLIL_();
-    for (int j = 0; j < slilVector.size(); j++) {
-      Logger::Info(
-          "SLIL after Heuristic Scheduler for dag %s Type %d %s is %d.",
-          dataDepGraph_->GetDagID(), j, machMdl_->GetRegTypeName(j).c_str(),
-          slilVector[j]);
-    }
-  }
-#endif
-
-  Milliseconds boundStart = Utilities::GetProcessorTime();
-  hurstcSchedLngth_ = lstSched->GetCrntLngth();
-  bestSchedLngth_ = hurstcSchedLngth_;
-  assert(bestSchedLngth_ >= schedLwrBound_);
-  bestSched = bestSched_ = lstSched;
-
-  // Step #2: Compute the lower bounds and cost upper bound.
-  if (rgnTimeout == 0)
+  // We can calculate lower bounds here since it is only dependent
+  // on schedLwrBound_
+  if (!BbSchedulerEnabled)
     costLwrBound_ = CmputCostLwrBound();
   else
     CmputLwrBounds_(false);
-  assert(schedLwrBound_ <= lstSched->GetCrntLngth());
 
-  InstCount hurstcExecCost;
-  Config &schedIni = SchedulerOptions::getInstance();
-  if (!schedIni.GetBool("USE_ACO", false)) {
+  // Step #1: Find the heuristic schedule if enabled.
+  // Note: Heuristic scheduler is required for the two-pass scheduler
+  // to use the sequential list scheduler which inserts stalls into
+  // the schedule found in the first pass.
+  if (HeuristicSchedulerEnabled || isSecondPass) {
+    Milliseconds hurstcStart = Utilities::GetProcessorTime();
+    lstSched = new InstSchedule(machMdl_, dataDepGraph_, vrfySched_);
+    if (lstSched == NULL)
+      Logger::Fatal("Out of memory.");
+
+    lstSchdulr = AllocHeuristicScheduler_();
+
+    rslt = lstSchdulr->FindSchedule(lstSched, this);
+
+    if (rslt != RES_SUCCESS) {
+      Logger::Fatal("List scheduling failed");
+      delete lstSchdulr;
+      delete lstSched;
+      return rslt;
+    }
+
+    hurstcTime = Utilities::GetProcessorTime() - hurstcStart;
+    stats::heuristicTime.Record(hurstcTime);
+    if (hurstcTime > 0)
+      Logger::Info("Heuristic_Time %d", hurstcTime);
+
+    hurstcSchedLngth_ = lstSched->GetCrntLngth();
+    InstCount hurstcExecCost;
+    // Compute cost for Heuristic list scheduler, this must be called before
+    // calling GetCost() on the InstSchedule instance.
     CmputNormCost_(lstSched, CCM_DYNMC, hurstcExecCost, true);
-  } else {
-    CmputNormCost_(lstSched, CCM_STTC, hurstcExecCost, false);
+    hurstcCost_ = lstSched->GetCost();
+
+    // This schedule is optimal so ACO will not be run
+    // so set bestSched here.
+    if (hurstcCost_ == 0) {
+      isLstOptml = true;
+      bestSched = bestSched_ = lstSched;
+      bestSchedLngth_ = hurstcSchedLngth_;
+      bestCost_ = hurstcCost_;
+    }
+
+    FinishHurstc_();
+
+    //  #ifdef IS_DEBUG_SOLN_DETAILS_1
+    Logger::Info(
+        "The list schedule is of length %d and spill cost %d. Tot cost = %d",
+        hurstcSchedLngth_, lstSched->GetSpillCost(), hurstcCost_);
+    //  #endif
+
+#ifdef IS_DEBUG_PRINT_SCHEDS
+    lstSched->Print(Logger::GetLogStream(), "Heuristic");
+#endif
+#ifdef IS_DEBUG_PRINT_BOUNDS
+    dataDepGraph_->PrintLwrBounds(DIR_FRWRD, Logger::GetLogStream(),
+                                  "CP Lower Bounds");
+#endif
   }
-  hurstcCost_ = lstSched->GetCost();
-  isLstOptml = CmputUprBounds_(lstSched, false);
+
+  // Step #2: Use ACO to find a schedule if enabled and no optimal schedule is
+  // yet to be found.
+  if (AcoBeforeEnum && !isLstOptml) {
+    AcoStart = Utilities::GetProcessorTime();
+    AcoSchedule = new InstSchedule(machMdl_, dataDepGraph_, vrfySched_);
+    if (AcoSchedule == NULL)
+      Logger::Fatal("Out of memory.");
+
+    rslt = runACO(AcoSchedule, lstSched);
+    if (rslt != RES_SUCCESS) {
+      Logger::Fatal("ACO scheduling failed");
+      if (lstSchdulr)
+        delete lstSchdulr;
+      if (lstSched)
+        delete lstSched;
+      delete AcoSchedule;
+      return rslt;
+    }
+
+    AcoTime = Utilities::GetProcessorTime() - AcoStart;
+    stats::AcoTime.Record(AcoTime);
+    if (AcoTime > 0)
+      Logger::Info("ACO_Time %d", AcoTime);
+
+    AcoScheduleLength_ = AcoSchedule->GetCrntLngth();
+    AcoScheduleCost_ = AcoSchedule->GetCost();
+
+    // If ACO is run then that means either:
+    // 1.) Heuristic was not run
+    // 2.) Heuristic was not optimal
+    // In both cases, the current best will be ACO if
+    // ACO is optimal so set bestSched here.
+    if (AcoScheduleCost_ == 0) {
+      isLstOptml = true;
+      bestSched = bestSched_ = AcoSchedule;
+      bestSchedLngth_ = AcoScheduleLength_;
+      bestCost_ = AcoScheduleCost_;
+    }
+  }
+
+  // If an optimal schedule was found then it should have already
+  // been taken care of when optimality was discovered.
+  // Thus we only account for cases where no optimal schedule
+  // was found.
+  if (!isLstOptml) {
+    // There are 3 possible situations:
+    // A) ACO was never run. In that case, just use Heuristic and run with its
+    // results, into B&B.
+    if (!AcoBeforeEnum) {
+      bestSched = bestSched_ = lstSched;
+      bestSchedLngth_ = hurstcSchedLngth_;
+      bestCost_ = hurstcCost_;
+    }
+    // B) Heuristic was never run. In that case, just use ACO and run with its
+    // results, into B&B.
+    else if (!HeuristicSchedulerEnabled) {
+      bestSched = bestSched_ = AcoSchedule;
+      bestSchedLngth_ = AcoScheduleLength_;
+      bestCost_ = AcoScheduleCost_;
+      // C) Neither scheduler was optimal. In that case, compare the two
+      // schedules and use the one that's better as the input (initialSched) for
+      // B&B.
+    } else {
+      bestSched_ = AcoScheduleCost_ < hurstcCost_ ? AcoSchedule : lstSched;
+      bestSched = bestSched_;
+      bestSchedLngth_ = bestSched_->GetCrntLngth();
+      bestCost_ = bestSched_->GetCost();
+    }
+  }
+  // Step #3: Compute the cost upper bound.
+  Milliseconds boundStart = Utilities::GetProcessorTime();
+  assert(bestSchedLngth_ >= schedLwrBound_);
+  assert(schedLwrBound_ <= bestSched_->GetCrntLngth());
+
+  // Calculate upper bounds with the best schedule found
+  CmputUprBounds_(bestSched_, false);
   boundTime = Utilities::GetProcessorTime() - boundStart;
   stats::boundComputationTime.Record(boundTime);
-
-  FinishHurstc_();
-
-  //  #ifdef IS_DEBUG_SOLN_DETAILS_1
-  Logger::Info(
-      "The list schedule is of length %d and spill cost %d. Tot cost = %d",
-      bestSchedLngth_, lstSched->GetSpillCost(), bestCost_);
-  //  #endif
 
 #ifdef IS_DEBUG_PRINT_SCHEDS
   lstSched->Print(Logger::GetLogStream(), "Heuristic");
@@ -200,9 +314,6 @@ FUNC_RESULT SchedRegion::FindOptimalSchedule(
   dataDepGraph_->PrintLwrBounds(DIR_FRWRD, Logger::GetLogStream(),
                                 "CP Lower Bounds");
 #endif
-
-  if (rgnTimeout == 0)
-    isLstOptml = true;
 
   // (Chris): If the cost function is SLIL, then the list schedule is considered
   // optimal if PERP is 0.
@@ -244,70 +355,110 @@ FUNC_RESULT SchedRegion::FindOptimalSchedule(
     return RES_FAIL;
   }
 
-  // Step #3: Find the optimal schedule if the heuristc was not optimal.
-  Milliseconds enumStart = Utilities::GetProcessorTime();
-
 #ifdef IS_DEBUG_BOUNDS
   Logger::Info("Sched LB = %d, Sched UB = %d", schedLwrBound_, schedUprBound_);
 #endif
 
-  if (isLstOptml == false) {
-    dataDepGraph_->SetHard(true);
-    rslt = Optimize_(enumStart, rgnTimeout, lngthTimeout);
-    Milliseconds enumTime = Utilities::GetProcessorTime() - enumStart;
+  InitialSchedule = bestSched_;
+  InitialScheduleCost = bestCost_;
+  InitialScheduleLength = bestSchedLngth_;
 
-    if (hurstcTime > 0) {
-      enumTime /= hurstcTime;
-      stats::enumerationToHeuristicTimeRatio.Record(enumTime);
-    }
+  if (rgnTimeout == 0)
+    BbSchedulerEnabled = false;
 
-    if (bestCost_ < hurstcCost_) {
-      assert(enumBestSched_ != NULL);
-      bestSched = bestSched_ = enumBestSched_;
+  // Step #4: Find the optimal schedule if the heuristc and ACO was not optimal.
+  if (BbSchedulerEnabled) {
+    Milliseconds enumStart = Utilities::GetProcessorTime();
+    if (!isLstOptml) {
+      dataDepGraph_->SetHard(true);
+      rslt = Optimize_(enumStart, rgnTimeout, lngthTimeout);
+      Milliseconds enumTime = Utilities::GetProcessorTime() - enumStart;
+
+      // TODO: Implement this stat for ACO also.
+      if (hurstcTime > 0) {
+        enumTime /= hurstcTime;
+        stats::enumerationToHeuristicTimeRatio.Record(enumTime);
+      }
+
+      if (bestCost_ < InitialScheduleCost) {
+        assert(enumBestSched_ != NULL);
+        bestSched = bestSched_ = enumBestSched_;
 #ifdef IS_DEBUG_PRINT_SCHEDS
-      enumBestSched_->Print(Logger::GetLogStream(), "Optimal");
+        enumBestSched_->Print(Logger::GetLogStream(), "Optimal");
 #endif
+      }
+    } else if (rgnTimeout == 0) {
+      Logger::Info(
+          "Bypassing optimal scheduling due to zero time limit with cost %d",
+          bestCost_);
+    } else {
+      Logger::Info("The initial schedule of length %d and cost %d is optimal.",
+                   bestSchedLngth_, bestCost_);
     }
-  } else if (rgnTimeout == 0) {
-    Logger::Info(
-        "Bypassing optimal scheduling due to zero time limit with cost %d",
-        bestCost_);
-  } else {
-    Logger::Info("The list schedule of length %d and cost %d is optimal.",
-                 bestSchedLngth_, bestCost_);
-  }
 
-  if (rgnTimeout != 0) {
-    bool optimalSchedule = isLstOptml || (rslt == RES_SUCCESS);
-    Logger::Info("Best schedule for DAG %s has cost %d and length %d. The "
-                 "schedule is %s",
-                 dataDepGraph_->GetDagID(), bestCost_, bestSchedLngth_,
-                 optimalSchedule ? "optimal" : "not optimal");
-  }
+    if (rgnTimeout != 0) {
+      bool optimalSchedule = isLstOptml || (rslt == RES_SUCCESS);
+      Logger::Info("Best schedule for DAG %s has cost %d and length %d. The "
+                   "schedule is %s",
+                   dataDepGraph_->GetDagID(), bestCost_, bestSchedLngth_,
+                   optimalSchedule ? "optimal" : "not optimal");
+    }
 
 #ifdef IS_DEBUG_PRINT_PERP_AT_EACH_STEP
-  Logger::Info("Printing PERP at each step in the schedule.");
+    Logger::Info("Printing PERP at each step in the schedule.");
 
-  int costSum = 0;
-  for (int i = 0; i < dataDepGraph_->GetInstCnt(); ++i) {
-    Logger::Info("Cycle: %lu Cost: %lu", i, bestSched_->GetSpillCost(i));
-    costSum += bestSched_->GetSpillCost(i);
-  }
-  Logger::Info("Cost Sum: %lu", costSum);
+    int costSum = 0;
+    for (int i = 0; i < dataDepGraph_->GetInstCnt(); ++i) {
+      Logger::Info("Cycle: %lu Cost: %lu", i, bestSched_->GetSpillCost(i));
+      costSum += bestSched_->GetSpillCost(i);
+    }
+    Logger::Info("Cost Sum: %lu", costSum);
 #endif
 
-  if (SchedulerOptions::getInstance().GetString(
-          "SIMULATE_REGISTER_ALLOCATION") != "NO") {
-    //#ifdef IS_DEBUG
-    RegAlloc_(bestSched, lstSched);
-    //#endif
+    if (SchedulerOptions::getInstance().GetString(
+            "SIMULATE_REGISTER_ALLOCATION") != "NO") {
+      //#ifdef IS_DEBUG
+      RegAlloc_(bestSched, InitialSchedule);
+      //#endif
+    }
+
+    enumTime = Utilities::GetProcessorTime() - enumStart;
+    stats::enumerationTime.Record(enumTime);
   }
 
-  enumTime = Utilities::GetProcessorTime() - enumStart;
-  stats::enumerationTime.Record(enumTime);
+  // Step 5: Run ACO if schedule from enumerator is not optimal
+  if (bestCost_ != 0 && AcoAfterEnum) {
+    Logger::Info("Final cost is not optimal, running ACO.");
+    InstSchedule *AcoAfterEnumSchedule =
+        new InstSchedule(machMdl_, dataDepGraph_, vrfySched_);
+    if (AcoAfterEnumSchedule == NULL)
+      Logger::Fatal("Out of memory");
+
+    FUNC_RESULT acoRslt = runACO(AcoAfterEnumSchedule, bestSched);
+    if (acoRslt != RES_SUCCESS) {
+      Logger::Info("Running final ACO failed");
+      delete AcoAfterEnumSchedule;
+    } else {
+      InstCount AcoAfterEnumCost = AcoAfterEnumSchedule->GetCost();
+      if (AcoAfterEnumCost < bestCost_) {
+        InstCount AcoAfterEnumLength = AcoAfterEnumSchedule->GetCrntLngth();
+        InstCount imprvmnt = bestCost_ - AcoAfterEnumCost;
+        Logger::Info(
+            "ACO found better schedule with length=%d, spill cost = %d, "
+            "tot cost = %d, cost imp=%d.",
+            AcoAfterEnumLength, AcoAfterEnumSchedule->GetSpillCost(),
+            AcoAfterEnumCost, imprvmnt);
+        bestSched_ = bestSched = AcoAfterEnumSchedule;
+        bestCost_ = AcoAfterEnumCost;
+        bestSchedLngth_ = AcoAfterEnumLength;
+      } else {
+        Logger::Info("ACO was unable to find a better schedule.");
+        delete AcoAfterEnumSchedule;
+      }
+    }
+  }
 
   Milliseconds vrfyStart = Utilities::GetProcessorTime();
-
   if (vrfySched_) {
     bool isValidSchdul = bestSched->Verify(machMdl_, dataDepGraph_);
 
@@ -328,15 +479,21 @@ FUNC_RESULT SchedRegion::FindOptimalSchedule(
 
   FinishOptml_();
 
-  bool tookBest = ChkSchedule_(bestSched, lstSched);
+  bool tookBest = ChkSchedule_(bestSched, InitialSchedule);
   if (tookBest == false) {
-    bestCost_ = hurstcCost_;
-    bestSchedLngth_ = hurstcSchedLngth_;
+    bestCost_ = InitialScheduleCost;
+    bestSchedLngth_ = InitialScheduleLength;
   }
 
-  delete lstSchdulr;
-  if (bestSched != lstSched)
+  if (lstSchdulr) {
+    delete lstSchdulr;
+  }
+  if (NULL != lstSched && bestSched != lstSched) {
     delete lstSched;
+  }
+  if (NULL != AcoSchedule && bestSched != AcoSchedule) {
+    delete AcoSchedule;
+  }
   if (enumBestSched_ != NULL && bestSched != enumBestSched_)
     delete enumBestSched_;
   if (enumCrntSched_ != NULL)
@@ -346,20 +503,23 @@ FUNC_RESULT SchedRegion::FindOptimalSchedule(
   bestSchedLngth = bestSchedLngth_;
   hurstcCost = hurstcCost_;
   hurstcSchedLngth = hurstcSchedLngth_;
+
   // (Chris): Experimental. Discard the schedule based on sched.ini setting.
   if (spillCostFunc_ == SCF_SLIL) {
     bool optimal = isLstOptml || (rslt == RES_SUCCESS);
     if ((blocksToKeep == BLOCKS_TO_KEEP::ZERO_COST && bestCost != 0) ||
         (blocksToKeep == BLOCKS_TO_KEEP::OPTIMAL && !optimal) ||
         (blocksToKeep == BLOCKS_TO_KEEP::IMPROVED &&
-         !(bestCost < hurstcCost)) ||
+         !(bestCost < InitialScheduleCost)) ||
         (blocksToKeep == BLOCKS_TO_KEEP::IMPROVED_OR_OPTIMAL &&
-         !(optimal || bestCost < hurstcCost))) {
+         !(optimal || bestCost < InitialScheduleCost))) {
       delete bestSched;
       bestSched = nullptr;
       return rslt;
     }
   }
+
+  // TODO: Update this to account for using heuristic scheduler and ACO.
 #if defined(IS_DEBUG_COMPARE_SLIL_BB)
   {
     const auto &status = [&]() {
@@ -533,23 +693,20 @@ void SchedRegion::CmputLwrBounds_(bool useFileBounds) {
   delete rvrsRlxdSchdulr;
 }
 
-bool SchedRegion::CmputUprBounds_(InstSchedule *lstSched, bool useFileBounds) {
+bool SchedRegion::CmputUprBounds_(InstSchedule *schedule, bool useFileBounds) {
   if (useFileBounds) {
     hurstcCost_ = dataDepGraph_->GetFileCostUprBound();
     hurstcCost_ -= GetCostLwrBound();
   }
 
-  bestCost_ = hurstcCost_;
-  bestSchedLngth_ = hurstcSchedLngth_;
-
   if (bestCost_ == 0) {
     // If the heuristic schedule is optimal, we are done!
-    schedUprBound_ = lstSched->GetCrntLngth();
+    schedUprBound_ = bestSchedLngth_;
     return true;
   } else if (isSecondPass) {
     // In the second pass, the upper bound is the length of the min-RP schedule
     // that was found in the first pass with stalls inserted.
-    schedUprBound_ = lstSched->GetCrntLngth();
+    schedUprBound_ = schedule->GetCrntLngth();
     return false;
   } else {
     CmputSchedUprBound_();
@@ -646,3 +803,14 @@ void SchedRegion::RegAlloc_(InstSchedule *&bestSched, InstSchedule *&lstSched) {
 }
 
 void SchedRegion::InitSecondPass() { isSecondPass = true; }
+
+FUNC_RESULT SchedRegion::runACO(InstSchedule *ReturnSched,
+                                InstSchedule *InitSched) {
+  InitForSchdulng();
+  ACOScheduler *AcoSchdulr = new ACOScheduler(
+      dataDepGraph_, machMdl_, abslutSchedUprBound_, hurstcPrirts_, vrfySched_);
+  AcoSchdulr->setInitialSched(InitSched);
+  FUNC_RESULT Rslt = AcoSchdulr->FindSchedule(ReturnSched, this);
+  delete AcoSchdulr;
+  return Rslt;
+}
