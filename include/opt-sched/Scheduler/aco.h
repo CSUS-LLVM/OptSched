@@ -21,6 +21,12 @@ struct Choice {
   double heuristic; // range 0 to 1
 };
 
+enum class ACOPass {
+  FIRST,
+  SECOND,
+  ALL_IN_ONE
+};
+
 class ACOScheduler : public ConstrainedScheduler {
 public:
   ACOScheduler(DataDepGraph *dataDepGraph, MachineModel *machineModel,
@@ -37,6 +43,9 @@ private:
   pheremone_t &Pheremone(SchedInstruction *from, SchedInstruction *to);
   pheremone_t &Pheremone(InstCount from, InstCount to);
   double Score(SchedInstruction *from, Choice choice);
+  FUNC_RESULT performSchedPass(InstSchedule *schedule_out);
+  bool shouldReplaceSchedule(ACOPass pass, InstSchedule* oldSched, InstSchedule* newSched);
+
 
   void PrintPheremone();
 
@@ -56,6 +65,8 @@ private:
   double decay_factor;
   int ants_per_iteration;
   bool print_aco_trace;
+  bool aco_use_two_pass;
+  ACOPass pass;
   std::vector<double> scores(std::vector<Choice> ready, SchedInstruction *last);
   InstSchedule* InitialSchedule;
   bool VrfySched_;

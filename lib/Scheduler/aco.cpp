@@ -22,6 +22,7 @@ double RandDouble(double min, double max) {
 }
 
 #define USE_ACS 1
+#define KEEP_HIGHER_RP_SCHED 0
 //#define BIASED_CHOICES 10000000
 //#define LOCAL_DECAY 0.1
 
@@ -52,6 +53,8 @@ ACOScheduler::ACOScheduler(DataDepGraph *dataDepGraph,
   decay_factor = schedIni.GetFloat("ACO_DECAY_FACTOR");
   ants_per_iteration = schedIni.GetInt("ACO_ANT_PER_ITERATION");
   print_aco_trace = schedIni.GetBool("ACO_TRACE");
+  aco_use_two_pass = schedIni.GetBool("ACO_USE_TWO_PASS");
+
 
   /*
   std::cerr << "useOldAlg===="<<useOldAlg<<"\n\n";
@@ -115,7 +118,7 @@ SchedInstruction *ACOScheduler::SelectInstruction(std::vector<Choice> ready,
 
   if (RandDouble(0, 1) < choose_best_chance) {
     if (print_aco_trace)
-      std::cerr << "choose_best, use fixed bais: " << use_fixed_bias << "\n";
+      std::cerr << "choose_best, use fixed bias: " << use_fixed_bias << "\n";
     pheremone_t max = -1;
     Choice maxChoice;
     for (auto choice : ready) {
@@ -251,14 +254,55 @@ FUNC_RESULT ACOScheduler::FindSchedule(InstSchedule *schedule_out,
                                        SchedRegion *region) {
   rgn_ = region;
 
+  if(!aco_use_two_pass)
+  {
+    pass = ACOPass::ALL_IN_ONE;
+    performSchedPass(schedule_out);
+  }
+  else
+  {
+    //in the first pass we schedule for register pressure only
+    //in the second pass we schedule for lower schedule length
+    //but only accept schedules with an RP <= the first passes RP
+    //the first pass result is the initial schedule the second pass
+    pass = ACOPass::FIRST;
+    performSchedPass(schedule_out);
+    pass = ACOPass::SECOND;
+    setInitialSched(schedule_out);
+    performSchedPass(schedule_out);
+
+  }
+}
+
+//compares to schedules taking into account which pass
+//we are on and returns whether the old schedule
+//is inferior to the new one and ought to be replaced
+bool ACOScheduler::shouldReplaceSchedule(ACOPass pass, InstSchedule* oldSched,
+                                         InstSchedule* newSched) {
+
+  return oldSched==NULL ||
+         (pass==ACOPass::FIRST &&
+         newSched->GetSpillCost() < oldSched->GetSpillCost()) ||
+         (pass==ACOPass::SECOND && newSched->GetCost() < oldSched->GetCost()
+         && newSched->GetSpillCost() < oldSched->GetSpillCost()) ||
+         pass==ACOPass::ALL_IN_ONE &&
+         newSched->GetCost() < oldSched->GetCost();
+
+}
+
+FUNC_RESULT ACOScheduler::performSchedPass(InstSchedule *schedule_out) {
+
   // initialize pheremone
   // for this, we need the cost of the pure heuristic schedule
   int pheremone_size = (count_ + 1) * count_;
   for (int i = 0; i < pheremone_size; i++)
     pheremone_[i] = 1;
   initialValue_ = 1;
+  InstSchedule* heuSched = FindOneSchedule();
+  // the +1 is to prevent a divide by 0
   InstCount heuristicCost =
-      FindOneSchedule()->GetCost() + 1; // prevent divide by zero
+    (pass==ACOPass::FIRST ? heuSched->GetSpillCost():heuSched->GetCost()) + 1;
+  delete heuSched;
 
 #if USE_ACS
   initialValue_ = 2.0 / ((double)count_ * heuristicCost);
@@ -283,8 +327,7 @@ FUNC_RESULT ACOScheduler::FindSchedule(InstSchedule *schedule_out,
       InstSchedule *schedule = FindOneSchedule();
       if (print_aco_trace)
         PrintSchedule(schedule);
-      if (iterationBest == NULL ||
-          schedule->GetCost() < iterationBest->GetCost()) {
+      if (ACOScheduler::shouldReplaceSchedule(pass, schedule, iterationBest)) {
         delete iterationBest;
         iterationBest = schedule;
       } else {
@@ -297,12 +340,28 @@ FUNC_RESULT ACOScheduler::FindSchedule(InstSchedule *schedule_out,
     /* PrintSchedule(iterationBest); */
     /* std::cout << iterationBest->GetCost() << std::endl; */
     // TODO DRY
-    if (bestSchedule == NULL ||
-        iterationBest->GetCost() < bestSchedule->GetCost()) {
+    if (ACOScheduler::shouldReplaceSchedule(pass, bestSchedule,
+                                            iterationBest)) {
       delete bestSchedule;
       bestSchedule = iterationBest;
-      Logger::Info("ACO found schedule with spill cost %d",
-                   bestSchedule->GetCost());
+      switch(pass) {
+      case ACOPass::FIRST:
+        Logger::Info("ACO First pass schedule with cost %d and spill cost %d",
+                     bestSchedule->GetCost(),
+                     bestSchedule->GetSpillCost());
+        break;
+      case ACOPass::SECOND:
+        Logger::Info("ACO Second pass schedule with cost %d and spill cost %d",
+                     bestSchedule->GetCost(),
+                     bestSchedule->GetSpillCost());
+        break;
+      case ACOPass::ALL_IN_ONE:
+      default:
+        Logger::Info("ACO found schedule with cost %d and spill cost %d",
+                     bestSchedule->GetCost(),
+                     bestSchedule->GetSpillCost());
+        break;
+      }
       noImprovement = 0;
     } else {
       delete iterationBest;
@@ -321,15 +380,28 @@ FUNC_RESULT ACOScheduler::FindSchedule(InstSchedule *schedule_out,
   schedule_out->Copy(bestSchedule);
   delete bestSchedule;
 
-  Logger::Info("ACO finished after %d iterations", iterations);
+  switch(pass) {
+  case ACOPass::FIRST:
+    Logger::Info("ACO first pass finished after %d iterations", iterations);
+    break;
+  case ACOPass::SECOND:
+    Logger::Info("ACO second pass finished after %d iterations", iterations);
+    break;
+  case ACOPass::ALL_IN_ONE:
+  default:
+    Logger::Info("ACO finished after %d iterations", iterations);
+    break;
+  }
   return RES_SUCCESS;
 }
 
 void ACOScheduler::UpdatePheremone(InstSchedule *schedule) {
   // I wish InstSchedule allowed you to just iterate over it, but it's got this
   // cycle and slot thing which needs to be accounted for
-  InstCount instNum, cycleNum, slotNum;
+  InstCount instNum, cycleNum, slotNum, schedCost;
   instNum = schedule->GetFrstInst(cycleNum, slotNum);
+  schedCost =
+    (pass==ACOPass::FIRST ? schedule->GetSpillCost() : schedule->GetCost())+1;
 
   SchedInstruction *lastInst = NULL;
   while (instNum != INVALID_VALUE) {
@@ -340,9 +412,9 @@ void ACOScheduler::UpdatePheremone(InstSchedule *schedule) {
     // ACS update rule includes decay
     // only the arcs on the current solution are decayed
     *pheremone = (1 - decay_factor) * *pheremone +
-                 decay_factor / (schedule->GetCost() + 1);
+                 decay_factor / schedCost;
 #else
-    *pheremone = *pheremone + 1 / (schedule->GetCost() + 1);
+    *pheremone = *pheremone + 1 / schedCost;
 #endif
     lastInst = inst;
 
