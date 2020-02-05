@@ -257,7 +257,7 @@ FUNC_RESULT ACOScheduler::FindSchedule(InstSchedule *schedule_out,
   if(!aco_use_two_pass)
   {
     pass = ACOPass::ALL_IN_ONE;
-    performSchedPass(schedule_out);
+    return performSchedPass(schedule_out);
   }
   else
   {
@@ -266,10 +266,13 @@ FUNC_RESULT ACOScheduler::FindSchedule(InstSchedule *schedule_out,
     //but only accept schedules with an RP <= the first passes RP
     //the first pass result is the initial schedule the second pass
     pass = ACOPass::FIRST;
-    performSchedPass(schedule_out);
+    FUNC_RESULT pass1Res = performSchedPass(schedule_out);
+	if(pass1Res!=RES_SUCCESS) {
+      return pass1Res;
+    }
     pass = ACOPass::SECOND;
     setInitialSched(schedule_out);
-    performSchedPass(schedule_out);
+    return performSchedPass(schedule_out);
 
   }
 }
@@ -279,14 +282,15 @@ FUNC_RESULT ACOScheduler::FindSchedule(InstSchedule *schedule_out,
 //is inferior to the new one and ought to be replaced
 bool ACOScheduler::shouldReplaceSchedule(ACOPass pass, InstSchedule* oldSched,
                                          InstSchedule* newSched) {
-
-  return oldSched==NULL ||
+  //Logger::Info("old_sched_addr:%p, new_sched_addr:%p", oldSched, newSched);
+  return newSched!=NULL &&
+         (oldSched==NULL ||
          (pass==ACOPass::FIRST &&
          newSched->GetSpillCost() < oldSched->GetSpillCost()) ||
          (pass==ACOPass::SECOND && newSched->GetCost() < oldSched->GetCost()
          && newSched->GetSpillCost() < oldSched->GetSpillCost()) ||
-         pass==ACOPass::ALL_IN_ONE &&
-         newSched->GetCost() < oldSched->GetCost();
+         (pass==ACOPass::ALL_IN_ONE &&
+         newSched->GetCost() < oldSched->GetCost()));
 
 }
 
@@ -327,7 +331,7 @@ FUNC_RESULT ACOScheduler::performSchedPass(InstSchedule *schedule_out) {
       InstSchedule *schedule = FindOneSchedule();
       if (print_aco_trace)
         PrintSchedule(schedule);
-      if (ACOScheduler::shouldReplaceSchedule(pass, schedule, iterationBest)) {
+      if (ACOScheduler::shouldReplaceSchedule(pass, iterationBest, schedule)) {
         delete iterationBest;
         iterationBest = schedule;
       } else {
