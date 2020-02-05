@@ -74,6 +74,19 @@ void SchedRegion::CmputAbslutUprBound_() {
   abslutSchedUprBound_ = dataDepGraph_->GetAbslutSchedUprBound();
 }
 
+static bool isBbEnabled(Config &schedIni, Milliseconds rgnTimeout) {
+  bool EnableBbOpt = schedIni.GetBool("ENUM_ENABLED");
+  if (!EnableBbOpt)
+    return false;
+
+  if (rgnTimeout <= 0) {
+    Logger::Info("Disabling enumerator becuase region timeout is set to zero.");
+    return false;
+  }
+
+  return true;
+}
+
 FUNC_RESULT SchedRegion::FindOptimalSchedule(
     Milliseconds rgnTimeout, Milliseconds lngthTimeout, bool &isLstOptml,
     InstCount &bestCost, InstCount &bestSchedLngth, InstCount &hurstcCost,
@@ -111,7 +124,8 @@ FUNC_RESULT SchedRegion::FindOptimalSchedule(
   Config &schedIni = SchedulerOptions::getInstance();
   bool HeuristicSchedulerEnabled = schedIni.GetBool("HEUR_ENABLED");
   bool AcoSchedulerEnabled = schedIni.GetBool("ACO_ENABLED");
-  bool BbSchedulerEnabled = schedIni.GetBool("ENUM_ENABLED");
+  bool BbSchedulerEnabled = isBbEnabled(schedIni, rgnTimeout);
+
   if (AcoSchedulerEnabled) {
     AcoBeforeEnum = schedIni.GetBool("ACO_BEFORE_ENUM");
     AcoAfterEnum = schedIni.GetBool("ACO_AFTER_ENUM");
@@ -133,7 +147,7 @@ FUNC_RESULT SchedRegion::FindOptimalSchedule(
   stats::problemSize.Record(dataDepGraph_->GetInstCnt());
 
   const auto *GraphTransformations = dataDepGraph_->GetGraphTrans();
-  if (rgnTimeout > 0 || GraphTransformations->size() > 0 ||
+  if (BbSchedulerEnabled || GraphTransformations->size() > 0 ||
       spillCostFunc_ == SCF_SLIL)
     needTrnstvClsr_ = true;
 
@@ -362,9 +376,6 @@ FUNC_RESULT SchedRegion::FindOptimalSchedule(
   InitialSchedule = bestSched_;
   InitialScheduleCost = bestCost_;
   InitialScheduleLength = bestSchedLngth_;
-
-  if (rgnTimeout == 0)
-    BbSchedulerEnabled = false;
 
   // Step #4: Find the optimal schedule if the heuristc and ACO was not optimal.
   if (BbSchedulerEnabled) {
