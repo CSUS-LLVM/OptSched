@@ -31,10 +31,8 @@ static const char *GetDependenceTypeName(DependenceType depType) {
     return "output";
   case DEP_OTHER:
     return "other";
-  default:
-    assert(false);
-    return "unknown";
   }
+  llvm_unreachable("Unknown dependence type!");
 }
 
 DataDepStruct::DataDepStruct(MachineModel *machMdl) {

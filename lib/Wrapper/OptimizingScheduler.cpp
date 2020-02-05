@@ -51,9 +51,6 @@ static LSHPair HeuristicNames[] = {
     LSHPair("SC", LSH_SC),    LSHPair("LS", LSH_LS),
     LSHPair("LLVM", LSH_LLVM)};
 
-// Max size for heuristic name.
-static constexpr int HEUR_NAME_MAX_SIZE = 10;
-
 // Default path to the the configuration directory for opt-sched.
 static constexpr const char *DEFAULT_CFG_DIR = "~/.optsched-cfg/";
 
