@@ -107,9 +107,8 @@ ConstrainedScheduler *BBWithSpill::AllocHeuristicScheduler_() {
     return new SequentialListScheduler(dataDepGraph_, machMdl_,
                                        abslutSchedUprBound_, hurstcPrirts_);
     break;
-  default:
-    llvm_unreachable("Unknown heuristic scheduler type!");
   }
+  llvm_unreachable("Unknown heuristic scheduler type!");
 }
 /*****************************************************************************/
 
@@ -378,11 +377,6 @@ InstCount BBWithSpill::CmputNormCost_(InstSchedule *sched,
 
 InstCount BBWithSpill::CmputCost_(InstSchedule *sched, COST_COMP_MODE compMode,
                                   InstCount &execCost, bool trackCnflcts) {
-  InstCount instNum;
-  InstCount cycleNum;
-  InstCount slotNum;
-  SchedInstruction *inst;
-  
   if (compMode == CCM_STTC) {
     if (spillCostFunc_ == SCF_SPILLS) {
       LocalRegAlloc regAlloc(sched, dataDepGraph_);
