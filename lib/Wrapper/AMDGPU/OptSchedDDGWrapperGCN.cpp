@@ -29,7 +29,7 @@ namespace {
 
 std::unique_ptr<SubRegSet>
 createSubRegSet(unsigned Reg, const MachineRegisterInfo &MRI, int16_t Type) {
-  return llvm::make_unique<SubRegSet>(
+  return std::make_unique<SubRegSet>(
       MRI.getMaxLaneMaskForVReg(Reg).getNumLanes(), Type);
 }
 
@@ -37,7 +37,7 @@ createSubRegSet(unsigned Reg, const MachineRegisterInfo &MRI, int16_t Type) {
 LaneBitmask getDefRegMask(const MachineOperand &MO,
                           const MachineRegisterInfo &MRI) {
   assert(MO.isDef() && MO.isReg() &&
-         TargetRegisterInfo::isVirtualRegister(MO.getReg()));
+         llvm::Register::isVirtualRegister(MO.getReg()));
 
   // We don't rely on read-undef flag because in case of tentative schedule
   // tracking it isn't set correctly yet. This works correctly however since
@@ -53,7 +53,7 @@ LaneBitmask getUsedRegMask(const MachineOperand &MO,
                            const MachineRegisterInfo &MRI,
                            const LiveIntervals &LIS) {
   assert(MO.isUse() && MO.isReg() &&
-         TargetRegisterInfo::isVirtualRegister(MO.getReg()));
+         llvm::Register::isVirtualRegister(MO.getReg()));
 
   if (auto SubReg = MO.getSubReg())
     return MRI.getTargetRegisterInfo()->getSubRegIndexLaneMask(SubReg);
@@ -75,7 +75,7 @@ collectVirtualRegUses(const MachineInstr &MI, const LiveIntervals &LIS,
                       const MachineRegisterInfo &MRI) {
   SmallVector<RegisterMaskPair, 8> Res;
   for (const auto &MO : MI.operands()) {
-    if (!MO.isReg() || !TargetRegisterInfo::isVirtualRegister(MO.getReg()))
+    if (!MO.isReg() || !llvm::Register::isVirtualRegister(MO.getReg()))
       continue;
     if (!MO.isUse() || !MO.readsReg())
       continue;
@@ -100,7 +100,7 @@ collectVirtualRegDefs(const MachineInstr &MI, const LiveIntervals &LIS,
                       const MachineRegisterInfo &MRI) {
   SmallVector<RegisterMaskPair, 8> Res;
   for (const auto &MO : MI.defs()) {
-    if (!MO.isReg() || !TargetRegisterInfo::isVirtualRegister(MO.getReg()) ||
+    if (!MO.isReg() || !llvm::Register::isVirtualRegister(MO.getReg()) ||
         MO.isDead())
       continue;
 
@@ -127,7 +127,7 @@ collectLiveSubRegsAtInstr(const MachineInstr *MI, const LiveIntervals *LIS,
 
   SmallVector<RegisterMaskPair, 8> Res;
   for (unsigned I = 0, E = MRI.getNumVirtRegs(); I != E; ++I) {
-    auto Reg = TargetRegisterInfo::index2VirtReg(I);
+    auto Reg = llvm::Register::index2VirtReg(I);
     if (!LIS->hasInterval(Reg))
       continue;
     auto LiveMask = getLiveLaneMask(Reg, SI, *LIS, MRI);
@@ -140,7 +140,7 @@ collectLiveSubRegsAtInstr(const MachineInstr *MI, const LiveIntervals *LIS,
 } // end anonymous namespace
 
 unsigned OptSchedDDGWrapperGCN::getRegKind(unsigned Reg) const {
-  assert(TargetRegisterInfo::isVirtualRegister(Reg));
+  assert(llvm::Register::isVirtualRegister(Reg));
   const auto RC = MRI.getRegClass(Reg);
   auto STI = static_cast<const SIRegisterInfo *>(MRI.getTargetRegisterInfo());
   return STI->isSGPRClass(RC) ? SGPR32 : VGPR32;

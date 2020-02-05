@@ -13,7 +13,6 @@
 #include "llvm/CodeGen/MachineFunction.h"
 #include "llvm/CodeGen/MachineInstr.h"
 #include "llvm/CodeGen/MachineRegisterInfo.h"
-#include "llvm/CodeGen/MachineScheduler.h"
 #include "llvm/CodeGen/RegisterPressure.h"
 #include "llvm/CodeGen/TargetInstrInfo.h"
 #include "llvm/CodeGen/TargetLowering.h"
@@ -30,11 +29,10 @@
 
 #define DEBUG_TYPE "optsched-ddg-wrapper"
 
-using namespace llvm;
 using namespace llvm::opt_sched;
 
 #ifndef NDEBUG
-static Printable printOptSchedReg(const Register *Reg,
+static Printable printOptSchedReg(const llvm::opt_sched::Register *Reg,
                                   const std::string &RegTypeName,
                                   int16_t RegTypeNum);
 #endif
@@ -323,7 +321,7 @@ OptSchedDDGWrapperBasic::getRegisterType(unsigned RegUnit) const {
 }
 
 #if !defined(NDEBUG) || defined(LLVM_ENABLE_DUMP)
-static Printable printOptSchedReg(const Register *Reg,
+static Printable printOptSchedReg(const llvm::opt_sched::Register *Reg,
                                   const std::string &RegTypeName,
                                   int16_t RegTypeNum) {
   return Printable([Reg, &RegTypeName, RegTypeNum](raw_ostream &OS) {
@@ -433,7 +431,7 @@ void OptSchedDDGWrapperBasic::convertEdges(const SUnit &SU) {
     int16_t Latency;
     if (ltncyPrcsn_ == LTP_PRECISE) { // get latency from the machine model
       const auto &InstName = DAG->TII->getName(instr->getOpcode());
-      const auto &InstType = MM->GetInstTypeByName(InstName);
+      const auto &InstType = MM->GetInstTypeByName(InstName.str());
       Latency = MM->GetLatency(InstType, DepType);
     } else if (ltncyPrcsn_ == LTP_ROUGH) // rough latency = llvm latency
       Latency = I->getLatency();
@@ -446,15 +444,14 @@ void OptSchedDDGWrapperBasic::convertEdges(const SUnit &SU) {
 
 void OptSchedDDGWrapperBasic::convertSUnit(const SUnit &SU) {
   InstType InstType;
-  std::string InstName;
   if (SU.isBoundaryNode() || !SU.isInstr())
     return;
 
   const MachineInstr *MI = SU.getInstr();
-  InstName = DAG->TII->getName(MI->getOpcode());
+  auto InstName = DAG->TII->getName(MI->getOpcode());
 
   // Search in the machine model for an instType with this OpCode name
-  InstType = MM->GetInstTypeByName(InstName.c_str());
+  InstType = MM->GetInstTypeByName(InstName.str());
 
   // If the machine model does not have an instruction type with this OpCode
   // name generate one. Alternatively if not generating types, use a default
@@ -466,7 +463,7 @@ void OptSchedDDGWrapperBasic::convertSUnit(const SUnit &SU) {
       InstType = MM->getDefaultInstType();
   }
 
-  CreateNode_(SU.NodeNum, InstName.c_str(), InstType, InstName.c_str(),
+  CreateNode_(SU.NodeNum, InstName.str().c_str(), InstType, InstName.str().c_str(),
               SU.NodeNum, // nodeID
               SU.NodeNum, // fileSchedOrder
               SU.NodeNum, // fileSchedCycle

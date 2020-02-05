@@ -65,7 +65,7 @@ static constexpr const char *DEFAULT_CFGMM_FNAME = "/machine_model.cfg";
 
 // Create OptSched ScheduleDAG.
 static ScheduleDAGInstrs *createOptSched(MachineSchedContext *C) {
-  return new ScheduleDAGOptSched(C, llvm::make_unique<GenericScheduler>(C));
+  return new ScheduleDAGOptSched(C, std::make_unique<GenericScheduler>(C));
 }
 
 // Register the machine scheduler.
@@ -167,7 +167,7 @@ static SchedulerType parseListSchedType() {
 
 static std::unique_ptr<GraphTrans>
 createStaticNodeSupTrans(DataDepGraph *DataDepGraph, bool IsMultiPass = false) {
-  return llvm::make_unique<StaticNodeSupTrans>(DataDepGraph, IsMultiPass);
+  return std::make_unique<StaticNodeSupTrans>(DataDepGraph, IsMultiPass);
 }
 
 void ScheduleDAGOptSched::addGraphTransformations(
@@ -374,7 +374,7 @@ void ScheduleDAGOptSched::schedule() {
   addGraphTransformations(BDDG);
 
   // create region
-  auto region = llvm::make_unique<BBWithSpill>(
+  auto region = std::make_unique<BBWithSpill>(
       OST.get(), static_cast<DataDepGraph *>(DDG.get()), 0, HistTableHashBits,
       LowerBoundAlgorithm, HeuristicPriorities, EnumPriorities, VerifySchedule,
       PruningStrategy, SchedForRPOnly, EnumStalls, SCW, SCF, HeurSchedType);
@@ -573,9 +573,9 @@ bool ScheduleDAGOptSched::isOptSchedEnabled() const {
     return true;
   } else if (optSchedOption == "HOT_ONLY") {
     // get the name of the function this scheduler was created for
-    std::string functionName = C->MF->getFunction().getName();
+    auto functionName = C->MF->getFunction().getName();
     // check the list of hot functions for the name of the current function
-    return HotFunctions.GetBool(functionName, false);
+    return HotFunctions.GetBool(functionName.str(), false);
   } else if (optSchedOption == "NO") {
     return false;
   } else {
@@ -700,8 +700,8 @@ bool ScheduleDAGOptSched::shouldPrintSpills() const {
   } else if (printSpills == "NO") {
     return false;
   } else if (printSpills == "HOT_ONLY") {
-    std::string functionName = C->MF->getFunction().getName();
-    return HotFunctions.GetBool(functionName, false);
+    auto functionName = C->MF->getFunction().getName();
+    return HotFunctions.GetBool(functionName.str(), false);
   } else {
     LLVM_DEBUG(
         Logger::Error("Unknown value for PRINT_SPILL_COUNTS: %s. Assuming NO.",
@@ -878,9 +878,9 @@ printMaskPairs(const SmallVectorImpl<RegisterMaskPair> &RegPairs,
     for (const auto &P : RegPairs) {
       const TargetRegisterClass *RegClass;
 
-      if (TRI->isPhysicalRegister(P.RegUnit))
+      if (llvm::Register::isPhysicalRegister(P.RegUnit))
         RegClass = TRI->getMinimalPhysRegClass(P.RegUnit);
-      else if (TRI->isVirtualRegister(P.RegUnit))
+      else if (llvm::Register::isVirtualRegister(P.RegUnit))
         RegClass = MRI.getRegClass(P.RegUnit);
       else
         RegClass = nullptr;

@@ -14,9 +14,12 @@
 #include "opt-sched/Scheduler/machine_model.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/SmallVector.h"
-#include "llvm/CodeGen/MachineScheduler.h"
 
 namespace llvm {
+
+struct MachineSchedContext;
+class ScheduleDAGInstrs;
+
 namespace opt_sched {
 
 class OptSchedMachineModel;
