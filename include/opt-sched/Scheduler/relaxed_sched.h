@@ -150,9 +150,6 @@ public:
 // A relaxed scheduler based on the L&C method (uses Rim & Jain recursively)
 class LC_RelaxedScheduler : public RelaxedScheduler {
 private:
-  // the traversal direction
-  DIRECTION trvrslDir_;
-
   // A list of instructions in a subgraph sorted by lower bound measured
   // relative to the sub-graph's leaf.
   PriorityList<SchedInstruction> *subGraphInstLst_;
