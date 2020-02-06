@@ -406,7 +406,9 @@ void CostHistEnumTreeNode::Init_() {
 
 bool CostHistEnumTreeNode::DoesDominate(EnumTreeNode *node,
                                         Enumerator *enumrtr) {
+#ifdef IS_DEBUG
   assert(isCnstrctd_);
+#endif
   assert(enumrtr->IsCostEnum());
 
   InstCount shft = 0;
@@ -469,7 +471,9 @@ bool CostHistEnumTreeNode::ChkCostDmntnForBBSpill_(EnumTreeNode *Node,
 
   // If the other node's prefix cost is higher than or equal to the history
   // prefix cost the other node is pruned.
+#ifdef IS_DEBUG
   assert(costInfoSet_);
+#endif
   bool ShouldPrune;
   if (Node->GetCostLwrBound() >= partialCost_)
     ShouldPrune = true;
