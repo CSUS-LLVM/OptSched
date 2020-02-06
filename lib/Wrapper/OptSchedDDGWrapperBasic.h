@@ -12,7 +12,6 @@
 #include "opt-sched/Scheduler/data_dep.h"
 #include "opt-sched/Scheduler/graph_trans.h"
 #include "llvm/CodeGen/MachineInstr.h"
-#include "llvm/CodeGen/MachineScheduler.h"
 #include "llvm/CodeGen/TargetRegisterInfo.h"
 #include <map>
 #include <set>

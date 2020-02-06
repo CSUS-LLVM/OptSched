@@ -228,7 +228,7 @@ static InstCount ComputeSLILStaticLowerBound(int64_t regTypeCnt_,
     // Get a list of instructions that define the registers, in array form.
     usedInsts.clear();
     for (int j = 0; j < usedRegCount; ++j) {
-      Register *reg = usedRegisters[j];
+      auto *reg = usedRegisters[j];
       assert(reg->GetDefList().size() == 1 &&
              "Number of defs for register is not 1!");
       usedInsts.push_back(std::make_pair(*(reg->GetDefList().begin()), reg));

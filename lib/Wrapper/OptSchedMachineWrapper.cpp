@@ -45,7 +45,7 @@ void dumpInstType(InstTypeInfo &instType, MachineModel *mm) {
 std::unique_ptr<MachineModelGenerator>
 createCortexA7MMGenerator(const llvm::ScheduleDAGInstrs *dag,
                           MachineModel *mm) {
-  return make_unique<CortexA7MMGenerator>(dag, mm);
+  return std::make_unique<CortexA7MMGenerator>(dag, mm);
 }
 
 } // end anonymous namespace
@@ -167,15 +167,15 @@ IssueType CortexA7MMGenerator::generateIssueType(const InstrStage *E) const {
 
 InstType CortexA7MMGenerator::generateInstrType(const MachineInstr *instr) {
   // Search in the machine model for an instType with this OpCode
-  const std::string instrName = DAG->TII->getName(instr->getOpcode());
-  const InstType InstType = MM->GetInstTypeByName(instrName);
+  auto instrName = DAG->TII->getName(instr->getOpcode());
+  const InstType InstType = MM->GetInstTypeByName(instrName.str());
 
   // If the machine model does not have instType with this OpCode name,
   // generate a type for the instruction.
   if (InstType != INVALID_INST_TYPE)
     return InstType;
   else {
-    LLVM_DEBUG(dbgs() << "Generating instr type for " << instrName.c_str());
+    LLVM_DEBUG(dbgs() << "Generating instr type for " << instrName.str());
 
     SUnit *SU = DAG->getSUnit(const_cast<MachineInstr *>(instr));
     const MCInstrDesc *instDesc = DAG->getInstrDesc(SU);
@@ -186,7 +186,7 @@ InstType CortexA7MMGenerator::generateInstrType(const MachineInstr *instr) {
 
     // Create the new instruction type
     InstTypeInfo InstTypeI;
-    InstTypeI.name = instrName;
+    InstTypeI.name = instrName.str();
     const InstrStage *E = IID->endStage(IDX);
     InstTypeI.issuType = generateIssueType(--E);
     InstTypeI.isCntxtDep = false;
