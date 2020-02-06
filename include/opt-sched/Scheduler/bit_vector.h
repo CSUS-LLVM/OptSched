@@ -86,8 +86,6 @@ inline void BitVector::Construct(int length) {
   if (vctr_)
     delete[] vctr_;
   vctr_ = new Unit[unitCnt_];
-  if (vctr_ == NULL)
-    Logger::Fatal("Out of memory.");
 
   for (int i = 0; i < unitCnt_; i++) {
     vctr_[i] = 0;

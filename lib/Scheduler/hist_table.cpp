@@ -42,8 +42,6 @@ void HistEnumTreeNode::SetRsrvSlots_(EnumTreeNode *node) {
   int issuRate = node->enumrtr_->machMdl_->GetIssueRate();
 
   rsrvSlots_ = new ReserveSlot[issuRate];
-  if (rsrvSlots_ == NULL)
-    Logger::Fatal("Out of memory.");
 
   for (int i = 0; i < issuRate; i++) {
     rsrvSlots_[i].strtCycle = node->rsrvSlots_[i].strtCycle;
