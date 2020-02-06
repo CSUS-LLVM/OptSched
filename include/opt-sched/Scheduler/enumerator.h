@@ -965,8 +965,6 @@ inline void Enumerator::CreateNewRdyLst_() {
   ReadyList *oldLst = rdyLst_;
 
   rdyLst_ = new ReadyList(dataDepGraph_, prirts_);
-  if (rdyLst_ == NULL)
-    Logger::Fatal("Out of memory.");
 
   if (oldLst != NULL) {
     rdyLst_->CopyList(oldLst);

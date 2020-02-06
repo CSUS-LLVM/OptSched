@@ -40,8 +40,6 @@ SchedInstruction::SchedInstruction(InstCount num, const string &name,
   unschduldScsrCnt_ = 0;
 
   crntRange_ = new SchedRange(this);
-  if (crntRange_ == NULL)
-    Logger::Fatal("Out of memory.");
 
   crntSchedCycle_ = SCHD_UNSCHDULD;
   crntRlxdCycle_ = SCHD_UNSCHDULD;
@@ -165,11 +163,6 @@ void SchedInstruction::AllocMem_(InstCount instCnt, bool isCP_FromScsr,
   prevMinRdyCyclePerPrdcsr_ = new InstCount[prdcsrCnt_];
   sortedPrdcsrLst_ = new PriorityList<SchedInstruction>;
 
-  if (rdyCyclePerPrdcsr_ == NULL || ltncyPerPrdcsr_ == NULL ||
-      prevMinRdyCyclePerPrdcsr_ == NULL || sortedPrdcsrLst_ == NULL) {
-    Logger::Fatal("Out of memory.");
-  }
-
   InstCount predecessorIndex = 0;
   for (GraphEdge *edge = prdcsrLst_->GetFrstElmnt(); edge != NULL;
        edge = prdcsrLst_->GetNxtElmnt()) {
@@ -180,8 +173,6 @@ void SchedInstruction::AllocMem_(InstCount instCnt, bool isCP_FromScsr,
 
   if (isCP_FromScsr) {
     crtclPathFrmRcrsvScsr_ = new InstCount[instCnt];
-    if (crtclPathFrmRcrsvScsr_ == NULL)
-      Logger::Fatal("Out of memory.");
 
     for (InstCount i = 0; i < instCnt; i++) {
       crtclPathFrmRcrsvScsr_[i] = INVALID_VALUE;
@@ -192,8 +183,6 @@ void SchedInstruction::AllocMem_(InstCount instCnt, bool isCP_FromScsr,
 
   if (isCP_FromPrdcsr) {
     crtclPathFrmRcrsvPrdcsr_ = new InstCount[instCnt];
-    if (crtclPathFrmRcrsvPrdcsr_ == NULL)
-      Logger::Fatal("Out of memory.");
 
     for (InstCount i = 0; i < instCnt; i++) {
       crtclPathFrmRcrsvPrdcsr_[i] = INVALID_VALUE;

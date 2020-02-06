@@ -435,8 +435,6 @@ template <class T> Entry<T> *LinkedList<T>::AllocEntry_(T *element) {
 
   if (maxSize_ == INVALID_VALUE) {
     entry = new Entry<T>();
-    if (entry == NULL)
-      Logger::Fatal("Out of memory.");
   } else {
     assert(crntAllocIndx_ < maxSize_);
     entry = allocEntries_ + crntAllocIndx_;
@@ -450,8 +448,6 @@ template <class T> Entry<T> *LinkedList<T>::AllocEntry_(T *element) {
 template <class T> void LinkedList<T>::AllocEntries_() {
   assert(maxSize_ != INVALID_VALUE);
   allocEntries_ = new Entry<T>[maxSize_];
-  if (allocEntries_ == NULL)
-    Logger::Fatal("Out of memory.");
   crntAllocIndx_ = 0;
 }
 
@@ -641,8 +637,6 @@ KeyedEntry<T, K> *PriorityList<T, K>::AllocEntry_(T *element, K key) {
 
   if (LinkedList<T>::maxSize_ == INVALID_VALUE) {
     newEntry = new KeyedEntry<T, K>(element, key);
-    if (newEntry == NULL)
-      Logger::Fatal("Out of memory.");
   } else {
     assert(LinkedList<T>::crntAllocIndx_ < LinkedList<T>::maxSize_);
     newEntry = allocKeyEntries_ + LinkedList<T>::crntAllocIndx_;
@@ -656,8 +650,6 @@ KeyedEntry<T, K> *PriorityList<T, K>::AllocEntry_(T *element, K key) {
 
 template <class T, class K> void PriorityList<T, K>::AllocEntries_() {
   allocKeyEntries_ = new KeyedEntry<T, K>[LinkedList<T>::maxSize_];
-  if (allocKeyEntries_ == NULL)
-    Logger::Fatal("Out of memory.");
   LinkedList<T>::crntAllocIndx_ = 0;
 }
 

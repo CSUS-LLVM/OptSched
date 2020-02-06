@@ -39,8 +39,6 @@ DataDepStruct::DataDepStruct(MachineModel *machMdl) {
   machMdl_ = machMdl;
   issuTypeCnt_ = (int16_t)machMdl->GetIssueTypeCnt();
   instCntPerIssuType_ = new InstCount[issuTypeCnt_];
-  if (instCntPerIssuType_ == NULL)
-    Logger::Fatal("Out of memory.");
 
   for (int16_t i = 0; i < issuTypeCnt_; i++) {
     instCntPerIssuType_[i] = 0;
@@ -100,8 +98,6 @@ InstCount DataDepStruct::CmputRsrcLwrBound_() {
 
   int *slotsPerIssuType;
   slotsPerIssuType = new int[issuTypeCnt_];
-  if (slotsPerIssuType == NULL)
-    Logger::Fatal("Out of memory.");
 
   machMdl_->GetSlotsPerCycle(slotsPerIssuType);
 
@@ -185,8 +181,6 @@ DataDepGraph::DataDepGraph(MachineModel *machMdl, LATENCY_PRECISION ltncyPrcsn)
 
   instTypeCnt_ = (int16_t)machMdl->GetInstTypeCnt();
   instCntPerType_ = new InstCount[instTypeCnt_];
-  if (instCntPerType_ == NULL)
-    Logger::Fatal("Out of memory.");
 
   for (i = 0; i < instTypeCnt_; i++) {
     instCntPerType_[i] = 0;
@@ -249,10 +243,6 @@ FUNC_RESULT DataDepGraph::SetupForSchdulng(bool cmputTrnstvClsr) {
 
   frwrdLwrBounds_ = new InstCount[instCnt_];
   bkwrdLwrBounds_ = new InstCount[instCnt_];
-
-  if (frwrdLwrBounds_ == NULL || bkwrdLwrBounds_ == NULL) {
-    Logger::Fatal("Out of memory.");
-  }
 
   CmputCrtclPaths_();
 
@@ -504,8 +494,6 @@ void DataDepGraph::AllocArrays_(InstCount instCnt) {
   instCnt_ = instCnt;
   nodeCnt_ = instCnt;
   insts_ = new SchedInstruction *[instCnt_];
-  if (insts_ == NULL)
-    Logger::Fatal("Out of memory.");
   nodes_ = (GraphNode **)insts_;
 
   for (i = 0; i < instCnt_; i++) {
@@ -843,8 +831,6 @@ SchedInstruction *DataDepGraph::CreateNode_(
   newInstPtr = new SchedInstruction(instNum, instName, instType, opCode,
                                     2 * instCnt_, nodeID, fileSchedOrder,
                                     fileSchedCycle, fileLB, fileUB, machMdl_);
-  if (newInstPtr == NULL)
-    Logger::Fatal("Out of memory.");
   if (instNum < 0 || instNum >= instCnt_)
     Logger::Fatal("Invalid instruction number");
   //  Logger::Info("Instruction order = %d, instCnt_ = %d", fileSchedOrder,
@@ -903,8 +889,6 @@ void DataDepGraph::CreateEdge(SchedInstruction *frmNode,
   }
 
   GraphEdge *newEdg = new GraphEdge(frmNode, toNode, ltncy, depType);
-  if (newEdg == NULL)
-    Logger::Fatal("Out of memory.");
 
   frmNode->AddScsr(newEdg);
   toNode->AddPrdcsr(newEdg);
@@ -945,8 +929,6 @@ void DataDepGraph::CreateEdge_(InstCount frmNodeNum, InstCount toNodeNum,
                  frmNodeNum, toNodeNum, depType, ltncy);
 #endif
     edge = new GraphEdge(frmNode, toNode, ltncy, depType);
-    if (edge == NULL)
-      Logger::Fatal("Out of memory.");
 
     frmNode->AddScsr(edge);
     toNode->AddPrdcsr(edge);
@@ -1334,8 +1316,6 @@ DataDepSubGraph::DataDepSubGraph(DataDepGraph *fullGraph, InstCount maxInstCnt,
   subType_ = SGT_DISC;
 
   insts_ = new SchedInstruction *[maxInstCnt_];
-  if (insts_ == NULL)
-    Logger::Fatal("Out of memory.");
 
   for (i = 0; i < maxInstCnt; i++) {
     insts_[i] = NULL;
@@ -1363,19 +1343,12 @@ DataDepSubGraph::DataDepSubGraph(DataDepGraph *fullGraph, InstCount maxInstCnt,
 
   rootVctr_ = new BitVector(fullGraph_->GetInstCnt());
   leafVctr_ = new BitVector(fullGraph_->GetInstCnt());
-  if (rootVctr_ == NULL || leafVctr_ == NULL) {
-    Logger::Fatal("Out of memory.");
-  }
 
   numToIndx_ = new InstCount[fullGraph_->GetInstCnt()];
-  if (numToIndx_ == NULL)
-    Logger::Fatal("Out of memory.");
 
   fxdLst_ = NULL;
 
   lostInsts_ = new Stack<LostInst>;
-  if (lostInsts_ == NULL)
-    Logger::Fatal("Out of memory.");
 
   for (i = 0; i < fullGraph_->GetInstCnt(); i++) {
     numToIndx_[i] = INVALID_VALUE;
@@ -1437,8 +1410,6 @@ void DataDepSubGraph::SetupForDynmcLwrBounds(InstCount schedUprBound) {
 
   dynmcRlxdSchdulr_ = new RJ_RelaxedScheduler(
       this, machMdl_, subGraphUprBound, DIR_FRWRD, RST_SUBDYNMC, maxInstCnt_);
-  if (dynmcRlxdSchdulr_ == NULL)
-    Logger::Fatal("Out of memory.");
 
   AllocDynmcData_();
 }
@@ -1447,25 +1418,13 @@ void DataDepSubGraph::AllocSttcData_() {
   frwrdCrtclPaths_ = new InstCount[maxInstCnt_];
   bkwrdCrtclPaths_ = new InstCount[maxInstCnt_];
 
-  if (frwrdCrtclPaths_ == NULL || bkwrdCrtclPaths_ == NULL) {
-    Logger::Fatal("Out of memory.");
-  }
-
   frwrdLwrBounds_ = new InstCount[maxInstCnt_];
   bkwrdLwrBounds_ = new InstCount[maxInstCnt_];
-
-  if (frwrdLwrBounds_ == NULL || bkwrdLwrBounds_ == NULL) {
-    Logger::Fatal("Out of memory.");
-  }
 }
 
 void DataDepSubGraph::AllocDynmcData_() {
   dynmcFrwrdLwrBounds_ = new InstCount[maxInstCnt_];
   dynmcBkwrdLwrBounds_ = new InstCount[maxInstCnt_];
-
-  if (dynmcFrwrdLwrBounds_ == NULL || dynmcBkwrdLwrBounds_ == NULL) {
-    Logger::Fatal("Out of memory.");
-  }
 }
 
 // Called before lower bound computation after all instructions have been added
@@ -1563,16 +1522,12 @@ void DataDepSubGraph::CreateRootAndLeafInsts_() {
   rootInst_ =
       new SchedInstruction(INVALID_VALUE, "root", instType, " ", maxInstCnt_, 0,
                            INVALID_VALUE, INVALID_VALUE, 0, 0, machMdl_);
-  if (rootInst_ == NULL)
-    Logger::Fatal("Out of memory.");
 
   rootInst_->SetIssueType(issuType);
 
   leafInst_ =
       new SchedInstruction(INVALID_VALUE, "leaf", instType, " ", maxInstCnt_, 0,
                            INVALID_VALUE, INVALID_VALUE, 0, 0, machMdl_);
-  if (leafInst_ == NULL)
-    Logger::Fatal("Out of memory.");
 
   leafInst_->SetIssueType(issuType);
 
@@ -1724,8 +1679,6 @@ void DataDepSubGraph::InstLost(SchedInstruction *inst) {
   InstCount instIndx = numToIndx_[instNum];
   assert(instIndx != INVALID_VALUE);
   LostInst *lostInst = new LostInst;
-  if (lostInst == NULL)
-    Logger::Fatal("Out of memory.");
 
   lostInst->inst = inst;
   lostInst->indx = instIndx;
@@ -1875,8 +1828,6 @@ void DataDepSubGraph::CreateEdge_(SchedInstruction *frmInst,
 
   //  assert(frmInst==rootInst_ || toInst==leafInst_);
   GraphEdge *newEdg = new GraphEdge(frmNode, toNode, 1);
-  if (newEdg == NULL)
-    Logger::Fatal("Out of memory.");
 
   if (toInst != leafInst_) {
     frmNode->ApndScsr(newEdg);
@@ -2034,10 +1985,6 @@ void DataDepSubGraph::AllocRlxdSchdulr_(LB_ALG lbAlg,
         new LC_RelaxedScheduler(this, machMdl_, schedUprBound_, DIR_BKWRD);
     rlxdSchdulr = LCRlxdSchdulr_;
     rvrsRlxdSchdulr = LCRvrsRlxdSchdulr_;
-  }
-
-  if (rlxdSchdulr == NULL || rvrsRlxdSchdulr == NULL) {
-    Logger::Fatal("Out of memory.");
   }
 }
 
@@ -2659,11 +2606,6 @@ InstSchedule::InstSchedule(MachineModel *machMdl, DataDepGraph *dataDepGraph,
   spillCosts_ = new InstCount[totInstCnt_];
   peakRegPressures_ = new InstCount[machMdl->GetRegTypeCnt()];
 
-  if (instInSlot_ == NULL || slotForInst_ == NULL || spillCosts_ == NULL ||
-      peakRegPressures_ == NULL) {
-    Logger::Fatal("Out of memory.");
-  }
-
   InstCount i;
 
   for (i = 0; i < totInstCnt_; i++) {
@@ -3256,7 +3198,7 @@ bool DataDepGraph::DoesFeedUser(SchedInstruction *inst) {
   for (GraphNode *succ = rcrsvSuccs->GetFrstElmnt(); succ != NULL;
        succ = rcrsvSuccs->GetNxtElmnt()) {
     SchedInstruction *succInst = static_cast<SchedInstruction *>(succ);
-    
+
     int curInstAdjUseCnt = succInst->GetAdjustedUseCnt();
     // Ignore successor instructions that does not close live intervals
     if (curInstAdjUseCnt == 0)

@@ -75,8 +75,6 @@ FUNC_RESULT InputBuffer::Load(char const *const _fullPath, long maxByts) {
 
   // Allocate an extra byte for possible null termination.
   buf = new char[totSize + 1];
-  if (buf == NULL)
-    Logger::Fatal("Out of memory.");
   if ((loadedByts = read(fileHndl, buf, totSize)) == 0) {
     Logger::Fatal("Empty input file: %s.", fullPath);
   }

@@ -16,9 +16,6 @@ GraphNode::GraphNode(UDT_GNODES num, UDT_GNODES maxNodeCnt) {
 
   scsrLst_ = new PriorityList<GraphEdge>(maxNodeCnt);
   prdcsrLst_ = new LinkedList<GraphEdge>(maxNodeCnt);
-  if (scsrLst_ == NULL || prdcsrLst_ == NULL) {
-    Logger::Fatal("Out of memory.");
-  }
 
   rcrsvScsrLst_ = NULL;
   rcrsvPrdcsrLst_ = NULL;
@@ -109,10 +106,6 @@ void GraphNode::AllocRcrsvInfo(DIRECTION dir, UDT_GNODES nodeCnt) {
     assert(rcrsvScsrLst_ == NULL && isRcrsvScsr_ == NULL);
     rcrsvScsrLst_ = new LinkedList<GraphNode>;
     isRcrsvScsr_ = new BitVector(nodeCnt);
-
-    if (rcrsvScsrLst_ == NULL || isRcrsvScsr_ == NULL) {
-      Logger::Fatal("Out of memory.");
-    }
   } else {
     if (rcrsvPrdcsrLst_ != NULL) {
       delete rcrsvPrdcsrLst_;
@@ -125,10 +118,6 @@ void GraphNode::AllocRcrsvInfo(DIRECTION dir, UDT_GNODES nodeCnt) {
     assert(rcrsvPrdcsrLst_ == NULL && isRcrsvPrdcsr_ == NULL);
     rcrsvPrdcsrLst_ = new LinkedList<GraphNode>;
     isRcrsvPrdcsr_ = new BitVector(nodeCnt);
-
-    if (rcrsvPrdcsrLst_ == NULL || isRcrsvPrdcsr_ == NULL) {
-      Logger::Fatal("Out of memory.");
-    }
   }
 }
 
@@ -350,8 +339,6 @@ void DirAcycGraph::CreateEdge_(UDT_GNODES frmNodeNum, UDT_GNODES toNodeNum,
   assert(toNode != NULL);
 
   newEdg = new GraphEdge(frmNode, toNode, label);
-  if (newEdg == NULL)
-    Logger::Fatal("Out of memory.");
 
   frmNode->AddScsr(newEdg);
   toNode->AddPrdcsr(newEdg);
@@ -360,8 +347,6 @@ void DirAcycGraph::CreateEdge_(UDT_GNODES frmNodeNum, UDT_GNODES toNodeNum,
 FUNC_RESULT DirAcycGraph::DepthFirstSearch() {
   if (tplgclOrdr_ == NULL)
     tplgclOrdr_ = new GraphNode *[nodeCnt_];
-  if (tplgclOrdr_ == NULL)
-    Logger::Fatal("Out of memory.");
 
   for (UDT_GNODES i = 0; i < nodeCnt_; i++) {
     nodes_[i]->SetColor(COL_WHITE);
