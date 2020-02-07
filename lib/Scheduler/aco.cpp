@@ -288,7 +288,7 @@ bool ACOScheduler::shouldReplaceSchedule(ACOPass pass, InstSchedule* oldSched,
          (pass==ACOPass::FIRST &&
          newSched->GetSpillCost() < oldSched->GetSpillCost()) ||
          (pass==ACOPass::SECOND && newSched->GetCost() < oldSched->GetCost()
-         && newSched->GetSpillCost() < oldSched->GetSpillCost()) ||
+         && newSched->GetSpillCost() <= oldSched->GetSpillCost()) ||
          (pass==ACOPass::ALL_IN_ONE &&
          newSched->GetCost() < oldSched->GetCost()));
 
