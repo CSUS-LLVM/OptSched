@@ -181,6 +181,10 @@ FUNC_RESULT SchedRegion::FindOptimalSchedule(
   else
     CmputLwrBounds_(false);
 
+  // Log the lower bound on the cost, allowing tools reading the log to compare
+  // absolute rather than relative costs.
+  Logger::Info("Lower bound of cost before scheduling: %d", costLwrBound_);
+
   // Step #1: Find the heuristic schedule if enabled.
   // Note: Heuristic scheduler is required for the two-pass scheduler
   // to use the sequential list scheduler which inserts stalls into
