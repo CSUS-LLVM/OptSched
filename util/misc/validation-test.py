@@ -11,7 +11,7 @@ import re
 RE_COST_LOWER_BOUND = re.compile(r'INFO: Lower bound of cost before scheduling: (\d+)')
 RE_DAG_COST = re.compile(r"INFO: Best schedule for DAG (?P<name>.*) has cost (?P<cost>\d+) and length (?P<length>\d+). The schedule is (?P<optimal>.*) \(Time")
 
-RE_REGION_DELIMITER = re.compile(r'INFO: \Q****\E*? Opt Scheduling \Q****\E*')
+RE_REGION_DELIMITER = re.compile(r'INFO: \*{4,}? Opt Scheduling \*{4,}?')
 
 dags1 = {}
 dags2 = {}
@@ -22,12 +22,12 @@ def dags_info(logtext):
     blocks = [block for block in RE_REGION_DELIMITER.split(logtext) if
               RE_COST_LOWER_BOUND.search(block)]
 
-    for block in block:
+    for block in blocks:
         lowerBound = int(RE_COST_LOWER_BOUND.search(block).group(1))
         blockInfo = RE_DAG_COST.search(block).groupdict()
         dagName = blockInfo['name']
         dags[dagName] = {
-            'lowerBound': lowerBound
+            'lowerBound': lowerBound,
             'cost': int(blockInfo['cost']) + lowerBound,
             'relativeCost': int(blockInfo['cost']),
             'length': int(blockInfo['length']),
