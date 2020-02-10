@@ -8,34 +8,40 @@
 import sys
 import re
 
-RE_DAG_COST = re.compile(r"INFO: Best schedule for DAG (.*) has cost (\d+) and length (\d+). The schedule is (.*) \(Time")
+RE_COST_LOWER_BOUND = re.compile(r'INFO: Lower bound of cost before scheduling: (\d+)')
+RE_DAG_COST = re.compile(r"INFO: Best schedule for DAG (?P<name>.*) has cost (?P<cost>\d+) and length (?P<length>\d+). The schedule is (?P<optimal>.*) \(Time")
+
+RE_REGION_DELIMITER = re.compile(r'INFO: \Q****\E*? Opt Scheduling \Q****\E*')
 
 dags1 = {}
 dags2 = {}
 
+def dags_info(logtext):
+    dags = {}
+
+    blocks = [block for block in RE_REGION_DELIMITER.split(logtext) if
+              RE_COST_LOWER_BOUND.search(block)]
+
+    for block in block:
+        lowerBound = int(RE_COST_LOWER_BOUND.search(block).group(1))
+        blockInfo = RE_DAG_COST.search(block).groupdict()
+        dagName = blockInfo['name']
+        dags[dagName] = {
+            'lowerBound': lowerBound
+            'cost': int(blockInfo['cost']) + lowerBound,
+            'relativeCost': int(blockInfo['cost']),
+            'length': int(blockInfo['length']),
+            'isOptimal': (blockInfo['optimal'] == 'optimal')
+        }
+
+    return dags
+
+
 with open(str(sys.argv[1])) as logfile1:
-    log1 = logfile1.read()
-    for dag in RE_DAG_COST.finditer(log1):
-        dagName = dag.group(1)
-        cost = dag.group(2)
-        length = dag.group(3)
-        isOptimal = dag.group(4)
-        dags1[dagName] = {}
-        dags1[dagName]['cost'] = int(cost)
-        dags1[dagName]['length'] = int(length)
-        dags1[dagName]['isOptimal'] = (isOptimal == 'optimal')
+    dags1 = dags_info(logfile1.read())
 
 with open(str(sys.argv[2])) as logfile2:
-    log2 = logfile2.read()
-    for dag in RE_DAG_COST.finditer(log2):
-        dagName = dag.group(1)
-        cost = dag.group(2)
-        length = dag.group(3)
-        isOptimal = dag.group(4)
-        dags2[dagName] = {}
-        dags2[dagName]['cost'] = int(cost)
-        dags2[dagName]['length'] = int(length)
-        dags2[dagName]['isOptimal'] = (isOptimal == 'optimal')
+    dags2 = dags_info(logfile2.read())
 
 numDagsLog1 = len(dags1)
 numDagsLog2 = len(dags2)
