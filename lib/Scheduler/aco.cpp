@@ -325,6 +325,7 @@ FUNC_RESULT ACOScheduler::performSchedPass(InstSchedule *schedule_out) {
   int noImprovementMax = schedIni.GetInt("ACO_STOP_ITERATIONS");
   int noImprovement = 0; // how many iterations with no improvement
   int iterations = 0;
+  bool passImproved = false;
   while (true) {
     InstSchedule *iterationBest = NULL;
     for (int i = 0; i < ants_per_iteration; i++) {
@@ -348,6 +349,7 @@ FUNC_RESULT ACOScheduler::performSchedPass(InstSchedule *schedule_out) {
                                             iterationBest)) {
       delete bestSchedule;
       bestSchedule = iterationBest;
+      passImproved = true;
       switch(pass) {
       case ACOPass::FIRST:
         Logger::Info("ACO First pass schedule with cost %d and spill cost %d",
@@ -390,6 +392,7 @@ FUNC_RESULT ACOScheduler::performSchedPass(InstSchedule *schedule_out) {
     break;
   case ACOPass::SECOND:
     Logger::Info("ACO second pass finished after %d iterations", iterations);
+    Logger::Info("ACO 2nd pass caused improvement: %s", (passImproved?"yes":"no"));
     break;
   case ACOPass::ALL_IN_ONE:
   default:
