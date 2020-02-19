@@ -9,6 +9,8 @@ Last Update:  Jan. 2020
 #ifndef OPTSCHED_ACO_H
 #define OPTSCHED_ACO_H
 
+#include <vector>
+
 #include "opt-sched/Scheduler/gen_sched.h"
 
 namespace llvm {
@@ -29,10 +31,10 @@ public:
   virtual ~ACOScheduler();
   FUNC_RESULT FindSchedule(InstSchedule *schedule, SchedRegion *region);
   inline void UpdtRdyLst_(InstCount cycleNum, int slotNum);
-  // Set the initial schedule for ACO 
+  // Set the initial schedule for ACO
   // Default is NULL if none are set.
   void setInitialSched(InstSchedule *Sched);
-  
+
 private:
   pheremone_t &Pheremone(SchedInstruction *from, SchedInstruction *to);
   pheremone_t &Pheremone(InstCount from, InstCount to);
@@ -44,7 +46,7 @@ private:
                                       SchedInstruction *lastInst);
   void UpdatePheremone(InstSchedule *schedule);
   InstSchedule *FindOneSchedule();
-  pheremone_t *pheremone_;
+  std::vector<pheremone_t> pheremone_;
   pheremone_t initialValue_;
   bool use_fixed_bias;
   int count_;

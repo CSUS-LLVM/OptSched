@@ -12,6 +12,7 @@ Last Update:  Mar. 2011
 #include "opt-sched/Scheduler/mem_mngr.h"
 #include <cstring>
 #include <memory>
+#include "llvm/ADT/STLExtras.h"
 
 namespace llvm {
 namespace opt_sched {
@@ -54,7 +55,7 @@ public:
 
 protected:
   // The buffer in which the bits are stored.
-  Unit *vctr_;
+  std::unique_ptr<Unit[]> vctr_;
   // The number of bits.
   int bitCnt_;
   // The number of units of the actual integer data type used.
@@ -72,7 +73,7 @@ inline BitVector::BitVector(int length) {
   bitCnt_ = 0;
   unitCnt_ = 0;
   oneCnt_ = 0;
-  vctr_ = NULL;
+  vctr_ = nullptr;
   Construct(length);
 }
 
@@ -83,9 +84,7 @@ inline void BitVector::Construct(int length) {
   if (unitCnt_ == 0)
     return;
 
-  if (vctr_)
-    delete[] vctr_;
-  vctr_ = new Unit[unitCnt_];
+  vctr_ = llvm::make_unique<Unit[]>(unitCnt_);
 
   for (int i = 0; i < unitCnt_; i++) {
     vctr_[i] = 0;
@@ -94,10 +93,7 @@ inline void BitVector::Construct(int length) {
   oneCnt_ = 0;
 }
 
-inline BitVector::~BitVector() {
-  if (vctr_ != NULL)
-    delete[] vctr_;
-}
+inline BitVector::~BitVector() = default;
 
 inline void BitVector::Reset() {
   if (oneCnt_ == 0)
@@ -175,7 +171,7 @@ inline int BitVector::GetOneCnt() const { return oneCnt_; }
 inline BitVector &BitVector::operator=(const BitVector &src) {
   assert(bitCnt_ == src.bitCnt_);
   int byteCnt = unitCnt_ * sizeof(Unit);
-  memcpy(vctr_, src.vctr_, byteCnt);
+  memcpy(vctr_.get(), src.vctr_.get(), byteCnt);
   oneCnt_ = src.oneCnt_;
   return *this;
 }
@@ -185,7 +181,7 @@ inline bool BitVector::operator==(const BitVector &other) const {
   if (oneCnt_ != other.oneCnt_)
     return false;
   int byteCnt = unitCnt_ * sizeof(Unit);
-  return (memcmp(vctr_, other.vctr_, byteCnt) == 0);
+  return (memcmp(vctr_.get(), other.vctr_.get(), byteCnt) == 0);
 }
 
 inline BitVector::Unit BitVector::GetMask_(int bitNum, bool bitVal) {

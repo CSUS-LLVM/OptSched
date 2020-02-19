@@ -14,6 +14,7 @@ Last Update:  Apr. 2011
 #include "opt-sched/Scheduler/sched_region.h"
 #include "llvm/ADT/SmallVector.h"
 #include <map>
+#include <memory>
 #include <set>
 #include <vector>
 
@@ -47,11 +48,11 @@ private:
 
   // A bit vector indexed by register number indicating whether that
   // register is live
-  WeightedBitVector *liveRegs_;
+  std::unique_ptr<WeightedBitVector[]> liveRegs_;
 
   // A bit vector indexed by physical register number indicating whether
   // that physical register is live
-  WeightedBitVector *livePhysRegs_;
+  std::unique_ptr<WeightedBitVector[]> livePhysRegs_;
 
   // Sum of lengths of live ranges. This vector is indexed by register type,
   // and each type will have its sum of live interval lengths computed.
@@ -70,10 +71,10 @@ private:
   int schduldExitInstCnt_;
   int schduldInstCnt_;
 
-  InstCount *spillCosts_;
+  std::vector<InstCount> spillCosts_;
   // Current register pressure for each register type.
   SmallVector<unsigned, 8> regPressures_;
-  InstCount *peakRegPressures_;
+  std::vector<InstCount> peakRegPressures_;
   InstCount crntStepNum_;
   InstCount peakSpillCost_;
   InstCount totSpillCost_;

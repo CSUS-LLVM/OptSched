@@ -19,6 +19,7 @@
 #include <set>
 #include <sstream>
 #include <utility>
+#include "llvm/ADT/STLExtras.h"
 
 extern bool OPTSCHED_gPrintSpills;
 
@@ -57,10 +58,10 @@ BBWithSpill::BBWithSpill(const OptSchedTarget *OST_, DataDepGraph *dataDepGraph,
 
   regTypeCnt_ = OST->MM->GetRegTypeCnt();
   regFiles_ = dataDepGraph->getRegFiles();
-  liveRegs_ = new WeightedBitVector[regTypeCnt_];
-  livePhysRegs_ = new WeightedBitVector[regTypeCnt_];
-  spillCosts_ = new InstCount[dataDepGraph_->GetInstCnt()];
-  peakRegPressures_ = new InstCount[regTypeCnt_];
+  liveRegs_ = llvm::make_unique<WeightedBitVector[]>(regTypeCnt_);
+  livePhysRegs_ = llvm::make_unique<WeightedBitVector[]>(regTypeCnt_);
+  spillCosts_.resize(dataDepGraph_->GetInstCnt());
+  peakRegPressures_.resize(regTypeCnt_);
   regPressures_.resize(regTypeCnt_);
   sumOfLiveIntervalLengths_.resize(regTypeCnt_, 0);
 
@@ -76,11 +77,6 @@ BBWithSpill::~BBWithSpill() {
   if (enumrtr_ != NULL) {
     delete enumrtr_;
   }
-
-  delete[] liveRegs_;
-  delete[] livePhysRegs_;
-  delete[] spillCosts_;
-  delete[] peakRegPressures_;
 }
 /*****************************************************************************/
 
@@ -390,8 +386,8 @@ InstCount BBWithSpill::CmputCost_(InstSchedule *sched, COST_COMP_MODE compMode,
   InstCount cost = sched->GetCrntLngth() * schedCostFactor_;
   execCost = cost;
   cost += crntSpillCost_ * SCW_;
-  sched->SetSpillCosts(spillCosts_);
-  sched->SetPeakRegPressures(peakRegPressures_);
+  sched->SetSpillCosts(spillCosts_.data());
+  sched->SetPeakRegPressures(peakRegPressures_.data());
   sched->SetSpillCost(crntSpillCost_);
   return cost;
 }

@@ -63,13 +63,12 @@ ACOScheduler::ACOScheduler(DataDepGraph *dataDepGraph,
   std::cerr << "ants_per_iteration===="<<ants_per_iteration<<"\n\n";
   */
   int pheremone_size = (count_ + 1) * count_;
-  pheremone_ = new pheremone_t[pheremone_size];
+  pheremone_.resize(pheremone_size);
   InitialSchedule = nullptr;
 }
 
 ACOScheduler::~ACOScheduler() {
   delete rdyLst_;
-  delete[] pheremone_;
 }
 
 // Pheremone table lookup
@@ -253,7 +252,7 @@ FUNC_RESULT ACOScheduler::FindSchedule(InstSchedule *schedule_out,
 
   // initialize pheremone
   // for this, we need the cost of the pure heuristic schedule
-  int pheremone_size = (count_ + 1) * count_;
+  int pheremone_size = pheremone_.size();
   for (int i = 0; i < pheremone_size; i++)
     pheremone_[i] = 1;
   initialValue_ = 1;
