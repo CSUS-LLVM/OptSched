@@ -130,7 +130,7 @@ static bool scheduleSpecificRegion(const StringRef RegionName, const Config &Sch
       SchedIni.GetBool("SCHEDULE_SPECIFIC_REGIONS");
 
   if (!ScheduleSpecificRegions)
-    return false;
+    return true;
 
   const std::list<std::string> RegionList =
       SchedIni.GetStringList("REGIONS_TO_SCHEDULE");
