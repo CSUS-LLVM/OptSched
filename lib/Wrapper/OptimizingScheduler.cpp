@@ -125,17 +125,17 @@ nextIfDebug(MachineBasicBlock::iterator I,
   return I;
 }
 
-static bool skipRegion(const StringRef RegionName, const Config &SchedIni) {
+static bool scheduleSpecificRegion(const StringRef RegionName, const Config &SchedIni) {
   const bool ScheduleSpecificRegions =
       SchedIni.GetBool("SCHEDULE_SPECIFIC_REGIONS");
 
   if (!ScheduleSpecificRegions)
-    return false;
+    return true;
 
-  const std::list<std::string> regionList =
+  const std::list<std::string> RegionList =
       SchedIni.GetStringList("REGIONS_TO_SCHEDULE");
-  return std::find(std::begin(regionList), std::end(regionList), RegionName) ==
-         std::end(regionList);
+  return std::find(std::begin(RegionList), std::end(RegionList), RegionName) !=
+         std::end(RegionList);
 }
 
 static BLOCKS_TO_KEEP blocksToKeep(const Config &SchedIni) {
@@ -254,17 +254,18 @@ void ScheduleDAGOptSched::schedule() {
   const std::string RegionName = C->MF->getFunction().getName().data() +
                                  std::string(":") +
                                  std::to_string(RegionNumber);
-  if (!OptSchedEnabled || skipRegion(RegionName, schedIni)) {
-    LLVM_DEBUG(dbgs() << "Skipping region " << RegionName << "\n");
-    return;
-  }
 
   // If two pass scheduling is enabled then
   // first just record the scheduling region.
-  if (TwoPassEnabled && (!TwoPassSchedulingStarted)) {
+  if (OptSchedEnabled && TwoPassEnabled && !TwoPassSchedulingStarted) {
     Regions.push_back(std::make_pair(RegionBegin, RegionEnd));
    LLVM_DEBUG(dbgs() << "Recording scheduling region before scheduling with two pass "
                  "scheduler...\n");
+    return;
+  }
+
+  if (!OptSchedEnabled || !scheduleSpecificRegion(RegionName, schedIni)) {
+    LLVM_DEBUG(dbgs() << "Skipping region " << RegionName << "\n");
     return;
   }
 
