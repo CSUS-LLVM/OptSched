@@ -801,11 +801,14 @@ void ScheduleDAGOptSched::scheduleOptSchedMinRP() {
 void ScheduleDAGOptSched::scheduleOptSchedBalanced() {
   SecondPass = true;
   LatencyPrecision = LTP_ROUGH;
+
   // Set times for the second pass
   RegionTimeout = SecondPassRegionTimeout;
   LengthTimeout = SecondPassLengthTimeout;
+
   // Set the heuristic for the enumerator in the second pass.
   EnumPriorities = SecondPassEnumPriorities;
+
   // Force the input to the balanced scheduler to be the sequential order of the
   // (hopefully) good register pressure schedule. We don’t want the list scheduler
   // to mangle the input because of latency or resource constraints.
@@ -814,9 +817,13 @@ void ScheduleDAGOptSched::scheduleOptSchedBalanced() {
   // Force disable LLVM scheduler so that it doesn't re-order schedule
   // from first pass.
   UseLLVMScheduler = false;
+
   // Disable RP-only for 2nd pass.
   SchedForRPOnly = false;
 
+  // Disable RP-only graph transformations in balanced mode
+  StaticNodeSup = false;
+  MultiPassStaticNodeSup = false;
 
   schedule();
   Logger::Info("End of second pass through");
