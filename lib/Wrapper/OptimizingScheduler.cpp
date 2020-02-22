@@ -175,13 +175,12 @@ void ScheduleDAGOptSched::addGraphTransformations(
   auto *GraphTransfomations = BDDG->GetGraphTrans();
 
   if (StaticNodeSup) {
-    if (LatencyPrecision != LTP_UNITY) {
+    if (LatencyPrecision == LTP_UNITY) {
+      GraphTransfomations->push_back(
+          createStaticNodeSupTrans(BDDG, MultiPassStaticNodeSup));
+    } else {
       Logger::Info("Skipping RP-only graph transforms for non-unity pass.");
-      return;
     }
-
-    GraphTransfomations->push_back(
-        createStaticNodeSupTrans(BDDG, MultiPassStaticNodeSup));
   }
 }
 
