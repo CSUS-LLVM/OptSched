@@ -173,9 +173,16 @@ createStaticNodeSupTrans(DataDepGraph *DataDepGraph, bool IsMultiPass = false) {
 void ScheduleDAGOptSched::addGraphTransformations(
     OptSchedDDGWrapperBasic *BDDG) {
   auto *GraphTransfomations = BDDG->GetGraphTrans();
-  if (StaticNodeSup)
+
+  if (StaticNodeSup) {
+    if (LatencyPrecision != LTP_UNITY) {
+      Logger::Info("Skipping RP-only graph transforms for non-unity pass.");
+      return;
+    }
+
     GraphTransfomations->push_back(
         createStaticNodeSupTrans(BDDG, MultiPassStaticNodeSup));
+  }
 }
 
 ScheduleDAGOptSched::ScheduleDAGOptSched(
@@ -263,8 +270,9 @@ void ScheduleDAGOptSched::schedule() {
   // first just record the scheduling region.
   if (TwoPassEnabled && (!TwoPassSchedulingStarted)) {
     Regions.push_back(std::make_pair(RegionBegin, RegionEnd));
-   LLVM_DEBUG(dbgs() << "Recording scheduling region before scheduling with two pass "
-                 "scheduler...\n");
+    LLVM_DEBUG(
+        dbgs() << "Recording scheduling region before scheduling with two pass "
+                  "scheduler...\n");
     return;
   }
 
@@ -404,8 +412,8 @@ void ScheduleDAGOptSched::schedule() {
   // Setup time before scheduling
   Utilities::startTime = std::chrono::high_resolution_clock::now();
   // Schedule region.
-  Rslt = region->FindOptimalSchedule(CurrentRegionTimeout, CurrentLengthTimeout, IsEasy,
-                                     NormBestCost, BestSchedLngth,
+  Rslt = region->FindOptimalSchedule(CurrentRegionTimeout, CurrentLengthTimeout,
+                                     IsEasy, NormBestCost, BestSchedLngth,
                                      NormHurstcCost, HurstcSchedLngth, Sched,
                                      FilterByPerp, blocksToKeep(schedIni));
 
@@ -546,7 +554,8 @@ void ScheduleDAGOptSched::loadOptSchedConfig() {
   LowerBoundAlgorithm = parseLowerBoundAlgorithm();
   HeuristicPriorities = parseHeuristic(schedIni.GetString("HEURISTIC"));
   EnumPriorities = parseHeuristic(schedIni.GetString("ENUM_HEURISTIC"));
-  SecondPassEnumPriorities = parseHeuristic(schedIni.GetString("SECOND_PASS_ENUM_HEURISTIC"));
+  SecondPassEnumPriorities =
+      parseHeuristic(schedIni.GetString("SECOND_PASS_ENUM_HEURISTIC"));
   SCF = parseSpillCostFunc();
   RegionTimeout = schedIni.GetInt("REGION_TIMEOUT");
   FirstPassRegionTimeout = schedIni.GetInt("FIRST_PASS_REGION_TIMEOUT");
@@ -589,9 +598,9 @@ bool ScheduleDAGOptSched::isTwoPassEnabled() const {
   // check scheduler ini file to see if two pass scheduling is enabled
   auto twoPassOption =
       SchedulerOptions::getInstance().GetString("USE_TWO_PASS");
-  if (twoPassOption == "YES") 
+  if (twoPassOption == "YES")
     return true;
-  else if (twoPassOption == "NO") 
+  else if (twoPassOption == "NO")
     return false;
   llvm_unreachable("Unrecognized option for USE_TWO_PASS setting.");
 }
@@ -806,8 +815,8 @@ void ScheduleDAGOptSched::scheduleOptSchedBalanced() {
   // Set the heuristic for the enumerator in the second pass.
   EnumPriorities = SecondPassEnumPriorities;
   // Force the input to the balanced scheduler to be the sequential order of the
-  // (hopefully) good register pressure schedule. We don’t want the list scheduler
-  // to mangle the input because of latency or resource constraints.
+  // (hopefully) good register pressure schedule. We don’t want the list
+  // scheduler to mangle the input because of latency or resource constraints.
   HeurSchedType = SCHED_SEQ;
 
   // Force disable LLVM scheduler so that it doesn't re-order schedule
@@ -815,7 +824,6 @@ void ScheduleDAGOptSched::scheduleOptSchedBalanced() {
   UseLLVMScheduler = false;
   // Disable RP-only for 2nd pass.
   SchedForRPOnly = false;
-
 
   schedule();
   Logger::Info("End of second pass through");
