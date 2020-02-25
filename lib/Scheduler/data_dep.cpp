@@ -870,13 +870,11 @@ void DataDepGraph::CreateEdge(SchedInstruction *frmNode,
                frmNodeNum, toNodeNum, depType, ltncy);
 #endif
 
-#if defined(IS_DEBUG) || defined(IS_DEBUG_DAG)
   assert(frmNodeNum < instCnt_);
   assert(nodes_[frmNodeNum] != NULL);
 
   assert(toNodeNum < instCnt_);
   assert(nodes_[toNodeNum] != NULL);
-#endif
 
 #ifdef IS_DEBUG_LATENCIES
   stats::dependenceTypeLatencies.Add(GetDependenceTypeName(depType), ltncy);

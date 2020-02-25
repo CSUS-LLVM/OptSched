@@ -720,10 +720,8 @@ InstCount LC_RelaxedScheduler::SchdulSubGraph_(SchedInstruction *leaf,
       continue;
     }
 
-#ifdef IS_DEBUG
     //    assert(wasLwrBoundCmputd_[inst->GetCrntIndx()]==true);
     assert(wasLwrBoundCmputd_[dataDepGraph_->GetInstIndx(inst)]);
-#endif
     rltvCP = dataDepGraph_->GetRltvCrtclPath(leaf, inst, trvrslDir);
     subGraphInstLst_->InsrtElmnt(inst, rltvCP, true);
   }
@@ -738,11 +736,9 @@ InstCount LC_RelaxedScheduler::SchdulSubGraph_(SchedInstruction *leaf,
 
   for (inst = subGraphInstLst_->GetFrstElmnt(); inst != NULL;
        inst = subGraphInstLst_->GetNxtElmnt()) {
-#ifdef IS_DEBUG
     //    assert(inst==leaf || wasLwrBoundCmputd_[inst->GetCrntIndx()]==true);
     assert(inst == leaf ||
            wasLwrBoundCmputd_[dataDepGraph_->GetInstIndx(inst)]);
-#endif
     schedCycle = SchdulInst_(inst, 0, trgtLastCycle);
     rltvCP = dataDepGraph_->GetRltvCrtclPath(leaf, inst, trvrslDir);
     delay = CmputDelay_(schedCycle, trgtLastCycle, rltvCP);
@@ -1049,9 +1045,7 @@ bool LPP_RelaxedScheduler::ProbeCycle_(SchedInstruction *newInst,
 
   for (inst = subGraphInstLst_->GetFrstElmnt(); inst != NULL;
        inst = subGraphInstLst_->GetNxtElmnt()) {
-#ifdef IS_DEBUG
     assert(inst == newInst || wasLwrBoundCmputd_[inst->GetNum()]);
-#endif
     InstCount schedCycle = SchdulInst_(inst, 0, trgtLastCycle);
     InstCount BLB = GetCrntLwrBound_(inst, bkwrdDir);
     InstCount delay = CmputDelay_(schedCycle, trgtLastCycle, BLB);
