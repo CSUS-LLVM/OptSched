@@ -22,7 +22,6 @@ double RandDouble(double min, double max) {
 }
 
 #define USE_ACS 1
-#define KEEP_HIGHER_RP_SCHED 0
 //#define BIASED_CHOICES 10000000
 //#define LOCAL_DECAY 0.1
 
@@ -350,24 +349,25 @@ FUNC_RESULT ACOScheduler::performSchedPass(InstSchedule *schedule_out) {
       delete bestSchedule;
       bestSchedule = iterationBest;
       passImproved = true;
+      const char* passName;
       switch(pass) {
       case ACOPass::FIRST:
-        Logger::Info("ACO First pass schedule with cost %d and spill cost %d",
-                     bestSchedule->GetCost(),
-                     bestSchedule->GetSpillCost());
+        passName = "first";
         break;
       case ACOPass::SECOND:
-        Logger::Info("ACO Second pass schedule with cost %d and spill cost %d",
-                     bestSchedule->GetCost(),
-                     bestSchedule->GetSpillCost());
+        passName = "second";
         break;
       case ACOPass::ALL_IN_ONE:
-      default:
-        Logger::Info("ACO found schedule with cost %d and spill cost %d",
-                     bestSchedule->GetCost(),
-                     bestSchedule->GetSpillCost());
+        passName = "onepass";
         break;
       }
+      Logger::Info("ACO found schedule "
+                   "pass:%s, cost:%d, spill cost:%d, iteration:%d",
+                   passName,
+                   bestSchedule->GetCost(),
+                   bestSchedule->GetSpillCost(),
+                   iterations);
+
       noImprovement = 0;
     } else {
       delete iterationBest;
@@ -395,7 +395,6 @@ FUNC_RESULT ACOScheduler::performSchedPass(InstSchedule *schedule_out) {
     Logger::Info("ACO 2nd pass caused improvement: %s", (passImproved?"yes":"no"));
     break;
   case ACOPass::ALL_IN_ONE:
-  default:
     Logger::Info("ACO finished after %d iterations", iterations);
     break;
   }
