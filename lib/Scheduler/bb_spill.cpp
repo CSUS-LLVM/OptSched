@@ -780,8 +780,6 @@ Enumerator *BBWithSpill::AllocEnumrtr_(Milliseconds timeout) {
   enumrtr_ = new LengthCostEnumerator(
       dataDepGraph_, machMdl_, schedUprBound_, sigHashSize_, enumPrirts_,
       prune_, SchedForRPOnly_, enblStallEnum, timeout, spillCostFunc_, 0, NULL);
-  if (enumrtr_ == NULL)
-    Logger::Fatal("Out of memory.");
 
   return enumrtr_;
 }

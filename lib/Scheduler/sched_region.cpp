@@ -65,8 +65,6 @@ void SchedRegion::UseFileBounds_() {
 InstSchedule *SchedRegion::AllocNewSched_() {
   InstSchedule *newSched =
       new InstSchedule(machMdl_, dataDepGraph_, vrfySched_);
-  if (newSched == NULL)
-    Logger::Fatal("Out of memory.");
   return newSched;
 }
 
@@ -190,8 +188,6 @@ FUNC_RESULT SchedRegion::FindOptimalSchedule(
   if (HeuristicSchedulerEnabled || isSecondPass) {
     Milliseconds hurstcStart = Utilities::GetProcessorTime();
     lstSched = new InstSchedule(machMdl_, dataDepGraph_, vrfySched_);
-    if (lstSched == NULL)
-      Logger::Fatal("Out of memory.");
 
     lstSchdulr = AllocHeuristicScheduler_();
 
@@ -247,8 +243,6 @@ FUNC_RESULT SchedRegion::FindOptimalSchedule(
   if (AcoBeforeEnum && !isLstOptml) {
     AcoStart = Utilities::GetProcessorTime();
     AcoSchedule = new InstSchedule(machMdl_, dataDepGraph_, vrfySched_);
-    if (AcoSchedule == NULL)
-      Logger::Fatal("Out of memory.");
 
     rslt = runACO(AcoSchedule, lstSched);
     if (rslt != RES_SUCCESS) {
@@ -442,8 +436,6 @@ FUNC_RESULT SchedRegion::FindOptimalSchedule(
     Logger::Info("Final cost is not optimal, running ACO.");
     InstSchedule *AcoAfterEnumSchedule =
         new InstSchedule(machMdl_, dataDepGraph_, vrfySched_);
-    if (AcoAfterEnumSchedule == NULL)
-      Logger::Fatal("Out of memory");
 
     FUNC_RESULT acoRslt = runACO(AcoAfterEnumSchedule, bestSched);
     if (acoRslt != RES_SUCCESS) {
@@ -671,10 +663,6 @@ void SchedRegion::CmputLwrBounds_(bool useFileBounds) {
     rvrsRlxdSchdulr = new RJ_RelaxedScheduler(
         dataDepGraph_, machMdl_, rlxdUprBound, DIR_BKWRD, RST_STTC);
     break;
-  }
-
-  if (rlxdSchdulr == NULL || rvrsRlxdSchdulr == NULL) {
-    Logger::Fatal("Out of memory.");
   }
 
   InstCount frwrdLwrBound = 0;

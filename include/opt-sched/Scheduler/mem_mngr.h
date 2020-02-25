@@ -118,8 +118,6 @@ template <class T> inline void MemAlloc<T>::GetNewBlock_() {
 
 template <class T> inline void MemAlloc<T>::AllocNewBlock_() {
   T *blk = new T[blockSize_];
-  if (blk == NULL)
-    Logger::Fatal("Out of memory.");
   allocatedBlocks_.InsrtElmnt(blk);
   currentIndex_ = 0;
   currentBlock_ = blk;

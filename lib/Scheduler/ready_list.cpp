@@ -78,12 +78,7 @@ ReadyList::ReadyList(DataDepGraph *dataDepGraph, SchedPriorities prirts) {
 #endif
 
   prirtyLst_ = new PriorityList<SchedInstruction>;
-  if (prirtyLst_ == NULL)
-    Logger::Fatal("Out of memory.");
-
   latestSubLst_ = new LinkedList<SchedInstruction>;
-  if (latestSubLst_ == NULL)
-    Logger::Fatal("Out of memory.");
 
   int16_t keySize = 0;
   maxPriority_ = 0;

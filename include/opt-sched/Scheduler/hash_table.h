@@ -340,9 +340,6 @@ inline void StrHashTblEntry<T>::Construct(const char *name, T *elmnt,
   HashTblEntry<T>::Construct_(elmnt, hashVal);
   name_ = new char[strlen(name) + 1];
 
-  if (name_ == NULL)
-    Logger::Fatal("Out of memory.");
-
   strcpy(name_, name);
   indx_ = indx;
 }
@@ -389,12 +386,6 @@ HashTable<T>::HashTable(UDT_HASHVAL size, UDT_HASHTBL_CPCTY maxEntryCnt) {
   topEntry_ = new HashTblEntry<T> *[tblSize_];
   lastEntry_ = new HashTblEntry<T> *[tblSize_];
   entryCnts_ = new UDT_HASHTBL_CPCTY[tblSize_];
-
-  if (topEntry_ == NULL || lastEntry_ == NULL || entryCnts_ == NULL) {
-    isCnstrctd_ = false;
-    Logger::Error("Not enough memory for a hashtable of size %d.", tblSize_);
-    return;
-  }
 
   UDT_HASHVAL i;
 
@@ -629,8 +620,6 @@ BinHashTable<T>::InsertElement(const UDT_HASHKEY key, T *elmnt,
     newEntry->Construct(key, elmnt, hashVal);
   } else {
     newEntry = new BinHashTblEntry<T>(key, elmnt, hashVal);
-    if (newEntry == NULL)
-      Logger::Fatal("Out of memory.");
   }
 
   HashTable<T>::AddNewEntry_(newEntry, hashVal);
@@ -869,13 +858,6 @@ StrHashTable<T>::StrHashTable(UDT_HASHVAL size, bool useIndx,
     UDT_HASHTBL_CPCTY i;
     indxdTbl_ = new StrHashTblEntry<T> *[this->maxEntryCnt_];
 
-    if (indxdTbl_ == NULL) {
-      this->isCnstrctd_ = false;
-      Logger::Error("Could not allocate memory for a hash table of %d entries",
-                    this->maxEntryCnt_);
-      return;
-    }
-
     for (i = 0; i < this->maxEntryCnt_; i++) {
       indxdTbl_[i] = NULL;
     }
@@ -930,11 +912,6 @@ FUNC_RESULT StrHashTable<T>::InsertElement(const char *name, T *elmnt) {
 
   assert(!HashTable<T>::isExtrnlAlctr_);
   newEntry = new StrHashTblEntry<T>(name, elmnt, hashVal);
-
-  if (newEntry == NULL) {
-    Logger::Error("Recoverable memory allocation error.");
-    return RES_FAIL;
-  }
 
   AddNewEntry_(newEntry, hashVal);
 

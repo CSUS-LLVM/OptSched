@@ -38,26 +38,16 @@ RelaxedScheduler::RelaxedScheduler(DataDepStruct *dataDepGraph,
   }
 
   instLst_ = new PriorityList<SchedInstruction>(maxInstCnt_);
-  //  instLst_ = new PriorityList<SchedInstruction>;
-  if (instLst_ == NULL)
-    Logger::Fatal("Out of memory.");
 
   for (InstCount i = 0; i < issuTypeCnt_; i++) {
     avlblSlots_[i] = new int16_t[schedUprBound_];
-    if (avlblSlots_[i] == NULL)
-      Logger::Fatal("Out of memory.");
-
     nxtAvlblCycles_[i] = new InstCount[schedUprBound_];
-    if (nxtAvlblCycles_[i] == NULL)
-      Logger::Fatal("Out of memory.");
   }
 
   isFxd_ = NULL;
 
   if (useFxng_) {
     isFxd_ = new bool[maxInstCnt_];
-    if (isFxd_ == NULL)
-      Logger::Fatal("Out of memory.");
 
     for (InstCount i = 0; i < maxInstCnt_; i++) {
       isFxd_[i] = false;
@@ -67,8 +57,6 @@ RelaxedScheduler::RelaxedScheduler(DataDepStruct *dataDepGraph,
   if (schedType_ == RST_DYNMC) {
     for (InstCount i = 0; i < issuTypeCnt_; i++) {
       prevAvlblSlots_[i] = new int16_t[schedUprBound_];
-      if (prevAvlblSlots_[i] == NULL)
-        Logger::Fatal("Out of memory.");
     }
   }
 
@@ -80,8 +68,6 @@ RelaxedScheduler::RelaxedScheduler(DataDepStruct *dataDepGraph,
 
 #ifdef IS_DEBUG
   wasLwrBoundCmputd_ = new bool[maxInstCnt_];
-  if (wasLwrBoundCmputd_ == NULL)
-    Logger::Fatal("Out of memory.");
 #endif
 }
 /*****************************************************************************/
@@ -608,10 +594,7 @@ LC_RelaxedScheduler::LC_RelaxedScheduler(DataDepStruct *dataDepGraph,
   // TEMP: Support for dynamic scheduling has not been implemented yet
   assert(schedType_ == RST_STTC);
 
-  //  subGraphInstLst_ = new PriorityList<SchedInstruction>(totInstCnt_);
   subGraphInstLst_ = new PriorityList<SchedInstruction>;
-  if (subGraphInstLst_ == NULL)
-    Logger::Fatal("Out of memory.");
 
   schedDir_ = mainDir_;
 }
@@ -783,28 +766,14 @@ LPP_RelaxedScheduler::LPP_RelaxedScheduler(DataDepStruct *dataDepGraph,
   schedDir_ = DirAcycGraph::ReverseDirection(mainDir_);
 
   subGraphInstLst_ = new PriorityList<SchedInstruction>;
-  if (subGraphInstLst_ == NULL)
-    Logger::Fatal("Out of memory.");
 
   crntFrwrdLwrBounds_ = new InstCount[totInstCnt_];
-  if (crntFrwrdLwrBounds_ == NULL)
-    Logger::Fatal("Out of memory.");
-
   crntBkwrdLwrBounds_ = new InstCount[totInstCnt_];
-  if (crntBkwrdLwrBounds_ == NULL)
-    Logger::Fatal("Out of memory.");
 
   tightndFrwrdLwrBounds_ = new LinkedList<SchedInstruction>(totInstCnt_);
-  if (tightndFrwrdLwrBounds_ == NULL)
-    Logger::Fatal("Out of memory.");
-
   tightndBkwrdLwrBounds_ = new LinkedList<SchedInstruction>(totInstCnt_);
-  if (tightndBkwrdLwrBounds_ == NULL)
-    Logger::Fatal("Out of memory.");
 
   lstEntries_ = new KeyedEntry<SchedInstruction> *[totInstCnt_];
-  if (lstEntries_ == NULL)
-    Logger::Fatal("Out of memory.");
 }
 /*****************************************************************************/
 
