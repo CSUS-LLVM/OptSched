@@ -43,13 +43,16 @@ using namespace llvm::opt_sched;
 bool OPTSCHED_gPrintSpills;
 
 // An array of possible OptSched heuristic names
-#define LSHPair std::pair<const char *, LISTSCHED_HEURISTIC>
-static LSHPair HeuristicNames[] = {
-    LSHPair("CP", LSH_CP),    LSHPair("LUC", LSH_LUC),
-    LSHPair("UC", LSH_UC),    LSHPair("NID", LSH_NID),
-    LSHPair("CPR", LSH_CPR),  LSHPair("ISO", LSH_ISO),
-    LSHPair("SC", LSH_SC),    LSHPair("LS", LSH_LS),
-    LSHPair("LLVM", LSH_LLVM)};
+constexpr struct {
+  const char* Name;
+  LISTSCHED_HEURISTIC HID;
+} HeuristicNames[] = {
+    {"CP", LSH_CP},   {"LUC", LSH_LUC},
+    {"UC", LSH_UC},   {"NID", LSH_NID},
+    {"CPR", LSH_CPR}, {"ISO", LSH_ISO},
+    {"SC", LSH_SC},   {"LS", LSH_LS},
+    {"LLVM", LSH_LLVM}
+};
 
 // Default path to the the configuration directory for opt-sched.
 static constexpr const char *DEFAULT_CFG_DIR = "~/.optsched-cfg/";
@@ -645,9 +648,9 @@ static LISTSCHED_HEURISTIC GetNextHeuristicName(const std::string &Str,
 
   // Match heuristic name to enum id
   for (const auto &LSH : HeuristicNames)
-    if (!Str.compare(StartIndex, Walk - StartIndex, LSH.first)) {
+    if (!Str.compare(StartIndex, Walk - StartIndex, LSH.Name)) {
       StartIndex = Walk + 1;
-      return LSH.second;
+      return LSH.HID;
     }
   llvm_unreachable("Unknown heuristic.");
 }
