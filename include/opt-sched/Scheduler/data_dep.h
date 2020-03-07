@@ -386,6 +386,7 @@ protected:
 
   SchedInstruction *CreateNode_(InstCount instNum, char const *const instName,
                                 InstType instType, char const *const opCode,
+                                /* bool InstrMayLoad, bool InstrMayStore,*/
                                 int nodeID, InstCount fileSchedOrder,
                                 InstCount fileSchedCycle, InstCount fileLB,
                                 InstCount fileUB, int blkNum);

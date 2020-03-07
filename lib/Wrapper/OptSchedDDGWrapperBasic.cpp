@@ -376,6 +376,8 @@ inline void OptSchedDDGWrapperBasic::setupRoot() {
   int RootNum = DAG->SUnits.size();
   root_ = CreateNode_(RootNum, "artificial",
                       MM->GetInstTypeByName("artificial"), "__optsched_entry",
+                      // mayLoad = false;
+                      // mayStore = false;
                       RootNum, // nodeID
                       RootNum, // fileSchedOrder
                       RootNum, // fileSchedCycle
@@ -394,6 +396,8 @@ inline void OptSchedDDGWrapperBasic::setupLeaf() {
   int LeafNum = DAG->SUnits.size() + 1;
   CreateNode_(LeafNum, "artificial", MM->GetInstTypeByName("artificial"),
               "__optsched_exit",
+              // mayLoad = false;
+              // mayStore = false;
               LeafNum, // nodeID
               LeafNum, // fileSchedOrder
               LeafNum, // fileSchedCycle
@@ -467,6 +471,8 @@ void OptSchedDDGWrapperBasic::convertSUnit(const SUnit &SU) {
   }
 
   CreateNode_(SU.NodeNum, InstName.c_str(), InstType, InstName.c_str(),
+              // MI->mayLoad()
+              // MI->mayStore()
               SU.NodeNum, // nodeID
               SU.NodeNum, // fileSchedOrder
               SU.NodeNum, // fileSchedCycle
@@ -499,6 +505,26 @@ void OptSchedDDGWrapperBasic::countBoundaryLiveness(
     Defs.insert(D.RegUnit);
   }
 }
+
+
+/// Iterate through SUnits and find all possible clustering then transfer
+/// the information over to the SchedInstruction class as a bitvector.
+/// Partially copied from https://github.com/llvm/llvm-project/blob/master/llvm/lib/CodeGen/MachineScheduler.cpp#L1615
+// void findPossibleClusters() {
+//   Copy how LLVM handles clustering except instead of actually
+//   modifying the DAG, we can possibly set MayCluster to true.
+//   Then add the nodes that can be clustered together into a
+//   data structure.
+
+//   for (auto &SU : DAG->SUnits) {
+//     if ((IsLoad && !SU.getInstr()->mayLoad()) ||
+//        (!IsLoad && !SU.getInstr()->mayStore()))
+//       continue;
+//      ...
+//      ...
+//   }
+//      ...
+// }
 
 LLVMRegTypeFilter::LLVMRegTypeFilter(
     const MachineModel *MM, const llvm::TargetRegisterInfo *TRI,

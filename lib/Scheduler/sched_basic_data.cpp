@@ -6,6 +6,7 @@ using namespace llvm::opt_sched;
 
 SchedInstruction::SchedInstruction(InstCount num, const string &name,
                                    InstType instType, const string &opCode,
+                                   /* bool InstrMayLoad, bool InstrMayStore,*/
                                    InstCount maxInstCnt, int nodeID,
                                    InstCount fileSchedOrder,
                                    InstCount fileSchedCycle, InstCount fileLB,
@@ -15,6 +16,9 @@ SchedInstruction::SchedInstruction(InstCount num, const string &name,
   name_ = name;
   opCode_ = opCode;
   instType_ = instType;
+  // MayLoad = InstrMayLoad;
+  // MayStore = InstrMayStore;
+  // MayCluster = false;
 
   frwrdLwrBound_ = INVALID_VALUE;
   bkwrdLwrBound_ = INVALID_VALUE;

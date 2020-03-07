@@ -425,6 +425,18 @@ public:
 
   InstType GetCrtclPathFrmRoot() { return crtclPathFrmRoot_; }
 
+  /// Return true if this instruction could possibly read memory 
+  /// Copied from https://llvm.org/doxygen/classllvm_1_1MachineInstr.html
+  // bool mayLoad() { return MayLoad; }
+
+  /// Return true if this instruction could possibly modify memory.
+  /// Copied from https://llvm.org/doxygen/classllvm_1_1MachineInstr.html
+  // bool mayStore() { return MayStore; }
+
+  /// Set MayCluster to true if clustering memory operations was found
+  /// to be possible.
+  // void setMayCluster () { MayCluster = true; }
+
   friend class SchedRange;
 
 protected:
@@ -432,6 +444,15 @@ protected:
   string name_;
   // The mnemonic of this instruction, e.g. "add" or "jmp".
   string opCode_;
+  /// Indicate if this instruction may be a load operation
+  // bool MayLoad;
+  /// Indicate if this instruction may be a store operation
+  // bool MayStore;
+  /// Data structure to store a possible clustering with other isntructions.
+  /// This data structure should have a fast lookup operation.
+  // dataStructure PossibleClustures;
+  /// This value should be set to true if clustering may be possible.
+  // bool MayCluster;
   // A numberical ID for this instruction.
   int nodeID_;
   // The type of this instruction.

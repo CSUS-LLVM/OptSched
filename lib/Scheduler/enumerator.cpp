@@ -982,6 +982,18 @@ bool Enumerator::FindNxtFsblBrnch_(EnumTreeNode *&newNode) {
   if (crntBrnchNum == 0 && SchedForRPOnly_)
     crntNode_->SetFoundInstWithUse(IsUseInRdyLst_());
 
+  // Note: This is just a thought, we might not need this here.
+  // Check if clustering is possible.
+  // We want to only do memory clustering in the second pass for now.
+  // if (crntBrnchNum == 0 && EnableMemClustering && SecondPass)
+  //   // TODO: Implement these functions/attributes
+  //   // and implement cost. Also keep track of current 
+  //   // cluster size since we do not want to exceed 15 
+  //   // memory operations in a cluster (This and the cost
+  //   // is probably done somewhere else and not here).
+  //   ClusteringPossible = crntNode_->CheckForClustering();
+  //   crntNode_->SetClusteringPossible(ClusteringPossible);
+
   for (i = crntBrnchNum; i < brnchCnt && crntNode_->IsFeasible(); i++) {
 #ifdef IS_DEBUG_FLOW
     Logger::Info("Probing branch %d out of %d", i, brnchCnt);

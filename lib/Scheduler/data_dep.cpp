@@ -824,8 +824,10 @@ FUNC_RESULT DataDepGraph::SkipGraph(SpecsBuffer *buf, bool &endOfFileReached) {
 
 SchedInstruction *DataDepGraph::CreateNode_(
     InstCount instNum, char const *const instName, InstType instType,
-    char const *const opCode, int nodeID, InstCount fileSchedOrder,
-    InstCount fileSchedCycle, InstCount fileLB, InstCount fileUB, int blkNum) {
+    char const *const opCode,
+    /* bool InstrMayLoad, bool InstrMayStore,*/ int nodeID,
+    InstCount fileSchedOrder, InstCount fileSchedCycle, InstCount fileLB,
+    InstCount fileUB, int blkNum) {
 
   SchedInstruction *newInstPtr;
   newInstPtr = new SchedInstruction(instNum, instName, instType, opCode,

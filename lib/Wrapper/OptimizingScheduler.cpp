@@ -380,6 +380,7 @@ void ScheduleDAGOptSched::schedule() {
       OST->createDDGWrapper(C, this, MM.get(), LatencyPrecision, RegionName);
   DDG->convertSUnits();
   DDG->convertRegFiles();
+  // DDG->findPossibleClusters();
 
   auto *BDDG = static_cast<OptSchedDDGWrapperBasic *>(DDG.get());
   addGraphTransformations(BDDG);

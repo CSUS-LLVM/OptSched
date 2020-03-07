@@ -431,6 +431,14 @@ void BBWithSpill::UpdateSpillInfoForSchdul_(SchedInstruction *inst,
   int liveRegs;
   InstCount newSpillCost;
 
+  // Possibly keep track of the current memory clustering size here
+  // and in UpdateSpillInfoForUnSchdul_()
+  // if inst->mayCluster() then
+  //   if current instruction is already part of a cluster then
+  //       increment cluster size by 1 
+  //   else if not in a cluster then
+  //       start clustering by initializing cluster values
+  
   defCnt = inst->GetDefs(defs);
   useCnt = inst->GetUses(uses);
 
