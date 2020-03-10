@@ -434,10 +434,29 @@ void BBWithSpill::UpdateSpillInfoForSchdul_(SchedInstruction *inst,
   // Possibly keep track of the current memory clustering size here
   // and in UpdateSpillInfoForUnSchdul_()
   // if inst->mayCluster() then
-  //   if current instruction is already part of a cluster then
+
+  //   // Can use bit operations to check if it is part of an active clustering
+  //   // Possible implementation: if (curClusterBitVector[inst->GetNum])
+  //   if curInst is part of an active cluster then
   //       increment cluster size by 1 
   //   else if not in a cluster then
   //       start clustering by initializing cluster values
+  //       // Possibly use bit operations to activate part of cluster
+  //       // Ex:
+  //       // Instr 0, 3, 4 can be clustered and there are 5 total instructions
+  //       // curClusterBitVector Bitvector: 11001
+  //
+  // Potential Issues: 
+  // 1. How to implement this when un-scheduling? Need to keep track if new instruction disable a cluster
+  //     so that when we backtrack, we can re-activate the cluster.
+  // 2. Keeping track of the average clustering size when we aren't done scheduling.
+  //    Cost function that was discussed during the meeting on Friday:
+  //      (15 - averageClusteringSize) * ClusteringWeight
+  //      We want to minimize this cost but there is an issue in the following example
+  //    Ex: Partial schedule was able to cluster a block of 15. averageClusteringSize : 15, CostFnc: (15-15)*Weight = 0
+  //          Any cluster block below size 15 will decrease the average cluster size and increase the cost.
+  //          This makes our B&B enumerator actually favor not doing clustering.
+
   
   defCnt = inst->GetDefs(defs);
   useCnt = inst->GetUses(uses);
