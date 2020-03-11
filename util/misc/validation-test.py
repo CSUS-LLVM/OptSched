@@ -19,8 +19,12 @@ dags2 = {}
 def dags_info(logtext):
     dags = {}
 
-    blocks = [block for block in RE_REGION_DELIMITER.split(logtext) if
-              RE_COST_LOWER_BOUND.search(block)]
+    unfiltered = RE_REGION_DELIMITER.split(logtext)
+    blocks = [block for block in unfiltered if RE_COST_LOWER_BOUND.search(block)]
+
+    if len(blocks) != len(unfiltered):
+        print('WARNING: {filtered}/{total} blocks do not have a logged lower bound.'
+            .format(filtered=len(blocks), total=len(unfiltered)), out=sys.stderr)
 
     for block in blocks:
         lowerBound = int(RE_COST_LOWER_BOUND.search(block).group(1))
