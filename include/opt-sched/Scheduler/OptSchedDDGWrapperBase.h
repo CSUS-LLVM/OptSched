@@ -17,6 +17,8 @@ public:
   virtual void convertSUnits() = 0;
 
   virtual void convertRegFiles() = 0;
+
+  virtual void findPossibleClusters() = 0;
 };
 
 } // namespace opt_sched

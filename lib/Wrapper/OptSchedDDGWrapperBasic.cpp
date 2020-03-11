@@ -9,6 +9,8 @@
 #include "opt-sched/Scheduler/logger.h"
 #include "opt-sched/Scheduler/register.h"
 #include "opt-sched/Scheduler/sched_basic_data.h"
+#include "llvm/ADT/DenseMap.h"
+#include "llvm/ADT/SmallVector.h"
 #include "llvm/CodeGen/ISDOpcodes.h"
 #include "llvm/CodeGen/MachineFunction.h"
 #include "llvm/CodeGen/MachineInstr.h"
@@ -20,12 +22,14 @@
 #include "llvm/CodeGen/TargetPassConfig.h"
 #include "llvm/IR/Function.h"
 #include "llvm/Target/TargetMachine.h"
+#include <bitset>
 #include <cstdio>
 #include <map>
 #include <queue>
 #include <set>
 #include <stack>
 #include <string>
+#include <utility>
 #include <vector>
 
 #define DEBUG_TYPE "optsched-ddg-wrapper"
@@ -205,7 +209,7 @@ void OptSchedDDGWrapperBasic::addDefsAndUses() {
     }
 
   LLVM_DEBUG(DAG->dumpLLVMRegisters());
-  LLVM_DEBUG(dumpOptSchedRegisters());
+  //LLVM_DEBUG(dumpOptSchedRegisters());
 }
 
 void OptSchedDDGWrapperBasic::addUse(unsigned RegUnit, InstCount Index) {
@@ -506,25 +510,97 @@ void OptSchedDDGWrapperBasic::countBoundaryLiveness(
   }
 }
 
+// Partially copied from
+// https://github.com/RadeonOpenCompute/llvm/blob/roc-ocl-2.4.0/lib/CodeGen/MachineScheduler.cpp#L1554
+void OptSchedDDGWrapperBasic::clusterNeighboringMemOps_(
+    ArrayRef<const SUnit *> MemOps) {
+  SmallVector<MemOpInfo, 32> MemOpRecords;
+  dbgs() << "Processing possible clusters\n";
+  for (const SUnit *SU : MemOps) {
+    dbgs() << "  " << SU->NodeNum << " is in the chain.\n";
+    MachineOperand *BaseOp;
+    int64_t Offset;
+    if (DAG->TII->getMemOperandWithOffset(*SU->getInstr(), BaseOp, Offset, DAG->TRI))
+      MemOpRecords.push_back(MemOpInfo(SU, BaseOp, Offset));
+  }
+
+  if (MemOpRecords.size() < 2) {
+    dbgs() << "  Unable to cluster memop cluster of 1.\n";
+    return;
+  }
+
+  llvm::sort(MemOpRecords);
+  unsigned ClusterLength = 1;
+  for (unsigned Idx = 0, End = MemOpRecords.size(); Idx < (End - 1); ++Idx) {
+    const SUnit *SUa = MemOpRecords[Idx].SU;
+    const SUnit *SUb = MemOpRecords[Idx + 1].SU;
+    dbgs() << "  Checking possible clustering of (" << SUa->NodeNum << ") and (" << SUb->NodeNum << ")\n";
+    if (DAG->TII->shouldClusterMemOps(*MemOpRecords[Idx].BaseOp,
+                                 *MemOpRecords[Idx + 1].BaseOp,
+                                 ClusterLength)) {
+	    dbgs() << "    Cluster possible at SU(" << SUa->NodeNum << ")- SU(" << SUb->NodeNum << ")\n";
+      ++ClusterLength;
+    } else
+      ClusterLength = 1;
+  }
+}
 
 /// Iterate through SUnits and find all possible clustering then transfer
 /// the information over to the SchedInstruction class as a bitvector.
-/// Partially copied from https://github.com/llvm/llvm-project/blob/master/llvm/lib/CodeGen/MachineScheduler.cpp#L1615
-// void findPossibleClusters() {
+/// Partially copied from https://github.com/RadeonOpenCompute/llvm/blob/roc-ocl-2.4.0/lib/CodeGen/MachineScheduler.cpp#L1595
+void OptSchedDDGWrapperBasic::findPossibleClusters() {
 //   Copy how LLVM handles clustering except instead of actually
 //   modifying the DAG, we can possibly set MayCluster to true.
 //   Then add the nodes that can be clustered together into a
 //   data structure.
 
-//   for (auto &SU : DAG->SUnits) {
-//     if ((IsLoad && !SU.getInstr()->mayLoad()) ||
-//        (!IsLoad && !SU.getInstr()->mayStore()))
-//       continue;
-//      ...
-//      ...
-//   }
-//      ...
-// }
+  // Experiment with clustering loads first
+  bool IsLoad = true;
+
+  dbgs() << "Looking for load clusters\n";
+  DenseMap<unsigned, unsigned> StoreChainIDs;
+  // Map each store chain to a set of dependent MemOps.
+  SmallVector<SmallVector<const SUnit *, 4>, 32> StoreChainDependents;
+  for (const SUnit &SU : DAG->SUnits) {
+    if ((IsLoad && !SU.getInstr()->mayLoad()) ||
+        (!IsLoad && !SU.getInstr()->mayStore()))
+      continue;
+    auto MI = SU.getInstr();
+    dbgs() << "  Instruction (" << SU.NodeNum << ") " << DAG->TII->getName(MI->getOpcode())  << " may load.\n";
+
+    unsigned ChainPredID = DAG->SUnits.size();
+    for (const SDep &Pred : SU.Preds) {
+      if (Pred.isCtrl()) {
+        auto PredMI = Pred.getSUnit()->getInstr();
+        dbgs() << "    Breaking chain at (" << Pred.getSUnit()->NodeNum << ") " << DAG->TII->getName(PredMI->getOpcode()) << '\n';
+        ChainPredID = Pred.getSUnit()->NodeNum;
+        break;
+      }
+    }
+    // Check if this chain-like pred has been seen
+    // before. ChainPredID==MaxNodeID at the top of the schedule.
+    unsigned NumChains = StoreChainDependents.size();
+    dbgs() << "    ChainPredID " << ChainPredID << ", NumChains " << NumChains << '\n';
+    std::pair<DenseMap<unsigned, unsigned>::iterator, bool> Result =
+        StoreChainIDs.insert(std::make_pair(ChainPredID, NumChains));
+    if (Result.second)
+      StoreChainDependents.resize(NumChains + 1);
+    dbgs() << "    Pushing (" << SU.NodeNum << ") on the chain.\n";
+    StoreChainDependents[Result.first->second].push_back(&SU);
+    dbgs() << "    inPrinting size of SCD: " << StoreChainDependents.size() << '\n';
+  }
+
+
+  dbgs() << "  outPrinting size of SCD: " << StoreChainDependents.size() << '\n';
+  // Iterate over the store chains.
+  for (auto &SCD : StoreChainDependents) {
+    dbgs() << "    Printing the list before clustering: ";
+    for (auto SU1 : SCD)
+    	dbgs() << SU1->NodeNum << " ";
+    dbgs() << '\n';
+    clusterNeighboringMemOps_(SCD);
+  }
+}
 
 LLVMRegTypeFilter::LLVMRegTypeFilter(
     const MachineModel *MM, const llvm::TargetRegisterInfo *TRI,
