@@ -63,14 +63,11 @@ ACOScheduler::ACOScheduler(DataDepGraph *dataDepGraph,
   std::cerr << "ants_per_iteration===="<<ants_per_iteration<<"\n\n";
   */
   int pheremone_size = (count_ + 1) * count_;
-  pheremone_ = new pheremone_t[pheremone_size];
+  pheremone_.resize(pheremone_size);
   InitialSchedule = nullptr;
 }
 
-ACOScheduler::~ACOScheduler() {
-  delete rdyLst_;
-  delete[] pheremone_;
-}
+ACOScheduler::~ACOScheduler() { delete rdyLst_; }
 
 // Pheremone table lookup
 // -1 means no instruction, so e.g. pheremone(-1, 10) gives pheremone on path
@@ -96,16 +93,9 @@ double ACOScheduler::Score(SchedInstruction *from, Choice choice) {
          pow(choice.heuristic, heuristicImportance_);
 }
 
-std::vector<double> ACOScheduler::scores(std::vector<Choice> ready,
-                                         SchedInstruction *last) {
-  std::vector<double> s;
-  for (auto choice : ready)
-    s.push_back(Score(last, choice));
-  return s;
-}
-
-SchedInstruction *ACOScheduler::SelectInstruction(std::vector<Choice> ready,
-                                                  SchedInstruction *lastInst) {
+SchedInstruction *
+ACOScheduler::SelectInstruction(const llvm::SmallVectorImpl<Choice> &ready,
+                                SchedInstruction *lastInst) {
 #if USE_ACS
   double choose_best_chance;
   if (use_fixed_bias)
@@ -115,7 +105,7 @@ SchedInstruction *ACOScheduler::SelectInstruction(std::vector<Choice> ready,
 
   if (RandDouble(0, 1) < choose_best_chance) {
     if (print_aco_trace)
-      std::cerr << "choose_best, use fixed bais: " << use_fixed_bias << "\n";
+      std::cerr << "choose_best, use fixed bias: " << use_fixed_bias << "\n";
     pheremone_t max = -1;
     Choice maxChoice;
     for (auto choice : ready) {
@@ -169,21 +159,23 @@ SchedInstruction *ACOScheduler::SelectInstruction(std::vector<Choice> ready,
   return ready.back().inst;
 }
 
-InstSchedule *ACOScheduler::FindOneSchedule() {
+std::unique_ptr<InstSchedule> ACOScheduler::FindOneSchedule() {
   SchedInstruction *lastInst = NULL;
-  InstSchedule *schedule = new InstSchedule(machMdl_, dataDepGraph_, true);
+  std::unique_ptr<InstSchedule> schedule(
+      new InstSchedule(machMdl_, dataDepGraph_, true));
   InstCount maxPriority = rdyLst_->MaxPriority();
   if (maxPriority == 0)
     maxPriority = 1; // divide by 0 is bad
   Initialize_();
   rgn_->InitForSchdulng();
 
+  llvm::SmallVector<Choice, 0> ready;
   while (!IsSchedComplete_()) {
     // convert the ready list from a custom priority queue to a std::vector,
     // much nicer for this particular scheduler
     UpdtRdyLst_(crntCycleNum_, crntSlotNum_);
-    std::vector<Choice> ready;
     unsigned long heuristic;
+    ready.reserve(rdyLst_->GetInstCnt());
     SchedInstruction *inst = rdyLst_->GetNextPriorityInst(heuristic);
     while (inst != NULL) {
       if (ChkInstLglty_(inst)) {
@@ -242,8 +234,9 @@ InstSchedule *ACOScheduler::FindOneSchedule() {
     if (MovToNxtSlot_(inst))
       InitNewCycle_();
     rdyLst_->ResetIterator();
+    ready.clear();
   }
-  rgn_->UpdateScheduleCost(schedule);
+  rgn_->UpdateScheduleCost(schedule.get());
   return schedule;
 }
 
@@ -257,8 +250,9 @@ FUNC_RESULT ACOScheduler::FindSchedule(InstSchedule *schedule_out,
   for (int i = 0; i < pheremone_size; i++)
     pheremone_[i] = 1;
   initialValue_ = 1;
+  std::unique_ptr<InstSchedule> heuristicSched = FindOneSchedule();
   InstCount heuristicCost =
-      FindOneSchedule()->GetCost() + 1; // prevent divide by zero
+      heuristicSched->GetCost() + 1; // prevent divide by zero
 
 #if USE_ACS
   initialValue_ = 2.0 / ((double)count_ * heuristicCost);
@@ -269,26 +263,23 @@ FUNC_RESULT ACOScheduler::FindSchedule(InstSchedule *schedule_out,
     pheremone_[i] = initialValue_;
   std::cerr << "initialValue_" << initialValue_ << std::endl;
 
-  InstSchedule *bestSchedule = InitialSchedule;
+  std::unique_ptr<InstSchedule> bestSchedule = std::move(InitialSchedule);
   if (bestSchedule) {
-    UpdatePheremone(bestSchedule);
+    UpdatePheremone(bestSchedule.get());
   }
   Config &schedIni = SchedulerOptions::getInstance();
   int noImprovementMax = schedIni.GetInt("ACO_STOP_ITERATIONS");
   int noImprovement = 0; // how many iterations with no improvement
   int iterations = 0;
   while (true) {
-    InstSchedule *iterationBest = NULL;
+    std::unique_ptr<InstSchedule> iterationBest;
     for (int i = 0; i < ants_per_iteration; i++) {
-      InstSchedule *schedule = FindOneSchedule();
+      std::unique_ptr<InstSchedule> schedule = FindOneSchedule();
       if (print_aco_trace)
-        PrintSchedule(schedule);
-      if (iterationBest == NULL ||
+        PrintSchedule(schedule.get());
+      if (iterationBest == nullptr ||
           schedule->GetCost() < iterationBest->GetCost()) {
-        delete iterationBest;
-        iterationBest = schedule;
-      } else {
-        delete schedule;
+        iterationBest = std::move(schedule);
       }
     }
 #if !USE_ACS
@@ -297,15 +288,19 @@ FUNC_RESULT ACOScheduler::FindSchedule(InstSchedule *schedule_out,
     /* PrintSchedule(iterationBest); */
     /* std::cout << iterationBest->GetCost() << std::endl; */
     // TODO DRY
-    if (bestSchedule == NULL ||
+    if (bestSchedule == nullptr ||
         iterationBest->GetCost() < bestSchedule->GetCost()) {
-      delete bestSchedule;
-      bestSchedule = iterationBest;
+      bestSchedule = std::move(iterationBest);
       Logger::Info("ACO found schedule with spill cost %d",
                    bestSchedule->GetCost());
+      Logger::Info("ACO found schedule "
+                   "cost:%d, rp cost:%d, sched length: %d, and "
+                   "iteration:%d",
+                   bestSchedule->GetCost(), bestSchedule->GetSpillCost(),
+                   bestSchedule->GetCrntLngth(), iterations);
+
       noImprovement = 0;
     } else {
-      delete iterationBest;
       noImprovement++;
       /* if (*iterationBest == *bestSchedule) */
       /*   std::cout << "same" << std::endl; */
@@ -313,13 +308,12 @@ FUNC_RESULT ACOScheduler::FindSchedule(InstSchedule *schedule_out,
         break;
     }
 #if USE_ACS
-    UpdatePheremone(bestSchedule);
+    UpdatePheremone(bestSchedule.get());
 #endif
     iterations++;
   }
-  PrintSchedule(bestSchedule);
-  schedule_out->Copy(bestSchedule);
-  delete bestSchedule;
+  PrintSchedule(bestSchedule.get());
+  schedule_out->Copy(bestSchedule.release());
 
   Logger::Info("ACO finished after %d iterations", iterations);
   return RES_SUCCESS;
@@ -439,7 +433,8 @@ void PrintSchedule(InstSchedule *schedule) {
 
 void ACOScheduler::setInitialSched(InstSchedule *Sched) {
   if (Sched) {
-    InitialSchedule = new InstSchedule(machMdl_, dataDepGraph_, VrfySched_);
+    InitialSchedule = std::unique_ptr<InstSchedule>(
+        new InstSchedule(machMdl_, dataDepGraph_, VrfySched_));
     InitialSchedule->Copy(Sched);
   }
 }
