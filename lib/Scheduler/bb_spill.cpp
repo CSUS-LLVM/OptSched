@@ -464,7 +464,7 @@ void BBWithSpill::UpdateSpillInfoForSchdul_(SchedInstruction *inst,
           // Only decrement the cost if we cluster at least 2 operations
           // together (EXPERIMENTAL FOR NOW)
           ClusterInitialCost -= ClusteringWeight;
-          //Logger::Info("More than 2 instructions clustered together!");
+          Logger::Info("More than 2 instructions clustered together!");
         }
       } else {
         // Case 3: Not currently clustering. Initialize clustering
@@ -712,7 +712,7 @@ void BBWithSpill::UpdateSpillInfoForUnSchdul_(SchedInstruction *inst) {
         // cluster
         if (CurrentClusterSize > 2) {
           ClusterInitialCost += ClusteringWeight; // Re-add the cost
-	        //Logger::Info("More than 2 instructions clustered together. Undoing!!");
+	  Logger::Info("More than 2 instructions clustered together. Undoing!!");
 	}
         CurrentClusterSize--;
       } else {
@@ -930,17 +930,18 @@ FUNC_RESULT BBWithSpill::Enumerate_(Milliseconds startTime,
     HandlEnumrtrRslt_(rslt, trgtLngth);
 
     if (bestCost_ == 0 || rslt == RES_ERROR ||
-        (lngthDeadline == rgnDeadline && rslt == RES_TIMEOUT) ||
-        (rslt == RES_SUCCESS && isSecondPass)) {
+        (lngthDeadline == rgnDeadline && rslt == RES_TIMEOUT)) { //||
+        //(rslt == RES_SUCCESS && isSecondPass)) {
 
       // If doing two pass optsched and on the second pass then terminate if a
       // schedule is found with the same min-RP found in first pass.
+      /*
       if (rslt == RES_SUCCESS && isSecondPass) {
         Logger::Info("Schedule found in second pass, terminating BB loop.");
 
         if (trgtLngth  < schedUprBound_)
           Logger::Info("Schedule found with length %d is shorter than current schedule with length %d.", trgtLngth, schedUprBound_);
-      }
+      }*/
 
       break;
     }
@@ -1042,7 +1043,7 @@ bool BBWithSpill::ChkCostFsblty(InstCount trgtLngth, EnumTreeNode *node) {
 
   // TODO: Implement cost function for clustering
   if (isSecondPass)
-    cost += ClusterInitialCost; 
+    crntCost += ClusterInitialCost; 
 
   // assert(cost >= 0);
   assert(dynmcCostLwrBound >= 0);
