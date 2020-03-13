@@ -426,14 +426,6 @@ public:
 
   InstType GetCrtclPathFrmRoot() { return crtclPathFrmRoot_; }
 
-  /// Return true if this instruction could possibly read memory 
-  /// Copied from https://llvm.org/doxygen/classllvm_1_1MachineInstr.html
-  // bool mayLoad() { return MayLoad; }
-
-  /// Return true if this instruction could possibly modify memory.
-  /// Copied from https://llvm.org/doxygen/classllvm_1_1MachineInstr.html
-  // bool mayStore() { return MayStore; }
-
   /// Set MayCluster to true if clustering memory operations was found
   /// to be possible.
   void SetMayCluster(std::shared_ptr<BitVector> PossibleClustersVector);
@@ -446,11 +438,7 @@ protected:
   string name_;
   // The mnemonic of this instruction, e.g. "add" or "jmp".
   string opCode_;
-  /// Indicate if this instruction may be a load operation
-  // bool MayLoad;
-  /// Indicate if this instruction may be a store operation
-  // bool MayStore;
-  /// Data structure to store a possible clustering with other isntructions.
+  /// Data structure to store a possible clustering with other instructions.
   /// This data structure should have a fast lookup operation.
   std::shared_ptr<BitVector> PossibleClusturesBitVector;
   /// This value should be set to true if clustering may be possible.

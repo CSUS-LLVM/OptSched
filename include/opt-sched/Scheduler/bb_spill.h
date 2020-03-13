@@ -42,25 +42,32 @@ private:
   /// together
   std::shared_ptr<BitVector> CurrentClusterVector;
 
+  // TODO: Implement cost function for clustering
   /// Experimental variables and values for cost adjustment
   int ClusteringWeight;
   int ClusterInitialCost;
 
-  // Data struct to contain information about the previous clusters
+  /// Data struct to contain information about the previous clusters
   struct PastClusters {
     std::shared_ptr<BitVector> ClusterVector;
+    /// Size of the cluster when it was ended by an instruction not in the
+    /// cluster
     int ClusterSize;
-    int InstNum; // Instruction number that ended this cluster
 
-    // Constructor
+    /// Instruction number that ended this cluster
+    int InstNum; 
+
+    /// Constructor for this struct
     PastClusters(std::shared_ptr<BitVector> Cluster, int size, int num)
         : ClusterVector(Cluster), ClusterSize(size), InstNum(num) {}
   };
 
   /// Vector containing the (n-1) past clusters
-  llvm::SmallVector<std::unique_ptr<PastClusters>, 0> PastClustersList;
+  llvm::SmallVector<std::unique_ptr<PastClusters>, 4> PastClustersList;
 
-  /// Pointer to the latest past cluster
+  /// Pointer to the last cluster. This is kept out of the vector to
+  /// avoid having to fetch it every time we compare the current instruction
+  /// number to the one that ended the cluster.
   std::unique_ptr<PastClusters> LastCluster;
 
   // The target machine

@@ -510,8 +510,8 @@ void OptSchedDDGWrapperBasic::countBoundaryLiveness(
   }
 }
 
-// Partially copied from
-// https://github.com/RadeonOpenCompute/llvm/blob/roc-ocl-2.4.0/lib/CodeGen/MachineScheduler.cpp#L1554
+/// Partially copied from
+/// https://github.com/RadeonOpenCompute/llvm/blob/roc-ocl-2.4.0/lib/CodeGen/MachineScheduler.cpp#L1554
 void OptSchedDDGWrapperBasic::clusterNeighboringMemOps_(
     ArrayRef<const SUnit *> MemOps) {
   SmallVector<MemOpInfo, 32> MemOpRecords;
@@ -566,12 +566,8 @@ void OptSchedDDGWrapperBasic::clusterNeighboringMemOps_(
 /// the information over to the SchedInstruction class as a bitvector.
 /// Partially copied from https://github.com/RadeonOpenCompute/llvm/blob/roc-ocl-2.4.0/lib/CodeGen/MachineScheduler.cpp#L1595
 void OptSchedDDGWrapperBasic::findPossibleClusters() {
-//   Copy how LLVM handles clustering except instead of actually
-//   modifying the DAG, we can possibly set MayCluster to true.
-//   Then add the nodes that can be clustered together into a
-//   data structure.
-
-  // Experiment with clustering loads first
+  // TODO: Add For-loop to also do store clusters. Currently only does load
+  // clusters
   bool IsLoad = true;
 
   LLVM_DEBUG(dbgs() << "Looking for load clusters\n");

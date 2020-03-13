@@ -376,6 +376,7 @@ InstCount BBWithSpill::CmputNormCost_(InstSchedule *sched,
   cost -= costLwrBound_;
   execCost -= costLwrBound_;
 
+  // TODO: Implement cost function for clustering
   if (isSecondPass)
 	  cost += ClusterInitialCost; 
 
@@ -443,17 +444,19 @@ void BBWithSpill::UpdateSpillInfoForSchdul_(SchedInstruction *inst,
 
   // Scheduling cases for clustering project:
   // 1.) Cluster -> Cluster
-      // Simple case, just increment 1 from cluster size
+  // Simple case, just increment 1 from cluster size
   // 2.) Cluster -> Non-Cluster
-      // ?? End clustering
+  // ?? End clustering
   // 3.) Non-Cluster -> Cluster
-      // Simple case, initialize clustering
+  // Simple case, initialize clustering
 
   // Possibly keep track of the current memory clustering size here
   // and in UpdateSpillInfoForUnSchdul_()
   if (isSecondPass) {
     if (inst->GetMayCluster()) {
-      if (CurrentClusterSize > 0 && CurrentClusterVector->GetBit(inst->GetNum())) {
+      // TODO: Check for different cluster to different cluster scheduling
+      if (CurrentClusterSize > 0 &&
+          CurrentClusterVector->GetBit(inst->GetNum())) {
         // Case 1: Currently clustering and this current instruction is part of
         // the cluster
         CurrentClusterSize++;
@@ -461,15 +464,14 @@ void BBWithSpill::UpdateSpillInfoForSchdul_(SchedInstruction *inst,
           // Only decrement the cost if we cluster at least 2 operations
           // together (EXPERIMENTAL FOR NOW)
           ClusterInitialCost -= ClusteringWeight;
-          Logger::Info("More than 2 instructions clustered together!");
-	}
-     } else {
+          //Logger::Info("More than 2 instructions clustered together!");
+        }
+      } else {
         // Case 3: Not currently clustering. Initialize clustering
-        // Sidenote: What if we go from current cluster to a different cluster?
-        CurrentClusterVector.reset(); // Clear cluster vector
+        CurrentClusterVector.reset();                    // Clear cluster vector
         CurrentClusterVector = inst->GetClusterVector(); // Set active cluster
-        CurrentClusterSize = 1; // Current size is 1
-     }
+        CurrentClusterSize = 1;                          // Current size is 1
+      }
     } else if (CurrentClusterSize > 1) {
       // Case 2: Exiting out of an active cluster
       // Save the cluster to restore when backtracking.
@@ -701,14 +703,16 @@ void BBWithSpill::UpdateSpillInfoForUnSchdul_(SchedInstruction *inst) {
       // Simple case, just decrement 1 from cluster size
       // If cluster size == 0, delete CurrentClusterVector
   if (isSecondPass) {
+    // TODO: Check for different cluster to different cluster
+    // backtracking.
     if (inst->GetMayCluster()) {
       // Case 1
       if (CurrentClusterSize > 0 && CurrentClusterVector->GetBit(inst->GetNum())) {
         // Currently clustering and this current instruction is part of the
-        // cluter
+        // cluster
         if (CurrentClusterSize > 2) {
           ClusterInitialCost += ClusteringWeight; // Re-add the cost
-	  Logger::Info("More than 2 instructions clustered together. Undoing!!");
+	        //Logger::Info("More than 2 instructions clustered together. Undoing!!");
 	}
         CurrentClusterSize--;
       } else {
@@ -1027,6 +1031,7 @@ void BBWithSpill::SetupForSchdulng_() {
 bool BBWithSpill::ChkCostFsblty(InstCount trgtLngth, EnumTreeNode *node) {
   bool fsbl = true;
   InstCount crntCost, dynmcCostLwrBound;
+
   if (spillCostFunc_ == SCF_SLIL) {
     crntCost = dynamicSlilLowerBound_ * SCW_ + trgtLngth * schedCostFactor_;
   } else {
@@ -1034,6 +1039,10 @@ bool BBWithSpill::ChkCostFsblty(InstCount trgtLngth, EnumTreeNode *node) {
   }
   crntCost -= costLwrBound_;
   dynmcCostLwrBound = crntCost;
+
+  // TODO: Implement cost function for clustering
+  if (isSecondPass)
+    cost += ClusterInitialCost; 
 
   // assert(cost >= 0);
   assert(dynmcCostLwrBound >= 0);
