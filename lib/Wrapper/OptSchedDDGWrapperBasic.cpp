@@ -530,7 +530,7 @@ void OptSchedDDGWrapperBasic::clusterNeighboringMemOps_(
     return;
   }
 
-  auto ClusterVector = llvm::make_unique<BitVector>(DAG->SUnits.size());
+  auto ClusterVector = std::make_shared<BitVector>(DAG->SUnits.size());
 
   llvm::sort(MemOpRecords);
   unsigned ClusterLength = 1;

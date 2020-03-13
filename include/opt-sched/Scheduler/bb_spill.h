@@ -35,9 +35,6 @@ private:
   InstCount crntSpillCost_;
   InstCount optmlSpillCost_;
 
-  /// May not need this variable
-  bool CurrentlyClustering;
-
   /// Current cluster size
   unsigned int CurrentClusterSize; 
 

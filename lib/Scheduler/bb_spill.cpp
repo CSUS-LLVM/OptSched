@@ -72,8 +72,8 @@ BBWithSpill::BBWithSpill(const OptSchedTarget *OST_, DataDepGraph *dataDepGraph,
   
   CurrentClusterSize = 0;
   CurrentClusterVector = nullptr;
-  ClusteringWeight = 10000;
-  ClusterInitialCost = 10000000;
+  ClusteringWeight = 1000;
+  ClusterInitialCost = 1000000;
   PastClustersList.clear();
   LastCluster = nullptr;
 }
@@ -376,6 +376,9 @@ InstCount BBWithSpill::CmputNormCost_(InstSchedule *sched,
   cost -= costLwrBound_;
   execCost -= costLwrBound_;
 
+  if (isSecondPass)
+	  cost += ClusterInitialCost; 
+
   sched->SetCost(cost);
   sched->SetExecCost(execCost);
   return cost;
@@ -454,10 +457,12 @@ void BBWithSpill::UpdateSpillInfoForSchdul_(SchedInstruction *inst,
         // Case 1: Currently clustering and this current instruction is part of
         // the cluster
         CurrentClusterSize++;
-        if (CurrentClusterSize > 1)
+        if (CurrentClusterSize > 2) {
           // Only decrement the cost if we cluster at least 2 operations
           // together (EXPERIMENTAL FOR NOW)
           ClusterInitialCost -= ClusteringWeight;
+          Logger::Info("More than 2 instructions clustered together!");
+	}
      } else {
         // Case 3: Not currently clustering. Initialize clustering
         // Sidenote: What if we go from current cluster to a different cluster?
@@ -701,8 +706,10 @@ void BBWithSpill::UpdateSpillInfoForUnSchdul_(SchedInstruction *inst) {
       if (CurrentClusterSize > 0 && CurrentClusterVector->GetBit(inst->GetNum())) {
         // Currently clustering and this current instruction is part of the
         // cluter
-        if (CurrentClusterSize > 1)
+        if (CurrentClusterSize > 2) {
           ClusterInitialCost += ClusteringWeight; // Re-add the cost
+	  Logger::Info("More than 2 instructions clustered together. Undoing!!");
+	}
         CurrentClusterSize--;
       } else {
         // Case 3
