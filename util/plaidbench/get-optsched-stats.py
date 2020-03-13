@@ -41,10 +41,10 @@ from openpyxl.styles import Font
 from openpyxl.styles import Alignment
 import argparse
 
-REGEX_DAG_INFO = re.compile('Processing DAG (.*) with (\d+) insts and max latency (\d+)')
-REGEX_LIST_OPTIMAL = re.compile('list schedule (.?)* is optimal')
-REGEX_COST_IMPROV = re.compile('cost imp=(\d+).')
-REGEX_OPTIMAL = re.compile('The schedule is optimal')
+REGEX_DAG_INFO = re.compile(r'Processing DAG (.*) with (\d+) insts and max latency (\d+)')
+REGEX_LIST_OPTIMAL = re.compile(r'list schedule (.?)* is optimal')
+REGEX_COST_IMPROV = re.compile(r'cost imp=(\d+).')
+REGEX_OPTIMAL = re.compile(r'The schedule is optimal')
 REGEX_PASS_NUM = re.compile(r'End of (.*) pass through')
 
 # Contains all of the stats
@@ -355,4 +355,3 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     main(args)
-

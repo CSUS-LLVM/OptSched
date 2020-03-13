@@ -48,6 +48,7 @@ benchmarks = [
 ]
 
 # Parse for DAG stats
+RE_DAG_COST_LOWER_BOUND = re.compile(r'Lower bound of cost before scheduling: (\d+)')
 RE_DAG_COST = re.compile(r'INFO: Best schedule for DAG (.*) has cost (\d+) and length (\d+). The schedule is (.*) \(Time')
 # Parse for passthrough number
 RE_PASS_NUM = re.compile(r'End of (.*) pass through')
@@ -199,11 +200,12 @@ def main(args):
                     passNum = getPass.group(1)
                     
                     # Get DAG stats
+                    dagLwrBound = RE_DAG_COST_LOWER_BOUND.search(block)
                     dagStats = RE_DAG_COST.search(block)
                     dag = {}
                     dagName = dagStats.group(1)
                     dag['dagName'] = dagName
-                    dag['cost'] = int(dagStats.group(2))
+                    dag['cost'] = int(dagStats.group(2)) + int(dagLwrBound.group(1))
                     dag['length'] = dagStats.group(3)
                     dag['isOptimal'] = (dagStats.group(4) == 'optimal')
                     
@@ -252,4 +254,3 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     main(args)
-
