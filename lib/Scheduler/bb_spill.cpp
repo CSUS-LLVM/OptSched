@@ -69,6 +69,13 @@ BBWithSpill::BBWithSpill(const OptSchedTarget *OST_, DataDepGraph *dataDepGraph,
   schduldEntryInstCnt_ = 0;
   schduldExitInstCnt_ = 0;
   schduldInstCnt_ = 0;
+  
+  CurrentClusterSize = 0;
+  CurrentClusterVector = nullptr;
+  ClusteringWeight = 10000;
+  ClusterInitialCost = 10000000;
+  PastClustersList.clear();
+  LastCluster = nullptr;
 }
 /****************************************************************************/
 
@@ -431,33 +438,63 @@ void BBWithSpill::UpdateSpillInfoForSchdul_(SchedInstruction *inst,
   int liveRegs;
   InstCount newSpillCost;
 
+  // Scheduling cases for clustering project:
+  // 1.) Cluster -> Cluster
+      // Simple case, just increment 1 from cluster size
+  // 2.) Cluster -> Non-Cluster
+      // ?? End clustering
+  // 3.) Non-Cluster -> Cluster
+      // Simple case, initialize clustering
+
   // Possibly keep track of the current memory clustering size here
   // and in UpdateSpillInfoForUnSchdul_()
-  // if inst->mayCluster() then
+  if (isSecondPass) {
+    if (inst->GetMayCluster()) {
+      if (CurrentClusterSize > 0 && CurrentClusterVector->GetBit(inst->GetNum()) {
+        // Case 1: Currently clustering and this current instruction is part of
+        // the cluster
+        CurrentClusterSize++;
+        if (CurrentClusterSize > 1)
+          // Only decrement the cost if we cluster at least 2 operations
+          // together (EXPERIMENTAL FOR NOW)
+          ClusterInitialCost -= ClusteringWeight;
+     } else {
+        // Case 3: Not currently clustering. Initialize clustering
+        // Sidenote: What if we go from current cluster to a different cluster?
+        CurrentClusterVector.reset(); // Clear cluster vector
+        CurrentClusterVector = inst->GetClusterVector(); // Set active cluster
+        CurrentClusterSize = 1; // Current size is 1
+     }
+    } else if (CurrentClusterSize > 1) {
+      // Case 2: Exiting out of an active cluster
+      // Save the cluster to restore when backtracking.
+      if (LastCluster) {
+        // List of previous clusters
+        PastClustersList.push_back(std::move(LastCluster));
 
-  //   // Can use bit operations to check if it is part of an active clustering
-  //   // Possible implementation: if (curClusterBitVector[inst->GetNum])
-  //   if curInst is part of an active cluster then
-  //       increment cluster size by 1 
-  //   else if not in a cluster then
-  //       start clustering by initializing cluster values
-  //       // Possibly use bit operations to activate part of cluster
-  //       // Ex:
-  //       // Instr 0, 3, 4 can be clustered and there are 5 total instructions
-  //       // curClusterBitVector Bitvector: 11001
-  //
-  // Potential Issues: 
-  // 1. How to implement this when un-scheduling? Need to keep track if new instruction disable a cluster
-  //     so that when we backtrack, we can re-activate the cluster.
-  // 2. Keeping track of the average clustering size when we aren't done scheduling.
+        // Current previous cluster
+        LastCluster = llvm::make_unique<PastClusters>(
+            CurrentClusterVector, CurrentClusterSize, inst->GetNum());
+      } else
+        LastCluster = llvm::make_unique<PastClusters>(
+            CurrentClusterVector, CurrentClusterSize, inst->GetNum());
+      CurrentClusterVector.reset(); // Reset active cluster
+      CurrentClusterSize = 0;       // Set cluster size to 0
+    }
+  }
+  // Potential Issues:
+  // 1. Keeping track of the average clustering size when we aren't done
+  // scheduling.
   //    Cost function that was discussed during the meeting on Friday:
   //      (15 - averageClusteringSize) * ClusteringWeight
-  //      We want to minimize this cost but there is an issue in the following example
-  //    Ex: Partial schedule was able to cluster a block of 15. averageClusteringSize : 15, CostFnc: (15-15)*Weight = 0
-  //          Any cluster block below size 15 will decrease the average cluster size and increase the cost.
-  //          This makes our B&B enumerator actually favor not doing clustering.
+  //      We want to minimize this cost but there is an issue in the following
+  //      example
+  //    Ex: Partial schedule was able to cluster a block of 15.
+  //    averageClusteringSize : 15, CostFnc: (15-15)*Weight = 0
+  //          Any cluster block below size 15 will decrease the average
+  //          cluster size and increase the cost. This makes our B&B
+  //          enumerator actually favor not doing clustering.
 
-  
   defCnt = inst->GetDefs(defs);
   useCnt = inst->GetUses(uses);
 
@@ -648,6 +685,48 @@ void BBWithSpill::UpdateSpillInfoForUnSchdul_(SchedInstruction *inst) {
   Logger::Info("Updating reg pressure after unscheduling Inst %d",
                inst->GetNum());
 #endif
+
+  // Backtracking cases for clustering project:
+  // 1.) Cluster <- Cluster 
+      // Simple case, just decrement 1 from cluster size
+  // 2.) Cluster <- Non-Cluster
+      // Have to restore state of Cluster and ??
+      // Can/should we use a stack to restore state?
+  // 3.) Non-Cluster <- Cluster
+      // Simple case, just decrement 1 from cluster size
+      // If cluster size == 0, delete CurrentClusterVector
+  if (isSecondPass) {
+    if (inst->GetMayCluster()) {
+      // Case 1
+      if (CurrentClusterSize > 0 && CurrentClusterVector->GetBit(inst->GetNum()) {
+        // Currently clustering and this current instruction is part of the
+        // cluter
+        if (CurrentClusterSize > 1)
+          ClusterInitialCost += ClusteringWeight; // Re-add the cost
+        CurrentClusterSize--;
+      } else {
+        // Case 3
+        CurrentClusterSize--;
+        if (CurrentClusterSize == 0)
+          CurrentClusterVector.reset();
+      }
+    } else if (LastCluster) {
+      if (LastCluster->InstNum == inst->GetNum()) {
+        // Case 2: If there was a previous cluster and
+        // this instruction ended the cluster then restore the previous
+        // cluster's state
+        CurrentClusterSize = LastCluster->ClusterSize;
+        CurrentClusterVector = LastCluster->ClusterVector;
+        LastCluster.reset(); // Release current cluster pointer
+
+        // Get previous cluster from vector list
+        if (!PastClustersList.empty()) {
+          LastCluster = std::move(PastClustersList.back());
+          PastClustersList.pop_back();
+        }
+    }
+  }
+
 
   defCnt = inst->GetDefs(defs);
   useCnt = inst->GetUses(uses);

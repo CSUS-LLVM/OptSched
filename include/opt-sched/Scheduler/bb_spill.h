@@ -9,11 +9,13 @@ Last Update:  Apr. 2011
 #ifndef OPTSCHED_SPILL_BB_SPILL_H
 #define OPTSCHED_SPILL_BB_SPILL_H
 
+#include "opt-sched/Scheduler/bit_vector.h"
 #include "opt-sched/Scheduler/OptSchedTarget.h"
 #include "opt-sched/Scheduler/defines.h"
 #include "opt-sched/Scheduler/sched_region.h"
 #include "llvm/ADT/SmallVector.h"
 #include <map>
+#include <memory>
 #include <set>
 #include <vector>
 
@@ -32,6 +34,37 @@ private:
 
   InstCount crntSpillCost_;
   InstCount optmlSpillCost_;
+
+  /// May not need this variable
+  bool CurrentlyClustering;
+
+  /// Current cluster size
+  unsigned int CurrentClusterSize; 
+
+  /// Bitvector containing active bits for instructions that can be clustered
+  /// together
+  std::shared_ptr<BitVector> CurrentClusterVector;
+
+  /// Experimental variables and values for cost adjustment
+  int ClusteringWeight;
+  int ClusterInitialCost;
+
+  // Data struct to contain information about the previous clusters
+  struct PastClusters {
+    std::shared_ptr<BitVector> ClusterVector;
+    int ClusterSize;
+    int InstNum; // Instruction number that ended this cluster
+
+    // Constructor
+    PastClusters(std::shared_ptr<BitVector> Cluster, int size, int num)
+        : ClusterVector(Cluster), ClusterSize(size), InstNum(num) {}
+  };
+
+  /// Vector containing the (n-1) past clusters
+  llvm::SmallVector<std::unique_ptr<PastClusters>> PastClustersList;
+
+  /// Pointer to the latest past cluster
+  std::unique_ptr<PastClusters> LastCluster;
 
   // The target machine
   const OptSchedTarget *OST;

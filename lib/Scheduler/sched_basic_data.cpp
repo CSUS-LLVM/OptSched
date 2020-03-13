@@ -18,7 +18,7 @@ SchedInstruction::SchedInstruction(InstCount num, const string &name,
   instType_ = instType;
   // MayLoad = InstrMayLoad;
   // MayStore = InstrMayStore;
-  // MayCluster = false;
+  MayCluster = false; 
 
   frwrdLwrBound_ = INVALID_VALUE;
   bkwrdLwrBound_ = INVALID_VALUE;
@@ -741,6 +741,15 @@ int16_t SchedInstruction::CmputLastUseCnt() {
 
   return lastUseCnt_;
 }
+
+void SchedInstruction::SetMayCluster(std::shared_ptr<BitVector> PossibleClustersVector) {
+  if (PossibleClustersVector->GetOneCnt > 0) {
+    PossibleClusturesBitVector = PossibleClustersVector;
+    MayCluster = true;
+  }
+}
+
+auto SchedInstruction::GetClusterVector() { return PossibleClusturesBitVector; }
 
 /******************************************************************************
  * SchedRange                                                                 *

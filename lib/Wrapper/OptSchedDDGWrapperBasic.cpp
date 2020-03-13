@@ -5,6 +5,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "OptSchedDDGWrapperBasic.h"
+#include "opt-sched/Scheduler/bit_vector.h"
 #include "opt-sched/Scheduler/config.h"
 #include "opt-sched/Scheduler/logger.h"
 #include "opt-sched/Scheduler/register.h"
@@ -22,7 +23,6 @@
 #include "llvm/CodeGen/TargetPassConfig.h"
 #include "llvm/IR/Function.h"
 #include "llvm/Target/TargetMachine.h"
-#include <bitset>
 #include <cstdio>
 #include <map>
 #include <queue>
@@ -516,6 +516,7 @@ void OptSchedDDGWrapperBasic::clusterNeighboringMemOps_(
     ArrayRef<const SUnit *> MemOps) {
   SmallVector<MemOpInfo, 32> MemOpRecords;
   dbgs() << "Processing possible clusters\n";
+  
   for (const SUnit *SU : MemOps) {
     dbgs() << "  " << SU->NodeNum << " is in the chain.\n";
     MachineOperand *BaseOp;
@@ -529,6 +530,8 @@ void OptSchedDDGWrapperBasic::clusterNeighboringMemOps_(
     return;
   }
 
+  auto ClusterVector = llvm::make_unique<BitVector>(DAG->SUnits.size());
+
   llvm::sort(MemOpRecords);
   unsigned ClusterLength = 1;
   for (unsigned Idx = 0, End = MemOpRecords.size(); Idx < (End - 1); ++Idx) {
@@ -538,11 +541,23 @@ void OptSchedDDGWrapperBasic::clusterNeighboringMemOps_(
     if (DAG->TII->shouldClusterMemOps(*MemOpRecords[Idx].BaseOp,
                                  *MemOpRecords[Idx + 1].BaseOp,
                                  ClusterLength)) {
-	    dbgs() << "    Cluster possible at SU(" << SUa->NodeNum << ")- SU(" << SUb->NodeNum << ")\n";
+	  dbgs() << "    Cluster possible at SU(" << SUa->NodeNum << ")- SU(" << SUb->NodeNum << ")\n";
       ++ClusterLength;
+      ClusterVector->SetBit(SUa->NodeNum);
+      ClusterVector->SetBit(SUb->NodeNum);
     } else
       ClusterLength = 1;
   }
+  dbgs () << "Printing bit vector: ";
+  for (int i = ClusterVector->GetSize() - 1; i >= 0; i--) {
+    if (ClusterVector->GetBit(i))
+      dbgs() << "1";
+    else
+      dbgs() << "0";
+  }
+  dbgs() << '\n';
+  insts_[SUa->NodeNum]->SetMayCluster(ClusterVector);
+  insts_[SUb->NodeNum]->SetMayCluster(ClusterVector);
 }
 
 /// Iterate through SUnits and find all possible clustering then transfer

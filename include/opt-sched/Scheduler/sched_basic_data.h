@@ -16,6 +16,7 @@ Last Update:  Sept. 2013
 #include "opt-sched/Scheduler/hash_table.h"
 #include "opt-sched/Scheduler/machine_model.h"
 #include <iostream>
+#include <memory>
 
 namespace llvm {
 namespace opt_sched {
@@ -435,8 +436,9 @@ public:
 
   /// Set MayCluster to true if clustering memory operations was found
   /// to be possible.
-  // void setMayCluster () { MayCluster = true; }
-
+  void SetMayCluster(std::shared_ptr<BitVector> PossibleClustersVector);
+  bool GetMayCluster() { return MayCluster; }
+  auto GetClusterVector();
   friend class SchedRange;
 
 protected:
@@ -450,9 +452,9 @@ protected:
   // bool MayStore;
   /// Data structure to store a possible clustering with other isntructions.
   /// This data structure should have a fast lookup operation.
-  // dataStructure PossibleClustures;
+  std::shared_ptr<BitVector> PossibleClusturesBitVector;
   /// This value should be set to true if clustering may be possible.
-  // bool MayCluster;
+  bool MayCluster;
   // A numberical ID for this instruction.
   int nodeID_;
   // The type of this instruction.
