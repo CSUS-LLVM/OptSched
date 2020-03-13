@@ -56,13 +56,14 @@ BLOCK_NAME_AND_SIZE_REGEX = re.compile(r'Processing DAG (.*) with (\d+) insts')
 #BLOCK_NOT_ENUMERATED_REGEX = re.compile(r'The list schedule .* is optimal')
 BLOCK_NOT_ENUMERATED_REGEX = re.compile(r'(Bypassing optimal scheduling due to zero time limit|The list schedule .* is optimal)')
 BLOCK_ENUMERATED_OPTIMAL_REGEX = re.compile(r'DAG solved optimally')
+BLOCK_COST_LOWER_BOUND_REGEX = re.compile(r'Lower bound of cost before scheduling: (\d+)')
 BLOCK_COST_REGEX = re.compile(r'list schedule is of length \d+ and spill cost \d+. Tot cost = (\d+)')
 BLOCK_IMPROVEMENT_REGEX = re.compile(r'cost imp=(\d+)')
 BLOCK_START_TIME_REGEX = re.compile(r'-{20} \(Time = (\d+) ms\)')
 BLOCK_END_TIME_REGEX = re.compile(r'verified successfully \(Time = (\d+) ms\)')
 BLOCK_LIST_FAILED_REGEX = re.compile(r'List scheduling failed')
 BLOCK_PEAK_REG_PRESSURE_REGEX = re.compile(r'PeakRegPresAfter Dag (.*?) Index (\d+) Name (.*) Peak (\d+) Limit (\d+)')
-SLIL_HEURISTIC_REGEX = re.compile('SLIL after Heuristic Scheduler for dag (.*?) Type (\d+) (.*?) is (\d+)')
+SLIL_HEURISTIC_REGEX = re.compile(r'SLIL after Heuristic Scheduler for dag (.*?) Type (\d+) (.*?) is (\d+)')
 BLOCK_FAILED_REGEX = re.compile(r'OptSched run failed')
 
 def writeStats(stats, args, dagSizesPerBenchmark):
@@ -448,7 +449,7 @@ def calculateBlockStats(output):
         end_time = int(BLOCK_END_TIME_REGEX.findall(block)[0])
         timeTaken = end_time - start_time
 
-        listCost = int(BLOCK_COST_REGEX.findall(block)[0])
+        listCost = int(BLOCK_COST_REGEX.findall(block)[0]) + int(BLOCK_COST_LOWER_BOUND_REGEX.search(block).group(1))
         isEnumerated = BLOCK_NOT_ENUMERATED_REGEX.findall(block) == []
         if isEnumerated:
           isOptimal = bool(BLOCK_ENUMERATED_OPTIMAL_REGEX.findall(block))
