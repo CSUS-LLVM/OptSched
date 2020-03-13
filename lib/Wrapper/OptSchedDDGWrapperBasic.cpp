@@ -545,6 +545,8 @@ void OptSchedDDGWrapperBasic::clusterNeighboringMemOps_(
       ++ClusterLength;
       ClusterVector->SetBit(SUa->NodeNum);
       ClusterVector->SetBit(SUb->NodeNum);
+      insts_[SUa->NodeNum]->SetMayCluster(ClusterVector);
+      insts_[SUb->NodeNum]->SetMayCluster(ClusterVector);
     } else
       ClusterLength = 1;
   }
@@ -556,8 +558,6 @@ void OptSchedDDGWrapperBasic::clusterNeighboringMemOps_(
       dbgs() << "0";
   }
   dbgs() << '\n';
-  insts_[SUa->NodeNum]->SetMayCluster(ClusterVector);
-  insts_[SUb->NodeNum]->SetMayCluster(ClusterVector);
 }
 
 /// Iterate through SUnits and find all possible clustering then transfer

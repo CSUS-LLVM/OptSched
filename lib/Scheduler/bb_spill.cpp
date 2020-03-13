@@ -450,7 +450,7 @@ void BBWithSpill::UpdateSpillInfoForSchdul_(SchedInstruction *inst,
   // and in UpdateSpillInfoForUnSchdul_()
   if (isSecondPass) {
     if (inst->GetMayCluster()) {
-      if (CurrentClusterSize > 0 && CurrentClusterVector->GetBit(inst->GetNum()) {
+      if (CurrentClusterSize > 0 && CurrentClusterVector->GetBit(inst->GetNum())) {
         // Case 1: Currently clustering and this current instruction is part of
         // the cluster
         CurrentClusterSize++;
@@ -698,7 +698,7 @@ void BBWithSpill::UpdateSpillInfoForUnSchdul_(SchedInstruction *inst) {
   if (isSecondPass) {
     if (inst->GetMayCluster()) {
       // Case 1
-      if (CurrentClusterSize > 0 && CurrentClusterVector->GetBit(inst->GetNum()) {
+      if (CurrentClusterSize > 0 && CurrentClusterVector->GetBit(inst->GetNum())) {
         // Currently clustering and this current instruction is part of the
         // cluter
         if (CurrentClusterSize > 1)
@@ -725,7 +725,7 @@ void BBWithSpill::UpdateSpillInfoForUnSchdul_(SchedInstruction *inst) {
           PastClustersList.pop_back();
         }
     }
-  }
+  }}
 
 
   defCnt = inst->GetDefs(defs);

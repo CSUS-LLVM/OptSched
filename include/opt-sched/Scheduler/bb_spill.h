@@ -61,7 +61,7 @@ private:
   };
 
   /// Vector containing the (n-1) past clusters
-  llvm::SmallVector<std::unique_ptr<PastClusters>> PastClustersList;
+  llvm::SmallVector<std::unique_ptr<PastClusters>, 0> PastClustersList;
 
   /// Pointer to the latest past cluster
   std::unique_ptr<PastClusters> LastCluster;

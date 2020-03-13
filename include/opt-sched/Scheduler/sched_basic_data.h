@@ -438,7 +438,7 @@ public:
   /// to be possible.
   void SetMayCluster(std::shared_ptr<BitVector> PossibleClustersVector);
   bool GetMayCluster() { return MayCluster; }
-  auto GetClusterVector();
+  std::shared_ptr<BitVector> GetClusterVector();
   friend class SchedRange;
 
 protected:

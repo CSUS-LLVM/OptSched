@@ -743,13 +743,13 @@ int16_t SchedInstruction::CmputLastUseCnt() {
 }
 
 void SchedInstruction::SetMayCluster(std::shared_ptr<BitVector> PossibleClustersVector) {
-  if (PossibleClustersVector->GetOneCnt > 0) {
+  if (PossibleClustersVector->GetOneCnt() > 0) {
     PossibleClusturesBitVector = PossibleClustersVector;
     MayCluster = true;
   }
 }
 
-auto SchedInstruction::GetClusterVector() { return PossibleClusturesBitVector; }
+std::shared_ptr<BitVector> SchedInstruction::GetClusterVector() { return PossibleClusturesBitVector; }
 
 /******************************************************************************
  * SchedRange                                                                 *
