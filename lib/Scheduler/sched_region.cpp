@@ -601,11 +601,13 @@ FUNC_RESULT SchedRegion::FindOptimalSchedule(
   }
 #endif
 
+#ifdef IS_DEBUG_MEMORY_CLUSTERING
   if (isSecondPass) {
     Logger::Info("Printing final schedule.");
     bestSched->Print(Logger::GetLogStream(), "Best Sched");
   }
-	
+#endif
+
   return rslt;
 }
 
@@ -647,7 +649,6 @@ FUNC_RESULT SchedRegion::Optimize_(Milliseconds startTime,
     }
     stats::unsolvedProblemSize.Record(dataDepGraph_->GetInstCnt());
   }
-	  
   return rslt;
 }
 

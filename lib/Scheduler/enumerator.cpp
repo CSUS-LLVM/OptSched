@@ -974,7 +974,7 @@ bool Enumerator::FindNxtFsblBrnch_(EnumTreeNode *&newNode) {
 #ifdef IS_DEBUG_READY_LIST
   Logger::Info("Ready List Size is %d", rdyInstCnt);
   // Warning! That will reset the instruction iterator!
-   rdyLst_->Print(Logger::GetLogStream());
+  // rdyLst_->Print(Logger::GetLogStream());
 
   stats::maxReadyListSize.SetMax(rdyInstCnt);
 #endif

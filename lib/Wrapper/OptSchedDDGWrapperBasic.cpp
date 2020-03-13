@@ -515,10 +515,10 @@ void OptSchedDDGWrapperBasic::countBoundaryLiveness(
 void OptSchedDDGWrapperBasic::clusterNeighboringMemOps_(
     ArrayRef<const SUnit *> MemOps) {
   SmallVector<MemOpInfo, 32> MemOpRecords;
-  dbgs() << "Processing possible clusters\n";
+  LLVM_DEBUG(dbgs() << "Processing possible clusters\n");
   
   for (const SUnit *SU : MemOps) {
-    dbgs() << "  " << SU->NodeNum << " is in the chain.\n";
+    LLVM_DEBUG(dbgs() << "  " << SU->NodeNum << " is in the chain.\n");
     MachineOperand *BaseOp;
     int64_t Offset;
     if (DAG->TII->getMemOperandWithOffset(*SU->getInstr(), BaseOp, Offset, DAG->TRI))
@@ -526,7 +526,7 @@ void OptSchedDDGWrapperBasic::clusterNeighboringMemOps_(
   }
 
   if (MemOpRecords.size() < 2) {
-    dbgs() << "  Unable to cluster memop cluster of 1.\n";
+    LLVM_DEBUG(dbgs() << "  Unable to cluster memop cluster of 1.\n");
     return;
   }
 
@@ -537,11 +537,11 @@ void OptSchedDDGWrapperBasic::clusterNeighboringMemOps_(
   for (unsigned Idx = 0, End = MemOpRecords.size(); Idx < (End - 1); ++Idx) {
     const SUnit *SUa = MemOpRecords[Idx].SU;
     const SUnit *SUb = MemOpRecords[Idx + 1].SU;
-    dbgs() << "  Checking possible clustering of (" << SUa->NodeNum << ") and (" << SUb->NodeNum << ")\n";
+    LLVM_DEBUG(dbgs() << "  Checking possible clustering of (" << SUa->NodeNum << ") and (" << SUb->NodeNum << ")\n");
     if (DAG->TII->shouldClusterMemOps(*MemOpRecords[Idx].BaseOp,
                                  *MemOpRecords[Idx + 1].BaseOp,
                                  ClusterLength)) {
-	  dbgs() << "    Cluster possible at SU(" << SUa->NodeNum << ")- SU(" << SUb->NodeNum << ")\n";
+      LLVM_DEBUG(dbgs() << "    Cluster possible at SU(" << SUa->NodeNum << ")- SU(" << SUb->NodeNum << ")\n");
       ++ClusterLength;
       ClusterVector->SetBit(SUa->NodeNum);
       ClusterVector->SetBit(SUb->NodeNum);
@@ -550,14 +550,16 @@ void OptSchedDDGWrapperBasic::clusterNeighboringMemOps_(
     } else
       ClusterLength = 1;
   }
-  dbgs () << "Printing bit vector: ";
+#ifdef IS_DEBUG_MEMORY_CLUSTERING
+  LLVM_DEBUG(dbgs () << "Printing bit vector: ");
   for (int i = ClusterVector->GetSize() - 1; i >= 0; i--) {
     if (ClusterVector->GetBit(i))
-      dbgs() << "1";
+      LLVM_DEBUG(dbgs() << "1");
     else
-      dbgs() << "0";
+      LLVM_DEBUG(dbgs() << "0");
   }
-  dbgs() << '\n';
+  LLVM_DEBUG(dbgs() << '\n');
+#endif
 }
 
 /// Iterate through SUnits and find all possible clustering then transfer
@@ -572,7 +574,7 @@ void OptSchedDDGWrapperBasic::findPossibleClusters() {
   // Experiment with clustering loads first
   bool IsLoad = true;
 
-  dbgs() << "Looking for load clusters\n";
+  LLVM_DEBUG(dbgs() << "Looking for load clusters\n");
   DenseMap<unsigned, unsigned> StoreChainIDs;
   // Map each store chain to a set of dependent MemOps.
   SmallVector<SmallVector<const SUnit *, 4>, 32> StoreChainDependents;
@@ -581,13 +583,13 @@ void OptSchedDDGWrapperBasic::findPossibleClusters() {
         (!IsLoad && !SU.getInstr()->mayStore()))
       continue;
     auto MI = SU.getInstr();
-    dbgs() << "  Instruction (" << SU.NodeNum << ") " << DAG->TII->getName(MI->getOpcode())  << " may load.\n";
+    LLVM_DEBUG(dbgs() << "  Instruction (" << SU.NodeNum << ") " << DAG->TII->getName(MI->getOpcode())  << " may load.\n");
 
     unsigned ChainPredID = DAG->SUnits.size();
     for (const SDep &Pred : SU.Preds) {
       if (Pred.isCtrl()) {
         auto PredMI = Pred.getSUnit()->getInstr();
-        dbgs() << "    Breaking chain at (" << Pred.getSUnit()->NodeNum << ") " << DAG->TII->getName(PredMI->getOpcode()) << '\n';
+        LLVM_DEBUG(dbgs() << "    Breaking chain at (" << Pred.getSUnit()->NodeNum << ") " << DAG->TII->getName(PredMI->getOpcode()) << '\n');
         ChainPredID = Pred.getSUnit()->NodeNum;
         break;
       }
@@ -595,24 +597,22 @@ void OptSchedDDGWrapperBasic::findPossibleClusters() {
     // Check if this chain-like pred has been seen
     // before. ChainPredID==MaxNodeID at the top of the schedule.
     unsigned NumChains = StoreChainDependents.size();
-    dbgs() << "    ChainPredID " << ChainPredID << ", NumChains " << NumChains << '\n';
+    LLVM_DEBUG(dbgs() << "    ChainPredID " << ChainPredID << ", NumChains " << NumChains << '\n');
     std::pair<DenseMap<unsigned, unsigned>::iterator, bool> Result =
         StoreChainIDs.insert(std::make_pair(ChainPredID, NumChains));
     if (Result.second)
       StoreChainDependents.resize(NumChains + 1);
-    dbgs() << "    Pushing (" << SU.NodeNum << ") on the chain.\n";
     StoreChainDependents[Result.first->second].push_back(&SU);
-    dbgs() << "    inPrinting size of SCD: " << StoreChainDependents.size() << '\n';
   }
 
-
-  dbgs() << "  outPrinting size of SCD: " << StoreChainDependents.size() << '\n';
   // Iterate over the store chains.
   for (auto &SCD : StoreChainDependents) {
-    dbgs() << "    Printing the list before clustering: ";
+#ifdef IS_DEBUG_MEMORY_CLUSTERING
+    LLVM_DEBUG(dbgs() << "    Printing the list before clustering: ");
     for (auto SU1 : SCD)
-    	dbgs() << SU1->NodeNum << " ";
-    dbgs() << '\n';
+    	LLVM_DEBUG(dbgs() << SU1->NodeNum << " ");
+    LLVM_DEBUG(dbgs() << '\n');
+#endif
     clusterNeighboringMemOps_(SCD);
   }
 }
