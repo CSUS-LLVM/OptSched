@@ -2,8 +2,11 @@
 #include "opt-sched/Scheduler/bit_vector.h"
 #include "opt-sched/Scheduler/logger.h"
 #include "opt-sched/Scheduler/register.h"
+#include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/STLExtras.h"
+#include <algorithm>
 #include <list>
+#include <vector>
 
 using namespace llvm::opt_sched;
 
@@ -187,29 +190,23 @@ bool StaticNodeSupTrans::NodeIsSuperior_(SchedInstruction *nodeA,
   int useCntA = nodeA->GetUses(usesA);
   int useCntB = nodeB->GetUses(usesB);
   // Register used by B but not by A.
-  std::list<Register *> usesOnlyB;
-  // A list of registers that will have their live range lengthened
+  std::vector<Register *> usesOnlyB;
+  // A vector of registers that will have their live range lengthened
   // by scheduling B after A.
-  std::list<Register *> lengthenedLiveRegisters;
+  std::vector<Register *> lengthenedLiveRegisters;
   // The number of registers that will be lengthened by
   // scheduling B after A. Indexed by register type.
   std::vector<InstCount> lengthenedByB(graph->GetRegTypeCnt());
-  std::fill(lengthenedByB.begin(), lengthenedByB.end(), 0);
   // The total number of live ranges that could be lengthened by
   // scheduling B after A.
   // InstCount totalLengthenedByB = 0;
 
   for (int i = 0; i < useCntB; i++) {
-    Register *useB = usesB[i];
+    const Register *useB = usesB[i];
     // Flag for determining whether useB is used by node A.
-    bool usedByA = false;
-    for (int j = 0; j < useCntA; j++) {
-      Register *useA = usesA[j];
-      if (useA == useB) {
-        usedByA = true;
-        break;
-      }
-    }
+    const bool usedByA =
+        std::any_of(usesA, usesA + useCntA,
+                    [useB](const Register *useA) { return useA == useB; });
     if (!usedByA) {
 #ifdef IS_DEBUG_GRAPH_TRANS
       Logger::Info("Found reg used by nodeB but not nodeA");
@@ -217,14 +214,11 @@ bool StaticNodeSupTrans::NodeIsSuperior_(SchedInstruction *nodeA,
 
       // For this register did we find a user C that is a successor of
       // A and B.
-      bool foundC = false;
-      for (const SchedInstruction *user : useB->GetUseList()) {
-        if (user != nodeB &&
-            nodeB->IsRcrsvScsr(const_cast<SchedInstruction *>(user))) {
-          foundC = true;
-          break;
-        }
-      }
+      bool foundC =
+          llvm::any_of(useB->GetUseList(), [&](const SchedInstruction *user) {
+            return user != nodeB &&
+                   nodeB->IsRcrsvScsr(const_cast<SchedInstruction *>(user));
+          });
       if (!foundC) {
 #ifdef IS_DEBUG_GRAPH_TRANS
         Logger::Info("Found register that has its live range lengthend by "
@@ -278,8 +272,8 @@ bool StaticNodeSupTrans::NodeIsSuperior_(SchedInstruction *nodeA,
   int defCntA = nodeA->GetDefs(defsA);
   int defCntB = nodeB->GetDefs(defsB);
   int regTypes = graph->GetRegTypeCnt();
-  vector<InstCount> regTypeDefsA(regTypes);
-  vector<InstCount> regTypeDefsB(regTypes);
+  std::vector<InstCount> regTypeDefsA(regTypes);
+  std::vector<InstCount> regTypeDefsB(regTypes);
 
   for (int i = 0; i < defCntA; i++)
     regTypeDefsA[defsA[i]->GetType()]++;
@@ -287,18 +281,12 @@ bool StaticNodeSupTrans::NodeIsSuperior_(SchedInstruction *nodeA,
   for (int i = 0; i < defCntB; i++)
     regTypeDefsB[defsB[i]->GetType()]++;
 
-  for (int i = 0; i < regTypes; i++) {
-    // Logger::Info("Def count A for Type %d is %d and B is %d", i,
-    // regTypeDefsA[i], regTypeDefsB[i]);
-    if (regTypeDefsA[i] > regTypeDefsB[i]) {
-#ifdef IS_DEBUG_GRAPH_TRANS
-      Logger::Info("Live range condition 2 failed");
-#endif
-      return false;
-    }
-  }
-
-  return true;
+  const auto correspondingRegTypeDefs = llvm::zip_first(
+      llvm::makeArrayRef(regTypeDefsA), llvm::makeArrayRef(regTypeDefsB));
+  return llvm::all_of(correspondingRegTypeDefs,
+                      [](std::tuple<InstCount, InstCount> regDefs) {
+                        return std::get<0>(regDefs) > std::get<1>(regDefs);
+                      });
 }
 
 void StaticNodeSupTrans::nodeMultiPass_(
