@@ -44,8 +44,8 @@ from openpyxl import Workbook
 from openpyxl.styles import Font
 
 # For AMD 
-RE_DAG_NAME = re.compile('Processing DAG (.*) with')
-RE_SCHED_LENGTH = re.compile('The list schedule is of length (\d+) and')
+RE_DAG_NAME = re.compile(r'Processing DAG (.*) with')
+RE_SCHED_LENGTH = re.compile(r'The list schedule is of length (\d+) and')
 
 # For OptSched
 RE_PASS_NUM = re.compile(r'End of (.*) pass through')
