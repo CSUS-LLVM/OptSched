@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.7)
 
 project(OptSched-SuperBuild)
 
-option(OPTSCHEDSUPER_FLANG "Check out and build flang." ON)
+option(OPTSCHEDSUPER_FLANG "Check out and build flang." OFF)
 set(OPTSCHEDSUPER_FLANG_INSTALL_PREFIX ${CMAKE_CURRENT_BINARY_DIR}/flang-install CACHE PATH "The directory to install flang")
 
 set(OPTSCHEDSUPER_FLANG_BUILD_TYPE Release CACHE STRING "The build type for flang")
