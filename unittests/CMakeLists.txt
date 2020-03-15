@@ -5,4 +5,8 @@ function(add_optsched_unittest test_dirname)
   add_unittest(OptSchedUnitTests ${test_dirname} ${ARGN})
 endfunction()
 
+# All unit test targets depend on OptSched
+add_library(UnitTest.OptSched STATIC $<TARGET_OBJECTS:OptSched.Lib>)
+link_libraries(UnitTest.OptSched)
+
 add_subdirectory(Basic)
