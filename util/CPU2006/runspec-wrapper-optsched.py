@@ -200,6 +200,7 @@ BLOCK_NAME_AND_SIZE_REGEX = re.compile(r'Processing DAG (.*) with (\d+) insts')
 BLOCK_NOT_ENUMERATED_REGEX = re.compile(r'The list schedule .* is optimal')
 BLOCK_ZERO_TIME_LIMIT = re.compile(r'Bypassing optimal scheduling due to zero time limit')
 BLOCK_ENUMERATED_OPTIMAL_REGEX = re.compile(r'DAG solved optimally')
+BLOCK_COST_LOWER_BOUND_REGEX = re.compile(r'Lower bound of cost before scheduling: (\d+)')
 BLOCK_COST_REGEX = re.compile(r'list schedule is of length \d+ and spill cost \d+. Tot cost = (\d+)')
 BLOCK_IMPROVEMENT_REGEX = re.compile(r'cost imp=(\d+)')
 BLOCK_START_TIME_REGEX = re.compile(r'-{20} \(Time = (\d+) ms\)')
@@ -626,7 +627,8 @@ def calculateBlockStats(output, trackOptSchedSpills):
                 else:
                     optSchedSpills = 0
 
-                listCost = int(BLOCK_COST_REGEX.findall(block)[0])
+                costLwrBound = int(BLOCK_COST_LOWER_BOUND_REGEX.search(block).group(1))
+                listCost = costLwrBound + int(BLOCK_COST_REGEX.findall(block)[0])
                 # The block is not enumerated if the list schedule is optimal or there is a zero
                 # time limit for enumeration.
                 isEnumerated = (BLOCK_NOT_ENUMERATED_REGEX.findall(block) == []) and (
@@ -919,5 +921,3 @@ if __name__ == '__main__':
                       help='Should the simulated number of spills per-block be tracked (%default).')
 
     main(parser.parse_args()[0])
-
-

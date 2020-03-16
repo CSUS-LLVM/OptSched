@@ -40,7 +40,7 @@ from openpyxl import Workbook
 from openpyxl.styles import Font
 import argparse
 
-RE_DAG_INFO = re.compile('Processing DAG (.*) with (\d+) insts and max latency (\d+)')
+RE_DAG_INFO = re.compile(r'Processing DAG (.*) with (\d+) insts and max latency (\d+)')
 RE_PASS_NUM = re.compile(r'End of (.*) pass through')
 
 # Contains all of the stats
@@ -241,4 +241,3 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     main(args)
-
