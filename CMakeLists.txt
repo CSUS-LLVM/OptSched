@@ -5,7 +5,9 @@ option(OPTSCHED_INCLUDE_TESTS "Generate build targets for the OptSched unit test
 # Exit if attempting to build as a standalone project.
 IF(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
   message(FATAL_ERROR "You cannot build opt-sched as a standalone project. Place opt-sched in the llvm tree under the \"projects\" directory.")
-ENDIF()
+endif()
+
+set(OPTSCHED_EXTRA_LINK_LIBRARIES "" CACHE STRING "Extra link_libraries to pass to OptSched, space-separated")
 
 IF(NOT CMAKE_BUILD_TYPE)
   message(FATAL_ERROR "Must set cmake build type.")
