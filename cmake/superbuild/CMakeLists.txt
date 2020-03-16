@@ -2,6 +2,8 @@ cmake_minimum_required(VERSION 3.7)
 
 project(OptSched-SuperBuild)
 
+set(OPTSCHEDSUPER_LLVM_INSTALL_PREFIX ${CMAKE_CURRENT_BINARY_DIR}/llvm-install CACHE PATH "The directory to install llvm")
+
 option(OPTSCHEDSUPER_FLANG "Check out and build flang." OFF)
 set(OPTSCHEDSUPER_FLANG_INSTALL_PREFIX ${CMAKE_CURRENT_BINARY_DIR}/flang-install CACHE PATH "The directory to install flang")
 
@@ -25,7 +27,7 @@ include(ExternalProject)
 
 function(add_variable OUT_LIST NAME)
   set(var "${${OUT_LIST}}")
-  
+
   if(DEFINED ${NAME})
     get_property(type CACHE ${NAME} PROPERTY TYPE)
     if(NOT type)
@@ -39,7 +41,7 @@ endfunction()
 
 function(add_variables OUT_LIST)
   set(list)
-  
+
   foreach(var IN LISTS ARGN)
     add_variable(list ${var})
   endforeach()
@@ -60,7 +62,9 @@ ExternalProject_Add(llvm
   GIT_REPOSITORY https://github.com/CSUS-LLVM/llvm-project.git
   GIT_TAG optsched
   SOURCE_SUBDIR llvm
+  INSTALL_DIR ${OPTSCHEDSUPER_LLVM_INSTALL_PREFIX}
   CMAKE_ARGS
+    -DCMAKE_INSTALL_PREFIX=<INSTALL_DIR>
     -DLLVM_PARALLEL_LINK_JOBS=${LLVM_PARALLEL_LINK_JOBS}
     -DLLVM_ENABLE_PROJECTS='clang'
     -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}
@@ -73,8 +77,6 @@ ExternalProject_Add(llvm
   USES_TERMINAL_CONFIGURE 1
   USES_TERMINAL_BUILD 1
   USES_TERMINAL_INSTALL 1
-  # Don't install anything:
-  INSTALL_COMMAND ""
 )
 # Add symlink to OptSched inside llvm/projects
 ExternalProject_Add_Step(llvm optsched_symlink
