@@ -72,21 +72,13 @@ ExternalProject_Add(llvm
     -DLLVM_BUILD_TOOLS=ON
     -DLLVM_INCLUDE_TESTS=ON
     -DLLVM_OPTIMIZED_TABLEGEN=ON
+    -DLLVM_EXTERNAL_PROJECTS=OptSched
+    -DLLVM_EXTERNAL_OPTSCHED_SOURCE_DIR=${ROOT_DIR}
   CMAKE_CACHE_DEFAULT_ARGS
     ${cache_default_args}
   USES_TERMINAL_CONFIGURE 1
   USES_TERMINAL_BUILD 1
   USES_TERMINAL_INSTALL 1
-)
-# Add symlink to OptSched inside llvm/projects
-ExternalProject_Add_Step(llvm optsched_symlink
-  DEPENDEES download
-  DEPENDERS configure
-  COMMAND
-    ${CMAKE_COMMAND} -E create_symlink
-      ${ROOT_DIR} <SOURCE_DIR>/llvm/projects/OptSched
-  BYPRODUCTS <SOURCE_DIR>/llvm/projects/OptSched
-  USES_TERMINAL 1
 )
 
 if(OPTSCHEDSUPER_FLANG)
