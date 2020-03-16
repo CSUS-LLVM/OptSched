@@ -163,13 +163,15 @@ Use the generator you want, be it Ninja with `-GNinja`, explicitly specified mak
 or something else.
 
 If you have ccache installed, consider adding `-DCMAKE_CXX_COMPILER_LAUNCHER=ccache`.
-This will speed up subsequent builds. If you do so, be sure to configure `hash_dir` to false.
+This will speed up subsequent builds. If you do so, be sure to disable the ccache `hash_dir` setting.
 
-To just build OptSched inside LLVM:
+To build OptSched inside LLVM:
 
 `
 cmake -GNinja -DCMAKE_BUILD_TYPE=Debug -DLLVM_PARALLEL_LINK_JOBS=1 ../cmake/superbuild
 `
+
+###### Note: In debug builds, linking uses a lot of memory. Set `LLVM_PARALLEL_LINK_JOBS=2` if you have >= 32G memory, otherwise use `LLVM_PARALLEL_LINK_JOBS=1`.
 
 If you also wish to build flang, add `-DOPTSCHEDSUPER_FLANG=ON`.
 The flang compiler cannot be built with ninja, so if you are using Ninja, add `-DOPTSCHEDSUPER_FLANG_COMPILER_CMAKE_GENERATOR='Unix Makefiles'`
@@ -177,7 +179,7 @@ The flang compiler cannot be built with ninja, so if you are using Ninja, add `-
 Complete command for building with flang:
 
 `
-cmake -GNinja -DCMAKE_BUILD_TYPE=Debug -DLLVM_PARALLEL_LINK_JOBS=1-DOPTSCHEDSUPER_FLANG_COMPILER_CMAKE_GENERATOR='Unix Makefiles' -DOPTSCHEDSUPER_FLANG=ON ../cmake/superbuild
+cmake -GNinja -DCMAKE_BUILD_TYPE=Debug -DLLVM_PARALLEL_LINK_JOBS=1 -DOPTSCHEDSUPER_FLANG_COMPILER_CMAKE_GENERATOR='Unix Makefiles' -DOPTSCHEDSUPER_FLANG=ON ../cmake/superbuild
 `
 
 **3. Run the Super-build**
