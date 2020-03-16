@@ -57,16 +57,9 @@ set(ROOT_DIR ${PROJECT_SOURCE_DIR}/../..)
 set(PATCH_DIR ${ROOT_DIR}/patches/llvm6.0)
 
 ExternalProject_Add(llvm
-  GIT_REPOSITORY https://github.com/llvm/llvm-project
-  GIT_TAG release/6.x
+  GIT_REPOSITORY https://github.com/CSUS-LLVM/llvm-project.git
+  GIT_TAG optsched
   SOURCE_SUBDIR llvm
-  PATCH_COMMAND git reset --hard release/6.x
-  COMMAND       git checkout -b release/6.x-spilling-info
-  COMMAND       git am ${PATCH_DIR}/llvm6-print-spilling-info.patch
-  COMMAND       ${CMAKE_COMMAND}
-                  -E create_symlink
-                  ${ROOT_DIR}
-                  <SOURCE_DIR>/llvm/projects/OptSched
   CMAKE_ARGS
     -DLLVM_PARALLEL_LINK_JOBS=${LLVM_PARALLEL_LINK_JOBS}
     -DLLVM_ENABLE_PROJECTS='clang'
@@ -83,12 +76,21 @@ ExternalProject_Add(llvm
   # Don't install anything:
   INSTALL_COMMAND ""
 )
+# Add symlink to OptSched inside llvm/projects
+ExternalProject_Add_Step(llvm optsched_symlink
+  DEPENDEES download
+  DEPENDERS configure
+  COMMAND
+    ${CMAKE_COMMAND} -E create_symlink
+      ${ROOT_DIR} <SOURCE_DIR>/llvm/projects/OptSched
+  BYPRODUCTS <SOURCE_DIR>/llvm/projects/OptSched
+  USES_TERMINAL 1
+)
 
 if(OPTSCHEDSUPER_FLANG)
   ExternalProject_Add(flang-llvm
-    GIT_REPOSITORY https://github.com/flang-compiler/llvm.git
-    GIT_TAG release_60
-    PATCH_COMMAND git am ${PATCH_DIR}/flang-llvm6-print-spilling-info.patch
+    GIT_REPOSITORY https://github.com/CSUS-LLVM/llvm.git
+    GIT_TAG optsched
     INSTALL_DIR ${OPTSCHEDSUPER_FLANG_INSTALL_PREFIX}
     CMAKE_GENERATOR ${OPTSCHEDSUPER_FLANG_LLVM_CMAKE_GENERATOR}
     CMAKE_ARGS
