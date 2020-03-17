@@ -744,17 +744,24 @@ void BBWithSpill::UpdateSpillInfoForUnSchdul_(SchedInstruction *inst) {
       Logger::Info("Undoing an instruction from the cluster. Current size: %d",
                    CurrentClusterSize);
 
+      // If there is no more member in the currently active cluster then disable
+      // the cluster
       if (CurrentClusterSize == 0) {
         CurrentClusterVector.reset();
-        if (LastCluster->InstNum == inst->GetNum()) {
-          CurrentClusterSize = LastCluster->ClusterSize;
-          CurrentClusterVector = LastCluster->ClusterVector;
-          LastCluster.reset(); // Release current cluster pointer
 
-          // Get previous cluster from vector list
-          if (!PastClustersList.empty()) {
-            LastCluster = std::move(PastClustersList.back());
-            PastClustersList.pop_back();
+        // If there was a previously active cluster, check last cluster to see
+        // if we need to restore the state
+        if (LastCluster) {
+          if (LastCluster->InstNum == inst->GetNum()) {
+            CurrentClusterSize = LastCluster->ClusterSize;
+            CurrentClusterVector = LastCluster->ClusterVector;
+            LastCluster.reset(); // Release current cluster pointer
+
+            // Get previous cluster from vector list
+            if (!PastClustersList.empty()) {
+              LastCluster = std::move(PastClustersList.back());
+              PastClustersList.pop_back();
+            }
           }
         }
       }
