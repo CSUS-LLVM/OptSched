@@ -327,6 +327,12 @@ InstCount BBWithSpill::CmputCostLwrBound() {
 void BBWithSpill::InitForSchdulng() {
   InitForCostCmputtn_();
 
+  CurrentClusterSize = 0;
+  CurrentClusterVector.reset();
+  ClusterInitialCost = 1000000;
+  PastClustersList.clear();
+  LastCluster.reset();
+
   schduldEntryInstCnt_ = 0;
   schduldExitInstCnt_ = 0;
   schduldInstCnt_ = 0;
@@ -464,7 +470,7 @@ void BBWithSpill::UpdateSpillInfoForSchdul_(SchedInstruction *inst,
           // Only decrement the cost if we cluster at least 2 operations
           // together (EXPERIMENTAL FOR NOW)
           ClusterInitialCost -= ClusteringWeight;
-          Logger::Info("More than 2 instructions clustered together!");
+          Logger::Info("Currently clustering %d instructions together", CurrentClusterSize);
         }
       } else {
         // Case 3: Not currently clustering. Initialize clustering
@@ -712,9 +718,9 @@ void BBWithSpill::UpdateSpillInfoForUnSchdul_(SchedInstruction *inst) {
         // cluster
         if (CurrentClusterSize > 2) {
           ClusterInitialCost += ClusteringWeight; // Re-add the cost
-	  Logger::Info("More than 2 instructions clustered together. Undoing!!");
 	}
         CurrentClusterSize--;
+	Logger::Info("Undoing an instruction from the cluster. Current size: %d", CurrentClusterSize);
       } else {
         // Case 3
         CurrentClusterSize--;
