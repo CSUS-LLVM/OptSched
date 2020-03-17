@@ -42,6 +42,10 @@ private:
   /// together
   std::shared_ptr<BitVector> CurrentClusterVector;
 
+  /// Flag to enable or disable clustering memory operations
+  /// in the ILP pass.
+  bool ClusterMemoryOperations;
+
   // TODO: Implement cost function for clustering
   /// Experimental variables and values for cost adjustment
   int ClusteringWeight;

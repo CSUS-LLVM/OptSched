@@ -76,6 +76,8 @@ BBWithSpill::BBWithSpill(const OptSchedTarget *OST_, DataDepGraph *dataDepGraph,
   ClusterInitialCost = 1000000;
   PastClustersList.clear();
   LastCluster = nullptr;
+
+  ClusterMemoryOperations = schedIni.GetBool("CLUSTER_MEMORY_OPS");
 }
 /****************************************************************************/
 
@@ -383,7 +385,7 @@ InstCount BBWithSpill::CmputNormCost_(InstSchedule *sched,
   execCost -= costLwrBound_;
 
   // TODO: Implement cost function for clustering
-  if (isSecondPass)
+  if (isSecondPass && ClusterMemoryOperations)
 	  cost += ClusterInitialCost; 
 
   sched->SetCost(cost);
@@ -458,19 +460,38 @@ void BBWithSpill::UpdateSpillInfoForSchdul_(SchedInstruction *inst,
 
   // Possibly keep track of the current memory clustering size here
   // and in UpdateSpillInfoForUnSchdul_()
-  if (isSecondPass) {
+  if (isSecondPass && ClusterMemoryOperations) {
     if (inst->GetMayCluster()) {
-      // TODO: Check for different cluster to different cluster scheduling
-      if (CurrentClusterSize > 0 &&
-          CurrentClusterVector->GetBit(inst->GetNum())) {
-        // Case 1: Currently clustering and this current instruction is part of
-        // the cluster
-        CurrentClusterSize++;
-        if (CurrentClusterSize > 2) {
-          // Only decrement the cost if we cluster at least 2 operations
-          // together (EXPERIMENTAL FOR NOW)
-          ClusterInitialCost -= ClusteringWeight;
-          Logger::Info("Currently clustering %d instructions together", CurrentClusterSize);
+      // If there is a current active cluster
+      if (CurrentClusterSize > 0) {
+        // The instruction is in the current active cluster
+        if (CurrentClusterVector->GetBit(inst->GetNum())) {
+          // Case 1: Currently clustering and this current instruction is part
+          // of the cluster
+          CurrentClusterSize++;
+          if (CurrentClusterSize > 2) {
+            // Only decrement the cost if we cluster at least 2 operations
+            // together (EXPERIMENTAL FOR NOW)
+            ClusterInitialCost -= ClusteringWeight;
+            Logger::Info("Currently clustering %d instructions together",
+                         CurrentClusterSize);
+          }
+        } else {
+          Logger::Info("Inst %d pushing cluster size %d onto the stack due to "
+                       "cluster to cluster op",
+                       inst->GetNum(), CurrentClusterSize);
+          // The instruction is in another cluster that is not currently active.
+          // Exit out of the currently active cluster into a new one.
+          if (LastCluster) {
+            PastClustersList.push_back(std::move(LastCluster));
+            LastCluster = llvm::make_unique<PastClusters>(
+                CurrentClusterVector, CurrentClusterSize, inst->GetNum());
+          } else 
+            LastCluster = llvm::make_unique<PastClusters>(
+                CurrentClusterVector, CurrentClusterSize, inst->GetNum());
+          CurrentClusterVector.reset();
+          CurrentClusterVector = inst->GetClusterVector();
+          CurrentClusterSize = 1;
         }
       } else {
         // Case 3: Not currently clustering. Initialize clustering
@@ -479,6 +500,8 @@ void BBWithSpill::UpdateSpillInfoForSchdul_(SchedInstruction *inst,
         CurrentClusterSize = 1;                          // Current size is 1
       }
     } else if (CurrentClusterSize > 1) {
+      Logger::Info("Inst %d pushing cluster size %d onto the stack",
+                   inst->GetNum(), CurrentClusterSize);
       // Case 2: Exiting out of an active cluster
       // Save the cluster to restore when backtracking.
       if (LastCluster) {
@@ -708,24 +731,31 @@ void BBWithSpill::UpdateSpillInfoForUnSchdul_(SchedInstruction *inst) {
   // 3.) Non-Cluster <- Cluster
       // Simple case, just decrement 1 from cluster size
       // If cluster size == 0, delete CurrentClusterVector
-  if (isSecondPass) {
+  if (isSecondPass && ClusterMemoryOperations) {
     // TODO: Check for different cluster to different cluster
     // backtracking.
     if (inst->GetMayCluster()) {
-      // Case 1
-      if (CurrentClusterSize > 0 && CurrentClusterVector->GetBit(inst->GetNum())) {
-        // Currently clustering and this current instruction is part of the
-        // cluster
-        if (CurrentClusterSize > 2) {
-          ClusterInitialCost += ClusteringWeight; // Re-add the cost
-	}
-        CurrentClusterSize--;
-	Logger::Info("Undoing an instruction from the cluster. Current size: %d", CurrentClusterSize);
-      } else {
-        // Case 3
-        CurrentClusterSize--;
-        if (CurrentClusterSize == 0)
-          CurrentClusterVector.reset();
+      // Case 1 and 3
+      if (CurrentClusterSize > 2) {
+        ClusterInitialCost += ClusteringWeight; // Re-add the cost
+      }
+      CurrentClusterSize--;
+      Logger::Info("Undoing an instruction from the cluster. Current size: %d",
+                   CurrentClusterSize);
+
+      if (CurrentClusterSize == 0) {
+        CurrentClusterVector.reset();
+        if (LastCluster->InstNum == inst->GetNum()) {
+          CurrentClusterSize = LastCluster->ClusterSize;
+          CurrentClusterVector = LastCluster->ClusterVector;
+          LastCluster.reset(); // Release current cluster pointer
+
+          // Get previous cluster from vector list
+          if (!PastClustersList.empty()) {
+            LastCluster = std::move(PastClustersList.back());
+            PastClustersList.pop_back();
+          }
+        }
       }
     } else if (LastCluster) {
       if (LastCluster->InstNum == inst->GetNum()) {
@@ -741,9 +771,11 @@ void BBWithSpill::UpdateSpillInfoForUnSchdul_(SchedInstruction *inst) {
           LastCluster = std::move(PastClustersList.back());
           PastClustersList.pop_back();
         }
+        Logger::Info("Inst %d popping cluster size %d off the stack",
+                     inst->GetNum(), CurrentClusterSize);
+      }
     }
-  }}
-
+  }
 
   defCnt = inst->GetDefs(defs);
   useCnt = inst->GetUses(uses);
@@ -1048,7 +1080,7 @@ bool BBWithSpill::ChkCostFsblty(InstCount trgtLngth, EnumTreeNode *node) {
   dynmcCostLwrBound = crntCost;
 
   // TODO: Implement cost function for clustering
-  if (isSecondPass)
+  if (isSecondPass && ClusterMemoryOperations)
     crntCost += ClusterInitialCost; 
 
   // assert(cost >= 0);
