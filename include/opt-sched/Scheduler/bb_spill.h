@@ -38,9 +38,8 @@ private:
   /// Current cluster size
   unsigned int CurrentClusterSize; 
 
-  /// Bitvector containing active bits for instructions that can be clustered
-  /// together
-  std::shared_ptr<BitVector> CurrentClusterVector;
+  /// Current active cluster group
+  int ActiveClusterGroup;
 
   /// Flag to enable or disable clustering memory operations
   /// in the ILP pass.
@@ -53,7 +52,7 @@ private:
 
   /// Data struct to contain information about the previous clusters
   struct PastClusters {
-    std::shared_ptr<BitVector> ClusterVector;
+    int ClusterGroup;
     /// Size of the cluster when it was ended by an instruction not in the
     /// cluster
     int ClusterSize;
@@ -62,8 +61,8 @@ private:
     int InstNum; 
 
     /// Constructor for this struct
-    PastClusters(std::shared_ptr<BitVector> Cluster, int size, int num)
-        : ClusterVector(Cluster), ClusterSize(size), InstNum(num) {}
+    PastClusters(int Cluster, int size, int num)
+        : ClusterGroup(Cluster), ClusterSize(size), InstNum(num) {}
   };
 
   /// Vector containing the (n-1) past clusters

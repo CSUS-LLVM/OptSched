@@ -6,7 +6,6 @@ using namespace llvm::opt_sched;
 
 SchedInstruction::SchedInstruction(InstCount num, const string &name,
                                    InstType instType, const string &opCode,
-                                   /* bool InstrMayLoad, bool InstrMayStore,*/
                                    InstCount maxInstCnt, int nodeID,
                                    InstCount fileSchedOrder,
                                    InstCount fileSchedCycle, InstCount fileLB,
@@ -16,8 +15,8 @@ SchedInstruction::SchedInstruction(InstCount num, const string &name,
   name_ = name;
   opCode_ = opCode;
   instType_ = instType;
-  // MayLoad = InstrMayLoad;
-  // MayStore = InstrMayStore;
+  ClusterGroup = 0;
+  ActiveCluster = 0;
   MayCluster = false; 
 
   frwrdLwrBound_ = INVALID_VALUE;
@@ -742,14 +741,12 @@ int16_t SchedInstruction::CmputLastUseCnt() {
   return lastUseCnt_;
 }
 
-void SchedInstruction::SetMayCluster(std::shared_ptr<BitVector> PossibleClustersVector) {
-  if (PossibleClustersVector->GetOneCnt() > 0) {
-    PossibleClusturesBitVector = PossibleClustersVector;
+void SchedInstruction::SetMayCluster(int ClusteringGroup) {
+  if (ClusteringGroup > 0) {
+    ClusterGroup = ClusteringGroup;
     MayCluster = true;
   }
 }
-
-std::shared_ptr<BitVector> SchedInstruction::GetClusterVector() { return PossibleClusturesBitVector; }
 
 /******************************************************************************
  * SchedRange                                                                 *

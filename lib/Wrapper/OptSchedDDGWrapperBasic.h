@@ -146,6 +146,9 @@ protected:
     std::vector<SchedInstruction *> consumers;
   };
 
+  /// Count of the total clusters possible 
+  int ClusterCount;
+
 // Copied from
 // https://github.com/RadeonOpenCompute/llvm/blob/roc-ocl-2.4.0/lib/CodeGen/MachineScheduler.cpp#L1467
   struct MemOpInfo {

@@ -71,7 +71,7 @@ BBWithSpill::BBWithSpill(const OptSchedTarget *OST_, DataDepGraph *dataDepGraph,
   schduldInstCnt_ = 0;
   
   CurrentClusterSize = 0;
-  CurrentClusterVector = nullptr;
+  ActiveClusterGroup = 0;
   ClusteringWeight = 1000;
   ClusterInitialCost = 1000000;
   PastClustersList.clear();
@@ -331,7 +331,7 @@ void BBWithSpill::InitForSchdulng() {
   InitForCostCmputtn_();
 
   CurrentClusterSize = 0;
-  CurrentClusterVector.reset();
+  ActiveClusterGroup = 0;
   ClusterInitialCost = 1000000;
   PastClustersList.clear();
   LastCluster.reset();
@@ -466,7 +466,7 @@ void BBWithSpill::UpdateSpillInfoForSchdul_(SchedInstruction *inst,
       // If there is a current active cluster
       if (CurrentClusterSize > 0) {
         // The instruction is in the current active cluster
-        if (CurrentClusterVector->GetBit(inst->GetNum())) {
+        if (ActiveClusterGroup == inst->GetClusterGroup()) {
           // Case 1: Currently clustering and this current instruction is part
           // of the cluster
           CurrentClusterSize++;
@@ -486,19 +486,18 @@ void BBWithSpill::UpdateSpillInfoForSchdul_(SchedInstruction *inst,
           if (LastCluster) {
             PastClustersList.push_back(std::move(LastCluster));
             LastCluster = llvm::make_unique<PastClusters>(
-                CurrentClusterVector, CurrentClusterSize, inst->GetNum());
+                ActiveClusterGroup, CurrentClusterSize, inst->GetNum());
           } else 
             LastCluster = llvm::make_unique<PastClusters>(
-                CurrentClusterVector, CurrentClusterSize, inst->GetNum());
-          CurrentClusterVector.reset();
-          CurrentClusterVector = inst->GetClusterVector();
+                ActiveClusterGroup, CurrentClusterSize, inst->GetNum());
+
+          ActiveClusterGroup = inst->GetClusterGroup();
           CurrentClusterSize = 1;
         }
       } else {
         // Case 3: Not currently clustering. Initialize clustering
-        CurrentClusterVector.reset();                    // Clear cluster vector
-        CurrentClusterVector = inst->GetClusterVector(); // Set active cluster
-        CurrentClusterSize = 1;                          // Current size is 1
+        ActiveClusterGroup = inst->GetClusterGroup();
+        CurrentClusterSize = 1;
       }
     } else if (CurrentClusterSize > 1) {
       Logger::Info("Inst %d pushing cluster size %d onto the stack",
@@ -511,11 +510,11 @@ void BBWithSpill::UpdateSpillInfoForSchdul_(SchedInstruction *inst,
 
         // Current previous cluster
         LastCluster = llvm::make_unique<PastClusters>(
-            CurrentClusterVector, CurrentClusterSize, inst->GetNum());
+            ActiveClusterGroup, CurrentClusterSize, inst->GetNum());
       } else
         LastCluster = llvm::make_unique<PastClusters>(
-            CurrentClusterVector, CurrentClusterSize, inst->GetNum());
-      CurrentClusterVector.reset(); // Reset active cluster
+            ActiveClusterGroup, CurrentClusterSize, inst->GetNum());
+      ActiveClusterGroup = 0;     // Reset active cluster
       CurrentClusterSize = 0;       // Set cluster size to 0
     }
   }
@@ -731,7 +730,7 @@ void BBWithSpill::UpdateSpillInfoForUnSchdul_(SchedInstruction *inst) {
       // Can/should we use a stack to restore state?
   // 3.) Non-Cluster <- Cluster
       // Simple case, just decrement 1 from cluster size
-      // If cluster size == 0, delete CurrentClusterVector
+      // If cluster size == 0, set ActiveClusterGroup = 0;
   if (isSecondPass && ClusterMemoryOperations) {
     // TODO: Check for different cluster to different cluster
     // backtracking.
@@ -747,14 +746,14 @@ void BBWithSpill::UpdateSpillInfoForUnSchdul_(SchedInstruction *inst) {
       // If there is no more member in the currently active cluster then disable
       // the cluster
       if (CurrentClusterSize == 0) {
-        CurrentClusterVector.reset();
+        ActiveClusterGroup = 0;
 
         // If there was a previously active cluster, check last cluster to see
         // if we need to restore the state
         if (LastCluster) {
           if (LastCluster->InstNum == inst->GetNum()) {
             CurrentClusterSize = LastCluster->ClusterSize;
-            CurrentClusterVector = LastCluster->ClusterVector;
+            ActiveClusterGroup = LastCluster->ClusterGroup;
             LastCluster.reset(); // Release current cluster pointer
 
             // Get previous cluster from vector list
@@ -771,7 +770,7 @@ void BBWithSpill::UpdateSpillInfoForUnSchdul_(SchedInstruction *inst) {
         // this instruction ended the cluster then restore the previous
         // cluster's state
         CurrentClusterSize = LastCluster->ClusterSize;
-        CurrentClusterVector = LastCluster->ClusterVector;
+        ActiveClusterGroup = LastCluster->ClusterGroup;
         LastCluster.reset(); // Release current cluster pointer
 
         // Get previous cluster from vector list

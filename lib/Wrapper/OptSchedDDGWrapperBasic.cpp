@@ -75,6 +75,8 @@ OptSchedDDGWrapperBasic::OptSchedDDGWrapperBasic(
   if (ShouldFilterRegisterTypes)
     RTFilter = createLLVMRegTypeFilter(MM, DAG->TRI,
                                        DAG->getRegPressure().MaxSetPressure);
+
+  ClusterCount = 0;
 }
 
 void OptSchedDDGWrapperBasic::convertSUnits() {
@@ -380,8 +382,6 @@ inline void OptSchedDDGWrapperBasic::setupRoot() {
   int RootNum = DAG->SUnits.size();
   root_ = CreateNode_(RootNum, "artificial",
                       MM->GetInstTypeByName("artificial"), "__optsched_entry",
-                      // mayLoad = false;
-                      // mayStore = false;
                       RootNum, // nodeID
                       RootNum, // fileSchedOrder
                       RootNum, // fileSchedCycle
@@ -400,8 +400,6 @@ inline void OptSchedDDGWrapperBasic::setupLeaf() {
   int LeafNum = DAG->SUnits.size() + 1;
   CreateNode_(LeafNum, "artificial", MM->GetInstTypeByName("artificial"),
               "__optsched_exit",
-              // mayLoad = false;
-              // mayStore = false;
               LeafNum, // nodeID
               LeafNum, // fileSchedOrder
               LeafNum, // fileSchedCycle
@@ -475,8 +473,6 @@ void OptSchedDDGWrapperBasic::convertSUnit(const SUnit &SU) {
   }
 
   CreateNode_(SU.NodeNum, InstName.c_str(), InstType, InstName.c_str(),
-              // MI->mayLoad()
-              // MI->mayStore()
               SU.NodeNum, // nodeID
               SU.NodeNum, // fileSchedOrder
               SU.NodeNum, // fileSchedCycle
@@ -515,8 +511,9 @@ void OptSchedDDGWrapperBasic::countBoundaryLiveness(
 void OptSchedDDGWrapperBasic::clusterNeighboringMemOps_(
     ArrayRef<const SUnit *> MemOps) {
   SmallVector<MemOpInfo, 32> MemOpRecords;
+  bool ClusterPossible = false;
+
   LLVM_DEBUG(dbgs() << "Processing possible clusters\n");
-  
   for (const SUnit *SU : MemOps) {
     LLVM_DEBUG(dbgs() << "  " << SU->NodeNum << " is in the chain.\n");
     MachineOperand *BaseOp;
@@ -530,8 +527,6 @@ void OptSchedDDGWrapperBasic::clusterNeighboringMemOps_(
     return;
   }
 
-  auto ClusterVector = std::make_shared<BitVector>(DAG->SUnits.size());
-
   llvm::sort(MemOpRecords);
   unsigned ClusterLength = 1;
   for (unsigned Idx = 0, End = MemOpRecords.size(); Idx < (End - 1); ++Idx) {
@@ -542,11 +537,19 @@ void OptSchedDDGWrapperBasic::clusterNeighboringMemOps_(
                                  *MemOpRecords[Idx + 1].BaseOp,
                                  ClusterLength)) {
       LLVM_DEBUG(dbgs() << "    Cluster possible at SU(" << SUa->NodeNum << ")- SU(" << SUb->NodeNum << ")\n");
+      
+      // If clustering was possible then increase the cluster count. This only
+      // happens once every cluster
+      if (!ClusterPossible) {
+        ClusterPossible = true;
+        ClusterCount++;
+      }
+
+      // Tell the instructions what cluster number they are in
+      insts_[SUa->NodeNum]->SetMayCluster(ClusterCount);
+      insts_[SUb->NodeNum]->SetMayCluster(ClusterCount);
+
       ++ClusterLength;
-      ClusterVector->SetBit(SUa->NodeNum);
-      ClusterVector->SetBit(SUb->NodeNum);
-      insts_[SUa->NodeNum]->SetMayCluster(ClusterVector);
-      insts_[SUb->NodeNum]->SetMayCluster(ClusterVector);
     } else
       ClusterLength = 1;
   }
