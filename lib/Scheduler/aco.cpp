@@ -5,6 +5,7 @@
 #include "opt-sched/Scheduler/ready_list.h"
 #include "opt-sched/Scheduler/register.h"
 #include "opt-sched/Scheduler/sched_region.h"
+#include "llvm/ADT/STLExtras.h"
 #include <iomanip>
 #include <iostream>
 #include <sstream>
@@ -94,7 +95,7 @@ double ACOScheduler::Score(SchedInstruction *from, Choice choice) {
 }
 
 SchedInstruction *
-ACOScheduler::SelectInstruction(const llvm::SmallVectorImpl<Choice> &ready,
+ACOScheduler::SelectInstruction(const llvm::ArrayRef<Choice> &ready,
                                 SchedInstruction *lastInst) {
 #if USE_ACS
   double choose_best_chance;
@@ -108,7 +109,7 @@ ACOScheduler::SelectInstruction(const llvm::SmallVectorImpl<Choice> &ready,
       std::cerr << "choose_best, use fixed bias: " << use_fixed_bias << "\n";
     pheremone_t max = -1;
     Choice maxChoice;
-    for (auto choice : ready) {
+    for (auto &choice : ready) {
       if (Score(lastInst, choice) > max) {
         max = Score(lastInst, choice);
         maxChoice = choice;
@@ -161,8 +162,8 @@ ACOScheduler::SelectInstruction(const llvm::SmallVectorImpl<Choice> &ready,
 
 std::unique_ptr<InstSchedule> ACOScheduler::FindOneSchedule() {
   SchedInstruction *lastInst = NULL;
-  std::unique_ptr<InstSchedule> schedule(
-      new InstSchedule(machMdl_, dataDepGraph_, true));
+  std::unique_ptr<InstSchedule> schedule =
+    llvm::make_unique<InstSchedule>(machMdl_, dataDepGraph_, true);
   InstCount maxPriority = rdyLst_->MaxPriority();
   if (maxPriority == 0)
     maxPriority = 1; // divide by 0 is bad
@@ -433,8 +434,8 @@ void PrintSchedule(InstSchedule *schedule) {
 
 void ACOScheduler::setInitialSched(InstSchedule *Sched) {
   if (Sched) {
-    InitialSchedule = std::unique_ptr<InstSchedule>(
-        new InstSchedule(machMdl_, dataDepGraph_, VrfySched_));
+    InitialSchedule =
+      llvm::make_unique<InstSchedule>(machMdl_, dataDepGraph_, VrfySched_);
     InitialSchedule->Copy(Sched);
   }
 }
