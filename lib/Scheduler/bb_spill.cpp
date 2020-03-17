@@ -77,6 +77,7 @@ BBWithSpill::BBWithSpill(const OptSchedTarget *OST_, DataDepGraph *dataDepGraph,
   PastClustersList.clear();
   LastCluster = nullptr;
 
+  Config &schedIni = SchedulerOptions::getInstance();
   ClusterMemoryOperations = schedIni.GetBool("CLUSTER_MEMORY_OPS");
 }
 /****************************************************************************/
