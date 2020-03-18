@@ -431,7 +431,7 @@ public:
   bool GetMayCluster() { return MayCluster; }
   int GetClusterGroup() { return ClusterGroup; }
   static int GetActiveCluster() { return ActiveCluster; }
-  static int SetActiveCluster(int Active) { ActiveCluster = Active; }
+  static void SetActiveCluster(int Active) { ActiveCluster = Active; }
   friend class SchedRange;
 
 protected:

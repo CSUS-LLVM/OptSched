@@ -4,6 +4,8 @@
 
 using namespace llvm::opt_sched;
 
+int SchedInstruction::ActiveCluster = 0;
+
 SchedInstruction::SchedInstruction(InstCount num, const string &name,
                                    InstType instType, const string &opCode,
                                    InstCount maxInstCnt, int nodeID,
@@ -16,7 +18,6 @@ SchedInstruction::SchedInstruction(InstCount num, const string &name,
   opCode_ = opCode;
   instType_ = instType;
   ClusterGroup = 0;
-  ActiveCluster = 0;
   MayCluster = false; 
 
   frwrdLwrBound_ = INVALID_VALUE;
