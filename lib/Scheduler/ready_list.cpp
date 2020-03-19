@@ -68,6 +68,13 @@ ReadyList::ReadyList(DataDepGraph *dataDepGraph, SchedPriorities prirts) {
       ltncySumBits_ = Utilities::clcltBitsNeededToHoldNum(maxLtncySum_);
       totKeyBits += ltncySumBits_;
       break;
+
+    case LSH_MEM:
+      Logger::Info("MEM heuristic detected");
+      break;
+
+    default:
+      break;
     } // end switch
   }   // end for
 
@@ -110,6 +117,13 @@ ReadyList::ReadyList(DataDepGraph *dataDepGraph, SchedPriorities prirts) {
     case LSH_LS:
       AddPrirtyToKey_(maxPriority_, keySize, ltncySumBits_, maxLtncySum_,
                       maxLtncySum_);
+      break;
+
+    case LSH_MEM:
+      Logger::Info("MEM heuristic detected");
+      break;
+
+    default:
       break;
     }
   }
@@ -189,6 +203,12 @@ unsigned long ReadyList::CmputKey_(SchedInstruction *inst, bool isUpdate,
     case LSH_LS:
       AddPrirtyToKey_(key, keySize, ltncySumBits_, inst->GetLtncySum(),
                       maxLtncySum_);
+      break;
+
+    case LSH_MEM:
+      break;
+
+    default:
       break;
     }
   }

@@ -492,32 +492,43 @@ void BBWithSpill::UpdateSpillInfoForSchdul_(SchedInstruction *inst,
                 ActiveClusterGroup, CurrentClusterSize, inst->GetNum());
 
           ActiveClusterGroup = inst->GetClusterGroup();
+          inst->SetActiveCluster(ActiveClusterGroup);
           CurrentClusterSize = 1;
         }
       } else {
         // Case 3: Not currently clustering. Initialize clustering
         ActiveClusterGroup = inst->GetClusterGroup();
+        inst->SetActiveCluster(ActiveClusterGroup);
         CurrentClusterSize = 1;
       }
-    } else if (CurrentClusterSize > 1) {
-      Logger::Info("Inst %d pushing cluster size %d onto the stack",
-                   inst->GetNum(), CurrentClusterSize);
+    } else if (CurrentClusterSize > 0) {
       // Case 2: Exiting out of an active cluster
-      // Save the cluster to restore when backtracking.
-      if (LastCluster) {
-        // List of previous clusters
-        PastClustersList.push_back(std::move(LastCluster));
+      // Only save the state if we cluster 2 or more instructions together
+      // already
+      if (CurrentClusterSize > 1) {
+        Logger::Info("Inst %d pushing cluster size %d onto the stack",
+                     inst->GetNum(), CurrentClusterSize);
+        
+        // Save the cluster to restore when backtracking.
+        if (LastCluster) {
+          // Save previous current cluster in a vector
+          PastClustersList.push_back(std::move(LastCluster));
 
-        // Current previous cluster
-        LastCluster = llvm::make_unique<PastClusters>(
-            ActiveClusterGroup, CurrentClusterSize, inst->GetNum());
-      } else
-        LastCluster = llvm::make_unique<PastClusters>(
-            ActiveClusterGroup, CurrentClusterSize, inst->GetNum());
+          // Current cluster
+          LastCluster = llvm::make_unique<PastClusters>(
+              ActiveClusterGroup, CurrentClusterSize, inst->GetNum());
+        } else
+          // This is the first cluster that we are saving
+          LastCluster = llvm::make_unique<PastClusters>(
+              ActiveClusterGroup, CurrentClusterSize, inst->GetNum());
+      }
+
       ActiveClusterGroup = 0;     // Reset active cluster
+      inst->SetActiveCluster(0);
       CurrentClusterSize = 0;       // Set cluster size to 0
     }
   }
+
   // Potential Issues:
   // 1. Keeping track of the average clustering size when we aren't done
   // scheduling.
@@ -747,6 +758,7 @@ void BBWithSpill::UpdateSpillInfoForUnSchdul_(SchedInstruction *inst) {
       // the cluster
       if (CurrentClusterSize == 0) {
         ActiveClusterGroup = 0;
+        inst->SetActiveCluster(0);
 
         // If there was a previously active cluster, check last cluster to see
         // if we need to restore the state
@@ -754,6 +766,7 @@ void BBWithSpill::UpdateSpillInfoForUnSchdul_(SchedInstruction *inst) {
           if (LastCluster->InstNum == inst->GetNum()) {
             CurrentClusterSize = LastCluster->ClusterSize;
             ActiveClusterGroup = LastCluster->ClusterGroup;
+            inst->SetActiveCluster(ActiveClusterGroup);
             LastCluster.reset(); // Release current cluster pointer
 
             // Get previous cluster from vector list
@@ -771,6 +784,7 @@ void BBWithSpill::UpdateSpillInfoForUnSchdul_(SchedInstruction *inst) {
         // cluster's state
         CurrentClusterSize = LastCluster->ClusterSize;
         ActiveClusterGroup = LastCluster->ClusterGroup;
+        inst->SetActiveCluster(ActiveClusterGroup);
         LastCluster.reset(); // Release current cluster pointer
 
         // Get previous cluster from vector list

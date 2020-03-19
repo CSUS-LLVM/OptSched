@@ -291,7 +291,12 @@ public:
 
   RegisterFile *getRegFiles() { return RegFiles.get(); }
 
+  int getMaxClusterCount() { return MaxClusterCount; }
+  void setMaxClusterCount(int Max) { MaxClusterCount = Max; }
+
 protected:
+  int MaxClusterCount;
+
   // TODO(max): Get rid of this.
   // Number of basic blocks
   int32_t bscBlkCnt_;

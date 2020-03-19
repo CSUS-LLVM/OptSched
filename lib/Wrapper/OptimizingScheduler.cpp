@@ -47,11 +47,9 @@ constexpr struct {
   const char* Name;
   LISTSCHED_HEURISTIC HID;
 } HeuristicNames[] = {
-    {"CP", LSH_CP},   {"LUC", LSH_LUC},
-    {"UC", LSH_UC},   {"NID", LSH_NID},
-    {"CPR", LSH_CPR}, {"ISO", LSH_ISO},
-    {"SC", LSH_SC},   {"LS", LSH_LS},
-    {"LLVM", LSH_LLVM}
+    {"CP", LSH_CP},     {"LUC", LSH_LUC}, {"UC", LSH_UC}, {"NID", LSH_NID},
+    {"CPR", LSH_CPR},   {"ISO", LSH_ISO}, {"SC", LSH_SC}, {"LS", LSH_LS},
+    {"LLVM", LSH_LLVM}, {"MEM", LSH_MEM}
 };
 
 // Default path to the the configuration directory for opt-sched.

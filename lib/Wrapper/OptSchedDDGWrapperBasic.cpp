@@ -543,6 +543,8 @@ void OptSchedDDGWrapperBasic::clusterNeighboringMemOps_(
       if (!ClusterPossible) {
         ClusterPossible = true;
         ClusterCount++;
+        setMaxClusterCount(ClusterCount);
+        Logger::Info("Setting max cluster count to %d", ClusterCount);
       }
 
       // Tell the instructions what cluster number they are in
