@@ -556,6 +556,8 @@ void ScheduleDAGOptSched::loadOptSchedConfig() {
   LowerBoundAlgorithm = parseLowerBoundAlgorithm();
   HeuristicPriorities = parseHeuristic(schedIni.GetString("HEURISTIC"));
   EnumPriorities = parseHeuristic(schedIni.GetString("ENUM_HEURISTIC"));
+  SecondPassPriorities =
+      parseHeuristic(schedIni.GetString("SECOND_PASS_HEURISTIC"))
   SecondPassEnumPriorities =
       parseHeuristic(schedIni.GetString("SECOND_PASS_ENUM_HEURISTIC"));
   SCF = parseSpillCostFunc();
@@ -818,6 +820,7 @@ void ScheduleDAGOptSched::scheduleOptSchedBalanced() {
 
   // Set the heuristic for the enumerator in the second pass.
   EnumPriorities = SecondPassEnumPriorities;
+  HeuristicPriorities = SecondPassPriorities;
 
   // Force the input to the balanced scheduler to be the sequential order of the
   // (hopefully) good register pressure schedule. We don’t want the list

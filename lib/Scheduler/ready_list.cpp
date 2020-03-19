@@ -70,7 +70,8 @@ ReadyList::ReadyList(DataDepGraph *dataDepGraph, SchedPriorities prirts) {
       break;
 
     case LSH_MEM:
-      Logger::Info("MEM heuristic detected");
+      ClusterBit = Utilities::clcltBitsNeededToHoldNum(1);
+      totKeyBits += ClusterBit
       break;
 
     default:
@@ -120,7 +121,7 @@ ReadyList::ReadyList(DataDepGraph *dataDepGraph, SchedPriorities prirts) {
       break;
 
     case LSH_MEM:
-      Logger::Info("MEM heuristic detected");
+      AddPrirtyToKey_(maxPriority_, keySize, ClusterBit, 1, 1);
       break;
 
     default:
@@ -206,6 +207,10 @@ unsigned long ReadyList::CmputKey_(SchedInstruction *inst, bool isUpdate,
       break;
 
     case LSH_MEM:
+      unsigned long ValueForKey =
+          inst->GetClusterGroup() == SchedInstruction::GetActiveCluster() ? 1
+                                                                          : 0;
+      AddPrirtyToKey_(key, keySize, ClusterBit, ValueForKey, 1);
       break;
 
     default:

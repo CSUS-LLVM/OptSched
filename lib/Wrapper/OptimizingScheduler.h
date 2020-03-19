@@ -158,6 +158,8 @@ protected:
   // The heuristic used for the enumerator.
   SchedPriorities EnumPriorities;
 
+  SchedPriorities SecondPassPriorities;
+
   // The heuristic used for the second pass enumerator in the two-pass scheduling approach.
   SchedPriorities SecondPassEnumPriorities;
 

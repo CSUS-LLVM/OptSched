@@ -115,6 +115,7 @@ private:
   int16_t ltncySumBits_;
   int16_t nodeID_Bits_;
   int16_t inptSchedOrderBits_;
+  int16_t ClusterBit;
 
   // Constructs the priority-list key based on the schemes listed in prirts_.
   unsigned long CmputKey_(SchedInstruction *inst, bool isUpdate, bool &changed);

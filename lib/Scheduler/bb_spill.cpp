@@ -330,6 +330,7 @@ InstCount BBWithSpill::CmputCostLwrBound() {
 void BBWithSpill::InitForSchdulng() {
   InitForCostCmputtn_();
 
+  SchedInstruction::SetActiveCluster(0);
   CurrentClusterSize = 0;
   ActiveClusterGroup = 0;
   ClusterInitialCost = 1000000;
