@@ -503,25 +503,21 @@ void BBWithSpill::UpdateSpillInfoForSchdul_(SchedInstruction *inst,
       }
     } else if (CurrentClusterSize > 0) {
       // Case 2: Exiting out of an active cluster
-      // Only save the state if we cluster 2 or more instructions together
-      // already
-      if (CurrentClusterSize > 1) {
-        Logger::Info("Inst %d pushing cluster size %d onto the stack",
-                     inst->GetNum(), CurrentClusterSize);
+      Logger::Info("Inst %d pushing cluster size %d onto the stack",
+                    inst->GetNum(), CurrentClusterSize);
         
-        // Save the cluster to restore when backtracking.
-        if (LastCluster) {
-          // Save previous current cluster in a vector
-          PastClustersList.push_back(std::move(LastCluster));
+      // Save the cluster to restore when backtracking.
+      if (LastCluster) {
+        // Save previous current cluster in a vector
+        PastClustersList.push_back(std::move(LastCluster));
 
-          // Current cluster
-          LastCluster = llvm::make_unique<PastClusters>(
-              ActiveClusterGroup, CurrentClusterSize, inst->GetNum());
-        } else
-          // This is the first cluster that we are saving
-          LastCluster = llvm::make_unique<PastClusters>(
-              ActiveClusterGroup, CurrentClusterSize, inst->GetNum());
-      }
+        // Current cluster
+        LastCluster = llvm::make_unique<PastClusters>(
+            ActiveClusterGroup, CurrentClusterSize, inst->GetNum());
+      } else
+        // This is the first cluster that we are saving
+        LastCluster = llvm::make_unique<PastClusters>(
+            ActiveClusterGroup, CurrentClusterSize, inst->GetNum());
 
       ActiveClusterGroup = 0;     // Reset active cluster
       inst->SetActiveCluster(0);
