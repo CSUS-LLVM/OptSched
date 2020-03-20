@@ -17,6 +17,8 @@ cmake_minimum_required(VERSION 3.7)
 
 project(OptSched-SuperBuild)
 
+option(OPTSCHEDSUPER_FLANG "Check out and build flang." OFF)
+
 set(OPTSCHEDSUPER_LLVM_INSTALL_PREFIX   ${CMAKE_CURRENT_BINARY_DIR}/llvm-install      CACHE PATH   "The directory to install llvm")
 set(OPTSCHEDSUPER_LLVM_GIT_REPO         https://github.com/CSUS-LLVM/llvm-project.git CACHE STRING "The git repository to clone for LLVM")
 set(OPTSCHEDSUPER_LLVM_GIT_TAG          optsched                                      CACHE STRING "The tag to checkout within the LLVM git repository")
@@ -58,10 +60,12 @@ ExternalProject_Add(llvm
   SOURCE_SUBDIR ${OPTSCHEDSUPER_LLVM_SOURCE_SUBDIR}
   INSTALL_DIR ${OPTSCHEDSUPER_LLVM_INSTALL_PREFIX}
   CMAKE_ARGS
+    -DCMAKE_CXX_COMPILER=${CMAKE_CXX_COMPILER}
+    -DCMAKE_C_COMPILER=${CMAKE_C_COMPILER}
+    -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}
     -DCMAKE_INSTALL_PREFIX=<INSTALL_DIR>
     -DLLVM_PARALLEL_LINK_JOBS=${LLVM_PARALLEL_LINK_JOBS}
     -DLLVM_ENABLE_PROJECTS='clang'
-    -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}
     -DLLVM_TARGETS_TO_BUILD=X86
     -DLLVM_BUILD_TOOLS=ON
     -DLLVM_INCLUDE_TESTS=ON
