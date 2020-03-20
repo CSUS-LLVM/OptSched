@@ -557,7 +557,7 @@ void ScheduleDAGOptSched::loadOptSchedConfig() {
   HeuristicPriorities = parseHeuristic(schedIni.GetString("HEURISTIC"));
   EnumPriorities = parseHeuristic(schedIni.GetString("ENUM_HEURISTIC"));
   SecondPassPriorities =
-      parseHeuristic(schedIni.GetString("SECOND_PASS_HEURISTIC"))
+      parseHeuristic(schedIni.GetString("SECOND_PASS_HEURISTIC"));
   SecondPassEnumPriorities =
       parseHeuristic(schedIni.GetString("SECOND_PASS_ENUM_HEURISTIC"));
   SCF = parseSpillCostFunc();

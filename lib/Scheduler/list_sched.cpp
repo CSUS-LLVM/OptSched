@@ -40,6 +40,8 @@ FUNC_RESULT ListScheduler::FindSchedule(InstSchedule *sched, SchedRegion *rgn) {
   while (!IsSchedComplete_()) {
     UpdtRdyLst_(crntCycleNum_, crntSlotNum_);
     rdyLst_->ResetIterator();
+    rdyLst_->Print(Logger::GetLogStream());
+    rdyLst_->ResetIterator();
 
     iterCnt++;
     rdyLstSize = rdyLst_->GetInstCnt();

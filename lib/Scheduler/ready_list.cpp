@@ -71,7 +71,7 @@ ReadyList::ReadyList(DataDepGraph *dataDepGraph, SchedPriorities prirts) {
 
     case LSH_MEM:
       ClusterBit = Utilities::clcltBitsNeededToHoldNum(1);
-      totKeyBits += ClusterBit
+      totKeyBits += ClusterBit;
       break;
 
     default:
@@ -158,6 +158,7 @@ unsigned long ReadyList::CmputKey_(SchedInstruction *inst, bool isUpdate,
   int16_t keySize = 0;
   int i;
   int16_t oldLastUseCnt, newLastUseCnt;
+  unsigned long ValueForKey;
   changed = true;
   if (isUpdate)
     changed = false;
@@ -207,7 +208,7 @@ unsigned long ReadyList::CmputKey_(SchedInstruction *inst, bool isUpdate,
       break;
 
     case LSH_MEM:
-      unsigned long ValueForKey =
+      ValueForKey =
           inst->GetClusterGroup() == SchedInstruction::GetActiveCluster() ? 1
                                                                           : 0;
       AddPrirtyToKey_(key, keySize, ClusterBit, ValueForKey, 1);
@@ -232,9 +233,9 @@ void ReadyList::AddLatestSubLists(LinkedList<SchedInstruction> *lst1,
 
 void ReadyList::Print(std::ostream &out) {
   out << "Ready List: ";
-  for (const auto *crntInst = prirtyLst_->GetFrstElmnt(); crntInst != NULL;
+  for (auto *crntInst = prirtyLst_->GetFrstElmnt(); crntInst != NULL;
        crntInst = prirtyLst_->GetNxtElmnt()) {
-    out << " " << crntInst->GetNum();
+    out << " " << crntInst->GetNum() << "(" << crntInst->GetClusterGroup() << ")";
   }
   out << '\n';
 

@@ -971,13 +971,13 @@ bool Enumerator::FindNxtFsblBrnch_(EnumTreeNode *&newNode) {
   assert(crntNode_->IsLeaf() || (brnchCnt != rdyInstCnt) ? 1 : rdyInstCnt);
   // brnchCnt == rdyInstCnt == 0 ? 1 : rdyInstCnt);
 
-#ifdef IS_DEBUG_READY_LIST
-  Logger::Info("Ready List Size is %d", rdyInstCnt);
+//#ifdef IS_DEBUG_READY_LIST
+//  Logger::Info("Ready List Size is %d", rdyInstCnt);
   // Warning! That will reset the instruction iterator!
-  // rdyLst_->Print(Logger::GetLogStream());
+   rdyLst_->Print(Logger::GetLogStream());
 
-  stats::maxReadyListSize.SetMax(rdyInstCnt);
-#endif
+//  stats::maxReadyListSize.SetMax(rdyInstCnt);
+//#endif
 
   if (crntBrnchNum == 0 && SchedForRPOnly_)
     crntNode_->SetFoundInstWithUse(IsUseInRdyLst_());

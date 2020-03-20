@@ -525,7 +525,7 @@ void BBWithSpill::UpdateSpillInfoForSchdul_(SchedInstruction *inst,
       CurrentClusterSize = 0;       // Set cluster size to 0
     }
   }
-
+  Logger::Info("Currently active cluster %d", ActiveClusterGroup);
   // Potential Issues:
   // 1. Keeping track of the average clustering size when we aren't done
   // scheduling.
@@ -794,6 +794,7 @@ void BBWithSpill::UpdateSpillInfoForUnSchdul_(SchedInstruction *inst) {
       }
     }
   }
+  Logger::Info("Currently active cluster %d", ActiveClusterGroup);
 
   defCnt = inst->GetDefs(defs);
   useCnt = inst->GetUses(uses);
