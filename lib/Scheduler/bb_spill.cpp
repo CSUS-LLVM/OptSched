@@ -72,13 +72,19 @@ BBWithSpill::BBWithSpill(const OptSchedTarget *OST_, DataDepGraph *dataDepGraph,
   
   CurrentClusterSize = 0;
   ActiveClusterGroup = 0;
-  ClusteringWeight = 1000;
   ClusterInitialCost = 1000000;
   PastClustersList.clear();
   LastCluster = nullptr;
+  TotalInstructionsInClusters = 0;
 
   Config &schedIni = SchedulerOptions::getInstance();
   ClusterMemoryOperations = schedIni.GetBool("CLUSTER_MEMORY_OPS");
+  ClusteringWeight = schedIni.GetInt("CLUSTER_WEIGHT");
+  MaxClusterBlocks = dataDepGraph_->getMaxClusterCount();
+  CurrentClusterBlocks = MaxClusterBlocks;
+  for (int begin = 1; begin <= MaxClusterBlocks; begin++) {
+    InstructionsScheduledInEachCluster[begin] = 0;
+  }
 }
 /****************************************************************************/
 
@@ -316,6 +322,11 @@ InstCount BBWithSpill::CmputCostLwrBound() {
   InstCount staticLowerBound =
       schedLwrBound_ * schedCostFactor_ + spillCostLwrBound * SCW_;
 
+
+  if (isSecondPass && ClusterMemoryOperations) {
+    staticLowerBound  += MaxClusterBlocks * ClusteringWeight;
+  }
+
 #if defined(IS_DEBUG_STATIC_LOWER_BOUND)
   Logger::Info(
       "DAG %s spillCostLB %d scFactor %d lengthLB %d lenFactor %d staticLB %d",
@@ -336,6 +347,10 @@ void BBWithSpill::InitForSchdulng() {
   ClusterInitialCost = 1000000;
   PastClustersList.clear();
   LastCluster.reset();
+  CurrentClusterBlocks = MaxClusterBlocks;
+  for (int begin = 1; begin <= MaxClusterBlocks; begin++) {
+    InstructionsScheduledInEachCluster[begin] = 0;
+  }
 
   schduldEntryInstCnt_ = 0;
   schduldExitInstCnt_ = 0;
@@ -383,12 +398,12 @@ InstCount BBWithSpill::CmputNormCost_(InstSchedule *sched,
                                       InstCount &execCost, bool trackCnflcts) {
   InstCount cost = CmputCost_(sched, compMode, execCost, trackCnflcts);
 
-  cost -= costLwrBound_;
-  execCost -= costLwrBound_;
-
   // TODO: Implement cost function for clustering
   if (isSecondPass && ClusterMemoryOperations)
-	  cost += ClusterInitialCost; 
+    cost += CurrentClusterBlocks * ClusteringWeight;
+
+  cost -= costLwrBound_;
+  execCost -= costLwrBound_;
 
   sched->SetCost(cost);
   sched->SetExecCost(execCost);
@@ -471,17 +486,11 @@ void BBWithSpill::UpdateSpillInfoForSchdul_(SchedInstruction *inst,
           // Case 1: Currently clustering and this current instruction is part
           // of the cluster
           CurrentClusterSize++;
-          if (CurrentClusterSize > 2) {
-            // Only decrement the cost if we cluster at least 2 operations
-            // together (EXPERIMENTAL FOR NOW)
-            ClusterInitialCost -= ClusteringWeight;
-            Logger::Info("Currently clustering %d instructions together",
-                         CurrentClusterSize);
-          }
+          InstructionsScheduledInEachCluster[ActiveClusterGroup]++; 
         } else {
-          Logger::Info("Inst %d pushing cluster size %d onto the stack due to "
-                       "cluster to cluster op",
-                       inst->GetNum(), CurrentClusterSize);
+          //Logger::Info("Inst %d pushing cluster size %d onto the stack due to "
+            //           "cluster to cluster op",
+            //           inst->GetNum(), CurrentClusterSize);
           // The instruction is in another cluster that is not currently active.
           // Exit out of the currently active cluster into a new one.
           if (LastCluster) {
@@ -491,21 +500,29 @@ void BBWithSpill::UpdateSpillInfoForSchdul_(SchedInstruction *inst,
           } else 
             LastCluster = llvm::make_unique<PastClusters>(
                 ActiveClusterGroup, CurrentClusterSize, inst->GetNum());
+          
+	  // If this cluster did not finish then that means there have to be an extra cluster block to finish all of the instructions
+	  // // in the cluster
+	  if (InstructionsScheduledInEachCluster[ActiveClusterGroup] < dataDepGraph_->getMaxInstructionsInCluster(ActiveClusterGroup)) {
+	    CurrentClusterBlocks++;
+	  }
 
           ActiveClusterGroup = inst->GetClusterGroup();
           inst->SetActiveCluster(ActiveClusterGroup);
           CurrentClusterSize = 1;
+          InstructionsScheduledInEachCluster[ActiveClusterGroup]++;
         }
       } else {
         // Case 3: Not currently clustering. Initialize clustering
         ActiveClusterGroup = inst->GetClusterGroup();
         inst->SetActiveCluster(ActiveClusterGroup);
         CurrentClusterSize = 1;
+        InstructionsScheduledInEachCluster[ActiveClusterGroup]++;
       }
     } else if (CurrentClusterSize > 0) {
       // Case 2: Exiting out of an active cluster
-      Logger::Info("Inst %d pushing cluster size %d onto the stack",
-                    inst->GetNum(), CurrentClusterSize);
+//      Logger::Info("Inst %d pushing cluster size %d onto the stack",
+  //                  inst->GetNum(), CurrentClusterSize);
         
       // Save the cluster to restore when backtracking.
       if (LastCluster) {
@@ -520,12 +537,23 @@ void BBWithSpill::UpdateSpillInfoForSchdul_(SchedInstruction *inst,
         LastCluster = llvm::make_unique<PastClusters>(
             ActiveClusterGroup, CurrentClusterSize, inst->GetNum());
 
+      // If InstrScheduledInEachCluster != Max
+      // blocks++
+
+      // If this cluster did not finish then that means there have to be an extra cluster block to finish all of the instructions
+      // in the cluster
+      if (InstructionsScheduledInEachCluster[ActiveClusterGroup] < dataDepGraph_->getMaxInstructionsInCluster(ActiveClusterGroup)) {
+        CurrentClusterBlocks++;
+      }
+
+      assert(InstructionsScheduledInEachCluster[ActiveClusterGroup] <= dataDepGraph_->getMaxInstructionsInCluster(ActiveClusterGroup));
+
       ActiveClusterGroup = 0;     // Reset active cluster
       inst->SetActiveCluster(0);
       CurrentClusterSize = 0;       // Set cluster size to 0
     }
   }
-  Logger::Info("Currently active cluster %d", ActiveClusterGroup);
+//  Logger::Info("Currently active cluster %d", ActiveClusterGroup);
   // Potential Issues:
   // 1. Keeping track of the average clustering size when we aren't done
   // scheduling.
@@ -744,12 +772,11 @@ void BBWithSpill::UpdateSpillInfoForUnSchdul_(SchedInstruction *inst) {
     // backtracking.
     if (inst->GetMayCluster()) {
       // Case 1 and 3
-      if (CurrentClusterSize > 2) {
-        ClusterInitialCost += ClusteringWeight; // Re-add the cost
-      }
       CurrentClusterSize--;
-      Logger::Info("Undoing an instruction from the cluster. Current size: %d",
-                   CurrentClusterSize);
+      InstructionsScheduledInEachCluster[ActiveClusterGroup]--;
+      assert(InstructionsScheduledInEachCluster[ActiveClusterGroup] >= 0);
+      //Logger::Info("Undoing an instruction from the cluster. Current size: %d",
+        //           CurrentClusterSize);
 
       // If there is no more member in the currently active cluster then disable
       // the cluster
@@ -771,6 +798,10 @@ void BBWithSpill::UpdateSpillInfoForUnSchdul_(SchedInstruction *inst) {
               LastCluster = std::move(PastClustersList.back());
               PastClustersList.pop_back();
             }
+	    if (InstructionsScheduledInEachCluster[ActiveClusterGroup] != dataDepGraph_->getMaxInstructionsInCluster(ActiveClusterGroup)) {
+ 	      CurrentClusterBlocks--;
+	      assert(CurrentClusterBlocks >= MaxClusterBlocks);
+	    }
           }
         }
       }
@@ -789,12 +820,17 @@ void BBWithSpill::UpdateSpillInfoForUnSchdul_(SchedInstruction *inst) {
           LastCluster = std::move(PastClustersList.back());
           PastClustersList.pop_back();
         }
-        Logger::Info("Inst %d popping cluster size %d off the stack",
-                     inst->GetNum(), CurrentClusterSize);
+        //Logger::Info("Inst %d popping cluster size %d off the stacks",
+          //           inst->GetNum(), CurrentClusterSize);
+
+       if (InstructionsScheduledInEachCluster[ActiveClusterGroup] != dataDepGraph_->getMaxInstructionsInCluster(ActiveClusterGroup)) {
+         CurrentClusterBlocks--;
+         assert(CurrentClusterBlocks >= MaxClusterBlocks);
+       }
       }
     }
   }
-  Logger::Info("Currently active cluster %d", ActiveClusterGroup);
+//  Logger::Info("Currently active cluster %d", ActiveClusterGroup);
 
   defCnt = inst->GetDefs(defs);
   useCnt = inst->GetUses(uses);
@@ -1095,12 +1131,12 @@ bool BBWithSpill::ChkCostFsblty(InstCount trgtLngth, EnumTreeNode *node) {
   } else {
     crntCost = crntSpillCost_ * SCW_ + trgtLngth * schedCostFactor_;
   }
-  crntCost -= costLwrBound_;
-  dynmcCostLwrBound = crntCost;
-
   // TODO: Implement cost function for clustering
   if (isSecondPass && ClusterMemoryOperations)
-    crntCost += ClusterInitialCost; 
+    crntCost += CurrentClusterBlocks * ClusteringWeight;
+
+  crntCost -= costLwrBound_;
+  dynmcCostLwrBound = crntCost;
 
   // assert(cost >= 0);
   assert(dynmcCostLwrBound >= 0);

@@ -379,6 +379,16 @@ void ScheduleDAGOptSched::schedule() {
   DDG->convertSUnits();
   DDG->convertRegFiles();
   DDG->findPossibleClusters();
+  if (SecondPass) {
+    auto DDG2 = static_cast<DataDepGraph *>(DDG.get());
+    int end = DDG2->getMaxClusterCount();
+    if (end > 0) {
+      Logger::Info("Total clusters in region: %d", end);
+      for (int begin = 1; begin <= end; begin++) {
+        Logger::Info("Cluster %d has total instructions %d", begin, DDG2->getMaxInstructionsInCluster(begin));
+      }
+    }
+  }
 
   auto *BDDG = static_cast<OptSchedDDGWrapperBasic *>(DDG.get());
   addGraphTransformations(BDDG);

@@ -13,6 +13,7 @@ Last Update:  Apr. 2011
 #include "opt-sched/Scheduler/OptSchedTarget.h"
 #include "opt-sched/Scheduler/defines.h"
 #include "opt-sched/Scheduler/sched_region.h"
+#include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/SmallVector.h"
 #include <map>
 #include <memory>
@@ -38,6 +39,11 @@ private:
   /// Current cluster size
   unsigned int CurrentClusterSize; 
 
+  MapVector<int, int> InstructionsScheduledInEachCluster;
+
+  int MaxClusterBlocks;
+  int CurrentClusterBlocks;
+
   /// Current active cluster group
   int ActiveClusterGroup;
 
@@ -49,6 +55,7 @@ private:
   /// Experimental variables and values for cost adjustment
   int ClusteringWeight;
   int ClusterInitialCost;
+  int TotalInstructionsInClusters;
 
   /// Data struct to contain information about the previous clusters
   struct PastClusters {
