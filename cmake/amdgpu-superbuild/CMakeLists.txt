@@ -42,32 +42,26 @@ message(STATUS "Found sed: ${SED_COMMAND}")
 
 include(ExternalProject)
 
-function(add_variable OUT_LIST NAME)
-  set(var "${${OUT_LIST}}")
+# add_cache_variables(<OUT> <VARS>...)
+# Compute a cache variable argument for each VARS, adding them to OUT.
+function(add_cache_variables OUT_LIST)
+  set(result "${${OUT_LIST}}")
 
-  if(DEFINED ${NAME})
-    get_property(type CACHE ${NAME} PROPERTY TYPE)
-    if(NOT type)
-      set(type UNINITIALIZED)
+  foreach(NAME IN LISTS ARGN)
+    if(DEFINED ${NAME})
+      get_property(type CACHE ${NAME} PROPERTY TYPE)
+      if(NOT type)
+        set(type UNINITIALIZED)
+      endif()
+      list(APPEND result -D${NAME}:${type}=${${NAME}})
     endif()
-    list(APPEND var -D${NAME}:${type}=${${NAME}})
-  endif()
-
-  set(${OUT_LIST} "${var}" PARENT_SCOPE)
-endfunction()
-
-function(add_variables OUT_LIST)
-  set(list)
-
-  foreach(var IN LISTS ARGN)
-    add_variable(list ${var})
   endforeach()
 
-  set(${OUT_LIST} "${list}" PARENT_SCOPE)
+  set(${OUT_LIST} "${result}" PARENT_SCOPE)
 endfunction()
 
 set(cache_default_args)
-add_variables(cache_default_args
+add_cache_variables(cache_default_args
   CMAKE_CXX_COMPILER
   CMAKE_C_COMPILER
   CMAKE_CXX_COMPILER_LAUNCHER
@@ -82,9 +76,13 @@ ExternalProject_Add(ROCm
                     && ${REPO_COMMAND} init -u https://github.com/RadeonOpenCompute/ROCm-OpenCL-Runtime.git
                       -b roc-2.4.x -m opencl.xml
   PATCH_COMMAND ${REPO_COMMAND} sync
+        COMMAND ${REPO_COMMAND} forall -vc "git reset --hard"
         COMMAND # Remove the line "local:".
                 ${SED_COMMAND} -i "/local:/d" <SOURCE_DIR>/opencl/api/opencl/amdocl/amdocl.map
         COMMAND cd <SOURCE_DIR>/opencl/compiler/driver && git apply ${PATCH_DIR}/load-plugins.patch
+        COMMAND # Remove the EXCLUDE_FROM_ALL from add_subdirectory(compiler/llvm)
+                ${SED_COMMAND} -i "s/add_subdirectory(compiler\\/llvm EXCLUDE_FROM_ALL)/add_subdirectory(compiler\\/llvm)/g"
+                <SOURCE_DIR>/opencl/CMakeLists.txt
   SOURCE_SUBDIR opencl
   INSTALL_DIR ${CMAKE_INSTALL_PREFIX}
   CMAKE_ARGS
@@ -95,7 +93,9 @@ ExternalProject_Add(ROCm
     -DLLVM_BUILD_TOOLS=ON
     -DLLVM_INCLUDE_TESTS=ON
     -DCLANG_ENABLE_STATIC_ANALYZER=ON
-    "-DOPTSCHED_EXTRA_LINK_LIBRARIES=<BINARY_DIR>/lib/libamdocl64.so"
+    -DOPTSCHED_EXTRA_LINK_LIBRARIES=<BINARY_DIR>/lib/libamdocl64.so
+    -DLLVM_EXTERNAL_PROJECTS=OptSched
+    -DLLVM_EXTERNAL_OPTSCHED_SOURCE_DIR=${ROOT_DIR}
   CMAKE_CACHE_DEFAULT_ARGS
     ${cache_default_args}
   USES_TERMINAL_CONFIGURE 1
@@ -103,16 +103,6 @@ ExternalProject_Add(ROCm
   USES_TERMINAL_INSTALL 1
   # Don't install anything
   INSTALL_COMMAND ""
-)
-# Add symlink to OptSched inside llvm/projects
-ExternalProject_Add_Step(ROCm optsched_symlink
-  DEPENDEES patch
-  DEPENDERS configure
-  COMMAND
-    ${CMAKE_COMMAND} -E create_symlink
-      ${ROOT_DIR} <SOURCE_DIR>/opencl/compiler/llvm/projects/OptSched
-  BYPRODUCTS <SOURCE_DIR>/opencl/compiler/llvm/projects/OptSched
-  USES_TERMINAL 1
 )
 ExternalProject_Get_Property(ROCm BINARY_DIR)
 
