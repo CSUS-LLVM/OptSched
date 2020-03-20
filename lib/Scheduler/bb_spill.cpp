@@ -342,7 +342,6 @@ void BBWithSpill::InitForSchdulng() {
   SchedInstruction::SetActiveCluster(0);
   CurrentClusterSize = 0;
   ActiveClusterGroup = 0;
-  ClusterInitialCost = 1000000;
   PastClustersList.clear();
   LastCluster.reset();
   CurrentClusterBlocks = MaxClusterBlocks;
