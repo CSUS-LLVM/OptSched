@@ -573,7 +573,7 @@ int OptSchedDDGWrapperBasic::clusterNeighboringMemOps_(
   }
   LLVM_DEBUG(dbgs() << '\n');
 #endif
-  MaxInstructionsInEachClusters.insert(ClusterCount, TotalInstructionsPossible);
+  MaxInstructionsInEachClusters.insert(std::make_pair(ClusterCount, TotalInstructionsPossible));
   return TotalInstructionsPossible;
 }
 
@@ -628,7 +628,7 @@ void OptSchedDDGWrapperBasic::findPossibleClusters() {
     TotalInstructionsPossible += clusterNeighboringMemOps_(SCD);
   }
 
-  setMaxInstructionsInClusters(TotalInstructionsPossible);
+ setMaxInstructionsInAllClusters(TotalInstructionsPossible);
 }
 
 LLVMRegTypeFilter::LLVMRegTypeFilter(

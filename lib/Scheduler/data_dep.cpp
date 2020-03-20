@@ -199,7 +199,7 @@ DataDepGraph::DataDepGraph(MachineModel *machMdl, LATENCY_PRECISION ltncyPrcsn)
   RegFiles = llvm::make_unique<RegisterFile[]>(machMdl_->GetRegTypeCnt());
 
   MaxClusterCount = 0;
-  MaxInstructionsInClusters = 0;
+  MaxInstructionsInAllClusters = 0;
 }
 
 DataDepGraph::~DataDepGraph() {
