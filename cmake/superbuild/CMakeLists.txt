@@ -1,67 +1,61 @@
+# A SuperBuild project for OptSched.
+#
+# Use this as the CMake source directory to run the superbuild.
+#
+# Documentation of configuration args:
+# 
+# In general, see option()s and set(... CACHE ...)s in this CMakeLists.txt and flang.cmake.
+#
+# Some options behave as follows:
+#  - OPTSCHEDSUPER_FLANG: Check out and build flang.
+#  - These options are passed on to llvm (and OptSched) directly from the SuperBuild configuration:
+#      - CMAKE_BUILD_TYPE. Note that the flang build types default to Release, but can be configured.
+#      - LLVM_PARALLEL_LINK_JOBS.
+#  - *_EXTRA_CMAKE_ARGS: Passes these CMake arguments on to the corresponding sub-build.
+#  - The flang builds can be configured to use a custom CMAKE_GENERATOR, separate from the superbuild's generator.
 cmake_minimum_required(VERSION 3.7)
 
 project(OptSched-SuperBuild)
 
-set(OPTSCHEDSUPER_LLVM_INSTALL_PREFIX ${CMAKE_CURRENT_BINARY_DIR}/llvm-install CACHE PATH "The directory to install llvm")
-
-option(OPTSCHEDSUPER_FLANG "Check out and build flang." OFF)
-set(OPTSCHEDSUPER_FLANG_INSTALL_PREFIX ${CMAKE_CURRENT_BINARY_DIR}/flang-install CACHE PATH "The directory to install flang")
-
-set(OPTSCHEDSUPER_FLANG_BUILD_TYPE Release CACHE STRING "The build type for flang")
-set(OPTSCHEDSUPER_FLANG_LLVM_BUILD_TYPE ${OPTSCHEDSUPER_FLANG_BUILD_TYPE} CACHE STRING "The build type for flang-llvm")
-set(OPTSCHEDSUPER_FLANG_DRIVER_BUILD_TYPE ${OPTSCHEDSUPER_FLANG_BUILD_TYPE} CACHE STRING "The build type for flang-driver")
-set(OPTSCHEDSUPER_FLANG_OPENMP_BUILD_TYPE ${OPTSCHEDSUPER_FLANG_BUILD_TYPE} CACHE STRING "The build type for openmp")
-set(OPTSCHEDSUPER_FLANG_LIBPGMATH_BUILD_TYPE ${OPTSCHEDSUPER_FLANG_BUILD_TYPE} CACHE STRING "The build type for libpgmath")
-set(OPTSCHEDSUPER_FLANG_COMPILER_BUILD_TYPE ${OPTSCHEDSUPER_FLANG_BUILD_TYPE} CACHE STRING "The build type for the flang compiler")
-
-set(OPTSCHEDSUPER_FLANG_CMAKE_GENERATOR ${CMAKE_GENERATOR} CACHE STRING "The generator to use to build flang")
-set(OPTSCHEDSUPER_FLANG_LLVM_CMAKE_GENERATOR ${OPTSCHEDSUPER_FLANG_CMAKE_GENERATOR} CACHE STRING "The generator to use to build flang-llvm")
-set(OPTSCHEDSUPER_FLANG_DRIVER_CMAKE_GENERATOR ${OPTSCHEDSUPER_FLANG_CMAKE_GENERATOR} CACHE STRING "The generator to use to build flang-driver")
-set(OPTSCHEDSUPER_FLANG_OPENMP_CMAKE_GENERATOR ${OPTSCHEDSUPER_FLANG_CMAKE_GENERATOR} CACHE STRING "The generator to use to build openmp")
-set(OPTSCHEDSUPER_FLANG_LIBPGMATH_CMAKE_GENERATOR ${OPTSCHEDSUPER_FLANG_CMAKE_GENERATOR} CACHE STRING "The generator to use to build libpgmath")
-set(OPTSCHEDSUPER_FLANG_COMPILER_CMAKE_GENERATOR ${OPTSCHEDSUPER_FLANG_CMAKE_GENERATOR} CACHE STRING "The generator to use to build the flang compiler")
-
-set(OPTSCHEDSUPER_FLANG_LIBPGMATH_GIT_TAG master CACHE STRING "What to git checkout for flang (w.r.t. libpgmath)")
+set(OPTSCHEDSUPER_LLVM_INSTALL_PREFIX   ${CMAKE_CURRENT_BINARY_DIR}/llvm-install      CACHE PATH   "The directory to install llvm")
+set(OPTSCHEDSUPER_LLVM_GIT_REPO         https://github.com/CSUS-LLVM/llvm-project.git CACHE STRING "The git repository to clone for LLVM")
+set(OPTSCHEDSUPER_LLVM_GIT_TAG          optsched                                      CACHE STRING "The tag to checkout within the LLVM git repository")
+set(OPTSCHEDSUPER_LLVM_SOURCE_SUBDIR    llvm                                          CACHE STRING "LLVM lives in this subdirectory of the cloned repository")
+set(OPTSCHEDSUPER_LLVM_EXTRA_CMAKE_ARGS ""                                            CACHE STRING ";-separated list of extra arguments to pass to configure cmake")
 
 include(ExternalProject)
+include(flang.cmake)
 
-function(add_variable OUT_LIST NAME)
-  set(var "${${OUT_LIST}}")
+# add_cache_variables(<OUT> <VARS>...)
+# Compute a cache variable argument for each VARS, adding them to OUT.
+function(add_cache_variables OUT_LIST)
+  set(result "${${OUT_LIST}}")
 
-  if(DEFINED ${NAME})
-    get_property(type CACHE ${NAME} PROPERTY TYPE)
-    if(NOT type)
-      set(type UNINITIALIZED)
+  foreach(NAME IN LISTS ARGN)
+    if(DEFINED ${NAME})
+      get_property(type CACHE ${NAME} PROPERTY TYPE)
+      if(NOT type)
+        set(type UNINITIALIZED)
+      endif()
+      list(APPEND result -D${NAME}:${type}=${${NAME}})
     endif()
-    list(APPEND var -D${NAME}:${type}=${${NAME}})
-  endif()
-
-  set(${OUT_LIST} "${var}" PARENT_SCOPE)
-endfunction()
-
-function(add_variables OUT_LIST)
-  set(list)
-
-  foreach(var IN LISTS ARGN)
-    add_variable(list ${var})
   endforeach()
 
-  set(${OUT_LIST} "${list}" PARENT_SCOPE)
+  set(${OUT_LIST} "${result}" PARENT_SCOPE)
 endfunction()
 
 set(cache_default_args)
-add_variables(cache_default_args
+add_cache_variables(cache_default_args
   CMAKE_CXX_COMPILER_LAUNCHER
   CMAKE_C_COMPILER_LAUNCHER
 )
 
 set(ROOT_DIR ${PROJECT_SOURCE_DIR}/../..)
-set(PATCH_DIR ${ROOT_DIR}/patches/llvm6.0)
 
 ExternalProject_Add(llvm
-  GIT_REPOSITORY https://github.com/CSUS-LLVM/llvm-project.git
-  GIT_TAG optsched
-  SOURCE_SUBDIR llvm
+  GIT_REPOSITORY ${OPTSCHEDSUPER_LLVM_GIT_REPO}
+  GIT_TAG ${OPTSCHEDSUPER_LLVM_GIT_TAG}
+  SOURCE_SUBDIR ${OPTSCHEDSUPER_LLVM_SOURCE_SUBDIR}
   INSTALL_DIR ${OPTSCHEDSUPER_LLVM_INSTALL_PREFIX}
   CMAKE_ARGS
     -DCMAKE_INSTALL_PREFIX=<INSTALL_DIR>
@@ -74,6 +68,7 @@ ExternalProject_Add(llvm
     -DLLVM_OPTIMIZED_TABLEGEN=ON
     -DLLVM_EXTERNAL_PROJECTS=OptSched
     -DLLVM_EXTERNAL_OPTSCHED_SOURCE_DIR=${ROOT_DIR}
+    ${OPTSCHEDSUPER_LLVM_EXTRA_CMAKE_ARGS}
   CMAKE_CACHE_DEFAULT_ARGS
     ${cache_default_args}
   USES_TERMINAL_CONFIGURE 1
@@ -82,100 +77,5 @@ ExternalProject_Add(llvm
 )
 
 if(OPTSCHEDSUPER_FLANG)
-  ExternalProject_Add(flang-llvm
-    GIT_REPOSITORY https://github.com/CSUS-LLVM/llvm.git
-    GIT_TAG optsched
-    INSTALL_DIR ${OPTSCHEDSUPER_FLANG_INSTALL_PREFIX}
-    CMAKE_GENERATOR ${OPTSCHEDSUPER_FLANG_LLVM_CMAKE_GENERATOR}
-    CMAKE_ARGS
-      -DCMAKE_INSTALL_PREFIX=<INSTALL_DIR>
-      -DCMAKE_BUILD_TYPE=${OPTSCHEDSUPER_FLANG_LLVM_BUILD_TYPE}
-      -DLLVM_TARGETS_TO_BUILD=X86
-      -DLLVM_BUILD_TOOLS=ON
-      -DLLVM_INCLUDE_TESTS=ON
-      -DLLVM_OPTIMIZED_TABLEGEN=ON
-    CMAKE_CACHE_DEFAULT_ARGS
-      ${cache_default_args}
-    USES_TERMINAL_CONFIGURE 1
-    USES_TERMINAL_BUILD 1
-    USES_TERMINAL_INSTALL 1
-  )
-
-  ExternalProject_Add(flang-driver
-    GIT_REPOSITORY https://github.com/flang-compiler/flang-driver.git
-    GIT_TAG release_60
-    DEPENDS flang-llvm
-    INSTALL_DIR ${OPTSCHEDSUPER_FLANG_INSTALL_PREFIX}
-    CMAKE_GENERATOR ${OPTSCHEDSUPER_FLANG_DRIVER_CMAKE_GENERATOR}
-    CMAKE_ARGS
-      -DCMAKE_INSTALL_PREFIX=<INSTALL_DIR>
-      -DCMAKE_BUILD_TYPE=${OPTSCHEDSUPER_FLANG_DRIVER_BUILD_TYPE}
-      -DLLVM_CONFIG=<INSTALL_DIR>/bin/llvm-config
-      -DCLANG_ENABLE_STATIC_ANALYZER=ON
-    CMAKE_CACHE_DEFAULT_ARGS
-      ${cache_default_args}
-    USES_TERMINAL_CONFIGURE 1
-    USES_TERMINAL_BUILD 1
-    USES_TERMINAL_INSTALL 1
-  )
-
-  ExternalProject_Add(openmp
-    GIT_REPOSITORY https://github.com/llvm-mirror/openmp.git
-    DEPENDS flang-driver
-    INSTALL_DIR ${OPTSCHEDSUPER_FLANG_INSTALL_PREFIX}
-    CMAKE_GENERATOR ${OPTSCHEDSUPER_FLANG_OPENMP_CMAKE_GENERATOR}
-    CMAKE_ARGS
-      -DCMAKE_INSTALL_PREFIX=<INSTALL_DIR>
-      -DCMAKE_BUILD_TYPE=${OPTSCHEDSUPER_FLANG_OPENMP_BUILD_TYPE}
-      -DCMAKE_CXX_COMPILER=<INSTALL_DIR>/bin/clang++
-      -DCMAKE_C_COMPILER=<INSTALL_DIR>/bin/clang
-    CMAKE_CACHE_DEFAULT_ARGS
-      ${cache_default_args}
-    USES_TERMINAL_CONFIGURE 1
-    USES_TERMINAL_BUILD 1
-    USES_TERMINAL_INSTALL 1
-  )
-
-  ExternalProject_Add(libpgmath
-    GIT_REPOSITORY https://github.com/flang-compiler/flang.git
-    GIT_TAG ${OPTSCHEDSUPER_FLANG_LIBPGMATH_GIT_TAG}
-    DEPENDS openmp
-    SOURCE_SUBDIR runtime/libpgmath
-    INSTALL_DIR ${OPTSCHEDSUPER_FLANG_INSTALL_PREFIX}
-    CMAKE_GENERATOR ${OPTSCHEDSUPER_FLANG_LIBPGMATH_CMAKE_GENERATOR}
-    CMAKE_ARGS
-      -DCMAKE_INSTALL_PREFIX=<INSTALL_DIR>
-      -DCMAKE_BUILD_TYPE=${OPTSCHEDSUPER_FLANG_LIBPGMATH_BUILD_TYPE}
-      -DCMAKE_CXX_COMPILER=<INSTALL_DIR>/bin/clang++
-      -DCMAKE_C_COMPILER=<INSTALL_DIR>/bin/clang
-      -DCMAKE_Fortran_COMPILER=<INSTALL_DIR>/bin/flang
-    CMAKE_CACHE_DEFAULT_ARGS
-      ${cache_default_args}
-    USES_TERMINAL_CONFIGURE 1
-    USES_TERMINAL_BUILD 1
-    USES_TERMINAL_INSTALL 1
-  )
-
-  ExternalProject_Get_Property(libpgmath SOURCE_DIR)
-  set(LIBPGMATH_SOURCE_DIR ${SOURCE_DIR})
-
-  ExternalProject_Add(flang
-    DEPENDS libpgmath
-    SOURCE_DIR ${LIBPGMATH_SOURCE_DIR}
-    DOWNLOAD_COMMAND ""
-    INSTALL_DIR ${OPTSCHEDSUPER_FLANG_INSTALL_PREFIX}
-    CMAKE_GENERATOR ${OPTSCHEDSUPER_FLANG_COMPILER_CMAKE_GENERATOR}
-    CMAKE_ARGS
-      -DCMAKE_INSTALL_PREFIX=<INSTALL_DIR>
-      -DCMAKE_BUILD_TYPE=${OPTSCHEDSUPER_FLANG_COMPILER_BUILD_TYPE}
-      -DCMAKE_CXX_COMPILER=<INSTALL_DIR>/bin/clang++
-      -DCMAKE_C_COMPILER=<INSTALL_DIR>/bin/clang
-      -DCMAKE_Fortran_COMPILER=<INSTALL_DIR>/bin/flang
-      -DLLVM_CONFIG=<INSTALL_DIR>/bin/llvm-config
-    CMAKE_CACHE_DEFAULT_ARGS
-      ${cache_default_args}
-    USES_TERMINAL_CONFIGURE 1
-    USES_TERMINAL_BUILD 1
-    USES_TERMINAL_INSTALL 1
-  )
+  setup_flang_external_projects("${cache_default_args}")
 endif()
