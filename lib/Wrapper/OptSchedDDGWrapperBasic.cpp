@@ -5,7 +5,6 @@
 //===----------------------------------------------------------------------===//
 
 #include "OptSchedDDGWrapperBasic.h"
-#include "opt-sched/Scheduler/bit_vector.h"
 #include "opt-sched/Scheduler/config.h"
 #include "opt-sched/Scheduler/logger.h"
 #include "opt-sched/Scheduler/register.h"
@@ -508,7 +507,7 @@ void OptSchedDDGWrapperBasic::countBoundaryLiveness(
 
 /// Partially copied from
 /// https://github.com/RadeonOpenCompute/llvm/blob/roc-ocl-2.4.0/lib/CodeGen/MachineScheduler.cpp#L1554
-int OptSchedDDGWrapperBasic::clusterNeighboringMemOps_(
+int OptSchedDDGWrapperBasic::clusterNeighboringMemOps(
     ArrayRef<const SUnit *> MemOps) {
   SmallVector<MemOpInfo, 32> MemOpRecords;
   bool ClusterPossible = false;
@@ -578,7 +577,7 @@ int OptSchedDDGWrapperBasic::clusterNeighboringMemOps_(
 }
 
 /// Iterate through SUnits and find all possible clustering then transfer
-/// the information over to the SchedInstruction class as a bitvector.
+/// the information so that our scheduler can access it.
 /// Partially copied from https://github.com/RadeonOpenCompute/llvm/blob/roc-ocl-2.4.0/lib/CodeGen/MachineScheduler.cpp#L1595
 void OptSchedDDGWrapperBasic::findPossibleClusters() {
   // TODO: Add For-loop to also do store clusters. Currently only does load
@@ -625,7 +624,7 @@ void OptSchedDDGWrapperBasic::findPossibleClusters() {
     	LLVM_DEBUG(dbgs() << SU1->NodeNum << " ");
     LLVM_DEBUG(dbgs() << '\n');
 #endif
-    TotalInstructionsPossible += clusterNeighboringMemOps_(SCD);
+    TotalInstructionsPossible += clusterNeighboringMemOps(SCD);
   }
 
  setMaxInstructionsInAllClusters(TotalInstructionsPossible);

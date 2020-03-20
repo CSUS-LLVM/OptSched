@@ -9,7 +9,6 @@ Last Update:  Apr. 2011
 #ifndef OPTSCHED_SPILL_BB_SPILL_H
 #define OPTSCHED_SPILL_BB_SPILL_H
 
-#include "opt-sched/Scheduler/bit_vector.h"
 #include "opt-sched/Scheduler/OptSchedTarget.h"
 #include "opt-sched/Scheduler/defines.h"
 #include "opt-sched/Scheduler/sched_region.h"
@@ -54,7 +53,6 @@ private:
   // TODO: Implement cost function for clustering
   /// Experimental variables and values for cost adjustment
   int ClusteringWeight;
-  int ClusterInitialCost;
   int TotalInstructionsInClusters;
 
   /// Data struct to contain information about the previous clusters

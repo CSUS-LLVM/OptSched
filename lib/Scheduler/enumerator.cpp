@@ -1065,7 +1065,6 @@ bool Enumerator::ProbeBranch_(SchedInstruction *inst, EnumTreeNode *&newNode,
   if (inst != NULL)
     if (inst->GetPreFxdCycle() != INVALID_VALUE)
       if (inst->GetPreFxdCycle() != crntCycleNum_) {
-	//Logger::Info("Pruned due to prefixed cycle");
         return false;
       }
 
@@ -1074,7 +1073,6 @@ bool Enumerator::ProbeBranch_(SchedInstruction *inst, EnumTreeNode *&newNode,
 #ifdef IS_DEBUG_INFSBLTY_TESTS
       stats::forwardLBInfeasibilityHits++;
 #endif
-      //Logger::Info("Pruned due to forward lowerbound");
       return false;
     }
 
@@ -1082,7 +1080,6 @@ bool Enumerator::ProbeBranch_(SchedInstruction *inst, EnumTreeNode *&newNode,
 #ifdef IS_DEBUG_INFSBLTY_TESTS
       stats::backwardLBInfeasibilityHits++;
 #endif
-      //Logger::Info("Pruned due to backward lowerbound");
       return false;
     }
   }
@@ -1103,7 +1100,6 @@ bool Enumerator::ProbeBranch_(SchedInstruction *inst, EnumTreeNode *&newNode,
         stats::nodeSuperiorityInfeasibilityHits++;
 #endif
         isNodeDmntd = true;
-	//Logger::Info("Pruned due to node superiority");
         return false;
       }
   }
@@ -1121,7 +1117,6 @@ bool Enumerator::ProbeBranch_(SchedInstruction *inst, EnumTreeNode *&newNode,
 #ifdef IS_DEBUG_INFSBLTY_TESTS
     stats::slotCountInfeasibilityHits++;
 #endif
-    //Logger::Info("Pruned due to issue slot infeasibility");
     return false;
   }
 
@@ -1132,7 +1127,6 @@ bool Enumerator::ProbeBranch_(SchedInstruction *inst, EnumTreeNode *&newNode,
 #ifdef IS_DEBUG_INFSBLTY_TESTS
     stats::rangeTighteningInfeasibilityHits++;
 #endif
-    //Logger::Info("Pruned due to range tightening infeasibility");
     return false;
   }
 
@@ -1150,7 +1144,6 @@ bool Enumerator::ProbeBranch_(SchedInstruction *inst, EnumTreeNode *&newNode,
 #ifdef IS_DEBUG_INFSBLTY_TESTS
         stats::historyDominationInfeasibilityHits++;
 #endif
-	//Logger::Info("Pruned due to history domination");
         return false;
       }
   }
@@ -1165,7 +1158,7 @@ bool Enumerator::ProbeBranch_(SchedInstruction *inst, EnumTreeNode *&newNode,
       stats::relaxedSchedulingInfeasibilityHits++;
 #endif
       isRlxInfsbl = true;
-      //Logger::Info("Pruned due to relaxed schedule");
+
       return false;
     }
   }
@@ -2078,7 +2071,6 @@ bool LengthCostEnumerator::ProbeBranch_(SchedInstruction *inst,
   isFsbl = ChkCostFsblty_(inst, newNode);
 
   if (isFsbl == false) {
-    //Logger::Info("Pruned due to cost infeasibility");
     return false;
   }
 
@@ -2096,7 +2088,6 @@ bool LengthCostEnumerator::ProbeBranch_(SchedInstruction *inst,
 #endif
       rgn_->UnschdulInst(inst, crntCycleNum_, crntSlotNum_, parent);
 
-      //Logger::Info("Pruned due to history domination");
       return false;
     }
   }

@@ -72,11 +72,9 @@ BBWithSpill::BBWithSpill(const OptSchedTarget *OST_, DataDepGraph *dataDepGraph,
   
   CurrentClusterSize = 0;
   ActiveClusterGroup = 0;
-  ClusterInitialCost = 1000000;
   PastClustersList.clear();
   LastCluster = nullptr;
   TotalInstructionsInClusters = 0;
-
   Config &schedIni = SchedulerOptions::getInstance();
   ClusterMemoryOperations = schedIni.GetBool("CLUSTER_MEMORY_OPS");
   ClusteringWeight = schedIni.GetInt("CLUSTER_WEIGHT");
