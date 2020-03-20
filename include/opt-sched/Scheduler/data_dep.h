@@ -13,6 +13,7 @@ Last Update:  Mar. 2011
 #include "opt-sched/Scheduler/buffers.h"
 #include "opt-sched/Scheduler/defines.h"
 #include "opt-sched/Scheduler/sched_basic_data.h"
+#include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/SmallVector.h"
 #include <memory>
 
@@ -293,9 +294,17 @@ public:
 
   int getMaxClusterCount() { return MaxClusterCount; }
   void setMaxClusterCount(int Max) { MaxClusterCount = Max; }
+  int getMaxInstructionsInAllClusters() { return MaxInstructionsInAllClusters; }
+  void setMaxInstructionsInAllClusters(int Max) {
+    MaxInstructionsInAllClusters = Max;
+  }
+
+  int getMaxInstructionsInCluster(int Cluster);
 
 protected:
   int MaxClusterCount;
+  int MaxInstructionsInAllClusters;
+  MapVector<int, int> MaxInstructionsInEachClusters;
 
   // TODO(max): Get rid of this.
   // Number of basic blocks

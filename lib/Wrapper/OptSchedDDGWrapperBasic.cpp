@@ -508,10 +508,11 @@ void OptSchedDDGWrapperBasic::countBoundaryLiveness(
 
 /// Partially copied from
 /// https://github.com/RadeonOpenCompute/llvm/blob/roc-ocl-2.4.0/lib/CodeGen/MachineScheduler.cpp#L1554
-void OptSchedDDGWrapperBasic::clusterNeighboringMemOps_(
+int OptSchedDDGWrapperBasic::clusterNeighboringMemOps_(
     ArrayRef<const SUnit *> MemOps) {
   SmallVector<MemOpInfo, 32> MemOpRecords;
   bool ClusterPossible = false;
+  int TotalInstructionsPossible = 0;
 
   LLVM_DEBUG(dbgs() << "Processing possible clusters\n");
   for (const SUnit *SU : MemOps) {
@@ -524,7 +525,7 @@ void OptSchedDDGWrapperBasic::clusterNeighboringMemOps_(
 
   if (MemOpRecords.size() < 2) {
     LLVM_DEBUG(dbgs() << "  Unable to cluster memop cluster of 1.\n");
-    return;
+    return 0;
   }
 
   llvm::sort(MemOpRecords);
@@ -548,8 +549,15 @@ void OptSchedDDGWrapperBasic::clusterNeighboringMemOps_(
       }
 
       // Tell the instructions what cluster number they are in
-      insts_[SUa->NodeNum]->SetMayCluster(ClusterCount);
-      insts_[SUb->NodeNum]->SetMayCluster(ClusterCount);
+      if (insts_[SUa->NodeNum]->GetClusterGroup() == 0) {
+        insts_[SUa->NodeNum]->SetMayCluster(ClusterCount);
+        TotalInstructionsPossible++;
+      }
+
+      if (insts_[SUb->NodeNum]->GetClusterGroup() == 0) {
+        insts_[SUb->NodeNum]->SetMayCluster(ClusterCount);
+        TotalInstructionsPossible++;
+      }
 
       ++ClusterLength;
     } else
@@ -565,6 +573,8 @@ void OptSchedDDGWrapperBasic::clusterNeighboringMemOps_(
   }
   LLVM_DEBUG(dbgs() << '\n');
 #endif
+  MaxInstructionsInEachClusters.insert(ClusterCount, TotalInstructionsPossible);
+  return TotalInstructionsPossible;
 }
 
 /// Iterate through SUnits and find all possible clustering then transfer
@@ -574,6 +584,7 @@ void OptSchedDDGWrapperBasic::findPossibleClusters() {
   // TODO: Add For-loop to also do store clusters. Currently only does load
   // clusters
   bool IsLoad = true;
+  int TotalInstructionsPossible = 0;
 
   LLVM_DEBUG(dbgs() << "Looking for load clusters\n");
   DenseMap<unsigned, unsigned> StoreChainIDs;
@@ -614,8 +625,10 @@ void OptSchedDDGWrapperBasic::findPossibleClusters() {
     	LLVM_DEBUG(dbgs() << SU1->NodeNum << " ");
     LLVM_DEBUG(dbgs() << '\n');
 #endif
-    clusterNeighboringMemOps_(SCD);
+    TotalInstructionsPossible += clusterNeighboringMemOps_(SCD);
   }
+
+  setMaxInstructionsInClusters(TotalInstructionsPossible);
 }
 
 LLVMRegTypeFilter::LLVMRegTypeFilter(
