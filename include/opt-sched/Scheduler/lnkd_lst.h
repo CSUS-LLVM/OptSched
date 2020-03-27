@@ -177,7 +177,8 @@ public:
   T *GetNxtPriorityElmnt();
   T *GetNxtPriorityElmnt(K &key);
   // Copies all the data from another list. The existing list must be empty.
-  void CopyList(PriorityList<T, K> const *const otherLst);
+  void CopyList(PriorityList<T, K> const *const otherLst,
+                KeyedEntry<T, unsigned long> **keyedEntries_);
 
 protected:
   KeyedEntry<T, K> *allocKeyEntries_;
@@ -572,8 +573,8 @@ inline T *PriorityList<T, K>::GetNxtPriorityElmnt(K &key) {
 }
 
 //(Vlad) added functionality to decrease priority
-//used for decreasing priority of clusterable instrs
-//when leaving a cluster
+// used for decreasing priority of clusterable instrs
+// when leaving a cluster
 template <class T, class K>
 void PriorityList<T, K>::BoostEntry(KeyedEntry<T, K> *entry, K newKey) {
   KeyedEntry<T, K> *crnt;
@@ -582,7 +583,7 @@ void PriorityList<T, K>::BoostEntry(KeyedEntry<T, K> *entry, K newKey) {
 
   assert(LinkedList<T>::topEntry_ != NULL);
 
-  if (entry->key < newKey) //behave normally
+  if (entry->key < newKey) // behave normally
   {
     entry->key = newKey;
 
@@ -612,22 +613,19 @@ void PriorityList<T, K>::BoostEntry(KeyedEntry<T, K> *entry, K newKey) {
     assert(next != entry->GetNext());
     LinkedList<T>::RmvEntry_(entry, false);
     InsrtEntry_(entry, next);
-  }
-  else //move entry down on priority list
+  } else // move entry down on priority list
   {
     entry->key = newKey;
 
-    //if it is at the bottom or next entry still has a smaller key,
-    //then the entry is already in place
+    // if it is at the bottom or next entry still has a smaller key,
+    // then the entry is already in place
     if (entry == LinkedList<T>::bottomEntry_ || next->key <= newKey)
       return;
 
-    for (crnt = entry->GetNext(); crnt != NULL; crnt = crnt->GetNext())
-    {
-      if (crnt->key <= newKey)
-      {
+    for (crnt = entry->GetNext(); crnt != NULL; crnt = crnt->GetNext()) {
+      if (crnt->key <= newKey) {
         next = crnt;
-	break;
+        break;
       }
     }
 
@@ -639,7 +637,9 @@ void PriorityList<T, K>::BoostEntry(KeyedEntry<T, K> *entry, K newKey) {
 }
 
 template <class T, class K>
-void PriorityList<T, K>::CopyList(PriorityList<T, K> const *const otherLst) {
+void PriorityList<T, K>::CopyList(
+    PriorityList<T, K> const *const otherLst,
+    KeyedEntry<T, unsigned long> **keyedEntries_) {
   assert(LinkedList<T>::elmntCnt_ == 0);
 
   for (KeyedEntry<T, K> *entry = (KeyedEntry<T, K> *)otherLst->topEntry_;
@@ -648,6 +648,7 @@ void PriorityList<T, K>::CopyList(PriorityList<T, K> const *const otherLst) {
     K key = entry->key;
     KeyedEntry<T, K> *newEntry = AllocEntry_(elmnt, key);
     LinkedList<T>::AppendEntry_(newEntry);
+    keyedEntries_[entry->element->GetNum()] = newEntry;
 
     if (entry == otherLst->rtrvEntry_) {
       LinkedList<T>::rtrvEntry_ = newEntry;

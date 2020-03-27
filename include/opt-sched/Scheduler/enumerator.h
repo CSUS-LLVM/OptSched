@@ -926,6 +926,9 @@ inline void Enumerator::UpdtRdyLst_(InstCount cycleNum, int slotNum) {
   }
 
   rdyLst_->AddLatestSubLists(lst1, lst2);
+
+ if (prirts_.isDynmc)
+    rdyLst_->UpdatePriorities();
 }
 /*****************************************************************************/
 

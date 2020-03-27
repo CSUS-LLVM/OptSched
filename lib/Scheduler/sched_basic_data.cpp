@@ -64,12 +64,20 @@ SchedInstruction::SchedInstruction(InstCount num, const string &name,
 
   mustBeInBBEntry_ = false;
   mustBeInBBExit_ = false;
+  WasActive = false;
 }
 
 SchedInstruction::~SchedInstruction() {
   if (memAllocd_)
     DeAllocMem_();
   delete crntRange_;
+}
+
+bool SchedInstruction::computeWasActive() {
+  if (ClusterGroup == 0) return false;
+
+  WasActive = GetActiveCluster() == GetClusterGroup();
+  return WasActive;
 }
 
 void SchedInstruction::SetupForSchdulng(InstCount instCnt, bool isCP_FromScsr,

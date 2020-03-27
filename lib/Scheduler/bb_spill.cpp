@@ -550,19 +550,7 @@ void BBWithSpill::UpdateSpillInfoForSchdul_(SchedInstruction *inst,
       CurrentClusterSize = 0;       // Set cluster size to 0
     }
   }
-//  Logger::Info("Currently active cluster %d", ActiveClusterGroup);
-  // Potential Issues:
-  // 1. Keeping track of the average clustering size when we aren't done
-  // scheduling.
-  //    Cost function that was discussed during the meeting on Friday:
-  //      (15 - averageClusteringSize) * ClusteringWeight
-  //      We want to minimize this cost but there is an issue in the following
-  //      example
-  //    Ex: Partial schedule was able to cluster a block of 15.
-  //    averageClusteringSize : 15, CostFnc: (15-15)*Weight = 0
-  //          Any cluster block below size 15 will decrease the average
-  //          cluster size and increase the cost. This makes our B&B
-  //          enumerator actually favor not doing clustering.
+  // Logger::Info("schedule, Currently active cluster %d", ActiveClusterGroup);
 
   defCnt = inst->GetDefs(defs);
   useCnt = inst->GetUses(uses);
@@ -827,7 +815,7 @@ void BBWithSpill::UpdateSpillInfoForUnSchdul_(SchedInstruction *inst) {
       }
     }
   }
-//  Logger::Info("Currently active cluster %d", ActiveClusterGroup);
+//  Logger::Info("unschedule, Currently active cluster %d", ActiveClusterGroup);
 
   defCnt = inst->GetDefs(defs);
   useCnt = inst->GetUses(uses);

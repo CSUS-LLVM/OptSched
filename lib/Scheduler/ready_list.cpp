@@ -149,7 +149,7 @@ void ReadyList::CopyList(ReadyList *othrLst) {
   assert(prirtyLst_->GetElmntCnt() == 0);
   assert(latestSubLst_->GetElmntCnt() == 0);
   assert(othrLst != NULL);
-  prirtyLst_->CopyList(othrLst->prirtyLst_);
+  prirtyLst_->CopyList(othrLst->prirtyLst_, keyedEntries_);
 }
 
 unsigned long ReadyList::CmputKey_(SchedInstruction *inst, bool isUpdate,
@@ -159,6 +159,7 @@ unsigned long ReadyList::CmputKey_(SchedInstruction *inst, bool isUpdate,
   int i;
   int16_t oldLastUseCnt, newLastUseCnt;
   unsigned long ValueForKey;
+  bool OldWasActive, NewWasActive;
   changed = true;
   if (isUpdate)
     changed = false;
@@ -174,9 +175,10 @@ unsigned long ReadyList::CmputKey_(SchedInstruction *inst, bool isUpdate,
     case LSH_LUC:
       oldLastUseCnt = inst->GetLastUseCnt();
       newLastUseCnt = inst->CmputLastUseCnt();
-      assert(!isUpdate || newLastUseCnt >= oldLastUseCnt);
-      if (newLastUseCnt != oldLastUseCnt)
+      // assert(!isUpdate || newLastUseCnt >= oldLastUseCnt);
+      if (newLastUseCnt != oldLastUseCnt) {
         changed = true;
+      }
 
       AddPrirtyToKey_(key, keySize, useCntBits_, newLastUseCnt, maxUseCnt_);
       break;
@@ -208,9 +210,19 @@ unsigned long ReadyList::CmputKey_(SchedInstruction *inst, bool isUpdate,
       break;
 
     case LSH_MEM:
-      ValueForKey =
-          inst->GetClusterGroup() == SchedInstruction::GetActiveCluster() ? 1
+      if (inst->GetClusterGroup() == 0)
+	      ValueForKey = 0;
+      else {
+        OldWasActive = inst->getWasActive();
+        NewWasActive = inst->computeWasActive();
+
+        if (OldWasActive != NewWasActive) {
+          changed = true;
+        }
+        ValueForKey =
+            inst->GetClusterGroup() == SchedInstruction::GetActiveCluster() ? 1
                                                                           : 0;
+      }
       AddPrirtyToKey_(key, keySize, ClusterBit, ValueForKey, 1);
       break;
 
@@ -298,6 +310,7 @@ void ReadyList::AddInst(SchedInstruction *inst) {
   assert(changed == true);
   KeyedEntry<SchedInstruction, unsigned long> *entry =
       prirtyLst_->InsrtElmnt(inst, key, true);
+
   InstCount instNum = inst->GetNum();
   if (prirts_.isDynmc)
     keyedEntries_[instNum] = entry;

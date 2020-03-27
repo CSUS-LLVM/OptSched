@@ -676,6 +676,7 @@ SchedPriorities ScheduleDAGOptSched::parseHeuristic(const std::string &Str) {
     Priorities.vctr[Priorities.cnt++] = LSH;
     switch (LSH) {
     // Is LUC still the only dynamic heuristic?
+    case LSH_MEM:
     case LSH_LUC:
       Priorities.isDynmc = true;
       break;

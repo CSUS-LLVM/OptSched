@@ -435,6 +435,8 @@ public:
   int GetClusterGroup() { return ClusterGroup; }
   static int GetActiveCluster() { return ActiveCluster; }
   static void SetActiveCluster(int Active) { ActiveCluster = Active; }
+  bool getWasActive() { return WasActive; }
+  bool computeWasActive();
   friend class SchedRange;
 
 protected:
@@ -442,6 +444,10 @@ protected:
   string name_;
   // The mnemonic of this instruction, e.g. "add" or "jmp".
   string opCode_;
+
+  bool WasActive;
+ 
+
   /// The cluster group that the current instruction is a part of.
   /// Default of 0 means that it is not part of any cluster.
   int ClusterGroup;
