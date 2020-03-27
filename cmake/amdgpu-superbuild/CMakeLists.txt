@@ -76,13 +76,12 @@ ExternalProject_Add(ROCm
                     && ${REPO_COMMAND} init -u https://github.com/RadeonOpenCompute/ROCm-OpenCL-Runtime.git
                       -b roc-2.4.x -m opencl.xml
   PATCH_COMMAND ${REPO_COMMAND} sync
-        COMMAND ${REPO_COMMAND} forall -vc "git reset --hard"
         COMMAND # Remove the line "local:".
                 ${SED_COMMAND} -i "/local:/d" <SOURCE_DIR>/opencl/api/opencl/amdocl/amdocl.map
         COMMAND cd <SOURCE_DIR>/opencl/compiler/driver && git apply ${PATCH_DIR}/load-plugins.patch
-        COMMAND # Remove the EXCLUDE_FROM_ALL from add_subdirectory(compiler/llvm)
-                ${SED_COMMAND} -i "s/add_subdirectory(compiler\\/llvm EXCLUDE_FROM_ALL)/add_subdirectory(compiler\\/llvm)/g"
-                <SOURCE_DIR>/opencl/CMakeLists.txt
+        COMMAND # Add top-level target depending on OptSched
+                ${CMAKE_COMMAND} -E echo "add_custom_target(build-optsched ALL)" >> <SOURCE_DIR>/opencl/CMakeLists.txt
+        COMMAND ${CMAKE_COMMAND} -E echo "add_dependencies(build-optsched OptSched)" >> <SOURCE_DIR>/opencl/CMakeLists.txt
   SOURCE_SUBDIR opencl
   INSTALL_DIR ${CMAKE_INSTALL_PREFIX}
   CMAKE_ARGS
