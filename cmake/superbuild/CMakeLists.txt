@@ -27,6 +27,7 @@ set(OPTSCHEDSUPER_LLVM_EXTRA_CMAKE_ARGS ""                                      
 
 include(ExternalProject)
 include(flang.cmake)
+include(CTest)
 
 # add_cache_variables(<OUT> <VARS>...)
 # Compute a cache variable argument for each VARS, adding them to OUT.
@@ -83,3 +84,20 @@ ExternalProject_Add(llvm
 if(OPTSCHEDSUPER_FLANG)
   setup_flang_external_projects("${cache_default_args}")
 endif()
+
+ExternalProject_Get_Property(llvm BINARY_DIR)
+set(LLVM_BUILD_DIR ${BINARY_DIR})
+
+add_test(NAME OptSchedTests
+  COMMAND ${CMAKE_COMMAND} --build . --target check-optsched
+  WORKING_DIRECTORY ${LLVM_BUILD_DIR}
+)
+add_test(NAME OptSched-CompileHelloWorld
+  COMMAND
+    ${OPTSCHEDSUPER_LLVM_INSTALL_PREFIX}/bin/clang ${CMAKE_CURRENT_SOURCE_DIR}/helloworld.cpp
+    -O3
+    -fplugin=${OPTSCHEDSUPER_LLVM_INSTALL_PREFIX}/lib/OptSched.so
+    -mllvm -misched=optsched
+    -mllvm -enable-misched
+    -mllvm -optsched-cfg=${ROOT_DIR}/example/optsched-cfg
+)
