@@ -7,11 +7,16 @@
 
 import sys
 import re
+import itertools
 
 RE_COST_LOWER_BOUND = re.compile(r'INFO: Lower bound of cost before scheduling: (\d+)')
 RE_DAG_COST = re.compile(r"INFO: Best schedule for DAG (?P<name>.*) has cost (?P<cost>\d+) and length (?P<length>\d+). The schedule is (?P<optimal>.*) \(Time")
 
 RE_REGION_DELIMITER = re.compile(r'INFO: \*{4,}? Opt Scheduling \*{4,}?')
+
+# Explain this many of the blocks missing a lower bound
+MISSING_LOWER_BOUND_DUMP_COUNT = 3
+MISSING_LOWER_BOUND_DUMP_LINES = 10
 
 dags1 = {}
 dags2 = {}
@@ -23,8 +28,15 @@ def dags_info(logtext):
     blocks = [block for block in unfiltered if RE_COST_LOWER_BOUND.search(block)]
 
     if len(blocks) != len(unfiltered):
-        print('WARNING: {filtered}/{total} blocks do not have a logged lower bound.'
-            .format(filtered=len(blocks), total=len(unfiltered)), out=sys.stderr)
+        print('WARNING: Missing a logged lower bound for {missing}/{total} blocks.'
+            .format(missing=len(unfiltered) - len(blocks), total=len(unfiltered)), file=sys.stderr)
+        
+        missing = set(unfiltered) - set(blocks)
+        trimmed = ('\n'.join(block.splitlines()[:MISSING_LOWER_BOUND_DUMP_LINES]) for block in missing)
+        
+        for i, block in enumerate(itertools.islice(trimmed, MISSING_LOWER_BOUND_DUMP_COUNT)):
+            print('WARNING: block {} missing lower-bound:\n{}\n...'.format(i, block),
+                  file=sys.stderr)
 
     for block in blocks:
         lowerBound = int(RE_COST_LOWER_BOUND.search(block).group(1))
