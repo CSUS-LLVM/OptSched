@@ -24,7 +24,7 @@ dags2 = {}
 def dags_info(logtext):
     dags = {}
 
-    unfiltered = RE_REGION_DELIMITER.split(logtext)
+    unfiltered = RE_REGION_DELIMITER.split(logtext)[1:]
     blocks = [block for block in unfiltered if RE_COST_LOWER_BOUND.search(block)]
 
     if len(blocks) != len(unfiltered):
