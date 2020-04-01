@@ -4,11 +4,65 @@
 #include "opt-sched/Scheduler/register.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/STLExtras.h"
+#include "llvm/ADT/SmallVector.h"
 #include <algorithm>
 #include <list>
 #include <vector>
 
 using namespace llvm::opt_sched;
+
+// Gets the registers which may be lengthened by scheduling nodeB after nodeA,
+// as compared to if nodeB was scheduled before nodeA
+static llvm::SmallVector<const Register *, 10> possiblyLengthenedIfAfterOther(
+    const SchedInstruction *nodeB, llvm::ArrayRef<const Register *> bUses,
+    const SchedInstruction *nodeA, llvm::ArrayRef<const Register *> aUses) {
+  llvm::SmallVector<const Register *, 10> result;
+
+  llvm::copy_if(bUses, std::back_inserter(result), [&](const Register *useB) {
+    // Is this register also used by A?
+    // If so, reordering A and B would have no effect on this register's
+    // live range.
+    const bool usedByA =
+        llvm::any_of(aUses, [&](const Register *useA) { return useA == useB; });
+    // If this register isn't used by A, is it at least used
+    // by some successor? If so, reordering A and B would have no effect on
+    // this register's live range, as it must live until C.
+    const auto usedByC = [&] {
+      return llvm::any_of(
+          useB->GetUseList(), [&](const SchedInstruction *user) {
+            return user != nodeB &&
+                   nodeB->IsRcrsvScsr(const_cast<SchedInstruction *>(user));
+          });
+    };
+
+    return !usedByA && !usedByC();
+  });
+
+  return result;
+}
+
+// Converts a class type and a function signature into a pointer to member
+// function.
+// Usage: memfn_t<Cls, int(double) const> ==> int (Cls::*)(double) const
+template <typename Cls, typename FnSig> using memfn_t = FnSig Cls::*;
+
+// Gets the Uses or Defs for the given SchedInstruction.
+template <std::size_t N,
+          memfn_t<SchedInstruction, int16_t(Register **&)> UsesOrDefsFn>
+static llvm::SmallVector<const Register *, N> getSet(SchedInstruction *node) {
+  Register **uses;
+  const int useCount = (node->*UsesOrDefsFn)(uses);
+  // Call the (Iter, Iter) constructor.
+  return {uses, uses + useCount};
+}
+
+// Calls llvm::zip_first(...) over the ranges, but wraps each range in an
+// llvm::ArrayRef.
+template <typename... Rs>
+static auto zipFirstRefs(const Rs &... ranges)
+    -> decltype(llvm::zip_first(llvm::makeArrayRef(ranges)...)) {
+  return llvm::zip_first(llvm::makeArrayRef(ranges)...);
+}
 
 GraphTrans::GraphTrans(DataDepGraph *dataDepGraph) {
   assert(dataDepGraph != NULL);
@@ -184,108 +238,68 @@ bool StaticNodeSupTrans::NodeIsSuperior_(SchedInstruction *nodeA,
   // of A.
   // TODO (austin) modify wrapper code so it is easier to identify physical
   // registers.
-  Register **usesA;
-  Register **usesB;
-  // Register **usesC;
-  int useCntA = nodeA->GetUses(usesA);
-  int useCntB = nodeB->GetUses(usesB);
-  // Register used by B but not by A.
-  std::vector<Register *> usesOnlyB;
-  // A vector of registers that will have their live range lengthened
-  // by scheduling B after A.
-  std::vector<Register *> lengthenedLiveRegisters;
+  const int regTypes = graph->GetRegTypeCnt();
+
+  const llvm::SmallVector<const Register *, 10> usesA =
+      ::getSet<10, &SchedInstruction::GetUses>(nodeA);
+  const llvm::SmallVector<const Register *, 10> usesB =
+      ::getSet<10, &SchedInstruction::GetUses>(nodeB);
+
+  const llvm::SmallVector<const Register *, 10> defsA =
+      ::getSet<10, &SchedInstruction::GetDefs>(nodeA);
+  const llvm::SmallVector<const Register *, 10> defsB =
+      ::getSet<10, &SchedInstruction::GetDefs>(nodeB);
+
   // The number of registers that will be lengthened by
   // scheduling B after A. Indexed by register type.
-  std::vector<InstCount> lengthenedByB(graph->GetRegTypeCnt());
-  // The total number of live ranges that could be lengthened by
-  // scheduling B after A.
-  // InstCount totalLengthenedByB = 0;
+  llvm::SmallVector<int, 10> usesLengthenedByB(regTypes);
+  llvm::SmallVector<int, 10> usesShortenedByA(regTypes);
 
-  for (int i = 0; i < useCntB; i++) {
-    const Register *useB = usesB[i];
-    // Flag for determining whether useB is used by node A.
-    const bool usedByA =
-        std::any_of(usesA, usesA + useCntA,
-                    [useB](const Register *useA) { return useA == useB; });
-    if (!usedByA) {
-#ifdef IS_DEBUG_GRAPH_TRANS
-      Logger::Info("Found reg used by nodeB but not nodeA");
-#endif
-
-      // For this register did we find a user C that is a successor of
-      // A and B.
-      bool foundC =
-          llvm::any_of(useB->GetUseList(), [&](const SchedInstruction *user) {
-            return user != nodeB &&
-                   nodeB->IsRcrsvScsr(const_cast<SchedInstruction *>(user));
-          });
-      if (!foundC) {
-#ifdef IS_DEBUG_GRAPH_TRANS
-        Logger::Info("Found register that has its live range lengthend by "
-                     "scheduling B after A");
-#endif
-        return false;
-        // lengthenedByB[useB->GetType()]++;
-        // totalLengthenedByB++;
-      }
-    }
+  // Optimality condition: R in Use(B) - Use(A), but there is no C successor
+  // which uses R.
+  const auto usesLengthenedByBUnclassified =
+      possiblyLengthenedIfAfterOther(nodeB, usesB, nodeA, usesA);
+  for (const Register *bLastUse : usesLengthenedByBUnclassified) {
+    ++usesLengthenedByB[bLastUse->GetType()];
   }
-  /*
-    for (int j = 0; j < useCntA && totalLengthenedByB > 0; j++) {
-      Register *useA = usesA[j];
 
-      if (lengthenedByB[useA->GetType()] < 1)
-        continue;
+  // Repeat for A, to find registers shortened by moving A earlier.
+  const auto usesLengthenedByAUnclassified =
+      possiblyLengthenedIfAfterOther(nodeA, usesA, nodeB, usesB);
+  for (const Register *aLastUse : usesLengthenedByAUnclassified) {
+    ++usesShortenedByA[aLastUse->GetType()];
+  }
 
-      // Try to find an instruction that must be scheduled after A
-      // that uses register "useA".
-      bool foundLaterUse = false;
-      for (const SchedInstruction *user : useA->GetUseList()) {
-        // If "nodeA" is not a recursive predecessor of "user" nodeA is not the
-        // last
-        // user of this register.
-        if (user != nodeA &&
-            !nodeA->IsRcrsvPrdcsr(const_cast<SchedInstruction *>(user))) {
-          foundLaterUse = true;
-          break;
-        }
-      }
+  // For each register type, the number of registers whose live range was
+  // shortened by scheduling A earlier must be >= than the number of registers
+  // whose live range was lengthened by scheduling B earlier
+  const bool swapShortensUses =
+      llvm::all_of(::zipFirstRefs(usesShortenedByA, usesLengthenedByB),
+                   [](std::tuple<int, int> regUses) {
+                     return std::get<0>(regUses) >= std::get<1>(regUses);
+                   });
 
-      if (!foundLaterUse) {
-        lengthenedByB[useA->GetType()]--;
-        totalLengthenedByB--;
-      }
-    }
-
-    if (totalLengthenedByB > 0) {
-  #ifdef IS_DEBUG_GRAPH_TRANS
-      Logger::Info("Live range condition 1 failed");
-  #endif
-      return false;
-    }
-  */
+  if (!swapShortensUses) {
+#ifdef IS_DEBUG_GRAPH_TRANS
+    Logger::Info("Live range condition 1 failed");
+#endif
+    return false;
+  }
 
   // For each register type, the number of registers defined by A is less than
   // or equal to the number of registers defined by B.
-  Register **defsA;
-  Register **defsB;
-  int defCntA = nodeA->GetDefs(defsA);
-  int defCntB = nodeB->GetDefs(defsB);
-  int regTypes = graph->GetRegTypeCnt();
-  std::vector<InstCount> regTypeDefsA(regTypes);
-  std::vector<InstCount> regTypeDefsB(regTypes);
+  llvm::SmallVector<int, 10> numADefsByType(regTypes);
+  llvm::SmallVector<int, 10> numBDefsByType(regTypes);
 
-  for (int i = 0; i < defCntA; i++)
-    regTypeDefsA[defsA[i]->GetType()]++;
+  for (const Register *reg : defsA)
+    ++numADefsByType[reg->GetType()];
 
-  for (int i = 0; i < defCntB; i++)
-    regTypeDefsB[defsB[i]->GetType()]++;
+  for (const Register *reg : defsB)
+    ++numBDefsByType[reg->GetType()];
 
-  const auto correspondingRegTypeDefs = llvm::zip_first(
-      llvm::makeArrayRef(regTypeDefsA), llvm::makeArrayRef(regTypeDefsB));
-  return llvm::all_of(correspondingRegTypeDefs,
-                      [](std::tuple<InstCount, InstCount> regDefs) {
-                        return std::get<0>(regDefs) > std::get<1>(regDefs);
+  return llvm::all_of(::zipFirstRefs(numADefsByType, numBDefsByType),
+                      [](std::tuple<int, int> regDefs) {
+                        return std::get<0>(regDefs) <= std::get<1>(regDefs);
                       });
 }
 
