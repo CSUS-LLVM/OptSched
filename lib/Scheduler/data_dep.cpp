@@ -3075,12 +3075,6 @@ SchedInstruction *DataDepGraph::GetLeafInst() {
   return (SchedInstruction *)leaf_;
 }
 
-void DataDepGraph::AddNode_(SchedInstruction *instPtr, InstCount instNum) {
-  assert(instNum < instCnt_);
-  insts_[instNum] = instPtr;
-  instPtr->SetNum(instNum);
-}
-
 void DataDepGraph::CmputCrtclPathsFrmRoot_() {
   InstCount i;
 
