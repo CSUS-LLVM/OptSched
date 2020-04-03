@@ -54,6 +54,21 @@ ACOScheduler::ACOScheduler(DataDepGraph *dataDepGraph,
   ants_per_iteration = schedIni.GetInt("ACO_ANT_PER_ITERATION");
   print_aco_trace = schedIni.GetBool("ACO_TRACE");
 
+  //pheremone Graph Debugging start
+  std::string tgtKernels = schedIni.GetString("ACO_DBG_KERNELS");
+  outPath = schedIni.GetString("ACO_DBG_KERNELS_OUT_PATH");
+  if(tgtKernels!="NONE"){
+    std::size_t startIdx = 0;
+    std::size_t sepIdx = tgtKernels.find("|");
+    while(sepIdx!=std::string::npos){
+      dbgKernels.insert(tgtKernels.substr(startIdx,sepIdx-startIdx));
+      startIdx = sepIdx+1;
+      sepIdx = tgtKernels.find("|", startIdx);
+    }
+  }
+  //pheremone Graph Debugging end
+
+
   /*
   std::cerr << "useOldAlg===="<<useOldAlg<<"\n\n";
   std::cerr << "heuristicImportance_===="<<heuristicImportance_<<"\n\n";
@@ -264,6 +279,8 @@ FUNC_RESULT ACOScheduler::FindSchedule(InstSchedule *schedule_out,
     pheremone_[i] = initialValue_;
   std::cerr << "initialValue_" << initialValue_ << std::endl;
 
+  writePheremoneGraph("initial");
+
   std::unique_ptr<InstSchedule> bestSchedule = std::move(InitialSchedule);
   if (bestSchedule) {
     UpdatePheremone(bestSchedule.get());
@@ -306,6 +323,8 @@ FUNC_RESULT ACOScheduler::FindSchedule(InstSchedule *schedule_out,
       if (noImprovement > noImprovementMax)
         break;
     }
+
+    writePheremoneGraph("iteration"+std::to_string(iterations));
     iterations++;
   }
   PrintSchedule(bestSchedule.get());
@@ -429,5 +448,47 @@ void ACOScheduler::setInitialSched(InstSchedule *Sched) {
     InitialSchedule =
         llvm::make_unique<InstSchedule>(machMdl_, dataDepGraph_, VrfySched_);
     InitialSchedule->Copy(Sched);
+  }
+}
+
+void ACOScheduler::writePheremoneGraph(std::string stage) {
+  if(!dbgKernels.count(dataDepGraph_->GetDagID()))
+    return;
+
+  std::string fullOutPath = outPath+"/"+dataDepGraph_->GetDagID()+"@"+stage;
+  FILE* out = fopen(fullOutPath.c_str(), "w");
+  if(!out){
+    Logger::Info("Could now open file to write pheremone display at %s."
+                 " Skipping.", fullOutPath.c_str());
+    return;
+  }
+
+  //header for .dot file
+  fprintf(out, "digraph pheremone_matrix {\n");
+  fprintf(out, "label=\"%s@%s\"\n", dataDepGraph_->GetDagID(), stage.c_str());
+/*
+  for(InstCount i=-1; i<count_; ++i){
+    for(InstCount j=0; j<count_; ++j){
+      fprintf(out,"\t%d -> %d [label=\"%.4f\"];\n", i, j, Pheremone(i,j));
+    }
+  }
+*/
+
+  writePGraphRecursive(out, dataDepGraph_->GetRootInst());
+
+  //footer for .dot file
+  fprintf(out, "}\n");
+  fclose(out);
+
+}
+
+void ACOScheduler::writePGraphRecursive(FILE* out, SchedInstruction* ins)
+{
+  InstCount i=ins->GetNum();
+  for(SchedInstruction* child = ins->GetFrstScsr(); child!=NULL; child= ins->GetNxtScsr())
+  {
+    InstCount j=child->GetNum();
+    fprintf(out, "\t%d -> %d [label=\"%.4f\"];\n", i, j, Pheremone(i,j));
+    writePGraphRecursive(out,child);
   }
 }
