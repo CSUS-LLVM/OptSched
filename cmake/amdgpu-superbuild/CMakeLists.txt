@@ -1,14 +1,33 @@
+# A SuperBuild project for OptSched on the AMDGPU machine.
+#
+# Use this as the CMake source directory to run the superbuild.
+#
+# Documentation of configuration args:
+#
+# In general, see option()s and set(... CACHE ...)s in this CMakeLists.txt and flang.cmake.
+#
+# Some options behave as follows:
+#  - OPTSCHEDSUPER_AUTO_DOWNLOAD_REPO: Automatically download Google's repo tool for our use.
+#                                      If you don't set this, either repo should already be in your
+#                                      $PATH, or it should be in $HOME/bin.
+#  - OPTSCHED_CFG: The path to the optsched-cfg directory you wish to use.
+#  - These options are passed on to llvm (and OptSched) directly from the SuperBuild configuration:
+#      - CMAKE_BUILD_TYPE. Note that the flang build types default to Release, but can be configured.
+#      - LLVM_PARALLEL_LINK_JOBS.
+#  - OPTSCHEDSUPER_EXTRA_CMAKE_ARGS: Passes these CMake arguments on to the cmake configure.
 cmake_minimum_required(VERSION 3.7)
 
 project(OptSched-AMDGPU-SuperBuild)
 
 option(OPTSCHEDSUPER_AUTO_DOWNLOAD_REPO "Automatically download Google repo" OFF)
 set(OPTSCHED_CFG $ENV{HOME}/optsched-cfg CACHE PATH "Path to the optsched-cfg directory you wish to use")
+set(OPTSCHEDSUPER_EXTRA_CMAKE_ARGS ""    CACHE STRING ";-separated list of extra arguments to pass to configure cmake")
 
 if(NOT CMAKE_CXX_COMPILER_ID STREQUAL Clang)
   message(WARNING "Clang is required to build ROCm OpenCL. This build is likely to fail.")
 endif()
 
+# Attempt to automatically download repo.
 if(OPTSCHEDSUPER_AUTO_DOWNLOAD_REPO)
   set(REPO_DOWNLOAD_DIR ${CMAKE_CURRENT_BINARY_DIR}/repo/download)
   set(REPO_BIN_DIR ${CMAKE_CURRENT_BINARY_DIR}/repo/bin)
@@ -24,6 +43,7 @@ if(OPTSCHEDSUPER_AUTO_DOWNLOAD_REPO)
   endif()
 endif()
 
+# Search for `repo`. We need repo to run the superbuild.
 find_program(REPO_COMMAND repo HINTS $ENV{HOME}/bin PATHS ${REPO_BIN_DIR})
 if(NOT REPO_COMMAND)
   message(FATAL_ERROR
@@ -34,6 +54,8 @@ if(NOT REPO_COMMAND)
 endif()
 message(STATUS "Found repo: ${REPO_COMMAND}")
 
+# Search for `sed`. We need sed to edit the relevent files in order for our build to work.
+# We could instead patch the relevent repos, but we have not done so.
 find_program(SED_COMMAND sed)
 if(NOT SED_COMMAND)
   message(FATAL_ERROR "sed is required to update the ROCm repo as needed for our build")
@@ -79,7 +101,9 @@ ExternalProject_Add(ROCm
         COMMAND # Remove the line "local:".
                 ${SED_COMMAND} -i "/local:/d" <SOURCE_DIR>/opencl/api/opencl/amdocl/amdocl.map
         COMMAND cd <SOURCE_DIR>/opencl/compiler/driver && git apply ${PATCH_DIR}/load-plugins.patch
-        COMMAND # Add top-level target depending on OptSched
+        COMMAND # Add top-level target depending on OptSched.
+                # ROCm's CMakeLists.txt adds LLVm as a subdirectory with EXCLUDE_FROM_ALL.
+                # Since we want to build OptSched, we need a way to depend on it.
                 ${CMAKE_COMMAND} -E echo "add_custom_target(build-optsched ALL)" >> <SOURCE_DIR>/opencl/CMakeLists.txt
         COMMAND ${CMAKE_COMMAND} -E echo "add_dependencies(build-optsched OptSched)" >> <SOURCE_DIR>/opencl/CMakeLists.txt
   SOURCE_SUBDIR opencl
@@ -95,6 +119,7 @@ ExternalProject_Add(ROCm
     -DOPTSCHED_EXTRA_LINK_LIBRARIES=<BINARY_DIR>/lib/libamdocl64.so
     -DLLVM_EXTERNAL_PROJECTS=OptSched
     -DLLVM_EXTERNAL_OPTSCHED_SOURCE_DIR=${ROOT_DIR}
+    ${OPTSCHEDSUPER_EXTRA_CMAKE_ARGS}
   CMAKE_CACHE_DEFAULT_ARGS
     ${cache_default_args}
   USES_TERMINAL_CONFIGURE 1
@@ -105,12 +130,14 @@ ExternalProject_Add(ROCm
 )
 ExternalProject_Get_Property(ROCm BINARY_DIR)
 
+# Write out a shrc to be `source`d by the user. This will set the environment variables they need.
 file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/rocm-env.shrc"
   "export LD_LIBRARY_PATH=${BINARY_DIR}/lib\n"
   "export OPTLIB=${BINARY_DIR}/compiler/llvm/lib/OptSched.so\n"
   "export AMD_OCL_BUILD_OPTIONS_APPEND=\"-Wf,-fplugin=$OPTLIB -Wb,-misched=gcn-optsched -Wb,-optsched-cfg=${OPTSCHED_CFG}\"\n"
 )
 
+# Inform the user to `source` the generated shrc.
 ExternalProject_Add_Step(ROCm inform_env_exports
   DEPENDEES install
   COMMAND ${CMAKE_COMMAND} -E echo
