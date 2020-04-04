@@ -14,6 +14,7 @@ Last Update:  Apr. 2011
 #include "opt-sched/Scheduler/sched_region.h"
 #include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/SmallVector.h"
+#include "llvm/ADT/StringRef.h"
 #include <map>
 #include <memory>
 #include <set>
@@ -65,6 +66,8 @@ private:
     /// Instruction number that ended this cluster
     int InstNum; 
 
+    std::unique_ptr<llvm::SmallVector<llvm::StringRef, 4>> InstrList;
+
     /// Constructor for this struct
     PastClusters(int Cluster, int size, int num)
         : ClusterGroup(Cluster), ClusterSize(size), InstNum(num) {}
@@ -72,6 +75,8 @@ private:
 
   /// Vector containing the (n-1) past clusters
   llvm::SmallVector<std::unique_ptr<PastClusters>, 4> PastClustersList;
+
+  std::unique_ptr<llvm::SmallVector<llvm::StringRef, 4>> InstrList;
 
   /// Pointer to the last cluster. This is kept out of the vector to
   /// avoid having to fetch it every time we compare the current instruction

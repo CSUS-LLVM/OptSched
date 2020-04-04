@@ -378,14 +378,24 @@ void ScheduleDAGOptSched::schedule() {
       OST->createDDGWrapper(C, this, MM.get(), LatencyPrecision, RegionName);
   DDG->convertSUnits();
   DDG->convertRegFiles();
-  DDG->findPossibleClusters();
   if (SecondPass) {
+    dbgs() << "Finding load clusters.\n";
+    int TotalLoadsInstructionsClusterable = DDG->findPossibleClusters(true);
+    if (TotalLoadsInstructionsClusterable == 0)
+      dbgs() << "  No load clustering possible\n";
+    dbgs() << "Finding store clusters.\n";
+    int TotalStoreInstructionsClusterable = DDG->findPossibleClusters(false);
+    if (TotalStoreInstructionsClusterable == 0)
+      dbgs() << "  No store clustering possible\n";
+
     auto DDG2 = static_cast<DataDepGraph *>(DDG.get());
+    Logger::Info("Total clusterable instructions: %d loads, %d stores", TotalLoadsInstructionsClusterable, TotalStoreInstructionsClusterable);
+    DDG2->setMaxInstructionsInAllClusters(TotalLoadsInstructionsClusterable + TotalStoreInstructionsClusterable);
     int end = DDG2->getMaxClusterCount();
     if (end > 0) {
       Logger::Info("Total clusters in region: %d", end);
       for (int begin = 1; begin <= end; begin++) {
-        Logger::Info("Cluster %d has total instructions %d", begin, DDG2->getMaxInstructionsInCluster(begin));
+        Logger::Info("  Cluster %d has total instructions %d", begin, DDG2->getMaxInstructionsInCluster(begin));
       }
     }
   }

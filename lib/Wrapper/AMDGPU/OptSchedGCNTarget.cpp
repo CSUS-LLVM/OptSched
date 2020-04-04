@@ -212,6 +212,10 @@ bool OptSchedGCNTarget::shouldKeepSchedule() {
       dbgs() << "Reverting Scheduling because of a decrease in occupancy from "
              << RegionStartingOccupancy << " to " << RegionEndingOccupancy
              << ".\n");
+  Logger::Info(
+      "Reverting Scheduling because of a decrease in occupancy from %d to %d.", RegionStartingOccupancy, RegionEndingOccupancy
+);
+
   return false;
 }
 

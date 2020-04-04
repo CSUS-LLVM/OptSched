@@ -513,9 +513,7 @@ int OptSchedDDGWrapperBasic::clusterNeighboringMemOps(
   bool ClusterPossible = false;
   int TotalInstructionsPossible = 0;
 
-  LLVM_DEBUG(dbgs() << "Processing possible clusters\n");
   for (const SUnit *SU : MemOps) {
-    LLVM_DEBUG(dbgs() << "  " << SU->NodeNum << " is in the chain.\n");
     MachineOperand *BaseOp;
     int64_t Offset;
     if (DAG->TII->getMemOperandWithOffset(*SU->getInstr(), BaseOp, Offset, DAG->TRI))
@@ -523,7 +521,7 @@ int OptSchedDDGWrapperBasic::clusterNeighboringMemOps(
   }
 
   if (MemOpRecords.size() < 2) {
-    LLVM_DEBUG(dbgs() << "  Unable to cluster memop cluster of 1.\n");
+    dbgs() << "  Unable to cluster memop cluster of 1.\n";
     return 0;
   }
 
@@ -532,11 +530,11 @@ int OptSchedDDGWrapperBasic::clusterNeighboringMemOps(
   for (unsigned Idx = 0, End = MemOpRecords.size(); Idx < (End - 1); ++Idx) {
     const SUnit *SUa = MemOpRecords[Idx].SU;
     const SUnit *SUb = MemOpRecords[Idx + 1].SU;
-    LLVM_DEBUG(dbgs() << "  Checking possible clustering of (" << SUa->NodeNum << ") and (" << SUb->NodeNum << ")\n");
+    dbgs() << "  Checking possible clustering of (" << SUa->NodeNum << ") and (" << SUb->NodeNum << ")\n";
     if (DAG->TII->shouldClusterMemOps(*MemOpRecords[Idx].BaseOp,
                                  *MemOpRecords[Idx + 1].BaseOp,
                                  ClusterLength)) {
-      LLVM_DEBUG(dbgs() << "    Cluster possible at SU(" << SUa->NodeNum << ")- SU(" << SUb->NodeNum << ")\n");
+      dbgs() << "    Cluster possible at SU(" << SUa->NodeNum << ")- SU(" << SUb->NodeNum << ")\n";
       
       // If clustering was possible then increase the cluster count. This only
       // happens once every cluster
@@ -544,7 +542,7 @@ int OptSchedDDGWrapperBasic::clusterNeighboringMemOps(
         ClusterPossible = true;
         ClusterCount++;
         setMaxClusterCount(ClusterCount);
-        Logger::Info("Setting max cluster count to %d", ClusterCount);
+        dbgs() << "    Setting total cluster count to " << ClusterCount << "\n";
       }
 
       // Tell the instructions what cluster number they are in
@@ -562,16 +560,6 @@ int OptSchedDDGWrapperBasic::clusterNeighboringMemOps(
     } else
       ClusterLength = 1;
   }
-#ifdef IS_DEBUG_MEMORY_CLUSTERING
-  LLVM_DEBUG(dbgs () << "Printing bit vector: ");
-  for (int i = ClusterVector->GetSize() - 1; i >= 0; i--) {
-    if (ClusterVector->GetBit(i))
-      LLVM_DEBUG(dbgs() << "1");
-    else
-      LLVM_DEBUG(dbgs() << "0");
-  }
-  LLVM_DEBUG(dbgs() << '\n');
-#endif
   MaxInstructionsInEachClusters.insert(std::make_pair(ClusterCount, TotalInstructionsPossible));
   return TotalInstructionsPossible;
 }
@@ -579,13 +567,10 @@ int OptSchedDDGWrapperBasic::clusterNeighboringMemOps(
 /// Iterate through SUnits and find all possible clustering then transfer
 /// the information so that our scheduler can access it.
 /// Partially copied from https://github.com/RadeonOpenCompute/llvm/blob/roc-ocl-2.4.0/lib/CodeGen/MachineScheduler.cpp#L1595
-void OptSchedDDGWrapperBasic::findPossibleClusters() {
+int OptSchedDDGWrapperBasic::findPossibleClusters(bool IsLoad) {
   // TODO: Add For-loop to also do store clusters. Currently only does load
   // clusters
-  bool IsLoad = true;
   int TotalInstructionsPossible = 0;
-
-  LLVM_DEBUG(dbgs() << "Looking for load clusters\n");
   DenseMap<unsigned, unsigned> StoreChainIDs;
   // Map each store chain to a set of dependent MemOps.
   SmallVector<SmallVector<const SUnit *, 4>, 32> StoreChainDependents;
@@ -594,13 +579,12 @@ void OptSchedDDGWrapperBasic::findPossibleClusters() {
         (!IsLoad && !SU.getInstr()->mayStore()))
       continue;
     auto MI = SU.getInstr();
-    LLVM_DEBUG(dbgs() << "  Instruction (" << SU.NodeNum << ") " << DAG->TII->getName(MI->getOpcode())  << " may load.\n");
+
+    dbgs() << "Instruction (" << SU.NodeNum << ") " << DAG->TII->getName(MI->getOpcode())  << " may " << (IsLoad ? "load" : "store") << "\n";
 
     unsigned ChainPredID = DAG->SUnits.size();
     for (const SDep &Pred : SU.Preds) {
       if (Pred.isCtrl()) {
-        auto PredMI = Pred.getSUnit()->getInstr();
-        LLVM_DEBUG(dbgs() << "    Breaking chain at (" << Pred.getSUnit()->NodeNum << ") " << DAG->TII->getName(PredMI->getOpcode()) << '\n');
         ChainPredID = Pred.getSUnit()->NodeNum;
         break;
       }
@@ -608,7 +592,6 @@ void OptSchedDDGWrapperBasic::findPossibleClusters() {
     // Check if this chain-like pred has been seen
     // before. ChainPredID==MaxNodeID at the top of the schedule.
     unsigned NumChains = StoreChainDependents.size();
-    LLVM_DEBUG(dbgs() << "    ChainPredID " << ChainPredID << ", NumChains " << NumChains << '\n');
     std::pair<DenseMap<unsigned, unsigned>::iterator, bool> Result =
         StoreChainIDs.insert(std::make_pair(ChainPredID, NumChains));
     if (Result.second)
@@ -618,16 +601,14 @@ void OptSchedDDGWrapperBasic::findPossibleClusters() {
 
   // Iterate over the store chains.
   for (auto &SCD : StoreChainDependents) {
-#ifdef IS_DEBUG_MEMORY_CLUSTERING
-    LLVM_DEBUG(dbgs() << "    Printing the list before clustering: ");
+    dbgs() << "Printing the Node ID of the current chain: ";
     for (auto SU1 : SCD)
-    	LLVM_DEBUG(dbgs() << SU1->NodeNum << " ");
-    LLVM_DEBUG(dbgs() << '\n');
-#endif
+    	dbgs() << SU1->NodeNum << " ";
+    dbgs() << '\n';
     TotalInstructionsPossible += clusterNeighboringMemOps(SCD);
   }
-
- setMaxInstructionsInAllClusters(TotalInstructionsPossible);
+ return TotalInstructionsPossible;
+// setMaxInstructionsInAllClusters(TotalInstructionsPossible);
 }
 
 LLVMRegTypeFilter::LLVMRegTypeFilter(

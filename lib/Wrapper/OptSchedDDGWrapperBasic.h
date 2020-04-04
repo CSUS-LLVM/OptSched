@@ -50,7 +50,7 @@ public:
 
   void convertSUnits() override;
   void convertRegFiles() override;
-  void findPossibleClusters() override;
+  int findPossibleClusters(bool IsLoad) override;
 
 protected:
   // A convenience machMdl_ pointer casted to OptSchedMachineModel*.

@@ -349,6 +349,8 @@ void BBWithSpill::InitForSchdulng() {
     InstructionsScheduledInEachCluster[begin] = 0;
   }
 
+  InstrList.reset();
+
   schduldEntryInstCnt_ = 0;
   schduldExitInstCnt_ = 0;
   schduldInstCnt_ = 0;
@@ -483,7 +485,10 @@ void BBWithSpill::UpdateSpillInfoForSchdul_(SchedInstruction *inst,
           // Case 1: Currently clustering and this current instruction is part
           // of the cluster
           CurrentClusterSize++;
-          InstructionsScheduledInEachCluster[ActiveClusterGroup]++; 
+          InstructionsScheduledInEachCluster[ActiveClusterGroup]++;
+	  
+	  InstrList->push_back(inst->GetName());
+
         } else {
           //Logger::Info("Inst %d pushing cluster size %d onto the stack due to "
             //           "cluster to cluster op",
@@ -497,7 +502,9 @@ void BBWithSpill::UpdateSpillInfoForSchdul_(SchedInstruction *inst,
           } else 
             LastCluster = llvm::make_unique<PastClusters>(
                 ActiveClusterGroup, CurrentClusterSize, inst->GetNum());
-          
+
+          LastCluster->InstrList = std::move(InstrList);
+
 	  // If this cluster did not finish then that means there have to be an extra cluster block to finish all of the instructions
 	  // // in the cluster
 	  if (InstructionsScheduledInEachCluster[ActiveClusterGroup] < dataDepGraph_->getMaxInstructionsInCluster(ActiveClusterGroup)) {
@@ -508,6 +515,10 @@ void BBWithSpill::UpdateSpillInfoForSchdul_(SchedInstruction *inst,
           inst->SetActiveCluster(ActiveClusterGroup);
           CurrentClusterSize = 1;
           InstructionsScheduledInEachCluster[ActiveClusterGroup]++;
+
+	  InstrList = llvm::make_unique<llvm::SmallVector<llvm::StringRef, 4>>();
+  	  InstrList->push_back(inst->GetName());
+
         }
       } else {
         // Case 3: Not currently clustering. Initialize clustering
@@ -515,6 +526,10 @@ void BBWithSpill::UpdateSpillInfoForSchdul_(SchedInstruction *inst,
         inst->SetActiveCluster(ActiveClusterGroup);
         CurrentClusterSize = 1;
         InstructionsScheduledInEachCluster[ActiveClusterGroup]++;
+
+	InstrList = llvm::make_unique<llvm::SmallVector<llvm::StringRef, 4>>();
+	InstrList->push_back(inst->GetName());
+
       }
     } else if (CurrentClusterSize > 0) {
       // Case 2: Exiting out of an active cluster
@@ -533,6 +548,8 @@ void BBWithSpill::UpdateSpillInfoForSchdul_(SchedInstruction *inst,
         // This is the first cluster that we are saving
         LastCluster = llvm::make_unique<PastClusters>(
             ActiveClusterGroup, CurrentClusterSize, inst->GetNum());
+
+      LastCluster->InstrList = std::move(InstrList);
 
       // If InstrScheduledInEachCluster != Max
       // blocks++
@@ -760,6 +777,9 @@ void BBWithSpill::UpdateSpillInfoForUnSchdul_(SchedInstruction *inst) {
       CurrentClusterSize--;
       InstructionsScheduledInEachCluster[ActiveClusterGroup]--;
       assert(InstructionsScheduledInEachCluster[ActiveClusterGroup] >= 0);
+
+      InstrList->pop_back();
+
       //Logger::Info("Undoing an instruction from the cluster. Current size: %d",
         //           CurrentClusterSize);
 
@@ -776,6 +796,9 @@ void BBWithSpill::UpdateSpillInfoForUnSchdul_(SchedInstruction *inst) {
             CurrentClusterSize = LastCluster->ClusterSize;
             ActiveClusterGroup = LastCluster->ClusterGroup;
             inst->SetActiveCluster(ActiveClusterGroup);
+
+	    InstrList = std::move(LastCluster->InstrList);
+
             LastCluster.reset(); // Release current cluster pointer
 
             // Get previous cluster from vector list
@@ -798,6 +821,9 @@ void BBWithSpill::UpdateSpillInfoForUnSchdul_(SchedInstruction *inst) {
         CurrentClusterSize = LastCluster->ClusterSize;
         ActiveClusterGroup = LastCluster->ClusterGroup;
         inst->SetActiveCluster(ActiveClusterGroup);
+
+	InstrList = std::move(LastCluster->InstrList);
+
         LastCluster.reset(); // Release current cluster pointer
 
         // Get previous cluster from vector list
@@ -1080,6 +1106,36 @@ InstCount BBWithSpill::UpdtOptmlSched(InstSchedule *crntSched,
     bestSchedLngth_ = crntSched->GetCrntLngth();
     enumBestSched_->Copy(crntSched);
     bestSched_ = enumBestSched_;
+   
+    if (isSecondPass && ClusterMemoryOperations) {
+      dbgs() << "Printing clustered instructions:\n";
+      int i = 1;
+      for (const auto &clusters : PastClustersList) {
+        dbgs() << "Printing cluster " << i << ": ";
+        for (const auto &instr : *clusters->InstrList) {
+          dbgs() << instr << " ";
+        }
+        i++;
+      dbgs() << '\n';
+      }
+
+      if (LastCluster) {
+        dbgs() << "Printing cluster " << i << ": ";
+        for (const auto &instr : *(LastCluster->InstrList)) {
+          dbgs() << instr << " ";
+        }
+        i++;
+      dbgs() << '\n';
+      }
+    
+      if (InstrList && InstrList->size() > 0) {
+        dbgs() << "Printing cluster " << i << ": ";
+        for (const auto &instr : *InstrList) {
+          dbgs() << instr << " ";
+        }
+      dbgs() << '\n';
+      }
+    }
   }
 
   return bestCost_;
