@@ -1,4 +1,5 @@
 add_optsched_unittest(OptSchedBasicTests
-  UtilitiesTest.cpp
   ConfigTest.cpp
+  LoggerTest.cpp
+  UtilitiesTest.cpp
   )

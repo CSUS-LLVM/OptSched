@@ -1,4 +1,5 @@
 #include "opt-sched/Scheduler/logger.h"
+#include <iostream>
 // For va_list, va_start(), va_end().
 #include <cstdarg>
 // For sprintf(), vsprintf().
@@ -116,4 +117,52 @@ void Logger::Summary(const char *format_string, ...) {
   char message_buffer[MAX_MSGSIZE];
   VPRINT(message_buffer, format_string);
   Output(Logger::SUMMARY, false, message_buffer);
+}
+
+using Logger::detail::EventAttrType;
+using Logger::detail::EventAttrValue;
+
+void Logger::detail::Event(
+    const std::pair<EventAttrType, EventAttrValue> *attrs, size_t numAttrs) {
+  std::ostream &out = *logStream;
+
+  // We alternate using ": " and ", " as the separators.
+  // However, we just print the separator before every attribute, meaning that
+  // we need to special case the first element, hence the third empty string.
+  const char *separators[] = {": ", ", ", ""};
+  int sepIndex = 2;
+
+  out << "EVENT: {";
+
+  for (size_t index = 0; index < numAttrs; ++index,
+              // Alternate the separator we are using. Note: !2 == 0
+                                           sepIndex = !sepIndex) {
+    const auto type = attrs[index].first;
+    const auto val = attrs[index].second;
+
+    out << separators[sepIndex];
+
+    switch (type) {
+    case EventAttrType::Bool:
+      out << (val.b ? "true" : "false");
+      break;
+    case EventAttrType::Int64:
+      out << val.i64;
+      break;
+    case EventAttrType::UInt64:
+      out << val.u64;
+      break;
+    case EventAttrType::CStr:
+      // TODO(justin): when we have C++14, use std::quoted(val.cstr), which will
+      // escape `"`s inside the string.
+      out << '"' << val.cstr << '"';
+      break;
+    default:
+      Logger::Fatal("Unknown event type %d. Internal error", (int)type);
+    }
+  }
+
+  out << separators[sepIndex] << "\"time\": " << Utilities::GetProcessorTime()
+      << "}\n"
+      << std::flush;
 }
