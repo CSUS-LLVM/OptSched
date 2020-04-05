@@ -3,6 +3,13 @@
 
 import sys
 import re
+import json
+
+def get_events_of_id(logs, event_id):
+    event_start = 'EVENT: {"event_id": "{}"'.format(event_id)
+    lines = logs.splitlines()
+    event_lines = [line.split(' ', 1)[1] for line in lines if line.startswith(event_start)]
+    return list(map(json.loads, event_lines))
 
 RE_NEW_BENCH = re.compile(r'(\d+)\.(.*) base \.exe default')
 RE_BLOCK = re.compile(r'INFO: Processing DAG (.*) with (\d+) insts')
@@ -15,7 +22,7 @@ if __name__ == "__main__":
         totalMismatches = 0
         for line in logfile.readlines():
             matchBench = RE_NEW_BENCH.findall(line)
-            matchBlock = RE_BLOCK.findall(line)
+            matchBlock = get_events_of_id(line)
 
             if matchBench != []:
                 if bench:

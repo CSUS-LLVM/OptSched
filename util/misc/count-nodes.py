@@ -2,16 +2,17 @@ import re
 import mmap
 import optparse
 import os
+import json
 
-regex = re.compile("Examined (\d+) nodes")
+NODE_COUNT_RE = re.compile(r'EVENT: (.*"event_id": "NodeExamineCount".*)')
 
 def getNodeCount(fileName):
     count = 0
     with open(fileName) as bff:
         bffm = mmap.mmap(bff.fileno(), 0, access=mmap.ACCESS_READ)
 
-        for match in regex.finditer(bffm):
-            count += int(match.group(1))
+        for match in NODE_COUNT_RE.finditer(bffm):
+            count += json.loads(match.group(1))['count']
 
         bffm.close()
 
@@ -25,7 +26,7 @@ parser.add_option('-p', '--path',
                   help='Log file.')
 parser.add_option('--isfolder',
                   action='store_true',
-                  help='Specify if parsing a foldere.')
+                  help='Specify if parsing a folder.')
 
 args = parser.parse_args()[0]
 

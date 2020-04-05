@@ -278,4 +278,4 @@ void LocalRegAlloc::PrintSpillInfo(const char *dagName) {
   Logger::Info("Number of loads %d", numLoads_);
 }
 
-int LocalRegAlloc::GetCost() { return numLoads_ + numStores_; }
+int LocalRegAlloc::GetCost() const { return numLoads_ + numStores_; }

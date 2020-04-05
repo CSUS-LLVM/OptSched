@@ -284,6 +284,8 @@ void ScheduleDAGOptSched::schedule() {
     return;
   }
 
+  // This log output is parsed by scripts. Don't change its format unless you
+  // are prepared to change the relevant scripts as well.
   Logger::Info("********** Opt Scheduling **********");
   LLVM_DEBUG(dbgs() << "********** Scheduling Region " << RegionName
                     << " **********\n");
@@ -824,6 +826,10 @@ void ScheduleDAGOptSched::scheduleOptSchedMinRP() {
   HeurSchedType = SCHED_LIST;
 
   schedule();
+  Logger::Event("PassFinished", "num", 1);
+  // TODO(justin): Remove once relevant scripts have been updated:
+  // get-benchmark-stats.py, get-optsched-stats.py, get-sched-length.py,
+  // plaidbench-validation-test.py
   Logger::Info("End of first pass through\n");
 }
 
@@ -855,6 +861,10 @@ void ScheduleDAGOptSched::scheduleOptSchedBalanced() {
   MultiPassStaticNodeSup = false;
 
   schedule();
+  Logger::Event("PassFinished", "num", 2);
+  // TODO(justin): Remove once relevant scripts have been updated:
+  // get-benchmark-stats.py, get-optsched-stats.py, get-sched-length.py,
+  // plaidbench-validation-test.py
   Logger::Info("End of second pass through");
 }
 
