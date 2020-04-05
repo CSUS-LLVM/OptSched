@@ -47,7 +47,11 @@ public:
   // allocation.
   virtual void PrintSpillInfo(const char *dagName);
   // Return the spill cost of region after register allocation.
-  virtual int GetCost();
+  virtual int GetCost() const;
+  // Return the number of loads
+  int GetNumLoads() const { return numLoads_; }
+  // Return the number of stores
+  int GetNumStores() const { return numStores_; }
 
 private:
   InstSchedule *instSchedule_;

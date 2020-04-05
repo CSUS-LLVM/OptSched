@@ -305,10 +305,10 @@ InstCount BBWithSpill::CmputCostLwrBound() {
       schedLwrBound_ * schedCostFactor_ + spillCostLwrBound * SCW_;
 
 #if defined(IS_DEBUG_STATIC_LOWER_BOUND)
-  Logger::Info(
-      "DAG %s spillCostLB %d scFactor %d lengthLB %d lenFactor %d staticLB %d",
-      dataDepGraph_->GetDagID(), spillCostLwrBound, SCW_, schedLwrBound_,
-      schedCostFactor_, staticLowerBound);
+  Logger::Event("StaticLowerBoundDebugInfo", "name", dataDepGraph_->GetDagID(),
+                "spill_cost_lb", spillCostLwrBound, "sc_factor", SCW_,       //
+                "length_lb", schedLwrBound_, "len_factor", schedCostFactor_, //
+                "static_lb", staticLowerBound);
 #endif
 
   return staticLowerBound;
@@ -790,9 +790,8 @@ FUNC_RESULT BBWithSpill::Enumerate_(Milliseconds startTime,
 
   for (trgtLngth = schedLwrBound_; trgtLngth <= schedUprBound_; trgtLngth++) {
     InitForSchdulng();
-    //#ifdef IS_DEBUG_ENUM_ITERS
-    Logger::Info("Enumerating at target length %d", trgtLngth);
-    //#endif
+    Logger::Event("Enumerating", "target_length", trgtLngth);
+
     rslt = enumrtr_->FindFeasibleSchedule(enumCrntSched_, trgtLngth, this,
                                           costLwrBound, lngthDeadline);
     if (rslt == RES_TIMEOUT)

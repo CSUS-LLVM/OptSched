@@ -2893,6 +2893,9 @@ bool InstSchedule::Verify(MachineModel *machMdl, DataDepGraph *dataDepGraph) {
   Print(std::cout, "debug");
 #endif
 
+  Logger::Event("ScheduleVerifiedSuccessfully");
+  // TODO(justin): Remove once relevant scripts have been updated:
+  // runspec-wrapper-SLIL.py
   Logger::Info("Schedule verified successfully");
 
   return true;
