@@ -8,12 +8,17 @@ using namespace llvm::opt_sched;
 ReadyList::ReadyList(DataDepGraph *dataDepGraph, SchedPriorities prirts) {
   prirts_ = prirts;
   prirtyLst_ = NULL;
-  keyedEntries_ = NULL;
   int i;
   uint16_t totKeyBits = 0;
 
   useCntBits_ = crtclPathBits_ = scsrCntBits_ = ltncySumBits_ = nodeID_Bits_ =
       inptSchedOrderBits_ = 0;
+
+  if (prirts_.isDynmc)
+    keyedEntries_ = new KeyedEntry<SchedInstruction, unsigned long>
+        *[dataDepGraph->GetInstCnt()];
+  else
+    keyedEntries_ = nullptr;
 
   // Calculate the number of bits needed to hold the maximum value of each
   // priority scheme
@@ -27,8 +32,6 @@ ReadyList::ReadyList(DataDepGraph *dataDepGraph, SchedPriorities prirts) {
       break;
 
     case LSH_LUC:
-      keyedEntries_ = new KeyedEntry<SchedInstruction, unsigned long>
-          *[dataDepGraph->GetInstCnt()];
       for (int j = 0; j < dataDepGraph->GetInstCnt(); j++) {
         keyedEntries_[j] = NULL;
       }
@@ -211,7 +214,7 @@ unsigned long ReadyList::CmputKey_(SchedInstruction *inst, bool isUpdate,
 
     case LSH_MEM:
       if (inst->GetClusterGroup() == 0)
-	      ValueForKey = 0;
+        ValueForKey = 0;
       else {
         OldWasActive = inst->getWasActive();
         NewWasActive = inst->computeWasActive();
@@ -221,7 +224,7 @@ unsigned long ReadyList::CmputKey_(SchedInstruction *inst, bool isUpdate,
         }
         ValueForKey =
             inst->GetClusterGroup() == SchedInstruction::GetActiveCluster() ? 1
-                                                                          : 0;
+                                                                            : 0;
       }
       AddPrirtyToKey_(key, keySize, ClusterBit, ValueForKey, 1);
       break;
@@ -247,7 +250,8 @@ void ReadyList::Print(std::ostream &out) {
   out << "Ready List: ";
   for (auto *crntInst = prirtyLst_->GetFrstElmnt(); crntInst != NULL;
        crntInst = prirtyLst_->GetNxtElmnt()) {
-    out << " " << crntInst->GetNum() << "(" << crntInst->GetClusterGroup() << ")";
+    out << " " << crntInst->GetNum() << "(" << crntInst->GetClusterGroup()
+        << ")";
   }
   out << '\n';
 

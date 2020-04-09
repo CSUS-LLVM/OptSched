@@ -178,7 +178,7 @@ public:
   T *GetNxtPriorityElmnt(K &key);
   // Copies all the data from another list. The existing list must be empty.
   void CopyList(PriorityList<T, K> const *const otherLst,
-                KeyedEntry<T, unsigned long> **keyedEntries_);
+                KeyedEntry<T, unsigned long> **keyedEntries_ = nullptr);
 
 protected:
   KeyedEntry<T, K> *allocKeyEntries_;
@@ -648,7 +648,8 @@ void PriorityList<T, K>::CopyList(
     K key = entry->key;
     KeyedEntry<T, K> *newEntry = AllocEntry_(elmnt, key);
     LinkedList<T>::AppendEntry_(newEntry);
-    keyedEntries_[entry->element->GetNum()] = newEntry;
+    if (keyedEntries_)
+      keyedEntries_[entry->element->GetNum()] = newEntry;
 
     if (entry == otherLst->rtrvEntry_) {
       LinkedList<T>::rtrvEntry_ = newEntry;
