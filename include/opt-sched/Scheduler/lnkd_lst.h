@@ -4,7 +4,7 @@ Description:  Defines a generic linked list template class with a number of
               Warning: the code within has evolved over many years.
 Author:       Ghassan Shobaki
 Created:      Oct. 1997
-Last Update:  Mar. 2011
+Last Update:  Apr. 2020
 *******************************************************************************/
 
 #ifndef OPTSCHED_GENERIC_LNKD_LST_H
@@ -177,7 +177,9 @@ public:
   T *GetNxtPriorityElmnt();
   T *GetNxtPriorityElmnt(K &key);
   // Copies all the data from another list. The existing list must be empty.
-  void CopyList(PriorityList<T, K> const *const otherLst);
+  // Also insert the entries into an array if it one is passed.
+  void CopyList(PriorityList<T, K> const *const otherLst,
+                KeyedEntry<T, unsigned long> **keyedEntries_ = nullptr);
 
 protected:
   KeyedEntry<T, K> *allocKeyEntries_;
@@ -613,7 +615,9 @@ void PriorityList<T, K>::BoostEntry(KeyedEntry<T, K> *entry, K newKey) {
 }
 
 template <class T, class K>
-void PriorityList<T, K>::CopyList(PriorityList<T, K> const *const otherLst) {
+void PriorityList<T, K>::CopyList(
+    PriorityList<T, K> const *const otherLst,
+    KeyedEntry<T, unsigned long> **keyedEntries_) {
   assert(LinkedList<T>::elmntCnt_ == 0);
 
   for (KeyedEntry<T, K> *entry = (KeyedEntry<T, K> *)otherLst->topEntry_;
@@ -622,6 +626,8 @@ void PriorityList<T, K>::CopyList(PriorityList<T, K> const *const otherLst) {
     K key = entry->key;
     KeyedEntry<T, K> *newEntry = AllocEntry_(elmnt, key);
     LinkedList<T>::AppendEntry_(newEntry);
+    if (keyedEntries_)
+      keyedEntries_[entry->element->GetNum()] = newEntry;
 
     if (entry == otherLst->rtrvEntry_) {
       LinkedList<T>::rtrvEntry_ = newEntry;

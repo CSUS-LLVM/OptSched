@@ -8,9 +8,16 @@ using namespace llvm::opt_sched;
 ReadyList::ReadyList(DataDepGraph *dataDepGraph, SchedPriorities prirts) {
   prirts_ = prirts;
   prirtyLst_ = NULL;
-  keyedEntries_ = NULL;
   int i;
   uint16_t totKeyBits = 0;
+
+  // Initialize an array of KeyedEntry if a dynamic heuristic is used. This
+  // enable fast updating for dynamic heuristics.
+  if (prirts_.isDynmc)
+    keyedEntries_ = new KeyedEntry<SchedInstruction, unsigned long>
+        *[dataDepGraph->GetInstCnt()];
+  else
+    keyedEntries_ = nullptr;
 
   useCntBits_ = crtclPathBits_ = scsrCntBits_ = ltncySumBits_ = nodeID_Bits_ =
       inptSchedOrderBits_ = 0;
@@ -27,8 +34,6 @@ ReadyList::ReadyList(DataDepGraph *dataDepGraph, SchedPriorities prirts) {
       break;
 
     case LSH_LUC:
-      keyedEntries_ = new KeyedEntry<SchedInstruction, unsigned long>
-          *[dataDepGraph->GetInstCnt()];
       for (int j = 0; j < dataDepGraph->GetInstCnt(); j++) {
         keyedEntries_[j] = NULL;
       }
@@ -134,7 +139,11 @@ void ReadyList::CopyList(ReadyList *othrLst) {
   assert(prirtyLst_->GetElmntCnt() == 0);
   assert(latestSubLst_->GetElmntCnt() == 0);
   assert(othrLst != NULL);
-  prirtyLst_->CopyList(othrLst->prirtyLst_);
+
+  // Copy the ready list and create the array of keyed entries. If a dynamic
+  // heuristic is not used then the second parameter should be a nullptr and the
+  // array will not be created.
+  prirtyLst_->CopyList(othrLst->prirtyLst_, keyedEntries_);
 }
 
 unsigned long ReadyList::CmputKey_(SchedInstruction *inst, bool isUpdate,
@@ -158,7 +167,6 @@ unsigned long ReadyList::CmputKey_(SchedInstruction *inst, bool isUpdate,
     case LSH_LUC:
       oldLastUseCnt = inst->GetLastUseCnt();
       newLastUseCnt = inst->CmputLastUseCnt();
-      assert(!isUpdate || newLastUseCnt >= oldLastUseCnt);
       if (newLastUseCnt != oldLastUseCnt)
         changed = true;
 
