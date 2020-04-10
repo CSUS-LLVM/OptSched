@@ -11,9 +11,11 @@
 #include "opt-sched/Scheduler/relaxed_sched.h"
 #include "opt-sched/Scheduler/stats.h"
 #include "opt-sched/Scheduler/utilities.h"
+#include "llvm/ADT/STLExtras.h"
 #include <algorithm>
 #include <cstdio>
 #include <iostream>
+#include <iterator>
 #include <map>
 #include <numeric>
 #include <set>
@@ -188,19 +190,16 @@ static InstCount ComputeSLILStaticLowerBound(int64_t regTypeCnt_,
     // For each register this instruction defines, compute the intersection
     // between the recursive successor list of this instruction and the
     // recursive predecessors of the dependent instruction.
-    Register **definedRegisters = nullptr;
-    auto defRegCount = inst->GetDefs(definedRegisters);
     auto recSuccBV = inst->GetRcrsvNghbrBitVector(DIR_FRWRD);
-    for (int j = 0; j < defRegCount; ++j) {
-      for (const auto &dependentInst : definedRegisters[j]->GetUseList()) {
+    for (Register *def : inst->GetDefs()) {
+      for (const auto &dependentInst : def->GetUseList()) {
         auto recPredBV = const_cast<SchedInstruction *>(dependentInst)
                              ->GetRcrsvNghbrBitVector(DIR_BKWRD);
         assert(recSuccBV->GetSize() == recPredBV->GetSize() &&
                "Successor list size doesn't match predecessor list size!");
         for (int k = 0; k < recSuccBV->GetSize(); ++k) {
           if (recSuccBV->GetBit(k) & recPredBV->GetBit(k)) {
-            if (definedRegisters[j]->AddToInterval(
-                    dataDepGraph_->GetInstByIndx(k))) {
+            if (def->AddToInterval(dataDepGraph_->GetInstByIndx(k))) {
               ++closureLowerBound;
             }
           }
@@ -221,17 +220,15 @@ static InstCount ComputeSLILStaticLowerBound(int64_t regTypeCnt_,
   std::vector<std::pair<const SchedInstruction *, Register *>> usedInsts;
   for (int i = 0; i < dataDepGraph_->GetInstCnt(); ++i) {
     const auto &inst = dataDepGraph_->GetInstByIndx(i);
-    Register **usedRegisters = nullptr;
-    auto usedRegCount = inst->GetUses(usedRegisters);
 
     // Get a list of instructions that define the registers, in array form.
     usedInsts.clear();
-    for (int j = 0; j < usedRegCount; ++j) {
-      Register *reg = usedRegisters[j];
-      assert(reg->GetDefList().size() == 1 &&
-             "Number of defs for register is not 1!");
-      usedInsts.push_back(std::make_pair(*(reg->GetDefList().begin()), reg));
-    }
+    llvm::transform(inst->GetUses(), std::back_inserter(usedInsts),
+                    [&](Register *reg) {
+                      assert(reg->GetDefList().size() == 1 &&
+                             "Number of defs for register is not 1!");
+                      return std::make_pair(*(reg->GetDefList().begin()), reg);
+                    });
 
 #if defined(IS_DEBUG_SLIL_COMMON_USE_LB)
     Logger::Info("Common Use Lower Bound Instruction %d", inst->GetNum());
@@ -424,14 +421,9 @@ void BBWithSpill::CmputCrntSpillCost_() {
 void BBWithSpill::UpdateSpillInfoForSchdul_(SchedInstruction *inst,
                                             bool trackCnflcts) {
   int16_t regType;
-  int defCnt, useCnt, regNum, physRegNum;
-  Register **defs, **uses;
-  Register *def, *use;
+  int regNum, physRegNum;
   int liveRegs;
   InstCount newSpillCost;
-
-  defCnt = inst->GetDefs(defs);
-  useCnt = inst->GetUses(uses);
 
 #ifdef IS_DEBUG_REG_PRESSURE
   Logger::Info("Updating reg pressure after scheduling Inst %d",
@@ -439,8 +431,7 @@ void BBWithSpill::UpdateSpillInfoForSchdul_(SchedInstruction *inst,
 #endif
 
   // Update Live regs after uses
-  for (int i = 0; i < useCnt; i++) {
-    use = uses[i];
+  for (Register *use : inst->GetUses()) {
     regType = use->GetType();
     regNum = use->GetNum();
     physRegNum = use->GetPhysicalNumber();
@@ -480,8 +471,7 @@ void BBWithSpill::UpdateSpillInfoForSchdul_(SchedInstruction *inst,
   }
 
   // Update Live regs after defs
-  for (int i = 0; i < defCnt; i++) {
-    def = defs[i];
+  for (Register *def : inst->GetDefs()) {
     regType = def->GetType();
     regNum = def->GetNum();
     physRegNum = def->GetPhysicalNumber();
@@ -611,18 +601,13 @@ void BBWithSpill::UpdateSpillInfoForSchdul_(SchedInstruction *inst,
 
 void BBWithSpill::UpdateSpillInfoForUnSchdul_(SchedInstruction *inst) {
   int16_t regType;
-  int i, defCnt, useCnt, regNum, physRegNum;
-  Register **defs, **uses;
-  Register *def, *use;
+  int regNum, physRegNum;
   bool isLive;
 
 #ifdef IS_DEBUG_REG_PRESSURE
   Logger::Info("Updating reg pressure after unscheduling Inst %d",
                inst->GetNum());
 #endif
-
-  defCnt = inst->GetDefs(defs);
-  useCnt = inst->GetUses(uses);
 
   // (Chris): Update the SLIL for all live regs at this point.
   if (GetSpillCostFunc() == SCF_SLIL) {
@@ -642,8 +627,7 @@ void BBWithSpill::UpdateSpillInfoForUnSchdul_(SchedInstruction *inst) {
   }
 
   // Update Live regs
-  for (i = 0; i < defCnt; i++) {
-    def = defs[i];
+  for (Register *def : inst->GetDefs()) {
     regType = def->GetType();
     regNum = def->GetNum();
     physRegNum = def->GetPhysicalNumber();
@@ -668,8 +652,7 @@ void BBWithSpill::UpdateSpillInfoForUnSchdul_(SchedInstruction *inst) {
     //}
   }
 
-  for (i = 0; i < useCnt; i++) {
-    use = uses[i];
+  for (Register *use : inst->GetUses()) {
     regType = use->GetType();
     regNum = use->GetNum();
     physRegNum = use->GetPhysicalNumber();
@@ -971,11 +954,8 @@ bool BBWithSpill::ChkInstLglty(SchedInstruction *inst) {
       return false;
   }
 
-  defCnt = inst->GetDefs(defs);
-
   // Update Live regs
-  for (int i = 0; i < defCnt; i++) {
-    def = defs[i];
+  for (Register *def : inst->GetDefs()) {
     regType = def->GetType();
     physRegNum = def->GetPhysicalNumber();
 
