@@ -65,14 +65,6 @@ static llvm::SmallVector<const Register *, N> getSet(SchedInstruction *node) {
   return {uses, uses + useCount};
 }
 
-// Calls llvm::zip_first(...) over the ranges, but wraps each range in an
-// llvm::ArrayRef.
-template <typename... Rs>
-static auto zipFirstRefs(const Rs &... ranges)
-    -> decltype(llvm::zip_first(llvm::makeArrayRef(ranges)...)) {
-  return llvm::zip_first(llvm::makeArrayRef(ranges)...);
-}
-
 GraphTrans::GraphTrans(DataDepGraph *dataDepGraph) {
   assert(dataDepGraph != NULL);
 
@@ -259,57 +251,34 @@ bool StaticNodeSupTrans::NodeIsSuperior_(SchedInstruction *nodeA,
   const llvm::SmallVector<const Register *, 10> defsB =
       ::getSet<10, &SchedInstruction::GetDefs>(nodeB);
 
-  // The number of registers that will be lengthened by
-  // scheduling B after A. Indexed by register type.
-  llvm::SmallVector<int, 10> usesLengthenedByB(regTypes);
-  llvm::SmallVector<int, 10> usesShortenedByA(regTypes);
+  // (# lengthened registers) - (# shortened registers)
+  // from scheduling B after A. Indexed by register type.
+  llvm::SmallVector<int, 10> amountLengthenedBySwap(regTypes);
 
-  // Optimality condition: R in Use(B) - Use(A), but there is no C successor
-  // which uses R.
+  // If B is after A, some registers' live ranges will be lengthened. Find them.
   const auto usesLengthenedByBUnclassified =
       possiblyLengthenedIfAfterOther(nodeB, usesB, nodeA, usesA);
   for (const Register *bLastUse : usesLengthenedByBUnclassified) {
-    ++usesLengthenedByB[bLastUse->GetType()];
+    ++amountLengthenedBySwap[bLastUse->GetType()];
   }
 
   // Repeat for A, to find registers shortened by moving A earlier.
   const auto usesLengthenedByAUnclassified =
       possiblyLengthenedIfAfterOther(nodeA, usesA, nodeB, usesB);
   for (const Register *aLastUse : usesLengthenedByAUnclassified) {
-    ++usesShortenedByA[aLastUse->GetType()];
+    --amountLengthenedBySwap[aLastUse->GetType()];
   }
 
-  // For each register type, the number of registers whose live range was
-  // shortened by scheduling A earlier must be >= than the number of registers
-  // whose live range was lengthened by scheduling B earlier
-  const bool swapShortensUses =
-      llvm::all_of(::zipFirstRefs(usesShortenedByA, usesLengthenedByB),
-                   [](std::tuple<int, int> regUses) {
-                     return std::get<0>(regUses) >= std::get<1>(regUses);
-                   });
-
-  if (!swapShortensUses) {
-#ifdef IS_DEBUG_GRAPH_TRANS
-    Logger::Info("Live range condition 1 failed");
-#endif
-    return false;
-  }
-
-  // For each register type, the number of registers defined by A is less than
-  // or equal to the number of registers defined by B.
-  llvm::SmallVector<int, 10> numADefsByType(regTypes);
-  llvm::SmallVector<int, 10> numBDefsByType(regTypes);
-
+  // Every register defined by A is moved earlier, lengthening their live ranges
   for (const Register *reg : defsA)
-    ++numADefsByType[reg->GetType()];
+    ++amountLengthenedBySwap[reg->GetType()];
 
+  // Every register defined by B is moved later, shortening their live ranges
   for (const Register *reg : defsB)
-    ++numBDefsByType[reg->GetType()];
+    --amountLengthenedBySwap[reg->GetType()];
 
-  return llvm::all_of(::zipFirstRefs(numADefsByType, numBDefsByType),
-                      [](std::tuple<int, int> regDefs) {
-                        return std::get<0>(regDefs) <= std::get<1>(regDefs);
-                      });
+  return llvm::all_of(amountLengthenedBySwap,
+                      [](int netLengthened) { return netLengthened <= 0; });
 }
 
 void StaticNodeSupTrans::nodeMultiPass_(
