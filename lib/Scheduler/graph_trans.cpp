@@ -50,19 +50,20 @@ static llvm::SmallVector<const Register *, 10> possiblyLengthenedIfAfterOther(
   return result;
 }
 
-// Converts a class type and a function signature into a pointer to member
-// function.
-// Usage: memfn_t<Cls, int(double) const> ==> int (Cls::*)(double) const
-template <typename Cls, typename FnSig> using memfn_t = FnSig Cls::*;
-
-// Gets the Uses or Defs for the given SchedInstruction.
-template <std::size_t N,
-          memfn_t<SchedInstruction, int16_t(Register **&)> UsesOrDefsFn>
-static llvm::SmallVector<const Register *, N> getSet(SchedInstruction *node) {
+// Gets the Uses for the given SchedInstruction.
+static llvm::ArrayRef<const Register *> getUses(SchedInstruction *node) {
   Register **uses;
-  const int useCount = (node->*UsesOrDefsFn)(uses);
-  // Call the (Iter, Iter) constructor.
-  return {uses, uses + useCount};
+  const int useCount = node->GetUses(uses);
+  assert(useCount >= 0);
+  return {uses, static_cast<size_t>(useCount)};
+}
+
+// Gets the Defs for the given SchedInstruction.
+static llvm::ArrayRef<const Register *> getDefs(SchedInstruction *node) {
+  Register **defs;
+  const int defCount = node->GetDefs(defs);
+  assert(defCount >= 0);
+  return {defs, static_cast<size_t>(defCount)};
 }
 
 GraphTrans::GraphTrans(DataDepGraph *dataDepGraph) {
@@ -241,15 +242,11 @@ bool StaticNodeSupTrans::NodeIsSuperior_(SchedInstruction *nodeA,
   // registers.
   const int regTypes = graph->GetRegTypeCnt();
 
-  const llvm::SmallVector<const Register *, 10> usesA =
-      ::getSet<10, &SchedInstruction::GetUses>(nodeA);
-  const llvm::SmallVector<const Register *, 10> usesB =
-      ::getSet<10, &SchedInstruction::GetUses>(nodeB);
+  const llvm::ArrayRef<const Register *> usesA = ::getUses(nodeA);
+  const llvm::ArrayRef<const Register *> usesB = ::getUses(nodeB);
 
-  const llvm::SmallVector<const Register *, 10> defsA =
-      ::getSet<10, &SchedInstruction::GetDefs>(nodeA);
-  const llvm::SmallVector<const Register *, 10> defsB =
-      ::getSet<10, &SchedInstruction::GetDefs>(nodeB);
+  const llvm::ArrayRef<const Register *> defsA = ::getDefs(nodeA);
+  const llvm::ArrayRef<const Register *> defsB = ::getDefs(nodeB);
 
   // (# lengthened registers) - (# shortened registers)
   // from scheduling B after A. Indexed by register type.
