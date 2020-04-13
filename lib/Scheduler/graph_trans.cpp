@@ -30,8 +30,17 @@ static llvm::SmallVector<const Register *, 10> possiblyLengthenedIfAfterOther(
     const auto usedByC = [&] {
       return llvm::any_of(
           useB->GetUseList(), [&](const SchedInstruction *user) {
+            // Given: [... B ... A ...]
+            // We need to prove that the register `useB` won't be used by an
+            // instruction before A but after B. In the hypothetical schedule we
+            // are considering, A currently appears after B. Thus, it is
+            // sufficient to show that this register has a user C that is a
+            // successor of A.
+            //
+            // This is more relaxed than showing that C is a successor of B, as
+            // RcrsvScsr(B) is a subset of RcrsvScsr(A).
             return user != nodeB &&
-                   nodeB->IsRcrsvScsr(const_cast<SchedInstruction *>(user));
+                   nodeA->IsRcrsvScsr(const_cast<SchedInstruction *>(user));
           });
     };
 
