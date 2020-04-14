@@ -803,9 +803,8 @@ FUNC_RESULT BBWithSpill::Enumerate_(Milliseconds startTime,
 
   for (trgtLngth = schedLwrBound_; trgtLngth <= schedUprBound_; trgtLngth++) {
     InitForSchdulng();
-    //#ifdef IS_DEBUG_ENUM_ITERS
+    // Output used in relevant script:
     Logger::Info("Enumerating at target length %d", trgtLngth);
-    //#endif
     rslt = enumrtr_->FindFeasibleSchedule(enumCrntSched_, trgtLngth, this,
                                           costLwrBound, lngthDeadline);
     if (rslt == RES_TIMEOUT)

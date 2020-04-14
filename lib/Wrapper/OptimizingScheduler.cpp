@@ -279,6 +279,7 @@ void ScheduleDAGOptSched::schedule() {
     return;
   }
 
+  // Output used in relevant script:
   Logger::Info("********** Opt Scheduling **********");
   LLVM_DEBUG(dbgs() << "********** Scheduling Region " << RegionName
                     << " **********\n");
@@ -806,6 +807,7 @@ void ScheduleDAGOptSched::scheduleOptSchedMinRP() {
   HeurSchedType = SCHED_LIST;
 
   schedule();
+  // Output used in relevant script:
   Logger::Info("End of first pass through\n");
 }
 
@@ -837,6 +839,7 @@ void ScheduleDAGOptSched::scheduleOptSchedBalanced() {
   MultiPassStaticNodeSup = false;
 
   schedule();
+  // Output used in relevant script:
   Logger::Info("End of second pass through");
 }
 

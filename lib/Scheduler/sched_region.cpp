@@ -78,7 +78,7 @@ static bool isBbEnabled(Config &schedIni, Milliseconds rgnTimeout) {
     return false;
 
   if (rgnTimeout <= 0) {
-    Logger::Info("Disabling enumerator becuase region timeout is set to zero.");
+    Logger::Info("Disabling enumerator because region timeout is set to zero.");
     return false;
   }
 
@@ -138,6 +138,7 @@ FUNC_RESULT SchedRegion::FindOptimalSchedule(
 
   Logger::Info("---------------------------------------------------------------"
                "------------");
+  // Output used in relevant script:
   Logger::Info("Processing DAG %s with %d insts and max latency %d.",
                dataDepGraph_->GetDagID(), dataDepGraph_->GetInstCnt(),
                dataDepGraph_->GetMaxLtncy());
@@ -181,6 +182,7 @@ FUNC_RESULT SchedRegion::FindOptimalSchedule(
   else
     CmputLwrBounds_(false);
 
+  // Output used in relevant script:
   // Log the lower bound on the cost, allowing tools reading the log to compare
   // absolute rather than relative costs.
   Logger::Info("Lower bound of cost before scheduling: %d", costLwrBound_);
@@ -227,11 +229,10 @@ FUNC_RESULT SchedRegion::FindOptimalSchedule(
 
     FinishHurstc_();
 
-    //  #ifdef IS_DEBUG_SOLN_DETAILS_1
+    // Output used in relevant script:
     Logger::Info(
         "The list schedule is of length %d and spill cost %d. Tot cost = %d",
         hurstcSchedLngth_, lstSched->GetSpillCost(), hurstcCost_);
-    //  #endif
 
 #ifdef IS_DEBUG_PRINT_SCHEDS
     lstSched->Print(Logger::GetLogStream(), "Heuristic");
@@ -401,12 +402,14 @@ FUNC_RESULT SchedRegion::FindOptimalSchedule(
           "Bypassing optimal scheduling due to zero time limit with cost %d",
           bestCost_);
     } else {
+      // Output used in relevant script:   
       Logger::Info("The initial schedule of length %d and cost %d is optimal.",
                    bestSchedLngth_, bestCost_);
     }
 
     if (rgnTimeout != 0) {
       bool optimalSchedule = isLstOptml || (rslt == RES_SUCCESS);
+      // Output used in relevant script:
       Logger::Info("Best schedule for DAG %s has cost %d and length %d. The "
                    "schedule is %s",
                    dataDepGraph_->GetDagID(), bestCost_, bestSchedLngth_,
@@ -630,6 +633,7 @@ FUNC_RESULT SchedRegion::Optimize_(Milliseconds startTime,
 
   InstCount imprvmnt = initCost - bestCost_;
   if (rslt == RES_SUCCESS) {
+    // Output used in relevant script:
     Logger::Info("DAG solved optimally in %lld ms with "
                  "length=%d, spill cost = %d, tot cost = %d, cost imp=%d.",
                  solnTime, bestSchedLngth_, bestSched_->GetSpillCost(),
@@ -637,6 +641,7 @@ FUNC_RESULT SchedRegion::Optimize_(Milliseconds startTime,
     stats::solvedProblemSize.Record(dataDepGraph_->GetInstCnt());
     stats::solutionTimeForSolvedProblems.Record(solnTime);
   } else {
+    // Output used in relevant script:
     if (rslt == RES_TIMEOUT) {
       Logger::Info("DAG timed out with "
                    "length=%d, spill cost = %d, tot cost = %d, cost imp=%d.",
