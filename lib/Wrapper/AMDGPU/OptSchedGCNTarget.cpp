@@ -208,18 +208,10 @@ bool OptSchedGCNTarget::shouldKeepSchedule() {
   if (RegionEndingOccupancy >= RegionStartingOccupancy ||
       RegionEndingOccupancy >= TargetOccupancy)
     return true;
-  
-  //Vlad: Debug statement no longer needed due to logger statement. Will only create
-  //duplicate messages in debug.
-  //LLVM_DEBUG(
-  //    dbgs() << "Reverting Scheduling because of a decrease in occupancy from "
-  //           << RegionStartingOccupancy << " to " << RegionEndingOccupancy
-  //           << ".\n");
-
-  Logger::Info(
-      "Reverting Scheduling because of a decrease in occupancy from %d to %d.", RegionStartingOccupancy, RegionEndingOccupancy
-);
-  
+  LLVM_DEBUG(
+      dbgs() << "Reverting Scheduling because of a decrease in occupancy from "
+             << RegionStartingOccupancy << " to " << RegionEndingOccupancy
+             << ".\n");
   return false;
 }
 
