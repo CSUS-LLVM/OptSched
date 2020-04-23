@@ -455,13 +455,16 @@ void ACOScheduler::writePheremoneGraph(std::string stage) {
   if(!dbgKernels.count(dataDepGraph_->GetDagID()))
     return;
 
-  std::string fullOutPath = outPath+"/"+dataDepGraph_->GetDagID()+"@"+stage;
+  std::string fullOutPath = outPath+"/"+dataDepGraph_->GetDagID()+"@"+stage+".dot";
   FILE* out = fopen(fullOutPath.c_str(), "w");
   if(!out){
     Logger::Info("Could now open file to write pheremone display at %s."
                  " Skipping.", fullOutPath.c_str());
     return;
   }
+
+  //already added set
+  llvm::SetVector<SchedInstruction*> visited;
 
   //header for .dot file
   fprintf(out, "digraph pheremone_matrix {\n");
@@ -474,7 +477,11 @@ void ACOScheduler::writePheremoneGraph(std::string stage) {
   }
 */
 
-  writePGraphRecursive(out, dataDepGraph_->GetRootInst());
+  //find the recursive neighbors
+  dataDepGraph_->FindRcrsvNghbrs(DIR_FRWRD);
+  dataDepGraph_->FindRcrsvNghbrs(DIR_BKWRD);
+
+  writePGraphRecursive(out, dataDepGraph_->GetRootInst(), visited);
 
   //footer for .dot file
   fprintf(out, "}\n");
@@ -482,13 +489,30 @@ void ACOScheduler::writePheremoneGraph(std::string stage) {
 
 }
 
-void ACOScheduler::writePGraphRecursive(FILE* out, SchedInstruction* ins)
-{
+void ACOScheduler::writePGraphRecursive(FILE* out, SchedInstruction* ins,
+                                        llvm::SetVector<SchedInstruction*>& visited){
   InstCount i=ins->GetNum();
-  for(SchedInstruction* child = ins->GetFrstScsr(); child!=NULL; child= ins->GetNxtScsr())
-  {
+
+  //do not add edges out twice
+  if(visited.count(ins)) return;
+
+  //create edges for other orderings
+  for(SchedInstruction* vIns : visited){
+    if(!(ins->IsRcrsvPrdcsr(vIns)||ins->IsRcrsvScsr(vIns)))
+    {
+      InstCount vVtx=vIns->GetNum();
+      fprintf(out, "\t%d -> %d [label=\"%.4f\" constraint=false style=dotted];\n", i, vVtx, Pheremone(i,vVtx));
+      fprintf(out, "\t%d -> %d [label=\"%.4f\" constraint=false style=dotted];\n", vVtx, i, Pheremone(vVtx,i));
+    }
+  }
+
+  //add edges to children
+  for(SchedInstruction* child = ins->GetFrstScsr(); child!=NULL; child= ins->GetNxtScsr()){
     InstCount j=child->GetNum();
     fprintf(out, "\t%d -> %d [label=\"%.4f\"];\n", i, j, Pheremone(i,j));
-    writePGraphRecursive(out,child);
+    writePGraphRecursive(out,child,visited);
   }
+
+  //add self to set so edges are not doubble counted
+  visited.insert(ins);
 }

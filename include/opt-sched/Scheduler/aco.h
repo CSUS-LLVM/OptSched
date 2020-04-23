@@ -12,6 +12,7 @@ Last Update:  Jan. 2020
 #include "opt-sched/Scheduler/gen_sched.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/SmallSet.h"
+#include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/SmallVector.h"
 #include <memory>
@@ -49,7 +50,8 @@ private:
   llvm::SmallSet<std::string, 20> dbgKernels;
   std::string outPath;
   void writePheremoneGraph(std::string stage);
-  void writePGraphRecursive(FILE* out, SchedInstruction* ins);
+  void writePGraphRecursive(FILE* out, SchedInstruction* ins,
+                            llvm::SetVector<SchedInstruction*>& visited);
 
   //pheremone Graph Debugging end
 
