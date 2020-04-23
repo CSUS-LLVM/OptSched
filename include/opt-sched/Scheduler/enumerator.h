@@ -917,6 +917,9 @@ inline void Enumerator::UpdtRdyLst_(InstCount cycleNum, int slotNum) {
   LinkedList<SchedInstruction> *lst1 = NULL;
   LinkedList<SchedInstruction> *lst2 = frstRdyLstPerCycle_[cycleNum];
 
+  if (prirts_.isDynmc)
+    rdyLst_->UpdatePriorities();
+
   if (slotNum == 0 && prevCycleNum >= 0) {
     // If at the begining of a new cycle other than the very first cycle, then
     // we also have to include the instructions that might have become ready in
@@ -926,9 +929,6 @@ inline void Enumerator::UpdtRdyLst_(InstCount cycleNum, int slotNum) {
   }
 
   rdyLst_->AddLatestSubLists(lst1, lst2);
-
- if (prirts_.isDynmc)
-    rdyLst_->UpdatePriorities();
 }
 /*****************************************************************************/
 

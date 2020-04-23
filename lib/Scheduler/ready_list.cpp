@@ -14,9 +14,13 @@ ReadyList::ReadyList(DataDepGraph *dataDepGraph, SchedPriorities prirts) {
   useCntBits_ = crtclPathBits_ = scsrCntBits_ = ltncySumBits_ = nodeID_Bits_ =
       inptSchedOrderBits_ = 0;
 
-  if (prirts_.isDynmc)
+  if (prirts_.isDynmc) {
     keyedEntries_ = new KeyedEntry<SchedInstruction, unsigned long>
         *[dataDepGraph->GetInstCnt()];
+    for (int j = 0; j < dataDepGraph->GetInstCnt(); j++) {
+      keyedEntries_[j] = nullptr;
+    }
+  }
   else
     keyedEntries_ = nullptr;
 
@@ -32,9 +36,6 @@ ReadyList::ReadyList(DataDepGraph *dataDepGraph, SchedPriorities prirts) {
       break;
 
     case LSH_LUC:
-      for (int j = 0; j < dataDepGraph->GetInstCnt(); j++) {
-        keyedEntries_[j] = NULL;
-      }
       maxUseCnt_ = dataDepGraph->GetMaxUseCnt();
       useCntBits_ = Utilities::clcltBitsNeededToHoldNum(maxUseCnt_);
       totKeyBits += useCntBits_;
@@ -72,7 +73,10 @@ ReadyList::ReadyList(DataDepGraph *dataDepGraph, SchedPriorities prirts) {
       totKeyBits += ltncySumBits_;
       break;
 
-    case LSH_MEM:
+    case LSH_CLUSTER:
+      // Bits needed: 1
+      // 0: Not part of an active cluster
+      // 1: Part of an active cluster
       ClusterBit = Utilities::clcltBitsNeededToHoldNum(1);
       totKeyBits += ClusterBit;
       break;
@@ -123,7 +127,7 @@ ReadyList::ReadyList(DataDepGraph *dataDepGraph, SchedPriorities prirts) {
                       maxLtncySum_);
       break;
 
-    case LSH_MEM:
+    case LSH_CLUSTER:
       AddPrirtyToKey_(maxPriority_, keySize, ClusterBit, 1, 1);
       break;
 
@@ -212,7 +216,8 @@ unsigned long ReadyList::CmputKey_(SchedInstruction *inst, bool isUpdate,
                       maxLtncySum_);
       break;
 
-    case LSH_MEM:
+    case LSH_CLUSTER:
+      // Partially copied how LUC is calculated to be updated.
       if (inst->GetClusterGroup() == 0)
         ValueForKey = 0;
       else {
@@ -224,7 +229,7 @@ unsigned long ReadyList::CmputKey_(SchedInstruction *inst, bool isUpdate,
         }
         ValueForKey =
             inst->GetClusterGroup() == SchedInstruction::GetActiveCluster() ? 1
-                                                                            : 0;
+                : 0;
       }
       AddPrirtyToKey_(key, keySize, ClusterBit, ValueForKey, 1);
       break;

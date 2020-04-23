@@ -53,8 +53,9 @@ enum LISTSCHED_HEURISTIC {
   // LLVM list scheduler order
   LSH_LLVM = 8,
 
-  // Memory clustering
-  LSH_MEM = 9
+  // Dynamic memory clustering heuristic, favor instructions that are part of
+  // an active cluster
+  LSH_CLUSTER = 9
 };
 
 #define MAX_SCHED_PRIRTS 10

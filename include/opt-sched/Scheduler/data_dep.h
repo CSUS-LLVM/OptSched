@@ -292,18 +292,20 @@ public:
 
   RegisterFile *getRegFiles() { return RegFiles.get(); }
 
-  int getMaxClusterCount() { return MaxClusterCount; }
-  void setMaxClusterCount(int Max) { MaxClusterCount = Max; }
-  int getMaxInstructionsInAllClusters() { return MaxInstructionsInAllClusters; }
-  void setMaxInstructionsInAllClusters(int Max) {
-    MaxInstructionsInAllClusters = Max;
+  // Memory clustering helper functions
+  int getMinClusterCount() { return MinClusterCount; }
+  void setMinClusterCount(int Max) { MinClusterCount = Max; }
+  int getTotalInstructionsInAllClusters() { return TotalInstructionsInAllClusters; }
+  void setTotalInstructionsInAllClusters(int Max) {
+    TotalInstructionsInAllClusters = Max;
   }
-
-  int getMaxInstructionsInCluster(int Cluster);
+  int getTotalInstructionsInCluster(int Cluster);
 
 protected:
-  int MaxClusterCount;
-  int MaxInstructionsInAllClusters;
+  int MinClusterCount;
+  int TotalInstructionsInAllClusters;
+  /// Map the cluster block to the total number of instructions found in the
+  /// block
   MapVector<int, int> MaxInstructionsInEachClusters;
 
   // TODO(max): Get rid of this.

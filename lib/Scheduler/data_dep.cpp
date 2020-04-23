@@ -198,8 +198,8 @@ DataDepGraph::DataDepGraph(MachineModel *machMdl, LATENCY_PRECISION ltncyPrcsn)
 
   RegFiles = llvm::make_unique<RegisterFile[]>(machMdl_->GetRegTypeCnt());
 
-  MaxClusterCount = 0;
-  MaxInstructionsInAllClusters = 0;
+  MinClusterCount = 0;
+  TotalInstructionsInAllClusters = 0;
 }
 
 DataDepGraph::~DataDepGraph() {
@@ -214,7 +214,7 @@ DataDepGraph::~DataDepGraph() {
   delete[] instCntPerType_;
 }
 
-int DataDepGraph::getMaxInstructionsInCluster(int Cluster) { 
+int DataDepGraph::getTotalInstructionsInCluster(int Cluster) { 
   assert(Cluster > 0);
   return MaxInstructionsInEachClusters[Cluster];
 }

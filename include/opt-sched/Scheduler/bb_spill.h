@@ -41,45 +41,53 @@ private:
 
   MapVector<int, int> InstructionsScheduledInEachCluster;
 
-  int MaxClusterBlocks;
+  /// The minimum amount of cluster blocks possible.
+  int MinClusterBlocks;
+
+  /// The minimum amount of cluster blocks + the optimistic expected cluster
+  /// blocks remaining.
   int CurrentClusterBlocks;
 
-  /// Current active cluster group
+  /// Current active cluster group.
   int ActiveClusterGroup;
 
-  /// Flag to enable or disable clustering memory operations
-  /// in the ILP pass.
+  /// Flag to enable or disable clustering memory operations in the ILP pass.
+  /// Reads from the sched.ini file then set the flag accordingly.
   bool ClusterMemoryOperations;
 
-  // TODO: Implement cost function for clustering
-  /// Experimental variables and values for cost adjustment
+  /// The weight for memory ops clustering.
   int ClusteringWeight;
-  int TotalInstructionsInClusters;
 
   /// Data struct to contain information about the previous clusters
   struct PastClusters {
+    /// The cluster group
     int ClusterGroup;
     /// Size of the cluster when it was ended by an instruction not in the
     /// cluster
     int ClusterSize;
 
-    /// Instruction number that ended this cluster
+    /// Instruction number that ended this cluster. Used to check if we should
+    /// restore the cluster state when backtracking.
     int InstNum; 
 
+    /// Contains the actual names of the instructions in the cluster. Only used
+    /// for printing and debugging purposes.
     std::unique_ptr<llvm::SmallVector<llvm::StringRef, 4>> InstrList;
 
     /// Constructor for this struct
-    PastClusters(int Cluster, int size, int num)
-        : ClusterGroup(Cluster), ClusterSize(size), InstNum(num) {}
+    PastClusters(int Cluster, int Size, int Instructions)
+        : ClusterGroup(Cluster), ClusterSize(Size), InstNum(Instructions) {}
   };
 
   /// Vector containing the (n-1) past clusters
   llvm::SmallVector<std::unique_ptr<PastClusters>, 4> PastClustersList;
 
+  /// Contains the actual names of the instructions in the current cluster.
+  /// Only used for printing and debugging purposes.
   std::unique_ptr<llvm::SmallVector<llvm::StringRef, 4>> InstrList;
 
-  /// Pointer to the last cluster. This is kept out of the vector to
-  /// avoid having to fetch it every time we compare the current instruction
+  /// Pointer to the last cluster. This is kept out of the vector to avoid
+  /// having to fetch it every time we compare the current instruction
   /// number to the one that ended the cluster.
   std::unique_ptr<PastClusters> LastCluster;
 

@@ -49,7 +49,7 @@ constexpr struct {
 } HeuristicNames[] = {
     {"CP", LSH_CP},     {"LUC", LSH_LUC}, {"UC", LSH_UC}, {"NID", LSH_NID},
     {"CPR", LSH_CPR},   {"ISO", LSH_ISO}, {"SC", LSH_SC}, {"LS", LSH_LS},
-    {"LLVM", LSH_LLVM}, {"MEM", LSH_MEM}
+    {"LLVM", LSH_LLVM}, {"CLUSTER", LSH_CLUSTER}
 };
 
 // Default path to the the configuration directory for opt-sched.
@@ -378,24 +378,37 @@ void ScheduleDAGOptSched::schedule() {
       OST->createDDGWrapper(C, this, MM.get(), LatencyPrecision, RegionName);
   DDG->convertSUnits();
   DDG->convertRegFiles();
+
+  // Find all clusterable instructions for the second pass.
   if (SecondPass) {
     dbgs() << "Finding load clusters.\n";
     int TotalLoadsInstructionsClusterable = DDG->findPossibleClusters(true);
     if (TotalLoadsInstructionsClusterable == 0)
       dbgs() << "  No load clustering possible\n";
+
     dbgs() << "Finding store clusters.\n";
     int TotalStoreInstructionsClusterable = DDG->findPossibleClusters(false);
     if (TotalStoreInstructionsClusterable == 0)
       dbgs() << "  No store clustering possible\n";
 
-    auto DDG2 = static_cast<DataDepGraph *>(DDG.get());
-    Logger::Info("Total clusterable instructions: %d loads, %d stores", TotalLoadsInstructionsClusterable, TotalStoreInstructionsClusterable);
-    DDG2->setMaxInstructionsInAllClusters(TotalLoadsInstructionsClusterable + TotalStoreInstructionsClusterable);
-    int end = DDG2->getMaxClusterCount();
+    Logger::Info("Total clusterable instructions: %d loads, %d stores",
+        TotalLoadsInstructionsClusterable, TotalStoreInstructionsClusterable);
+
+    // Get the DDG instance so that we can set and get information that will be
+    // read later on during enumeration.
+    auto DataDepGraphInstance = static_cast<DataDepGraph *>(DDG.get());
+    // Store total instructions in all clusters in the DDG instance.
+    DataDepGraphInstance->setTotalInstructionsInAllClusters(
+        TotalLoadsInstructionsClusterable + TotalStoreInstructionsClusterable);
+    int end = DataDepGraphInstance->getMinClusterCount();
+
+    // Iterate through all of the cluster blocks and print the total
+    // instructions in each block.
     if (end > 0) {
       Logger::Info("Total clusters in region: %d", end);
       for (int begin = 1; begin <= end; begin++) {
-        Logger::Info("  Cluster %d has total instructions %d", begin, DDG2->getMaxInstructionsInCluster(begin));
+        Logger::Info("  Cluster %d has total instructions %d", begin,
+            DataDepGraphInstance->getTotalInstructionsInCluster(begin));
       }
     }
   }
@@ -576,8 +589,6 @@ void ScheduleDAGOptSched::loadOptSchedConfig() {
   LowerBoundAlgorithm = parseLowerBoundAlgorithm();
   HeuristicPriorities = parseHeuristic(schedIni.GetString("HEURISTIC"));
   EnumPriorities = parseHeuristic(schedIni.GetString("ENUM_HEURISTIC"));
-  SecondPassPriorities =
-      parseHeuristic(schedIni.GetString("SECOND_PASS_HEURISTIC"));
   SecondPassEnumPriorities =
       parseHeuristic(schedIni.GetString("SECOND_PASS_ENUM_HEURISTIC"));
   SCF = parseSpillCostFunc();
@@ -686,7 +697,7 @@ SchedPriorities ScheduleDAGOptSched::parseHeuristic(const std::string &Str) {
     Priorities.vctr[Priorities.cnt++] = LSH;
     switch (LSH) {
     // Is LUC still the only dynamic heuristic?
-    case LSH_MEM:
+    case LSH_CLUSTER:
     case LSH_LUC:
       Priorities.isDynmc = true;
       break;
@@ -841,7 +852,6 @@ void ScheduleDAGOptSched::scheduleOptSchedBalanced() {
 
   // Set the heuristic for the enumerator in the second pass.
   EnumPriorities = SecondPassEnumPriorities;
-  HeuristicPriorities = SecondPassPriorities;
 
   // Force the input to the balanced scheduler to be the sequential order of the
   // (hopefully) good register pressure schedule. We don’t want the list

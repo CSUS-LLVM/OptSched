@@ -210,7 +210,7 @@ void OptSchedDDGWrapperBasic::addDefsAndUses() {
     }
 
   LLVM_DEBUG(DAG->dumpLLVMRegisters());
-  //LLVM_DEBUG(dumpOptSchedRegisters());
+  LLVM_DEBUG(dumpOptSchedRegisters());
 }
 
 void OptSchedDDGWrapperBasic::addUse(unsigned RegUnit, InstCount Index) {
@@ -505,14 +505,18 @@ void OptSchedDDGWrapperBasic::countBoundaryLiveness(
   }
 }
 
-/// Partially copied from
-/// https://github.com/RadeonOpenCompute/llvm/blob/roc-ocl-2.4.0/lib/CodeGen/MachineScheduler.cpp#L1554
+// Iterate through all chains found by LLVm and verify that the instructions
+// are actually able to be clustered together.
+// Partially copied from
+// https://github.com/RadeonOpenCompute/llvm/blob/roc-ocl-2.4.0/lib/CodeGen/MachineScheduler.cpp#L1554
 int OptSchedDDGWrapperBasic::clusterNeighboringMemOps(
     ArrayRef<const SUnit *> MemOps) {
-  SmallVector<MemOpInfo, 32> MemOpRecords;
+  // Will be set to true if clustering was found to be possible in this chain.
   bool ClusterPossible = false;
+  // Keep track of the count of instructions that are able to be clustered
+  // and return the number.
   int TotalInstructionsPossible = 0;
-
+  SmallVector<MemOpInfo, 32> MemOpRecords;
   for (const SUnit *SU : MemOps) {
     MachineOperand *BaseOp;
     int64_t Offset;
@@ -537,15 +541,15 @@ int OptSchedDDGWrapperBasic::clusterNeighboringMemOps(
       dbgs() << "    Cluster possible at SU(" << SUa->NodeNum << ")- SU(" << SUb->NodeNum << ")\n";
       
       // If clustering was possible then increase the cluster count. This only
-      // happens once every cluster
+      // happens once every new cluster
       if (!ClusterPossible) {
         ClusterPossible = true;
         ClusterCount++;
-        setMaxClusterCount(ClusterCount);
+        setMinClusterCount(ClusterCount);
         dbgs() << "    Setting total cluster count to " << ClusterCount << "\n";
       }
 
-      // Tell the instructions what cluster number they are in
+      // Tell the instructions what cluster group they are in
       if (insts_[SUa->NodeNum]->GetClusterGroup() == 0) {
         insts_[SUa->NodeNum]->SetMayCluster(ClusterCount);
         TotalInstructionsPossible++;
@@ -560,17 +564,23 @@ int OptSchedDDGWrapperBasic::clusterNeighboringMemOps(
     } else
       ClusterLength = 1;
   }
+  // Save the total instructions possible in this cluster. This number will be
+  // used in enumeration to estimate an optimistic cost on the remaining
+  // cluster blocks.
   MaxInstructionsInEachClusters.insert(std::make_pair(ClusterCount, TotalInstructionsPossible));
+
+  // Return the total number of instructions in this cluster block
   return TotalInstructionsPossible;
 }
 
-/// Iterate through SUnits and find all possible clustering then transfer
-/// the information so that our scheduler can access it.
-/// Partially copied from https://github.com/RadeonOpenCompute/llvm/blob/roc-ocl-2.4.0/lib/CodeGen/MachineScheduler.cpp#L1595
+// Iterate through SUnits and find all possible clustering using LLVM/AMD's
+// method for possible clustering detection then transfer the information to
+// our scheduler so that our scheduler can access it during enumeration.
+// Partially copied from https://github.com/RadeonOpenCompute/llvm/blob/roc-ocl-2.4.0/lib/CodeGen/MachineScheduler.cpp#L1595
 int OptSchedDDGWrapperBasic::findPossibleClusters(bool IsLoad) {
-  // TODO: Add For-loop to also do store clusters. Currently only does load
-  // clusters
+  // The count of all of the instructions that are in a load/store cluster.
   int TotalInstructionsPossible = 0;
+  // Map DAG NodeNum to store chain ID.
   DenseMap<unsigned, unsigned> StoreChainIDs;
   // Map each store chain to a set of dependent MemOps.
   SmallVector<SmallVector<const SUnit *, 4>, 32> StoreChainDependents;
@@ -580,7 +590,10 @@ int OptSchedDDGWrapperBasic::findPossibleClusters(bool IsLoad) {
       continue;
     auto MI = SU.getInstr();
 
-    dbgs() << "Instruction (" << SU.NodeNum << ") " << DAG->TII->getName(MI->getOpcode())  << " may " << (IsLoad ? "load" : "store") << "\n";
+    // Print which instruction may load or store. Used for debugging purposes.
+    dbgs() << "Instruction (" << SU.NodeNum << ") " <<
+      DAG->TII->getName(MI->getOpcode())  << " may " <<
+      (IsLoad ? "load" : "store") << "\n";
 
     unsigned ChainPredID = DAG->SUnits.size();
     for (const SDep &Pred : SU.Preds) {
@@ -601,14 +614,15 @@ int OptSchedDDGWrapperBasic::findPossibleClusters(bool IsLoad) {
 
   // Iterate over the store chains.
   for (auto &SCD : StoreChainDependents) {
+    // Print the chain that LLVM has found
     dbgs() << "Printing the Node ID of the current chain: ";
     for (auto SU1 : SCD)
     	dbgs() << SU1->NodeNum << " ";
     dbgs() << '\n';
+
     TotalInstructionsPossible += clusterNeighboringMemOps(SCD);
   }
  return TotalInstructionsPossible;
-// setMaxInstructionsInAllClusters(TotalInstructionsPossible);
 }
 
 LLVMRegTypeFilter::LLVMRegTypeFilter(

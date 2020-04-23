@@ -4,6 +4,7 @@
 
 using namespace llvm::opt_sched;
 
+// Initially set the active clustering to 0 for none.
 int SchedInstruction::ActiveCluster = 0;
 
 SchedInstruction::SchedInstruction(InstCount num, const string &name,

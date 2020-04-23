@@ -182,7 +182,7 @@ void OptSchedDDGWrapperGCN::convertRegFiles() {
     }
 
   LLVM_DEBUG(DAG->dumpLLVMRegisters());
-  //LLVM_DEBUG(dumpOptSchedRegisters());
+  LLVM_DEBUG(dumpOptSchedRegisters());
 }
 
 void OptSchedDDGWrapperGCN::addSubRegDefs(SchedInstruction *Instr, unsigned Reg,
