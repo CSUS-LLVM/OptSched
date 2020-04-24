@@ -81,7 +81,7 @@ IF("AMDGPU" IN_LIST LLVM_TARGETS_TO_BUILD)
                                           Wrapper/AMDGPU/OptSchedDDGWrapperGCN.cpp)
     SET(OPT_SCHED_INCLUDE_DIRS ${OPT_SCHED_INCLUDE_DIRS} ${CMAKE_CURRENT_SOURCE_DIR}/lib
                                 ${LLVM_MAIN_SRC_DIR}/lib/Target/AMDGPU
-                                ${CMAKE_CURRENT_BINARY_DIR}/../../lib/Target/AMDGPU)
+                                ${LLVM_BINARY_DIR}/lib/Target/AMDGPU)
   ENDIF()
 ENDIF()
 

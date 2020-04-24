@@ -1,0 +1,65 @@
+name: Check Clang Tidy
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+
+jobs:
+  build:
+    runs-on: ubuntu-18.04
+
+    steps:
+    - uses: actions/checkout@v2
+
+    - name: Install clang-tidy
+      run: |
+        sudo add-apt-repository "deb http://apt.llvm.org/bionic/ llvm-toolchain-bionic-9 main"
+        sudo apt-get update
+        sudo apt-get install clang-tidy-9
+
+      # Install tblgen so that we don't have to build it. The version must match the version of LLVM
+      # which we are building.
+    - name: Install llvm-tblgen
+      run: |
+        sudo add-apt-repository "deb http://apt.llvm.org/bionic/ llvm-toolchain-bionic-7 main"
+        sudo apt-get update
+        sudo apt-get install llvm-7-tools
+
+    - name: Install ninja
+      id: ninja-build
+      run: sudo apt-get install ninja-build
+
+      # The AMDGPU build requires LLVM 7.x. This allows us to clang-tidy everything at once.
+    - name: Get LLVM source
+      uses: actions/checkout@v2
+      with:
+        repository: CSUS-LLVM/llvm-project
+        ref: release/7.x
+        path: llvm-project
+
+    - name: Setup Compilation Database
+      id: compiledb
+      # Use CMake to generate the compile_commands.json file.
+      # We also need to generate headers via tblgen.
+      run: |
+        mkdir build && cd build
+        CXX=g++ CC=gcc cmake -GNinja -DCMAKE_BUILD_TYPE=Debug ../llvm-project/llvm -DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
+          '-DLLVM_TARGETS_TO_BUILD=X86;AMDGPU' -DLLVM_TABLEGEN=$(which llvm-tblgen-7) \
+          -DLLVM_EXTERNAL_PROJECTS=OptSched -DLLVM_EXTERNAL_OPTSCHED_SOURCE_DIR=$(cd .. && pwd)
+        cmake --build . --target X86CommonTableGen intrinsics_gen AttributeCompatFuncTableGen AMDGPUCommonTableGen
+        echo "::set-output name=dbjson::$PWD/compile_commands.json"
+
+    - name: Run Clang Tidy
+      run: |
+        shopt -s globstar
+        clang-tidy-9 -p ${{ steps.compiledb.outputs.dbjson }} --checks=-readability-identifier-naming --warnings-as-errors='*' include/**/*.h lib/**/*.h lib/**/*.cpp
+
+      # This check is noisy over our codebase, so we pull it out into its own step and don't allow
+      # it to fail the build.
+    - name: Run Clang Tidy - Noisy
+      if: always() # Run even if the prior clang-tidy found problems.
+      run: |
+        shopt -s globstar
+        clang-tidy-9 -p ${{ steps.compiledb.outputs.dbjson }} --checks='-*,readability-identifier-naming' --warnings-as-errors='-*' include/**/*.h lib/**/*.h lib/**/*.cpp
