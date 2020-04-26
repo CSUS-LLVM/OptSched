@@ -128,6 +128,16 @@ ExternalProject_Add(ROCm
   # Don't install anything
   INSTALL_COMMAND ""
 )
+ExternalProject_Add_Step(ROCm runtblgen
+  COMMAND ${CMAKE_COMMAND} --build . --target intrinsics_gen
+  COMMAND ${CMAKE_COMMAND} --build . --target AttributeCompatFuncTableGen
+  COMMAND ${CMAKE_COMMAND} --build . --target AMDGPUCommonTableGen
+  COMMAND ${CMAKE_COMMAND} --build . --target X86CommonTableGen
+  DEPENDEES configure
+  DEPENDERS build
+  WORKING_DIRECTORY <BINARY_DIR>
+  USES_TERMINAL 1
+)
 ExternalProject_Get_Property(ROCm BINARY_DIR)
 
 # Write out a shrc to be `source`d by the user. This will set the environment variables they need.
