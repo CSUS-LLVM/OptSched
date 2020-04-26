@@ -141,7 +141,6 @@ ExternalProject_Add_Step(ROCm runtblgen
   COMMAND ${CMAKE_COMMAND} --build . --target intrinsics_gen ${EXTRA_ARGS}
   COMMAND ${CMAKE_COMMAND} --build . --target AttributeCompatFuncTableGen ${EXTRA_ARGS}
   COMMAND ${CMAKE_COMMAND} --build . --target AMDGPUCommonTableGen ${EXTRA_ARGS}
-  COMMAND ${CMAKE_COMMAND} --build . --target X86CommonTableGen ${EXTRA_ARGS}
   DEPENDEES configure
   DEPENDERS build
   WORKING_DIRECTORY <BINARY_DIR>
