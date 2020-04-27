@@ -395,6 +395,7 @@ void ACOScheduler::PrintPheremone() {
 }
 
 #ifndef NDEBUG
+// NOLINTNEXTLINE(clang-diagnostic-unused-function)
 static void PrintInstruction(SchedInstruction *inst) {
   std::cerr << std::setw(2) << inst->GetNum() << " ";
   std::cerr << std::setw(20) << std::left << inst->GetOpCode();

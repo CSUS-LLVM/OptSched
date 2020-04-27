@@ -69,7 +69,7 @@ public:
   bool IsLiveOut() const;
   void SetIsLiveOut(bool liveOut);
 
-  const Register &operator=(Register &rhs);
+  Register &operator=(const Register &rhs);
 
   void SetupConflicts(int regCnt);
   void ResetConflicts();
