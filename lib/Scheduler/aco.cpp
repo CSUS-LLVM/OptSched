@@ -163,7 +163,7 @@ ACOScheduler::SelectInstruction(const llvm::ArrayRef<Choice> &ready,
 std::unique_ptr<InstSchedule> ACOScheduler::FindOneSchedule() {
   SchedInstruction *lastInst = NULL;
   std::unique_ptr<InstSchedule> schedule =
-    llvm::make_unique<InstSchedule>(machMdl_, dataDepGraph_, true);
+      llvm::make_unique<InstSchedule>(machMdl_, dataDepGraph_, true);
   InstCount maxPriority = rdyLst_->MaxPriority();
   if (maxPriority == 0)
     maxPriority = 1; // divide by 0 is bad
@@ -435,7 +435,7 @@ void PrintSchedule(InstSchedule *schedule) {
 void ACOScheduler::setInitialSched(InstSchedule *Sched) {
   if (Sched) {
     InitialSchedule =
-      llvm::make_unique<InstSchedule>(machMdl_, dataDepGraph_, VrfySched_);
+        llvm::make_unique<InstSchedule>(machMdl_, dataDepGraph_, VrfySched_);
     InitialSchedule->Copy(Sched);
   }
 }

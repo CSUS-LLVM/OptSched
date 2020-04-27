@@ -180,9 +180,11 @@ protected:
 
   void SetBestCost(InstCount bestCost) { bestCost_ = bestCost; }
 
-  void SetBestSchedLength(InstCount bestSchedLngth) { bestSchedLngth_ = bestSchedLngth; }
+  void SetBestSchedLength(InstCount bestSchedLngth) {
+    bestSchedLngth_ = bestSchedLngth;
+  }
 
-  const SchedPriorities& GetEnumPriorities() const { return enumPrirts_; }
+  const SchedPriorities &GetEnumPriorities() const { return enumPrirts_; }
 
   int16_t GetSigHashSize() const { return sigHashSize_; }
 

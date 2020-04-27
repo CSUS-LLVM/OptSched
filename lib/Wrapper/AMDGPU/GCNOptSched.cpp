@@ -93,7 +93,8 @@ void ScheduleDAGOptSchedGCN::finalizeSchedule() {
           exitRegion();
           continue;
         }
-        LLVM_DEBUG(getRealRegionPressure(RegionBegin, RegionEnd, LIS, "Before"));
+        LLVM_DEBUG(
+            getRealRegionPressure(RegionBegin, RegionEnd, LIS, "Before"));
         runSchedPass(S);
         LLVM_DEBUG(getRealRegionPressure(RegionBegin, RegionEnd, LIS, "After"));
         Region = std::make_pair(RegionBegin, RegionEnd);

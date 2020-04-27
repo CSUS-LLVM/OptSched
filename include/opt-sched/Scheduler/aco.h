@@ -10,8 +10,8 @@ Last Update:  Jan. 2020
 #define OPTSCHED_ACO_H
 
 #include "opt-sched/Scheduler/gen_sched.h"
-#include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/ArrayRef.h"
+#include "llvm/ADT/SmallVector.h"
 #include <memory>
 
 namespace llvm {
@@ -43,9 +43,8 @@ private:
 
   void PrintPheremone();
 
-  SchedInstruction *
-  SelectInstruction(const llvm::ArrayRef<Choice> &ready,
-                    SchedInstruction *lastInst);
+  SchedInstruction *SelectInstruction(const llvm::ArrayRef<Choice> &ready,
+                                      SchedInstruction *lastInst);
   void UpdatePheremone(InstSchedule *schedule);
   std::unique_ptr<InstSchedule> FindOneSchedule();
   llvm::SmallVector<pheremone_t, 0> pheremone_;

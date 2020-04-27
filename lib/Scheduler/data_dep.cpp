@@ -3205,7 +3205,6 @@ bool DataDepGraph::DoesFeedUser(SchedInstruction *inst) {
     // If there is a successor instruction that decreases live intervals
     // or one that does not increase live intervals, then return true.
     return true;
-
   }
 // Return false if there is no recursive successor of inst
 // that uses a live register.
