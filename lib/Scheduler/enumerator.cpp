@@ -1303,7 +1303,7 @@ void Enumerator::InitNewNode_(EnumTreeNode *newNode) {
 namespace {
 void SetTotalCostsAndSuffixes(EnumTreeNode *const currentNode,
                               EnumTreeNode *const parentNode,
-                              InstCount const targetLength,
+                              const InstCount targetLength,
                               const bool suffixConcatenationEnabled) {
   // (Chris): Before archiving, set the total cost info of this node. If it's a
   // leaf node, then the total cost is the current cost. If it's an inner node,

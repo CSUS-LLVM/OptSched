@@ -98,7 +98,7 @@ public:
   // Returns the name of a given register type.
   const string &GetRegTypeName(int16_t regType) const;
   // Returns the register type given its name.
-  int16_t GetRegTypeByName(char const *const regTypeName) const;
+  int16_t GetRegTypeByName(const char *const regTypeName) const;
   // Returns the number of issue slots for a given issue type.
   int GetSlotsPerCycle(IssueType type) const;
   // Returns the total number of issue slots and fills the passed array with
@@ -108,11 +108,11 @@ public:
   // of the specified type.
   int16_t GetLatency(InstType instTypeCode, DependenceType type) const;
   // Returns the name of a given instruction type.
-  char const *GetInstTypeNameByCode(InstType instTypeCode) const;
+  const char *GetInstTypeNameByCode(InstType instTypeCode) const;
   // Returns the name of a given issue type.
-  char const *GetIssueTypeNameByCode(IssueType issueTypeCode) const;
+  const char *GetIssueTypeNameByCode(IssueType issueTypeCode) const;
   // Returns the issue type given its name.
-  IssueType GetIssueTypeByName(char const *const issuTypeName) const;
+  IssueType GetIssueTypeByName(const char *const issuTypeName) const;
   // Returns the issue type of a given instruction type.
   IssueType GetIssueType(InstType instTypeCode) const;
   // Returns the instruction type given the name of the instruction as well
