@@ -823,8 +823,8 @@ FUNC_RESULT DataDepGraph::SkipGraph(SpecsBuffer *buf, bool &endOfFileReached) {
 }
 
 SchedInstruction *DataDepGraph::CreateNode_(
-    InstCount instNum, char const *const instName, InstType instType,
-    char const *const opCode, int nodeID, InstCount fileSchedOrder,
+    InstCount instNum, const char *const instName, InstType instType,
+    const char *const opCode, int nodeID, InstCount fileSchedOrder,
     InstCount fileSchedCycle, InstCount fileLB, InstCount fileUB, int blkNum) {
 
   SchedInstruction *newInstPtr;
@@ -1098,7 +1098,7 @@ void DataDepGraph::WriteDepInfoToF2File_(FILE *file) {
     DependenceType depType;
     for (SchedInstruction *scsr = inst->GetFrstScsr(NULL, &ltncy, &depType);
          scsr != NULL; scsr = inst->GetNxtScsr(NULL, &ltncy, &depType)) {
-      char const *bareDepTypeName = GetDependenceTypeName(depType);
+      const char *bareDepTypeName = GetDependenceTypeName(depType);
       int bareDepTypeLngth = strlen(bareDepTypeName);
       char depTypeName[MAX_NAMESIZE];
       addDblQuotes(bareDepTypeName, bareDepTypeLngth, depTypeName);
@@ -1182,7 +1182,7 @@ void DataDepGraph::CmputCrtclPathsFrmRcrsvScsr_(SchedInstruction *ref) {
 }
 
 void DataDepGraph::PrintLwrBounds(DIRECTION dir, std::ostream &out,
-                                  char const *const title) {
+                                  const char *const title) {
   out << '\n' << title;
   for (InstCount i = 0; i < instCnt_; i++) {
     out << "\nLB(" << i << ")= " << insts_[i]->GetLwrBound(dir);
@@ -2797,7 +2797,7 @@ void InstSchedule::SetSpillCandidateCount(int spillCnddtCnt) {
 }
 
 // TODO(austin) move logger print of schedule to different function
-void InstSchedule::Print(std::ostream &out, char const *const label) {
+void InstSchedule::Print(std::ostream &out, const char *const label) {
   InstCount slotInCycle = 0;
   InstCount cycleNum = 0;
   InstCount i;

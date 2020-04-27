@@ -245,7 +245,7 @@ public:
 
   bool UseFileBounds();
   void PrintLwrBounds(DIRECTION dir, std::ostream &out,
-                      char const *const title);
+                      const char *const title);
   void RestoreAbsoluteBounds();
 
   void PrintInstTypeInfo(FILE *file);
@@ -384,8 +384,8 @@ protected:
                             InstCount &nodeNum, InstType &instType,
                             NXTLINE_TYPE &nxtLine);
 
-  SchedInstruction *CreateNode_(InstCount instNum, char const *const instName,
-                                InstType instType, char const *const opCode,
+  SchedInstruction *CreateNode_(InstCount instNum, const char *const instName,
+                                InstType instType, const char *const opCode,
                                 int nodeID, InstCount fileSchedOrder,
                                 InstCount fileSchedCycle, InstCount fileLB,
                                 InstCount fileUB, int blkNum);
@@ -696,7 +696,7 @@ public:
   int GetSpillCandidateCount();
   void SetSpillCandidateCount(int cnflctCnt);
 
-  void Print(std::ostream &out, char const *const title);
+  void Print(std::ostream &out, const char *const title);
   void PrintInstList(FILE *file, DataDepGraph *dataDepGraph,
                      const char *title) const;
   void PrintRegPressures() const;

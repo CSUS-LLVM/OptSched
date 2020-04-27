@@ -73,7 +73,7 @@ public:
   // Appends a new element to the end of the list.
   virtual void InsrtElmnt(T *elmnt);
   // Removes the provided element. The list must be dynamically sized.
-  virtual void RmvElmnt(T const *const elmnt);
+  virtual void RmvElmnt(const T *const elmnt);
   // Removes the last element of the list. The list must be dynamically sized.
   virtual void RmvLastElmnt();
 
@@ -103,10 +103,10 @@ public:
   virtual void RmvCrntElmnt();
 
   // Searches for an element in the list. Returns true if it is found.
-  virtual bool FindElmnt(T const *const element) const;
+  virtual bool FindElmnt(const T *const element) const;
   // Searches for an element in the list and records the number of times it.
   // is found in hitCnt. Returns true if the element is found at least once.
-  virtual bool FindElmnt(T const *const element, int &hitCnt) const;
+  virtual bool FindElmnt(const T *const element, int &hitCnt) const;
 
 protected:
   int maxSize_;
@@ -238,7 +238,7 @@ template <class T> void LinkedList<T>::InsrtElmnt(T *elmnt) {
   AppendEntry_(newEntry);
 }
 
-template <class T> void LinkedList<T>::RmvElmnt(T const *const elmnt) {
+template <class T> void LinkedList<T>::RmvElmnt(const T *const elmnt) {
   assert(LinkedList<T>::maxSize_ == INVALID_VALUE);
 
   Entry<T> *crntEntry, *prevEntry = NULL;
@@ -346,7 +346,7 @@ template <class T> inline void LinkedList<T>::ResetIterator() {
 }
 
 template <class T>
-bool LinkedList<T>::FindElmnt(T const *const element, int &hitCnt) const {
+bool LinkedList<T>::FindElmnt(const T *const element, int &hitCnt) const {
   Entry<T> *crntEntry;
   hitCnt = 0;
   for (crntEntry = topEntry_; crntEntry != NULL;
@@ -358,7 +358,7 @@ bool LinkedList<T>::FindElmnt(T const *const element, int &hitCnt) const {
   return hitCnt > 0 ? true : false;
 }
 
-template <class T> bool LinkedList<T>::FindElmnt(T const *const element) const {
+template <class T> bool LinkedList<T>::FindElmnt(const T *const element) const {
   int hitCnt;
   return FindElmnt(element, hitCnt);
 }
