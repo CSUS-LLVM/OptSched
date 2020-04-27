@@ -44,14 +44,12 @@ bool OPTSCHED_gPrintSpills;
 
 // An array of possible OptSched heuristic names
 constexpr struct {
-  const char* Name;
+  const char *Name;
   LISTSCHED_HEURISTIC HID;
 } HeuristicNames[] = {
-    {"CP", LSH_CP},   {"LUC", LSH_LUC},
-    {"UC", LSH_UC},   {"NID", LSH_NID},
-    {"CPR", LSH_CPR}, {"ISO", LSH_ISO},
-    {"SC", LSH_SC},   {"LS", LSH_LS},
-    {"LLVM", LSH_LLVM}
+    {"CP", LSH_CP},   {"LUC", LSH_LUC}, {"UC", LSH_UC},
+    {"NID", LSH_NID}, {"CPR", LSH_CPR}, {"ISO", LSH_ISO},
+    {"SC", LSH_SC},   {"LS", LSH_LS},   {"LLVM", LSH_LLVM},
 };
 
 // Default path to the the configuration directory for opt-sched.
@@ -128,7 +126,8 @@ nextIfDebug(MachineBasicBlock::iterator I,
   return I;
 }
 
-static bool scheduleSpecificRegion(const StringRef RegionName, const Config &SchedIni) {
+static bool scheduleSpecificRegion(const StringRef RegionName,
+                                   const Config &SchedIni) {
   const bool ScheduleSpecificRegions =
       SchedIni.GetBool("SCHEDULE_SPECIFIC_REGIONS");
 
