@@ -256,7 +256,7 @@ def writeStats(stats, args, dagSizesPerBenchmark):
   #     regp_file.write('Summary for Benchmark %s:\n' % benchName)
   #     for setIndex in sorted(benchRegp.keys()):
   #       regp_file.write('  %2d %5d\n' % (setIndex, benchRegp[setIndex]))
-        
+
 
   # write regp csv file
   with open(os.path.join(statsFolder, args.regp + ".mf.csv"), 'w') as regp_file:
@@ -271,7 +271,7 @@ def writeStats(stats, args, dagSizesPerBenchmark):
         benchRegp = {}
         counter = 0
         for functionName in regpressure:
-          if counter > 0: 
+          if counter > 0:
             regp_file.write('\n,')
             regpBBFile.write('\n,')
           counter += 1
@@ -285,19 +285,19 @@ def writeStats(stats, args, dagSizesPerBenchmark):
             for setIndex, perp in regpressure[functionName][blockName]:
               maxSetPerp = max(maxSetPerp, perp)
             if maxSetPerp < args.minperp:
-              # print("DAG %s:%d MaxSetPerp %d does not meet minimum PERP requirement %d. Skipping." % 
+              # print("DAG %s:%d MaxSetPerp %d does not meet minimum PERP requirement %d. Skipping." %
               #   (functionName, blockName, maxSetPerp, args.minperp))
               continue
             dagName = "%s:%d" % (functionName, blockName)
             if not dagSizesPerBenchmark[benchName] is None and dagSizesPerBenchmark[benchName][dagName] < args.mininstcnt:
-              # print("DAG %s:%d InstCnt %d does not meet minimum InstCnt requirement %d. Skipping." 
-              #   % (functionName, blockName, 
-              #      dagSizesPerBenchmark[benchName]["%s:%d" % (functionName, blockName)], 
+              # print("DAG %s:%d InstCnt %d does not meet minimum InstCnt requirement %d. Skipping."
+              #   % (functionName, blockName,
+              #      dagSizesPerBenchmark[benchName]["%s:%d" % (functionName, blockName)],
               #      args.mininstcnt))
               continue
-            # print("DAG %s InstCnt %d MaxPERP %d meets contraints MinInstCnt %d MinPERP %d." % 
-            #   (dagName, 
-            #   dagSizesPerBenchmark[benchName][dagName], 
+            # print("DAG %s InstCnt %d MaxPERP %d meets contraints MinInstCnt %d MinPERP %d." %
+            #   (dagName,
+            #   dagSizesPerBenchmark[benchName][dagName],
             #   maxSetPerp, args.mininstcnt, args.minperp))
             if bbCounter > 0: regpBBFile.write('\n,,')
             bbCounter += 1
@@ -312,7 +312,7 @@ def writeStats(stats, args, dagSizesPerBenchmark):
             if not setIndex in benchRegp: benchRegp[setIndex] = 0
             benchRegp[setIndex] += functionRegp[setIndex]
           regp_file.write('%d' % spills[functionName])
-        
+
   # # write SLIL
   # with open(os.path.join(statsFolder, args.slil), 'w') as slilFile:
   #   for benchName in stats:
@@ -350,7 +350,7 @@ def writeStats(stats, args, dagSizesPerBenchmark):
         counter = 0
         for functionName in slilStats:
           functionStats = {}
-          if counter > 0: 
+          if counter > 0:
             slilCsvFile.write('\n,')
             slilBBCsvFile.write('\n,')
           counter += 1
@@ -364,19 +364,19 @@ def writeStats(stats, args, dagSizesPerBenchmark):
             for setIndex, perp in regpressure[functionName][blockNum]:
               maxSetPerp = max(maxSetPerp, perp)
             if maxSetPerp < args.minperp:
-              # print("DAG %s:%d MaxSetPerp %d does not meet minimum PERP requirement %d. Skipping." % 
+              # print("DAG %s:%d MaxSetPerp %d does not meet minimum PERP requirement %d. Skipping." %
               #   (functionName, blockNum, maxSetPerp, args.minperp))
               continue
             dagName = "%s:%d" % (functionName, blockNum)
             if not dagSizesPerBenchmark[benchName] is None and dagSizesPerBenchmark[benchName][dagName] < args.mininstcnt:
-              # print("DAG %s:%d InstCnt %d does not meet minimum InstCnt requirement %d. Skipping." 
-              #   % (functionName, blockNum, 
-              #      dagSizesPerBenchmark[benchName]["%s:%d" % (functionName, blockNum)], 
+              # print("DAG %s:%d InstCnt %d does not meet minimum InstCnt requirement %d. Skipping."
+              #   % (functionName, blockNum,
+              #      dagSizesPerBenchmark[benchName]["%s:%d" % (functionName, blockNum)],
               #      args.mininstcnt))
               continue
-            # print("DAG %s InstCnt %d MaxPERP %d meets contraints MinInstCnt %d MinPERP %d." % 
-            #   (dagName, 
-            #   dagSizesPerBenchmark[benchName][dagName], 
+            # print("DAG %s InstCnt %d MaxPERP %d meets contraints MinInstCnt %d MinPERP %d." %
+            #   (dagName,
+            #   dagSizesPerBenchmark[benchName][dagName],
             #   maxSetPerp, args.mininstcnt, args.minperp))
             if bbCounter > 0:
               slilBBCsvFile.write('\n,,')
@@ -428,7 +428,7 @@ def calculatePeakPressureStats(output):
     if peakExcessPressure < 0: peakExcessPressure = 0
     stats[functionName][blockName].append((int(setIndexString), peakExcessPressure))
   return stats
-    
+
 def calculateBlockStats(output):
   blocks = output.split('Opt Scheduling **********')[1:]
   stats = []
@@ -454,7 +454,7 @@ def calculateBlockStats(output):
         if isEnumerated:
           isOptimal = bool(BLOCK_ENUMERATED_OPTIMAL_REGEX.findall(block))
           """
-          Sometimes the OptScheduler doesn't print out cost improvement. 
+          Sometimes the OptScheduler doesn't print out cost improvement.
           This happens when the scheduler determines that the list schedule is
           already optimal, which means no further improvements can be made.
 
@@ -462,9 +462,9 @@ def calculateBlockStats(output):
           If the improvement is not found, it is assumed to be 0.
           """
           matches = BLOCK_IMPROVEMENT_REGEX.findall(block)
-          if matches == []: 
+          if matches == []:
             improvement = 0
-          else: 
+          else:
             improvement = int(matches[0])
         else:
           isOptimal = False
@@ -518,9 +518,9 @@ def runBenchmarks(benchmarks, config):
   for bench in benchmarks:
     print 'Running', bench
     try:
-      p = subprocess.Popen('/bin/bash', stdin=subprocess.PIPE, 
+      p = subprocess.Popen('/bin/bash', stdin=subprocess.PIPE,
                            stdout=subprocess.PIPE)
-      p.stdin.write("source shrc" + "\n"); 
+      p.stdin.write("source shrc" + "\n");
       p.stdin.write(COMMAND % (config, bench) + "\n")
       p.stdin.write("runspec --loose -size=ref -iterations=1 -config=%s --tune=base -r 1 -I -a scrub %s" % (config,bench))
       p.stdin.close()
@@ -584,7 +584,7 @@ def main(args):
             output = logFile.read()
           results[benchName] = getBenchmarkResult(output)
           dagSizesPerBenchmark[benchName] = calculateDagSizes(output)
-    
+
   # Run the benchmarks and collect results.
   elif args.opt is not None:
 

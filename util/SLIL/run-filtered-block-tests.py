@@ -35,10 +35,10 @@ function run_test() {
 
     echo python runspec-wrapper-chris.py
     python runspec-wrapper-chris.py
-    
+
     echo cp "$SCHED_INI_DIR/$1" "$SCHED_INI_DIR/sched.ini"
     cp "$SCHED_INI_DIR/$1" "$SCHED_INI_DIR/sched.ini"
-    
+
     RESULT_DIR="$TEST_DIR/$3"
     RESULT_DIR_SHARED="$TEST_DIR_SHARED/$3"
     if [ ! -d "$RESULT_DIR" ]; then
@@ -49,10 +49,10 @@ function run_test() {
         echo mkdir "$RESULT_DIR_SHARED"
         mkdir "$RESULT_DIR_SHARED"
     fi
-    
+
     echo cp "$CPU2006_DIR/wrapper*" "$SCHED_INI_DIR/sched.ini" "$RESULT_DIR"
     cp -R $CPU2006_DIR/wrapper* $SCHED_INI_DIR/sched.ini $RESULT_DIR
-    
+
     echo cp "$CPU2006_DIR/wrapper*" "$SCHED_INI_DIR/sched.ini" "$RESULT_DIR"
     cp $CPU2006_DIR/wrapperStats/*.dat $SCHED_INI_DIR/sched.ini $RESULT_DIR_SHARED
 }

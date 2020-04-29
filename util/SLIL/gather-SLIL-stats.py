@@ -66,7 +66,7 @@ def getStatsFromLogFile(filename, path):
       if blockStats['isOptimal']: totalOptimal += 1
       if blockStats['isEnumerated']: totalEnumerated += 1
       if gapSize == 0 and blockStats['isEnumerated']: totalOptimalAndEnumerated += 1
-      if blockStats['isPerpHigher']: 
+      if blockStats['isPerpHigher']:
         totalHigherPerp += 1
         if blockStats['isOptimal']: totalOptimalHigherPerp += 1
     functionStats = benchStats[functionName]
@@ -80,7 +80,7 @@ def getStatsFromLogFile(filename, path):
     functionStats['totalOptimalAndEnumerated'] = totalOptimalAndEnumerated
     functionStats['totalHigherPerp'] = totalHigherPerp
     functionStats['totalOptimalHigherPerp'] = totalOptimalHigherPerp
-    
+
   return benchStats
 
 parser = optparse.OptionParser(description='Wrapper around runspec for collecting spill counts.')

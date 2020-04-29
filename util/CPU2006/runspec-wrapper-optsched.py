@@ -668,8 +668,8 @@ def calculateBlockStats(output, trackOptSchedSpills):
             for line in blocks[index].split('\n')[1:-1][:10]:
                 print '   ', line
 
-				
-				
+
+
     return stats
 
 
@@ -697,7 +697,7 @@ def calculateSpills(output):
     # Get and record the number of spills using a regular expression
     for functionName, spillCountString in SPILLS_REGEX.findall(output):
         numOfSpills[functionName] = int(spillCountString)
-		
+
     # Get and record the number of weighted spills using a regular expression
     for functionName, weightedSpillCount in SPILLS_WEIGHTED_REGEX.findall(output):
 	weightedSpills[functionName] = int(weightedSpillCount)
@@ -705,8 +705,8 @@ def calculateSpills(output):
     # Insert the spills and weighted spills into the spills dictionary variable
     spills['spills'] = numOfSpills
     spills['weightedSpills'] = weightedSpills
-    
-	
+
+
     return spills
 
 

@@ -12,7 +12,7 @@ def getNodeCount(fileName):
 
     for match in regex.finditer(bffm):
       count += int(match.group(1))
-      
+
     bffm.close()
 
   return count
@@ -40,5 +40,5 @@ else:
   if not os.path.isfile(args.path):
     raise Error("Please specify a valid log file.")
   total += getNodeCount(args.path)
-  
+
 print(total)

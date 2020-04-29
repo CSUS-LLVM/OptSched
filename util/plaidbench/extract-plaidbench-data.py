@@ -30,7 +30,7 @@ HOW TO USE:
 
 Example:
     ./extract-plaidbench-data.py -i /home/tom/plaidbench-runs
-    
+
     where plaidbench-runs/ contains
         plaidbench-optsched-01/
         plaidbench-optsched-02/
@@ -66,7 +66,7 @@ benchmarks = [
 
 def parseStats(inputFolder, ignoreFolders):
     scanDirPath = os.path.abspath(inputFolder)
-    
+
     # Get name of all directories in current folder
     subfolders = [f.name for f in os.scandir(path=scanDirPath) if f.is_dir() ]
 
@@ -74,7 +74,7 @@ def parseStats(inputFolder, ignoreFolders):
     for folderName in subfolders:
         if folderName in ignoreFolders:
             continue
-        
+
         name = folderName.split('-')
 
         # Get the run number from the end
@@ -84,7 +84,7 @@ def parseStats(inputFolder, ignoreFolders):
         # Get the name of the run
         # and exclude the run number
         nameOfRun = '-'.join(name[:-1])
-            
+
         # Create an entry in the stats for the
         # name of the run
         if (nameOfRun not in benchStats):
@@ -126,7 +126,7 @@ def parseStats(inputFolder, ignoreFolders):
                                 # Accumulate total execution time for this run
                                 total_exe_time += execution_time
                                 stats['execution_time'] = execution_time
-                                
+
                             elif (test[0] in benchmarks):
                                 inference_lat = float(test[1])
                                 fps = float(test[6])
@@ -155,12 +155,12 @@ def printStats():
                     print('        Total compile time: {:0.3f}'.format(benchStats[nameOfRun][runNumber][bench]))
                 elif (bench == 'total_exe_time'):
                     print('        Total execution time: {:0.3f}'.format(benchStats[nameOfRun][runNumber][bench]))
-                else: 
+                else:
                     print('        {}'.format(bench))
                     print('            Compile Time: {:0.3f}'.format(benchStats[nameOfRun][runNumber][bench]['compile_time']))
                     print('            Inference Latency: {:0.2f}'.format(benchStats[nameOfRun][runNumber][bench]['inference_lat']))
                     print('            FPS: {:0.2f}'.format(benchStats[nameOfRun][runNumber][bench]['fps']))
-            
+
 # Create compile time excel spreadsheet
 def CreateCompileTimeSpreadsheet():
     # Create a new excel file
@@ -347,7 +347,7 @@ def CreateTPSSpreadsheet():
         # Write run name
         row = 0
         sh.write(row, col, nameOfRun)
-        
+
         for runNumber in benchStats[nameOfRun]:
             # Write run number
             row = 1
@@ -376,7 +376,7 @@ def main(args):
 
     # Start stats collection
     parseStats(args.inputFolder, ignoreFolders)
-    
+
     if args.verbose:
         printStats()
 
@@ -414,4 +414,3 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     main(args)
-

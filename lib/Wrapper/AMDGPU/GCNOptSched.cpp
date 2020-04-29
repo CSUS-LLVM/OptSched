@@ -60,7 +60,7 @@ void ScheduleDAGOptSchedGCN::initSchedulers() {
   SchedPasses.push_back(OptSchedMaxOcc);
   // Second
   SchedPasses.push_back(OptSchedBalanced);
-}   
+}
 
 // Execute scheduling passes.
 // Partially copied GCNScheduleDAGMILive::finalizeSchedule

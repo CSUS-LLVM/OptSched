@@ -46,7 +46,7 @@ with open(bruteForceFile) as bff:
     dagResult['bf']['cost'] = int(match.group(3))
     dagResult['bf']['time'] = int(match.group(4))
     results[match.group(1)] = dagResult
-    
+
   bffm.close()
 
 with open(bbFile) as bbf:
@@ -60,10 +60,10 @@ with open(bbFile) as bbf:
     results[match.group(1)]['bb']['time'] = int(match.group(4))
   bbfm.close()
 
-  
+
 #analyze results
 for dagName in results:
-  if not "bf" in results[dagName] or not "bb" in results[dagName]: 
+  if not "bf" in results[dagName] or not "bb" in results[dagName]:
     if len(results[dagName]) > 0:
       staticErrorCount += 1
       print("StaticLBError: Found B&B results for one file but not the other")
@@ -98,7 +98,7 @@ for dagName in results:
       goodCount += 1
       print("Good: Dag %s: brute force timed out and dynamic optimal, and brute force cost (%d) is not better than dynamic cost (%d)" % (dagName, bfCost, bbCost))
 
-  
+
 print("Good: %d" % goodCount)
 print("Static LB Error: %d" % staticErrorCount)
 print("Dynamic LB Error: %d" % dynamicErrorCount)

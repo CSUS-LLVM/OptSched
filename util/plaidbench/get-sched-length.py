@@ -28,7 +28,7 @@ HOW TO USE:
 
 Example:
     ./get-sched-length.py -i /home/tom/plaidbench-runs
-    
+
     where plaidbench-runs/ contains
         plaidbench-optsched-01/
         plaidbench-optsched-02/
@@ -43,7 +43,7 @@ import argparse
 from openpyxl import Workbook
 from openpyxl.styles import Font
 
-# For AMD 
+# For AMD
 RE_DAG_NAME = re.compile(r'Processing DAG (.*) with')
 RE_SCHED_LENGTH = re.compile(r'The list schedule is of length (\d+) and')
 
@@ -74,7 +74,7 @@ benchmarks = [
 ]
 def parseStats(inputFolder, ignoreFolders):
     scanDirPath = os.path.abspath(inputFolder)
-    
+
     # Get name of all directories in the specified folder
     subfolders = [f.name for f in os.scandir(path=scanDirPath) if f.is_dir() ]
 
@@ -91,7 +91,7 @@ def parseStats(inputFolder, ignoreFolders):
         # Get the name of the run
         # and exclude the run number
         nameOfRun = '-'.join(name[:-1])
-            
+
         # Create an entry in the stats for the
         # name of the run
         if (nameOfRun not in benchStats):
@@ -118,7 +118,7 @@ def parseStats(inputFolder, ignoreFolders):
             # First check if log file exists.
             if os.path.exists(currentLogFile):
                 # Open log file if it exists.
-                with open(currentLogFile) as file: 
+                with open(currentLogFile) as file:
                     # Read the whole log file
                     # and split the scheduling
                     # regions into a list
@@ -156,10 +156,10 @@ def parseStats(inputFolder, ignoreFolders):
 
                         if stats['maxLength'] < schedLength:
                             stats['maxLength'] = schedLength
-                        
+
                 if stats['numRegions'] != 0:
                     stats['average'] = stats['total']/stats['numRegions']
-                    
+
                 benchStats[nameOfRun][bench] = stats
 
                 cumulativeStats[nameOfRun]['total'] += stats['total']
@@ -184,7 +184,7 @@ def printStats():
 def createSpreadsheets(output):
     if 'xls' not in output[-4:]:
         output += '.xlsx'
-    
+
     # Create new excel worksheet
     wb = Workbook()
 
@@ -199,7 +199,7 @@ def createSpreadsheets(output):
     for bench in benchmarks:
         ws['A' + str(row)] = bench
         row += 1
-        
+
     ws['A' + str(row)] = 'Overall'
     ws['A' + str(row)].font = Font(bold=True)
 
@@ -211,7 +211,7 @@ def createSpreadsheets(output):
         row = 2
         ws[col+str(row)] = 'Average Sched. Length'
         ws[chr(ord(col)+1)+str(row)] = 'Max Sched. Length'
-        
+
         row = 3
         for bench in benchmarks:
             ws[col+str(row)] = benchStats[nameOfRun][bench]['average']
@@ -219,7 +219,7 @@ def createSpreadsheets(output):
             row += 1
         ws[col+str(row)] = cumulativeStats[nameOfRun]['average']
         ws[chr(ord(col)+1)+str(row)] = cumulativeStats[nameOfRun]['maxLength']
-        
+
         # Convert column char to ASCII value
         # then increment it and convert
         # back into char. Used to go to next
@@ -239,7 +239,7 @@ def main(args):
         printStats()
 
     if not args.disable:
-        createSpreadsheets(args.output)   
+        createSpreadsheets(args.output)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Script to extract average schedule length.',

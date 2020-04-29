@@ -49,9 +49,9 @@ with open(bbFile) as bbf:
   bbfm.close()
   results['bb'] = dagResults
 
-  
+
 #analyze results
-# 
+#
 for dagName in results['bf']:
   bfLowerBound = results['bf'][dagName]
   if not dagName in results['bb']: continue

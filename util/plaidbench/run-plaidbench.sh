@@ -1,6 +1,6 @@
 #!/bin/bash
 #**************************************************************************************
-#Description:	Run all plaidbench benchmarks and redirect output to a directory 
+#Description:	Run all plaidbench benchmarks and redirect output to a directory
 #               that will contain the log file for each benchmark.
 #Author:	    Austin Kerbow
 #Modified By:	Vang Thao
@@ -18,7 +18,7 @@ Examples=4096
 BatchSize=16
 Command="plaidbench --examples $Examples --batch-size $BatchSize --results "
 # Note: The run number at the end such as "01" should be kept. This number is used
-# in other scripts. 
+# in other scripts.
 DirectoryBasePath="plaidbench-optsched-"
 Keras="keras --no-fp16 --no-train"
 
