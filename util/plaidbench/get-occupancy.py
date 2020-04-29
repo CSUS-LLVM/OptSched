@@ -29,7 +29,7 @@ HOW TO USE:
 
 Example:
     ./get-occupancy.py -i /home/tom/plaidbench-runs
-    
+
     where plaidbench-runs/ contains
         plaidbench-optsched-01/
         plaidbench-optsched-02/
@@ -84,7 +84,7 @@ ignore = [
 
 def parseStats(inputFolder, ignoreFolders):
     scanDirPath = os.path.abspath(inputFolder)
-    
+
     # Get name of all directories in the specified folder
     subfolders = [f.name for f in os.scandir(path=scanDirPath) if f.is_dir() ]
 
@@ -101,7 +101,7 @@ def parseStats(inputFolder, ignoreFolders):
         # Get the name of the run
         # and exclude the run number
         nameOfRun = '-'.join(name[:-1])
-            
+
         # Create an entry in the stats for the
         # name of the run
         if (nameOfRun not in benchStats):
@@ -134,13 +134,13 @@ def parseStats(inputFolder, ignoreFolders):
 
                             # Get occupancy
                             occupancy = int(getOccupancyStats.group(2))
-                            
+
                             # Used for averaging
                             stats['total'] += occupancy
                             stats['numKernel'] += 1
             else:
                 print('Cannot find log file for {} run {} benchmark {}.'.format(nameOfRun, runNumber, bench))
-            
+
             if stats['numKernel'] != 0:
                 stats['average'] = stats['total'] / stats['numKernel']
 
@@ -162,7 +162,7 @@ def printStats():
 def createSpreadsheets(output):
     if 'xls' not in output[-4:]:
         output += '.xlsx'
-    
+
     # Create new excel worksheet
     wb = Workbook()
 
@@ -177,7 +177,7 @@ def createSpreadsheets(output):
     for bench in benchmarks:
         ws['A' + str(row)] = bench
         row += 1
-        
+
     ws['A' + str(row)] = 'Average'
     ws['A' + str(row)].font = Font(bold=True)
 
@@ -189,7 +189,7 @@ def createSpreadsheets(output):
         row = 2
         ws[col+str(row)] = 'Occupancy'
         row = 3
-        
+
         total = 0.0
         kernel = 0
         for bench in benchmarks:
@@ -198,7 +198,7 @@ def createSpreadsheets(output):
             kernel += benchStats[nameOfRun][bench]['numKernel']
             row += 1
         ws[col+str(row)] = total/kernel
-        
+
         # Convert column char to ASCII value
         # then increment it and convert
         # back into char. Used to go to next
@@ -218,7 +218,7 @@ def main(args):
         printStats()
 
     if not args.disable:
-        createSpreadsheets(args.output)    
+        createSpreadsheets(args.output)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Script to extract occupancy data. \

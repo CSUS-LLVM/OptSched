@@ -3,7 +3,7 @@
 # Use this as the CMake source directory to run the superbuild.
 #
 # Documentation of configuration args:
-# 
+#
 # In general, see option()s and set(... CACHE ...)s in this CMakeLists.txt and flang.cmake.
 #
 # Some options behave as follows:

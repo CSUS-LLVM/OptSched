@@ -30,10 +30,10 @@ def dags_info(logtext):
     if len(blocks) != len(unfiltered):
         print('WARNING: Missing a logged lower bound for {missing}/{total} blocks.'
             .format(missing=len(unfiltered) - len(blocks), total=len(unfiltered)), file=sys.stderr)
-        
+
         missing = set(unfiltered) - set(blocks)
         trimmed = ('\n'.join(block.splitlines()[:MISSING_LOWER_BOUND_DUMP_LINES]) for block in missing)
-        
+
         for i, block in enumerate(itertools.islice(trimmed, MISSING_LOWER_BOUND_DUMP_COUNT)):
             print('WARNING: block {} missing lower-bound:\n{}\n...'.format(i, block),
                   file=sys.stderr)

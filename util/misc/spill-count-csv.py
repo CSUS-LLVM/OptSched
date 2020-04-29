@@ -11,10 +11,10 @@ def debugPrint(str):
 
 if len(sys.argv) != 2:
   raise Exception("Invalid number of arguments. Expected 1")
-  
+
 if not os.path.isfile(sys.argv[1]):
   raise Exception("%s is not a file!" % sys.argv[1])
-  
+
 with open(sys.argv[1]) as f:
   benchName = ""
   for line in f:

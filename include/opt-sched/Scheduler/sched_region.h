@@ -129,7 +129,7 @@ private:
 
   // The absolute cost lower bound to be used as a ref for normalized costs.
   InstCount costLwrBound_ = 0;
-  
+
   // The best results found so far.
   InstCount bestCost_;
   InstCount bestSchedLngth_;

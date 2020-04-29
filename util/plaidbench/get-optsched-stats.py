@@ -3,7 +3,7 @@
 **********************************************************************************
 Description:    This script is meant to be used with the OptSched scheduler and
                 the run-plaidbench.sh script. This script will extract stats
-                about how our OptSched scheduler is doing from the log files 
+                about how our OptSched scheduler is doing from the log files
                 generated from the run-plaidbench.sh script.
 Author:	        Vang Thao
 Last Update:	December 30, 2019
@@ -26,7 +26,7 @@ HOW TO USE:
 
 Example:
     ./get-optsched-stats.py -i /home/tom/plaidbench-optsched-01/
-    
+
     where plaidbench-optsched-01/ contains
         densenet121
         densenet169
@@ -87,13 +87,13 @@ def initializePassStats(dictToInitialize):
     dictToInitialize['AverageSizeToEnum'] = -1.0
     dictToInitialize['LargestOptimalRegion'] = -1
     dictToInitialize['LargestImprovedRegion'] = -1
-        
+
 def parseStats(inputFolder):
     # Initialize pass stats collection variables
     for x in passes:
         passStats[x] = {}
         initializePassStats(passStats[x])
-        
+
     # Begin stats collection for this run
     for bench in benchmarks:
         # Get the path to the log file
@@ -111,7 +111,7 @@ def parseStats(inputFolder):
                     stats[x] = {}
                     initializePassStats(stats[x])
 
-                log = file.read()                        
+                log = file.read()
                 blocks = log.split('********** Opt Scheduling **********')[1:]
                 for block in blocks:
                     # Get pass num, if none is found then
@@ -158,8 +158,8 @@ def parseStats(inputFolder):
                             elif cost == 0:
                                 stats[passNum]['TimeoutNotImpr'] += 1
                             stats[passNum]['TimeoutCnt'] += 1
-                            
-                                                        
+
+
         # If the file doesn't exist, output error log.
         else:
             print('Cannot find log file for benchmark {}.'.format(bench))
@@ -192,7 +192,7 @@ def printStats():
             print('first')
         else:
             print(passNum)
-    
+
         for stat in passStats[passNum]:
             print('    {} : {}'.format(stat, passStats[passNum][stat]))
 
@@ -206,7 +206,7 @@ def writeBenchmarkNames(ws, row):
 def createSpreadsheets(output):
     if 'xls' not in output[-4:]:
         output += '.xlsx'
-    
+
     # Create new excel worksheet
     wb = Workbook()
 
@@ -242,7 +242,7 @@ def createSpreadsheets(output):
         if not passNum == 'third':
             ws['A'+str(row-1)] = passNum.capitalize() + ' Pass'
             ws['A'+str(row-1)].font = Font(bold=True)
-            
+
         writeBenchmarkNames(ws, row)
 
         # Write individual benchmark stats
@@ -269,16 +269,16 @@ def createSpreadsheets(output):
                 enumCntPcnt = float(benchStats[bench][passNum]['TimeoutNotImpr']) / benchStats[bench][passNum]['EnumCnt'] * 100.0
                 ws[chr(ord(col)+5)+str(row)] = str(benchStats[bench][passNum]['TimeoutNotImpr']) + ' ({:.2f}%)'.format(enumCntPcnt)
                 ws[chr(ord(col)+5)+str(row)].alignment = Alignment(horizontal='right')
-                
+
                 ws[chr(ord(col)+6)+str(row)] = benchStats[bench][passNum]['AverageSizeToEnum']
                 ws[chr(ord(col)+6)+str(row)].alignment = Alignment(horizontal='right')
-                
+
                 ws[chr(ord(col)+7)+str(row)] = benchStats[bench][passNum]['LargestOptimalRegion']
                 ws[chr(ord(col)+7)+str(row)].alignment = Alignment(horizontal='right')
-                
+
                 ws[chr(ord(col)+8)+str(row)] = benchStats[bench][passNum]['LargestImprovedRegion']
                 ws[chr(ord(col)+8)+str(row)].alignment = Alignment(horizontal='right')
-                
+
             row += 1
 
         # Write overall stats
@@ -296,20 +296,20 @@ def createSpreadsheets(output):
             ws[chr(ord(col)+3)+str(row)] = str(passStats[passNum]['OptNotImpr']) + ' ({:.2f}%)'.format(enumCntPcnt)
             ws[chr(ord(col)+3)+str(row)].alignment = Alignment(horizontal='right')
 
-            enumCntPcnt = float(passStats[passNum]['TimeoutImpr']) / passStats[passNum]['EnumCnt'] * 100.0        
+            enumCntPcnt = float(passStats[passNum]['TimeoutImpr']) / passStats[passNum]['EnumCnt'] * 100.0
             ws[chr(ord(col)+4)+str(row)] = str(passStats[passNum]['TimeoutImpr']) + ' ({:.2f}%)'.format(enumCntPcnt)
             ws[chr(ord(col)+4)+str(row)].alignment = Alignment(horizontal='right')
-            
+
             enumCntPcnt = float(passStats[passNum]['TimeoutNotImpr']) / passStats[passNum]['EnumCnt'] * 100.0
             ws[chr(ord(col)+5)+str(row)] = str(passStats[passNum]['TimeoutNotImpr']) + ' ({:.2f}%)'.format(enumCntPcnt)
             ws[chr(ord(col)+5)+str(row)].alignment = Alignment(horizontal='right')
-            
+
             ws[chr(ord(col)+6)+str(row)] = passStats[passNum]['AverageSizeToEnum']
             ws[chr(ord(col)+6)+str(row)].alignment = Alignment(horizontal='right')
-            
+
             ws[chr(ord(col)+7)+str(row)] = passStats[passNum]['LargestOptimalRegion']
             ws[chr(ord(col)+7)+str(row)].alignment = Alignment(horizontal='right')
-            
+
             ws[chr(ord(col)+8)+str(row)] = passStats[passNum]['LargestImprovedRegion']
             ws[chr(ord(col)+8)+str(row)].alignment = Alignment(horizontal='right')
 
@@ -326,7 +326,7 @@ def main(args):
         printStats()
 
     if not args.disable:
-        createSpreadsheets(args.output)  
+        createSpreadsheets(args.output)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Script to extract OptSched stats', \

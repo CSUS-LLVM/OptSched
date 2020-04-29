@@ -78,7 +78,7 @@ TEST_P(StringListTest, ReadStrings) {
 
     const auto result = config.GetStringList("KEY");
     const std::vector<std::string> strings(result.begin(), result.end());
-    
+
     const std::vector<std::string> expected = GetParam().first;
 
     EXPECT_EQ(expected, strings);
@@ -108,7 +108,7 @@ TEST_P(IntListTest, ReadInts) {
 
     const auto result = config.GetIntList("KEY");
     const std::vector<int64_t> ints(result.begin(), result.end());
-    
+
     const std::vector<int64_t> expected = GetParam().first;
 
     EXPECT_EQ(expected, ints);
@@ -136,7 +136,7 @@ TEST_P(FloatListTest, ReadFloats) {
 
     const auto result = config.GetFloatList("KEY");
     const std::vector<float> ints(result.begin(), result.end());
-    
+
     const std::vector<float> expected = GetParam().first;
 
     EXPECT_EQ(expected, ints);
