@@ -5,8 +5,8 @@ Description:    This script is meant to be used with the OptSched scheduler and
                 the run-plaidbench.sh script. This script will extract stats
                 about how our OptSched scheduler is doing from the log files
                 generated from the run-plaidbench.sh script.
-Author:	        Vang Thao
-Last Update:	December 30, 2019
+Author:         Vang Thao
+Last Update:    December 30, 2019
 **********************************************************************************
 
 OUTPUT:
