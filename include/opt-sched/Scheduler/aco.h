@@ -10,6 +10,9 @@ Last Update:  Jan. 2020
 #define OPTSCHED_ACO_H
 
 #include "opt-sched/Scheduler/gen_sched.h"
+#include "llvm/ADT/SmallVector.h"
+#include "llvm/ADT/ArrayRef.h"
+#include <memory>
 
 namespace llvm {
 namespace opt_sched {
@@ -29,10 +32,10 @@ public:
   virtual ~ACOScheduler();
   FUNC_RESULT FindSchedule(InstSchedule *schedule, SchedRegion *region);
   inline void UpdtRdyLst_(InstCount cycleNum, int slotNum);
-  // Set the initial schedule for ACO 
+  // Set the initial schedule for ACO
   // Default is NULL if none are set.
   void setInitialSched(InstSchedule *Sched);
-  
+
 private:
   pheremone_t &Pheremone(SchedInstruction *from, SchedInstruction *to);
   pheremone_t &Pheremone(InstCount from, InstCount to);
@@ -40,11 +43,12 @@ private:
 
   void PrintPheremone();
 
-  SchedInstruction *SelectInstruction(std::vector<Choice> ready,
-                                      SchedInstruction *lastInst);
+  SchedInstruction *
+  SelectInstruction(const llvm::ArrayRef<Choice> &ready,
+                    SchedInstruction *lastInst);
   void UpdatePheremone(InstSchedule *schedule);
-  InstSchedule *FindOneSchedule();
-  pheremone_t *pheremone_;
+  std::unique_ptr<InstSchedule> FindOneSchedule();
+  llvm::SmallVector<pheremone_t, 0> pheremone_;
   pheremone_t initialValue_;
   bool use_fixed_bias;
   int count_;
@@ -56,8 +60,7 @@ private:
   double decay_factor;
   int ants_per_iteration;
   bool print_aco_trace;
-  std::vector<double> scores(std::vector<Choice> ready, SchedInstruction *last);
-  InstSchedule* InitialSchedule;
+  std::unique_ptr<InstSchedule> InitialSchedule;
   bool VrfySched_;
 };
 

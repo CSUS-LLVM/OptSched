@@ -4,7 +4,7 @@ Description:  Defines a generic linked list template class with a number of
               Warning: the code within has evolved over many years.
 Author:       Ghassan Shobaki
 Created:      Oct. 1997
-Last Update:  Mar. 2011
+Last Update:  Apr. 2020
 *******************************************************************************/
 
 #ifndef OPTSCHED_GENERIC_LNKD_LST_H
@@ -177,6 +177,7 @@ public:
   T *GetNxtPriorityElmnt();
   T *GetNxtPriorityElmnt(K &key);
   // Copies all the data from another list. The existing list must be empty.
+  // Also insert the entries into an array if it one is passed.
   void CopyList(PriorityList<T, K> const *const otherLst,
                 KeyedEntry<T, unsigned long> **keyedEntries_ = nullptr);
 

@@ -47,7 +47,8 @@ public:
   SchedRegion(MachineModel *machMdl, DataDepGraph *dataDepGraph, long rgnNum,
               int16_t sigHashSize, LB_ALG lbAlg, SchedPriorities hurstcPrirts,
               SchedPriorities enumPrirts, bool vrfySched,
-              Pruning PruningStrategy, SchedulerType HeurSchedType);
+              Pruning PruningStrategy, SchedulerType HeurSchedType,
+              SPILL_COST_FUNCTION spillCostFunc = SCF_PERP);
   // Destroys the region. Must be overriden by child classes.
   virtual ~SchedRegion() {}
 
@@ -106,31 +107,52 @@ public:
   // Initialie variables for the second pass of the two-pass-optsched
   void InitSecondPass();
 
+private:
+  // The algorithm to use for calculated lower bounds.
+  LB_ALG lbAlg_;
+  // The number of this region.
+  long rgnNum_;
+  // Whether to verify the schedule after calculating it.
+  bool vrfySched_;
+
+  // The nomal heuristic scheduling results.
+  InstCount hurstcCost_;
+
+  // total simulated spills.
+  int totalSimSpills_;
+
+  // What list scheduler should be used to find an initial feasible schedule.
+  SchedulerType HeurSchedType_;
+
+  // Used for two-pass-optsched to enable second pass functionalies.
+  bool isSecondPass_;
+
+  // The absolute cost lower bound to be used as a ref for normalized costs.
+  InstCount costLwrBound_ = 0;
+  
+  // The best results found so far.
+  InstCount bestCost_;
+  InstCount bestSchedLngth_;
+
+  // (Chris): The cost function. Defaults to PERP.
+  SPILL_COST_FUNCTION spillCostFunc_ = SCF_PERP;
+
+  // list scheduling heuristics
+  SchedPriorities hurstcPrirts_;
+  // Scheduling heuristics to use when enumerating
+  SchedPriorities enumPrirts_;
+
+  // TODO(max): Document.
+  int16_t sigHashSize_;
+
+  // The pruning technique to use for this region.
+  Pruning prune_;
+
 protected:
   // The dependence graph of this region.
   DataDepGraph *dataDepGraph_;
   // The machine model used by this region.
   MachineModel *machMdl_;
-  // The number of this region.
-  long rgnNum_;
-  // The number of instructions in this region.
-  InstCount instCnt_;
-  // Whether to verify the schedule after calculating it.
-  bool vrfySched_;
-  // What list scheduler should be used to find an initial feasible schedule.
-  SchedulerType HeurSchedType_;
-
-  // Used for two-pass-optsched to enable second pass functionalies.
-  bool isSecondPass;
-
-  // The best results found so far.
-  InstCount bestCost_;
-  InstCount bestSchedLngth_;
-  // The nomal heuristic scheduling results.
-  InstCount hurstcCost_;
-  InstCount hurstcSchedLngth_;
-  InstCount AcoScheduleLength_;
-  InstCount AcoScheduleCost_;
 
   // The schedule currently used by the enumerator
   InstSchedule *enumCrntSched_;
@@ -139,12 +161,6 @@ protected:
   // The best schedule found so far (may be heuristic or enumerator generated)
   InstSchedule *bestSched_;
 
-  // (Chris): The cost function. Defaults to PERP.
-  SPILL_COST_FUNCTION spillCostFunc_ = SCF_PERP;
-
-  // The absolute cost lower bound to be used as a ref for normalized costs.
-  InstCount costLwrBound_;
-
   // TODO(max): Document.
   InstCount schedLwrBound_;
   // TODO(max): Document.
@@ -152,29 +168,25 @@ protected:
   // TODO(max): Document.
   InstCount abslutSchedUprBound_;
 
-  // The algorithm to use for calculated lower bounds.
-  LB_ALG lbAlg_;
-
-  // list scheduling heuristics
-  SchedPriorities hurstcPrirts_;
-  // Scheduling heuristics to use when enumerating
-  SchedPriorities enumPrirts_;
-
-  // The pruning technique to use for this region.
-  Pruning prune_;
-
-  // Do we need to compute the graph's transitive closure?
-  bool needTrnstvClsr_;
-
-  // TODO(max): Document.
-  int16_t sigHashSize_;
-
   // TODO(max): Document.
   InstCount crntCycleNum_;
   // TODO(max): Document.
   InstCount crntSlotNum_;
-  // total simulated spills.
-  int totalSimSpills_;
+
+  // protected accessors:
+  SchedulerType GetHeuristicSchedulerType() const { return HeurSchedType_; }
+
+  bool IsSecondPass() const { return isSecondPass_; }
+
+  void SetBestCost(InstCount bestCost) { bestCost_ = bestCost; }
+
+  void SetBestSchedLength(InstCount bestSchedLngth) { bestSchedLngth_ = bestSchedLngth; }
+
+  const SchedPriorities& GetEnumPriorities() const { return enumPrirts_; }
+
+  int16_t GetSigHashSize() const { return sigHashSize_; }
+
+  Pruning GetPruningStrategy() const { return prune_; }
 
   // TODO(max): Document.
   void UseFileBounds_();

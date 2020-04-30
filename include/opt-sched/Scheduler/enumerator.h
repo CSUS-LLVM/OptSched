@@ -2,7 +2,7 @@
 Description:  Defines an enumerator class.
 Author:       Ghassan Shobaki
 Created:      Jun. 2002
-Last Update:  Jun. 2017
+Last Update:  Apr. 2020
 *******************************************************************************/
 
 #ifndef OPTSCHED_ENUM_ENUMERATOR_H

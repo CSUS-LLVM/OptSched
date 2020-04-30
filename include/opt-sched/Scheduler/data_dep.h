@@ -405,7 +405,6 @@ protected:
                                 int nodeID, InstCount fileSchedOrder,
                                 InstCount fileSchedCycle, InstCount fileLB,
                                 InstCount fileUB, int blkNum);
-  void AddNode_(SchedInstruction *instPtr, InstCount instNum);
   FUNC_RESULT FinishNode_(InstCount nodeNum, InstCount edgeCnt = -1);
   void CreateEdge_(InstCount frmInstNum, InstCount toInstNum, int ltncy,
                    DependenceType depType);

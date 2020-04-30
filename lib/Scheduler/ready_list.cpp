@@ -11,18 +11,16 @@ ReadyList::ReadyList(DataDepGraph *dataDepGraph, SchedPriorities prirts) {
   int i;
   uint16_t totKeyBits = 0;
 
-  useCntBits_ = crtclPathBits_ = scsrCntBits_ = ltncySumBits_ = nodeID_Bits_ =
-      inptSchedOrderBits_ = 0;
-
-  if (prirts_.isDynmc) {
+  // Initialize an array of KeyedEntry if a dynamic heuristic is used. This
+  // enable fast updating for dynamic heuristics.
+  if (prirts_.isDynmc)
     keyedEntries_ = new KeyedEntry<SchedInstruction, unsigned long>
-        *[dataDepGraph->GetInstCnt()];
-    for (int j = 0; j < dataDepGraph->GetInstCnt(); j++) {
-      keyedEntries_[j] = nullptr;
-    }
-  }
+        *[dataDepGraph->GetInstCnt()]();
   else
     keyedEntries_ = nullptr;
+
+  useCntBits_ = crtclPathBits_ = scsrCntBits_ = ltncySumBits_ = nodeID_Bits_ =
+      inptSchedOrderBits_ = 0;
 
   // Calculate the number of bits needed to hold the maximum value of each
   // priority scheme
@@ -156,6 +154,10 @@ void ReadyList::CopyList(ReadyList *othrLst) {
   assert(prirtyLst_->GetElmntCnt() == 0);
   assert(latestSubLst_->GetElmntCnt() == 0);
   assert(othrLst != NULL);
+
+  // Copy the ready list and create the array of keyed entries. If a dynamic
+  // heuristic is not used then the second parameter should be a nullptr and the
+  // array will not be created.
   prirtyLst_->CopyList(othrLst->prirtyLst_, keyedEntries_);
 }
 
@@ -182,8 +184,7 @@ unsigned long ReadyList::CmputKey_(SchedInstruction *inst, bool isUpdate,
     case LSH_LUC:
       oldLastUseCnt = inst->GetLastUseCnt();
       newLastUseCnt = inst->CmputLastUseCnt();
-      // assert(!isUpdate || newLastUseCnt >= oldLastUseCnt);
-      if (newLastUseCnt != oldLastUseCnt) {
+      if (newLastUseCnt != oldLastUseCnt)
         changed = true;
       }
 
