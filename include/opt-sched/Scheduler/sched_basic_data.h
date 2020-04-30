@@ -176,17 +176,6 @@ public:
   // Returns the instruction's forward or backward lower bound.
   InstCount GetLwrBound(DIRECTION dir) const;
 
-  // Returns the number of predecessors of this instruction.
-  InstCount GetPrdcsrCnt() const;
-  // Returns the number of successors of this instruction node.
-  InstCount GetScsrCnt() const;
-  // Returns the number of predecessors in this instructions transitive
-  // closure (i.e. total number of ancestors).
-  InstCount GetRcrsvPrdcsrCnt() const;
-  // Returns the number of successors in this instructions transitive
-  // closure (i.e. total number of descendants).
-  InstCount GetRcrsvScsrCnt() const;
-
   /***************************************************************************
    * Iterators                                                               *
    ***************************************************************************/
