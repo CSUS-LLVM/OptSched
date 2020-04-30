@@ -22,6 +22,8 @@
 
     + **[Install Ninja (optional)][setup-macos-ninja]**
 
++ **[AMDGPU][amdgpu]**
+
 + **[Super-build Script][super-build]**
 
 + **[Manual Build][manual-build]**
@@ -144,6 +146,10 @@ wget -q https://github.com/ninja-build/ninja/releases/download/v1.9.0/ninja-mac.
 If you would like to use Xcode to build LLVM, and do not already have it installed, go to the Mac App Store,
 search for `Xcode`, and click `Get`.
 
+## AMDGPU
+
+See the [documentation](documentation/amdgpu.md).
+
 ## Super-build Script
 
 To let a script manage cloning and installing all dependencies, placing OptSched inside llvm for you.
@@ -159,7 +165,7 @@ mkdir build && cd build
 **2. Configure**
 
 We want to configure against the OptSched/cmake/superbuild directory.
-Use the generator you want, be it Ninja with `-GNinja`, explicitly specified makefiles with `-G'Unix Makefilex'`,
+Use the generator you want, be it Ninja with `-GNinja`, explicitly specified makefiles with `-G'Unix Makefiles'`,
 or something else.
 
 If you have ccache installed, consider adding `-DCMAKE_CXX_COMPILER_LAUNCHER=ccache`.
@@ -382,6 +388,7 @@ echo 'int main(){};' | Debug/bin/clang -xc - -O3 -fplugin=lib/OptSched.so -mllvm
 [setup-macos-homebrew]: #install-homebrew-optional
 [setup-macos-cmake]: #install-cmake
 [setup-macos-ninja]: #install-ninja-optional-1
+[AMDGPU]: #amdgpu
 [super-build]: #super-build-script
 [manual-build]: #manual-build
 [download-source]: #download-the-source-code

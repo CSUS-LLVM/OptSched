@@ -137,6 +137,9 @@ else()
   set(EXTRA_ARGS)
 endif()
 
+# The dependencies within the build system are messed up.
+# This works around that problem by just generating the necessary files manually
+# before running the rest of the build.
 ExternalProject_Add_Step(ROCm runtblgen
   COMMAND ${CMAKE_COMMAND} --build . --target intrinsics_gen ${EXTRA_ARGS}
   COMMAND ${CMAKE_COMMAND} --build . --target AttributeCompatFuncTableGen ${EXTRA_ARGS}
