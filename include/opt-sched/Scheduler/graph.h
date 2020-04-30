@@ -512,7 +512,7 @@ inline UDT_GEDGES GraphNode::GetRcrsvScsrCnt() const {
 }
 
 inline LinkedList<GraphEdge> *GraphNode::GetNghbrLst(DIRECTION dir) {
-  return dir == DIR_FRWRD ? scsrLst_ : prdcsrLst_;
+  return dir == DIR_FRWRD ? prdcsrLst_ : scsrLst_;
 }
 
 inline GraphEdge *GraphNode::GetFrstScsrEdge() {
