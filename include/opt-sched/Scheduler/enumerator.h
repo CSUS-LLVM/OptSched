@@ -2,7 +2,7 @@
 Description:  Defines an enumerator class.
 Author:       Ghassan Shobaki
 Created:      Jun. 2002
-Last Update:  Jun. 2017
+Last Update:  Apr. 2020
 *******************************************************************************/
 
 #ifndef OPTSCHED_ENUM_ENUMERATOR_H
@@ -916,6 +916,9 @@ inline void Enumerator::UpdtRdyLst_(InstCount cycleNum, int slotNum) {
   InstCount prevCycleNum = cycleNum - 1;
   LinkedList<SchedInstruction> *lst1 = NULL;
   LinkedList<SchedInstruction> *lst2 = frstRdyLstPerCycle_[cycleNum];
+
+  if (prirts_.isDynmc)
+    rdyLst_->UpdatePriorities();
 
   if (slotNum == 0 && prevCycleNum >= 0) {
     // If at the begining of a new cycle other than the very first cycle, then
