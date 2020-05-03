@@ -1,0 +1,20 @@
+name: Reject Trailing Whitespace
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v2
+      with:
+        fetch-depth: 0
+
+    - name: Check Trailing Whitespace
+      # Diff an empty tree against the current commit
+      run: git diff-tree --check $(git hash-object -t tree /dev/null) HEAD
