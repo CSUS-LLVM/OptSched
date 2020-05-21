@@ -1,7 +1,48 @@
-if(${PACKAGE_VERSION} VERSION_LESS "8.0")
-  add_llvm_loadable_module(OptSched OBJECT ${OPT_SCHED_SRCS})
-else()
-  add_llvm_library(OptSched MODULE OBJECT ${OPT_SCHED_SRCS})
+set(OPTSCHED_SRCS Scheduler/aco.cpp
+  Scheduler/bb_spill.cpp
+  Scheduler/buffers.cpp
+  Scheduler/config.cpp
+  Scheduler/data_dep.cpp
+  Scheduler/enumerator.cpp
+  Scheduler/gen_sched.cpp
+  Scheduler/graph.cpp
+  Scheduler/graph_trans.cpp
+  Scheduler/hist_table.cpp
+  Scheduler/list_sched.cpp
+  Scheduler/logger.cpp
+  Scheduler/reg_alloc.cpp
+  Scheduler/utilities.cpp
+  Scheduler/machine_model.cpp
+  Scheduler/random.cpp
+  Scheduler/ready_list.cpp
+  Scheduler/register.cpp
+  Scheduler/relaxed_sched.cpp
+  Scheduler/sched_basic_data.cpp
+  Scheduler/sched_region.cpp
+  Scheduler/stats.cpp
+  Wrapper/OptimizingScheduler.cpp
+  Wrapper/OptSchedMachineWrapper.cpp
+  Wrapper/OptSchedDDGWrapperBasic.cpp
+  Wrapper/OptSchedGenericTarget.cpp
+)
+
+if(OPTSCHED_ENABLE_AMDGPU)
+  list(APPEND OPTSCHED_SRCS
+    Wrapper/AMDGPU/GCNOptSched.cpp
+    Wrapper/AMDGPU/OptSchedGCNTarget.cpp
+    Wrapper/AMDGPU/OptSchedDDGWrapperGCN.cpp
+  )
 endif()
 
-add_dependencies(OptSched ${OPT_SCHED_TARGET_DEPS})
+function(add_optsched_library)
+  if(LLVM_VERSION VERSION_LESS 8.0)
+    add_llvm_loadable_module(OptSched OBJECT ${ARGN})
+  else()
+    add_llvm_library(OptSched MODULE OBJECT ${ARGN})
+  endif()
+endfunction()
+
+add_optsched_library(
+  ${OPTSCHED_SRCS}
+  LINK_LIBS ${OPTSCHED_LINK_LIBS}
+)
