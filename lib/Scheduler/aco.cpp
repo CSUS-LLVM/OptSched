@@ -402,16 +402,16 @@ static void PrintInstruction(SchedInstruction *inst) {
 
   std::cerr << " defs ";
   for (auto def : llvm::enumerate(inst->GetDefs())) {
-    std::cerr << def.value()->GetNum() << def.value()->GetType();
-    if (def.index() != inst->NumDefs() - 1)
+    if (def.index() != 0)
       std::cerr << ", ";
+    std::cerr << def.value()->GetNum() << def.value()->GetType();
   }
 
   std::cerr << " uses ";
   for (auto use : llvm::enumerate(inst->GetUses())) {
-    std::cerr << use.value()->GetNum() << use.value()->GetType();
-    if (use.index() != inst->NumUses() - 1)
+    if (use.index() != 0)
       std::cerr << ", ";
+    std::cerr << use.value()->GetNum() << use.value()->GetType();
   }
   std::cerr << std::endl;
 }
