@@ -4,7 +4,7 @@ Description:  Defines a generic linked list template class with a number of
               Warning: the code within has evolved over many years.
 Author:       Ghassan Shobaki
 Created:      Oct. 1997
-Last Update:  Apr. 2020
+Last Update:  May  2020
 *******************************************************************************/
 
 #ifndef OPTSCHED_GENERIC_LNKD_LST_H
@@ -573,43 +573,66 @@ inline T *PriorityList<T, K>::GetNxtPriorityElmnt(K &key) {
   }
 }
 
+//(Vlad) added functionality to decrease priority
+// used for decreasing priority of clusterable instrs
+// when leaving a cluster
 template <class T, class K>
 void PriorityList<T, K>::BoostEntry(KeyedEntry<T, K> *entry, K newKey) {
   KeyedEntry<T, K> *crnt;
   KeyedEntry<T, K> *next = entry->GetNext();
   KeyedEntry<T, K> *prev = entry->GetPrev();
 
-  assert(newKey > entry->key);
   assert(LinkedList<T>::topEntry_ != NULL);
 
-  entry->key = newKey;
+  if (entry->key < newKey) // behave normally
+  {
+    entry->key = newKey;
 
-  // If it is already at the top, or its previous still has a larger key,
-  // then the entry is already in place and no boosting is needed
-  if (entry == LinkedList<T>::topEntry_ || prev->key >= newKey)
-    return;
+    // If it is already at the top, or its previous still has a larger key,
+    // then the entry is already in place and no boosting is needed
+    if (entry == LinkedList<T>::topEntry_ || prev->key >= newKey)
+      return;
 
-  prev = NULL;
+    prev = NULL;
 
-  for (crnt = entry->GetPrev(); crnt != NULL; crnt = crnt->GetPrev()) {
-    if (crnt->key >= newKey) {
-      assert(crnt != entry);
-      assert(crnt != entry->GetPrev());
-      prev = crnt;
-      break;
+    for (crnt = entry->GetPrev(); crnt != NULL; crnt = crnt->GetPrev()) {
+      if (crnt->key >= newKey) {
+        assert(crnt != entry);
+        assert(crnt != entry->GetPrev());
+        prev = crnt;
+        break;
+      }
     }
-  }
 
-  if (prev == NULL) {
-    next = (KeyedEntry<T, K> *)LinkedList<T>::topEntry_;
-  } else {
-    next = prev->GetNext();
-    assert(next != NULL);
-  }
+    if (prev == NULL) {
+      next = (KeyedEntry<T, K> *)LinkedList<T>::topEntry_;
+    } else {
+      next = prev->GetNext();
+      assert(next != NULL);
+    }
 
-  assert(next != entry->GetNext());
-  LinkedList<T>::RmvEntry_(entry, false);
-  InsrtEntry_(entry, next);
+    assert(next != entry->GetNext());
+    LinkedList<T>::RmvEntry_(entry, false);
+    InsrtEntry_(entry, next);
+  } else // move entry down on priority list
+  {
+    entry->key = newKey;
+
+    // if it is at the bottom or next entry still has a smaller key,
+    // then the entry is already in place
+    if (entry == LinkedList<T>::bottomEntry_ || next->key <= newKey)
+      return;
+
+    for (crnt = entry->GetNext(); crnt != NULL; crnt = crnt->GetNext()) {
+      if (crnt->key <= newKey) {
+        next = crnt;
+        break;
+      }
+    }
+
+    LinkedList<T>::RmvEntry_(entry, false);
+    InsrtEntry_(entry, next);
+  }
 
   this->itrtrReset_ = true;
 }
