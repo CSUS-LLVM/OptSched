@@ -50,22 +50,6 @@ static llvm::SmallVector<const Register *, 10> possiblyLengthenedIfAfterOther(
   return result;
 }
 
-// Gets the Uses for the given SchedInstruction.
-static llvm::ArrayRef<const Register *> getUses(SchedInstruction *node) {
-  Register **uses;
-  const int useCount = node->GetUses(uses);
-  assert(useCount >= 0);
-  return {uses, static_cast<size_t>(useCount)};
-}
-
-// Gets the Defs for the given SchedInstruction.
-static llvm::ArrayRef<const Register *> getDefs(SchedInstruction *node) {
-  Register **defs;
-  const int defCount = node->GetDefs(defs);
-  assert(defCount >= 0);
-  return {defs, static_cast<size_t>(defCount)};
-}
-
 GraphTrans::GraphTrans(DataDepGraph *dataDepGraph) {
   assert(dataDepGraph != NULL);
 
@@ -242,11 +226,11 @@ bool StaticNodeSupTrans::NodeIsSuperior_(SchedInstruction *nodeA,
   // registers.
   const int regTypes = graph->GetRegTypeCnt();
 
-  const llvm::ArrayRef<const Register *> usesA = ::getUses(nodeA);
-  const llvm::ArrayRef<const Register *> usesB = ::getUses(nodeB);
+  const llvm::ArrayRef<const Register *> usesA = nodeA->GetUses();
+  const llvm::ArrayRef<const Register *> usesB = nodeB->GetUses();
 
-  const llvm::ArrayRef<const Register *> defsA = ::getDefs(nodeA);
-  const llvm::ArrayRef<const Register *> defsB = ::getDefs(nodeB);
+  const llvm::ArrayRef<const Register *> defsA = nodeA->GetDefs();
+  const llvm::ArrayRef<const Register *> defsB = nodeB->GetDefs();
 
   // (# lengthened registers) - (# shortened registers)
   // from scheduling B after A. Indexed by register type.

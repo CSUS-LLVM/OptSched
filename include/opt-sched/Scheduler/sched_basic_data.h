@@ -8,14 +8,12 @@ Last Update:  Sept. 2013
 #ifndef OPTSCHED_BASIC_SCHED_BASIC_DATA_H
 #define OPTSCHED_BASIC_SCHED_BASIC_DATA_H
 
-// For class string.
-#include <string>
-// For class ostream.
 #include "opt-sched/Scheduler/defines.h"
 #include "opt-sched/Scheduler/graph.h"
 #include "opt-sched/Scheduler/hash_table.h"
 #include "opt-sched/Scheduler/machine_model.h"
-#include <iostream>
+#include "llvm/ADT/ArrayRef.h"
+#include <string>
 
 namespace llvm {
 namespace opt_sched {
@@ -394,15 +392,25 @@ public:
   bool FindDef(Register *reg) const;
   // Returns whether this instruction uses the specified register.
   bool FindUse(Register *reg) const;
-  // Retrieves the list of registers defined by this node. The array is put
-  // into defs and the number of elements is returned.
-  int16_t GetDefs(Register **&defs);
-  // Retrieves the list of registers used by this node. The array is put
-  // into uses and the number of elements is returned.
-  int16_t GetUses(Register **&uses);
 
-  int16_t GetDefCnt() { return defCnt_; }
-  int16_t GetUseCnt() { return useCnt_; }
+  int16_t NumDefs() { return defCnt_; }
+  int16_t NumUses() { return useCnt_; }
+
+  llvm::ArrayRef<Register *> GetDefs() {
+    return llvm::makeArrayRef(defs_, static_cast<size_t>(defCnt_));
+  }
+
+  llvm::ArrayRef<const Register *> GetDefs() const {
+    return llvm::makeArrayRef(defs_, static_cast<size_t>(defCnt_));
+  }
+
+  llvm::ArrayRef<Register *> GetUses() {
+    return llvm::makeArrayRef(uses_, static_cast<size_t>(useCnt_));
+  }
+
+  llvm::ArrayRef<const Register *> GetUses() const {
+    return llvm::makeArrayRef(uses_, static_cast<size_t>(useCnt_));
+  }
 
   // Return the adjusted use count. The number of uses minus live-out uses.
   int16_t GetAdjustedUseCnt() { return adjustedUseCnt_; }

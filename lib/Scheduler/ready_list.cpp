@@ -174,7 +174,7 @@ unsigned long ReadyList::CmputKey_(SchedInstruction *inst, bool isUpdate,
       break;
 
     case LSH_UC:
-      AddPrirtyToKey_(key, keySize, useCntBits_, inst->GetUseCnt(), maxUseCnt_);
+      AddPrirtyToKey_(key, keySize, useCntBits_, inst->NumUses(), maxUseCnt_);
       break;
 
     case LSH_NID:

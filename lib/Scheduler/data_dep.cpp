@@ -230,8 +230,8 @@ FUNC_RESULT DataDepGraph::SetupForSchdulng(bool cmputTrnstvClsr) {
     inst->SetMustBeInBBEntry(false);
     inst->SetMustBeInBBExit(false);
 
-    if (inst->GetUseCnt() > maxUseCnt_)
-      maxUseCnt_ = inst->GetUseCnt();
+    if (inst->NumUses() > maxUseCnt_)
+      maxUseCnt_ = inst->NumUses();
   }
 
   //  Logger::Info("Max use count = %d", maxUseCnt_);
@@ -3199,7 +3199,7 @@ bool DataDepGraph::DoesFeedUser(SchedInstruction *inst) {
       continue;
     // Ignore instructions that open more live intervals than
     // it closes because it will increase register pressure instead.
-    else if (curInstAdjUseCnt < succInst->GetDefCnt())
+    else if (curInstAdjUseCnt < succInst->NumDefs())
       continue;
 
     // If there is a successor instruction that decreases live intervals

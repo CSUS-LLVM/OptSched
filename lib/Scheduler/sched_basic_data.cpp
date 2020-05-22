@@ -1,6 +1,7 @@
 #include "opt-sched/Scheduler/sched_basic_data.h"
 #include "opt-sched/Scheduler/register.h"
 #include "opt-sched/Scheduler/stats.h"
+#include "llvm/ADT/STLExtras.h"
 
 using namespace llvm::opt_sched;
 
@@ -280,35 +281,11 @@ void SchedInstruction::AddUse(Register *reg) {
 }
 
 bool SchedInstruction::FindDef(Register *reg) const {
-  assert(reg != NULL);
-
-  for (int i = 0; i < defCnt_; i++) {
-    if (defs_[i] == reg)
-      return true;
-  }
-
-  return false;
+  return llvm::any_of(GetDefs(), [reg](const Register *r) { return reg == r; });
 }
 
 bool SchedInstruction::FindUse(Register *reg) const {
-  assert(reg != NULL);
-
-  for (int i = 0; i < useCnt_; i++) {
-    if (uses_[i] == reg)
-      return true;
-  }
-
-  return false;
-}
-
-int16_t SchedInstruction::GetDefs(Register **&defs) {
-  defs = defs_;
-  return defCnt_;
-}
-
-int16_t SchedInstruction::GetUses(Register **&uses) {
-  uses = uses_;
-  return useCnt_;
+  return llvm::any_of(GetUses(), [reg](const Register *r) { return reg == r; });
 }
 
 bool SchedInstruction::BlocksCycle() const { return blksCycle_; }
@@ -664,14 +641,10 @@ bool SchedInstruction::ProbeScsrsCrntLwrBounds(InstCount cycle) {
 }
 
 void SchedInstruction::ComputeAdjustedUseCnt_() {
-  Register **uses;
-  int useCnt = GetUses(uses);
-  adjustedUseCnt_ = useCnt;
-
-  for (int i = 0; i < useCnt; i++) {
-    if (uses[i]->IsLiveOut())
-      adjustedUseCnt_--;
-  }
+  adjustedUseCnt_ =
+      NumUses() - llvm::count_if(GetUses(), [](const Register *use) {
+        return use->IsLiveOut();
+      });
 }
 
 InstCount SchedInstruction::GetFileSchedOrder() const {

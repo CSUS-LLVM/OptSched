@@ -401,21 +401,17 @@ static void PrintInstruction(SchedInstruction *inst) {
   std::cerr << std::setw(20) << std::left << inst->GetOpCode();
 
   std::cerr << " defs ";
-  Register **defs;
-  uint16_t defsCount = inst->GetDefs(defs);
-  for (uint16_t i = 0; i < defsCount; i++) {
-    std::cerr << defs[i]->GetNum() << defs[i]->GetType();
-    if (i != defsCount - 1)
+  for (auto def : llvm::enumerate(inst->GetDefs())) {
+    if (def.index() != 0)
       std::cerr << ", ";
+    std::cerr << def.value()->GetNum() << def.value()->GetType();
   }
 
   std::cerr << " uses ";
-  Register **uses;
-  uint16_t usesCount = inst->GetUses(uses);
-  for (uint16_t i = 0; i < usesCount; i++) {
-    std::cerr << uses[i]->GetNum() << uses[i]->GetType();
-    if (i != usesCount - 1)
+  for (auto use : llvm::enumerate(inst->GetUses())) {
+    if (use.index() != 0)
       std::cerr << ", ";
+    std::cerr << use.value()->GetNum() << use.value()->GetType();
   }
   std::cerr << std::endl;
 }
