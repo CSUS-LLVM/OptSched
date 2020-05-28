@@ -614,7 +614,7 @@ void PriorityList<T, K>::BoostEntry(KeyedEntry<T, K> *entry, K newKey) {
     LinkedList<T>::RmvEntry_(entry, false);
     InsrtEntry_(entry, next);
     
-  } else { // move entry down on priority list    
+  } else { // move entry down on priority list
     entry->key = newKey;
 
     // if it is at the bottom or next entry still has a smaller key,
