@@ -26,23 +26,27 @@ set(OPTSCHED_SRCS Scheduler/aco.cpp
   Wrapper/OptSchedGenericTarget.cpp
 )
 
+set(OPTSCHED_TARGET_DEPS LLVMCodeGen)
+
 if(OPTSCHED_ENABLE_AMDGPU)
   list(APPEND OPTSCHED_SRCS
     Wrapper/AMDGPU/GCNOptSched.cpp
     Wrapper/AMDGPU/OptSchedGCNTarget.cpp
     Wrapper/AMDGPU/OptSchedDDGWrapperGCN.cpp
   )
+  list(APPEND OPTSCHED_TARGET_DEPS AMDGPUCommonTableGen)
 endif()
 
-function(add_optsched_library)
+function(add_optsched_library name)
   if(LLVM_VERSION VERSION_LESS 8.0)
-    add_llvm_loadable_module(OptSched OBJECT ${ARGN})
+    add_llvm_loadable_module(${name} OBJECT ${ARGN})
   else()
-    add_llvm_library(OptSched MODULE OBJECT ${ARGN})
+    add_llvm_library(${name} MODULE OBJECT ${ARGN})
   endif()
 endfunction()
 
-add_optsched_library(
+add_optsched_library(OptSched
   ${OPTSCHED_SRCS}
   LINK_LIBS ${OPTSCHED_LINK_LIBS}
 )
+add_dependencies(OptSched ${OPTSCHED_TARGET_DEPS})
