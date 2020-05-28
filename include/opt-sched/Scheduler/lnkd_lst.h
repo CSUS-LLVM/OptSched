@@ -584,8 +584,7 @@ void PriorityList<T, K>::BoostEntry(KeyedEntry<T, K> *entry, K newKey) {
 
   assert(LinkedList<T>::topEntry_ != NULL);
 
-  if (entry->key < newKey) // behave normally
-  {
+  if (entry->key < newKey) { // behave normally
     entry->key = newKey;
 
     // If it is already at the top, or its previous still has a larger key,
@@ -614,8 +613,8 @@ void PriorityList<T, K>::BoostEntry(KeyedEntry<T, K> *entry, K newKey) {
     assert(next != entry->GetNext());
     LinkedList<T>::RmvEntry_(entry, false);
     InsrtEntry_(entry, next);
-  } else // move entry down on priority list
-  {
+    
+  } else { // move entry down on priority list    
     entry->key = newKey;
 
     // if it is at the bottom or next entry still has a smaller key,
