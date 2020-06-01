@@ -238,9 +238,9 @@ void ScheduleDAGOptSched::SetupLLVMDag() {
   // Apply llvm DAG post processing.
   if (EnableMutations) {
     addMutation(createCopyConstrainDAGMutation(TII, TRI));
-    //README: if you need the x86 mutations uncomment the next line.
-    //addMutation(createX86MacroFusionDAGMutation());
-    //You also need to add the next line somewhere above this function
+    // README: if you need the x86 mutations uncomment the next line.
+    // addMutation(createX86MacroFusionDAGMutation());
+    // You also need to add the next line somewhere above this function
     //#include "../../../../../llvm/lib/Target/X86/X86MacroFusion.h"
     Topo.InitDAGTopologicalSorting();
     postprocessDAG();
