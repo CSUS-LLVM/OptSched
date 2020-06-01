@@ -237,6 +237,11 @@ void ScheduleDAGOptSched::SetupLLVMDag() {
 
   // Apply llvm DAG post processing.
   if (EnableMutations) {
+    addMutation(createCopyConstrainDAGMutation(TII, TRI));
+    //README: if you need the x86 mutations uncomment the next line.
+    //addMutation(createX86MacroFusionDAGMutation());
+    //You also need to add the next line somewhere above this function
+    //#include "../../../../../llvm/lib/Target/X86/X86MacroFusion.h"
     Topo.InitDAGTopologicalSorting();
     postprocessDAG();
   }
@@ -275,6 +280,8 @@ void ScheduleDAGOptSched::schedule() {
 
   if (!OptSchedEnabled || !scheduleSpecificRegion(RegionName, schedIni)) {
     LLVM_DEBUG(dbgs() << "Skipping region " << RegionName << "\n");
+    SetupLLVMDag();
+    ScheduleDAGMILive::schedule();
     return;
   }
 
@@ -296,6 +303,7 @@ void ScheduleDAGOptSched::schedule() {
 
   // Use LLVM's heuristic schedule as input to the B&B scheduler.
   if (UseLLVMScheduler) {
+    SetupLLVMDag();
     ScheduleDAGMILive::schedule();
 
     OriginalDAG = SUnits;
