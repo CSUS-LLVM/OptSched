@@ -613,7 +613,6 @@ void PriorityList<T, K>::BoostEntry(KeyedEntry<T, K> *entry, K newKey) {
     assert(next != entry->GetNext());
     LinkedList<T>::RmvEntry_(entry, false);
     InsrtEntry_(entry, next);
-    
   } else { // move entry down on priority list
     entry->key = newKey;
 
