@@ -217,6 +217,9 @@ ScheduleDAGOptSched::ScheduleDAGOptSched(
   MM = OST->createMachineModel(PathCfgMM.c_str());
   MM->convertMachineModel(static_cast<ScheduleDAGInstrs &>(*this),
                           RegClassInfo);
+
+  if(EnableMutations)
+    addLLVMMutations();
 }
 
 void ScheduleDAGOptSched::SetupLLVMDag() {
@@ -235,16 +238,6 @@ void ScheduleDAGOptSched::SetupLLVMDag() {
   // Finalize live-in
   RPTracker.closeTop();
 
-  // Apply llvm DAG post processing.
-  if (EnableMutations) {
-    addMutation(createCopyConstrainDAGMutation(TII, TRI));
-    // README: if you need the x86 mutations uncomment the next line.
-    // addMutation(createX86MacroFusionDAGMutation());
-    // You also need to add the next line somewhere above this function
-    //#include "../../../../../llvm/lib/Target/X86/X86MacroFusion.h"
-    Topo.InitDAGTopologicalSorting();
-    postprocessDAG();
-  }
 }
 
 // Add the two passes used for the two pass scheduling approach
@@ -255,6 +248,15 @@ void ScheduleDAGOptSched::initSchedulers() {
   SchedPasses.push_back(OptSchedMinRP);
   // Second
   SchedPasses.push_back(OptSchedBalanced);
+}
+
+// Add the appropriate LLVM mutations. Called if LLVM_MUTATIONS is set
+void ScheduleDAGOptSched::addLLVMMutations() {
+    addMutation(createCopyConstrainDAGMutation(TII, TRI));
+    // README: if you need the x86 mutations uncomment the next line.
+    // addMutation(createX86MacroFusionDAGMutation());
+    // You also need to add the next line somewhere above this function
+    //#include "../../../../../llvm/lib/Target/X86/X86MacroFusion.h"
 }
 
 // schedule called for each basic block
@@ -280,7 +282,6 @@ void ScheduleDAGOptSched::schedule() {
 
   if (!OptSchedEnabled || !scheduleSpecificRegion(RegionName, schedIni)) {
     LLVM_DEBUG(dbgs() << "Skipping region " << RegionName << "\n");
-    SetupLLVMDag();
     ScheduleDAGMILive::schedule();
     return;
   }
@@ -303,7 +304,6 @@ void ScheduleDAGOptSched::schedule() {
 
   // Use LLVM's heuristic schedule as input to the B&B scheduler.
   if (UseLLVMScheduler) {
-    SetupLLVMDag();
     ScheduleDAGMILive::schedule();
 
     OriginalDAG = SUnits;

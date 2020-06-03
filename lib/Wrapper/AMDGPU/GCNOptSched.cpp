@@ -46,12 +46,6 @@ ScheduleDAGOptSchedGCN::ScheduleDAGOptSchedGCN(
     : ScheduleDAGOptSched(C, std::move(S)) {}
 
 void ScheduleDAGOptSchedGCN::initSchedulers() {
-  // Add DAG mutations that apply to both GCN and OptSched DAG's
-
-  addMutation(createLoadClusterDAGMutation(TII, TRI));
-  addMutation(createStoreClusterDAGMutation(TII, TRI));
-  // addMutation(createAMDGPUMacroFusionDAGMutation());
-
   // Add passes
 
   // SchedPasses.push_back(GCNMaxOcc);
@@ -61,6 +55,16 @@ void ScheduleDAGOptSchedGCN::initSchedulers() {
   // Second
   SchedPasses.push_back(OptSchedBalanced);
 }
+
+// Add the appropriate LLVM mutations. Called if LLVM_MUTATIONS is set
+void ScheduleDAGOptSchedGCN::addLLVMMutations() {
+  // Add DAG mutations that apply to both GCN and OptSched DAG's
+
+  addMutation(createLoadClusterDAGMutation(TII, TRI));
+  addMutation(createStoreClusterDAGMutation(TII, TRI));
+  // addMutation(createAMDGPUMacroFusionDAGMutation());
+}
+
 
 // Execute scheduling passes.
 // Partially copied GCNScheduleDAGMILive::finalizeSchedule
