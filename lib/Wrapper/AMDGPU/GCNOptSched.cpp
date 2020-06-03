@@ -65,7 +65,6 @@ void ScheduleDAGOptSchedGCN::addLLVMMutations() {
   // addMutation(createAMDGPUMacroFusionDAGMutation());
 }
 
-
 // Execute scheduling passes.
 // Partially copied GCNScheduleDAGMILive::finalizeSchedule
 void ScheduleDAGOptSchedGCN::finalizeSchedule() {
