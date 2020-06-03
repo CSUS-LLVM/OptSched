@@ -218,8 +218,7 @@ ScheduleDAGOptSched::ScheduleDAGOptSched(
   MM->convertMachineModel(static_cast<ScheduleDAGInstrs &>(*this),
                           RegClassInfo);
 
-  if (EnableMutations)
-    addLLVMMutations();
+  addLLVMMutations();
 }
 
 void ScheduleDAGOptSched::SetupLLVMDag() {
@@ -249,13 +248,17 @@ void ScheduleDAGOptSched::initSchedulers() {
   SchedPasses.push_back(OptSchedBalanced);
 }
 
-// Add the appropriate LLVM mutations. Called if LLVM_MUTATIONS is set
+// Add the appropriate LLVM mutations.
 void ScheduleDAGOptSched::addLLVMMutations() {
-  addMutation(createCopyConstrainDAGMutation(TII, TRI));
-  // README: if you need the x86 mutations uncomment the next line.
-  // addMutation(createX86MacroFusionDAGMutation());
-  // You also need to add the next line somewhere above this function
-  //#include "../../../../../llvm/lib/Target/X86/X86MacroFusion.h"
+
+  // Adds the LLVM mutations if LLVM_MUTATIONS is set
+  if (EnableMutations) {
+    addMutation(createCopyConstrainDAGMutation(TII, TRI));
+    // README: if you need the x86 mutations uncomment the next line.
+    // addMutation(createX86MacroFusionDAGMutation());
+    // You also need to add the next line somewhere above this function
+    //#include "../../../../../llvm/lib/Target/X86/X86MacroFusion.h"
+  }
 }
 
 // schedule called for each basic block

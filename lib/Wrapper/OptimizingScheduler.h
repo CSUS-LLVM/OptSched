@@ -236,7 +236,7 @@ public:
   // Setup and select schedulers for the two pass scheduling approach.
   virtual void initSchedulers();
 
-  // Add the appropriate LLVM mutations. Called if LLVM_MUTATIONS is set
+  // Add the appropriate LLVM mutations.
   virtual void addLLVMMutations();
 
   // Execute a scheduling pass on the function.

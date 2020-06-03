@@ -56,7 +56,7 @@ void ScheduleDAGOptSchedGCN::initSchedulers() {
   SchedPasses.push_back(OptSchedBalanced);
 }
 
-// Add the appropriate LLVM mutations. Called if LLVM_MUTATIONS is set
+// Add the appropriate LLVM mutations.
 void ScheduleDAGOptSchedGCN::addLLVMMutations() {
   // Add DAG mutations that apply to both GCN and OptSched DAG's
 
