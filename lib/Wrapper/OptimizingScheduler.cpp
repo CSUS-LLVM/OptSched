@@ -236,6 +236,9 @@ void ScheduleDAGOptSched::SetupLLVMDag() {
 
   // Finalize live-in
   RPTracker.closeTop();
+
+  Topo.InitDAGTopologicalSorting();
+  postprocessDAG();
 }
 
 // Add the two passes used for the two pass scheduling approach
@@ -379,10 +382,17 @@ void ScheduleDAGOptSched::schedule() {
         dep.setSUnit(&SUnits[nodeNumMap[pred->NodeNum]]);
       }
     }
+  } else {
+    // Only call SetupLLVMDag if ScheduleDAGMILive::schedule() was not invoked.
+    // ScheduleDAGMILive::schedule() will perform the same post processing
+    // steps that SetupLLVMDag() does when called, and if the post processing
+    // is called a second time the post processing will be applied a second
+    // time.  This will lead to the leads to the a different LLVM DAG and will
+    // cause the LLVM heuristic to produce a schedule which is significantly
+    // different from the one produced by LLVM without OptSched.
+    SetupLLVMDag();
   }
 
-  // Build LLVM DAG
-  SetupLLVMDag();
   OST->initRegion(this, MM.get());
   // Convert graph
   auto DDG =
