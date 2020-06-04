@@ -538,9 +538,12 @@ int OptSchedDDGWrapperBasic::clusterNeighboringMemOps(
     const SUnit *SUb = MemOpRecords[Idx + 1].SU;
     dbgs() << "  Checking possible clustering of (" << SUa->NodeNum << ") and ("
            << SUb->NodeNum << ")\n";
+           
+    // Pass constant of 1 to AMD's function to determine clustering to remove
+    // the limit of 15. Our enumerator can determine when it has reached the
+    // limit instead of depending on AMD.
     if (DAG->TII->shouldClusterMemOps(*MemOpRecords[Idx].BaseOp,
-                                      *MemOpRecords[Idx + 1].BaseOp,
-                                      ClusterLength)) {
+                                      *MemOpRecords[Idx + 1].BaseOp, 1u)) {
       dbgs() << "    Cluster possible at SU(" << SUa->NodeNum << ")- SU("
              << SUb->NodeNum << ")\n";
 

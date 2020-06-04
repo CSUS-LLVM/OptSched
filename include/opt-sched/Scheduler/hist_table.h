@@ -109,6 +109,10 @@ protected:
   InstCount cost_;
   InstCount peakSpillCost_;
   InstCount spillCostSum_;
+  int ClusterCost;
+  int ClusterActiveGroup;
+  int ClusterAbsorbCount;
+  int ClusterTotalCost;
 
   // (Chris)
   InstCount totalCost_ = -1;
@@ -119,7 +123,6 @@ protected:
 #ifdef IS_DEBUG
   bool costInfoSet_;
 #endif
-
   bool ChkCostDmntnForBBSpill_(EnumTreeNode *node, Enumerator *enumrtr);
   bool ChkCostDmntn_(EnumTreeNode *node, Enumerator *enumrtr,
                      InstCount &maxShft);

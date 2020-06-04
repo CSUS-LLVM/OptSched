@@ -39,6 +39,7 @@ SchedRegion::SchedRegion(MachineModel *machMdl, DataDepGraph *dataDepGraph,
 
   totalSimSpills_ = INVALID_VALUE;
   bestCost_ = INVALID_VALUE;
+  BestClusterCost = INVALID_VALUE;
   bestSchedLngth_ = INVALID_VALUE;
   hurstcCost_ = INVALID_VALUE;
   enumCrntSched_ = NULL;

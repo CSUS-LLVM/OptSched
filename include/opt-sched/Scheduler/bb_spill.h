@@ -35,21 +35,53 @@ private:
 
   InstCount crntSpillCost_;
   InstCount optmlSpillCost_;
+  int CurrentClusterCost;
+
+  /// Used to calculate the dynamic lower bound for clustering.
+  llvm::SmallVector<int, 32> ClusterCount;
+  llvm::SmallVector<int, 32> ClusterInstrRemainderCount;
+  int ClusterGroupCount;
+
+  /// Print the current clusters found so far in the schedule.
+  void printCurrentClustering();
+
+  void initForClustering();
+  
+  /// Calculate the lower bound cost for memory operations clustering and
+  /// return the lower bound cost. Does not take into account the clustering
+  /// weight.
+  int calculateClusterStaticLB();
+
+  /// Helper function for clustering to save the state of the current cluster.
+  void saveCluster(SchedInstruction *inst);
+
+  /// Helper function for clustering to start a new clustering.
+  void initCluster(SchedInstruction *inst);
+
+  /// Reset the active cluster to 0 (none).
+  void resetActiveCluster(SchedInstruction *inst);
+
+  /// Helper function to restore the previous cluster.
+  void restorePreviousCluster(SchedInstruction *inst);
+
+  bool isClusterFinished();
+
+  int calculateClusterDLB();
 
   /// Current cluster size
   unsigned int CurrentClusterSize; 
-
-  MapVector<int, int> InstructionsScheduledInEachCluster;
 
   /// The minimum amount of cluster blocks possible.
   int MinClusterBlocks;
 
   /// The minimum amount of cluster blocks + the optimistic expected cluster
   /// blocks remaining.
-  int CurrentClusterBlocks;
+  int DynamicClusterLowerBound;
 
   /// Current active cluster group.
-  int ActiveClusterGroup;
+  int ClusterActiveGroup;
+
+  int StartCycle;
 
   /// Flag to enable or disable clustering memory operations in the ILP pass.
   /// Reads from the sched.ini file then set the flag accordingly.
@@ -70,13 +102,15 @@ private:
     /// restore the cluster state when backtracking.
     int InstNum; 
 
+    int Start;
+
     /// Contains the actual names of the instructions in the cluster. Only used
     /// for printing and debugging purposes.
     std::unique_ptr<llvm::SmallVector<llvm::StringRef, 4>> InstrList;
 
     /// Constructor for this struct
-    PastClusters(int Cluster, int Size, int Instructions)
-        : ClusterGroup(Cluster), ClusterSize(Size), InstNum(Instructions) {}
+    PastClusters(int Cluster, int Size, int Instructions, int CycleStart)
+        : ClusterGroup(Cluster), ClusterSize(Size), InstNum(Instructions), Start(CycleStart) {}
   };
 
   /// Vector containing the (n-1) past clusters
@@ -161,7 +195,7 @@ private:
   void InitForCostCmputtn_();
   InstCount CmputDynmcCost_();
 
-  void UpdateSpillInfoForSchdul_(SchedInstruction *inst, bool trackCnflcts);
+  void UpdateSpillInfoForSchdul_(SchedInstruction *inst, bool trackCnflcts, int Start);
   void UpdateSpillInfoForUnSchdul_(SchedInstruction *inst);
   void SetupPhysRegs_();
   void CmputCrntSpillCost_();

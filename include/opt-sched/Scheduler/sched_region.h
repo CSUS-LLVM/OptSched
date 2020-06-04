@@ -58,6 +58,7 @@ public:
   inline int GetCostLwrBound() { return costLwrBound_; }
   // Returns the best cost found so far for this region.
   inline InstCount GetBestCost() { return bestCost_; }
+  inline int getBestClusterCost() { return BestClusterCost; }
   // Returns a pointer to the list scheduler heurisitcs.
   inline SchedPriorities GetHeuristicPriorities() { return hurstcPrirts_; }
   // Get the number of simulated spills code added for this block.
@@ -132,6 +133,7 @@ private:
   
   // The best results found so far.
   InstCount bestCost_;
+  int BestClusterCost;
   InstCount bestSchedLngth_;
 
   // (Chris): The cost function. Defaults to PERP.
@@ -179,6 +181,8 @@ protected:
   bool IsSecondPass() const { return isSecondPass_; }
 
   void SetBestCost(InstCount bestCost) { bestCost_ = bestCost; }
+
+  void setBestClusterCost(int BestCost) { BestClusterCost = BestCost; }
 
   void SetBestSchedLength(InstCount bestSchedLngth) { bestSchedLngth_ = bestSchedLngth; }
 

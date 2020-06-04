@@ -400,6 +400,10 @@ void CostHistEnumTreeNode::Init_() {
   costInfoSet_ = false;
 #endif
   cost_ = 0;
+  ClusterCost = 9999999;
+  ClusterTotalCost = 9999999;
+  ClusterActiveGroup = 0;
+  ClusterAbsorbCount = 0;
 }
 
 bool CostHistEnumTreeNode::DoesDominate(EnumTreeNode *node,
@@ -467,6 +471,41 @@ static bool doesHistoryPeakCostDominate(InstCount OtherPrefixCost,
   return LCE->GetBestCost() <= OtherPrefixCost;
 }
 
+static bool doesClusterCostDominate(EnumTreeNode *CurEnumNode,
+                                    int ClusterActiveGroup, int ClusterCost,
+                                    int ClusterAbsorbCount, int ClusterTotalCost,
+                                    int ClusterBest) {
+  // Correct but too restrictive
+  if (CurEnumNode->getCurClusteringGroup() != ClusterActiveGroup)
+    return false;
+
+  // Count the instructions only if there is an instruction in the ready list that belongs
+  // to the open cluster. If there is none, you can't add any instructions. If there are no instructions
+  // on the ready list that belong to the open cluster, we can set the cluster absorb count to 0.
+  if (CurEnumNode->getClusteringCost() >= ClusterCost &&
+      CurEnumNode->getClusterAbsorbCount() <= ClusterAbsorbCount)
+    return true;
+
+  // More room in the open cluster can reduce the number clusters by at most one
+  if (CurEnumNode->getClusteringCost() >= ClusterCost + 1)
+    return true;
+
+  int improvement = ClusterCost - CurEnumNode->getClusteringCost();
+
+  // If the current node has a better absorb count then we optimistically assume it may
+  // improve the number of clusters by 1
+  if (CurEnumNode->getClusterAbsorbCount() < ClusterAbsorbCount)
+    improvement++;
+
+  // Two cases for a history node,
+  // 1.) One without a full schedule below it. Look at DLB.
+  // 2.) One with a full schedule below it. Look at the best found below the history node.
+  if (ClusterBest != INVALID_VALUE && improvement <= ClusterTotalCost - ClusterBest)
+    return true;
+
+  return false;
+}
+
 // Should we prune the other node based on RP cost.
 bool CostHistEnumTreeNode::ChkCostDmntnForBBSpill_(EnumTreeNode *Node,
                                                    Enumerator *E) {
@@ -502,6 +541,10 @@ bool CostHistEnumTreeNode::ChkCostDmntnForBBSpill_(EnumTreeNode *Node,
       ShouldPrune =
           spillCostSum_ % instCnt >= Node->GetSpillCostSum() % instCnt;
     }
+    if (!ShouldPrune && LCE->isClustering()) {
+      int ClusterBest = LCE->getBestClusterCost();
+      ShouldPrune = doesClusterCostDominate(Node, ClusterActiveGroup, ClusterCost, ClusterAbsorbCount, ClusterTotalCost, ClusterBest);
+    }
   }
   return ShouldPrune;
 }
@@ -511,6 +554,10 @@ void CostHistEnumTreeNode::SetCostInfo(EnumTreeNode *node, bool, Enumerator *) {
   peakSpillCost_ = node->GetPeakSpillCost();
   spillCostSum_ = node->GetSpillCostSum();
   isLngthFsbl_ = node->IsLngthFsbl();
+  ClusterCost = node->getClusteringCost();
+  ClusterActiveGroup = node->getCurClusteringGroup();
+  ClusterAbsorbCount = node->getClusterAbsorbCount();
+  ClusterTotalCost = node->getTotalClusterCost();
 
   // (Chris)
   partialCost_ = node->GetCostLwrBound();

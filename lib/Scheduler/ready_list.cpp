@@ -78,9 +78,6 @@ ReadyList::ReadyList(DataDepGraph *dataDepGraph, SchedPriorities prirts) {
       ClusterBit = Utilities::clcltBitsNeededToHoldNum(1);
       totKeyBits += ClusterBit;
       break;
-
-    default:
-      break;
     } // end switch
   }   // end for
 
@@ -127,9 +124,6 @@ ReadyList::ReadyList(DataDepGraph *dataDepGraph, SchedPriorities prirts) {
 
     case LSH_CLUSTER:
       AddPrirtyToKey_(maxPriority_, keySize, ClusterBit, 1, 1);
-      break;
-
-    default:
       break;
     }
   }
@@ -186,7 +180,6 @@ unsigned long ReadyList::CmputKey_(SchedInstruction *inst, bool isUpdate,
       newLastUseCnt = inst->CmputLastUseCnt();
       if (newLastUseCnt != oldLastUseCnt)
         changed = true;
-      }
 
       AddPrirtyToKey_(key, keySize, useCntBits_, newLastUseCnt, maxUseCnt_);
       break;
@@ -234,9 +227,6 @@ unsigned long ReadyList::CmputKey_(SchedInstruction *inst, bool isUpdate,
       }
       AddPrirtyToKey_(key, keySize, ClusterBit, ValueForKey, 1);
       break;
-
-    default:
-      break;
     }
   }
   return key;
@@ -253,15 +243,17 @@ void ReadyList::AddLatestSubLists(LinkedList<SchedInstruction> *lst1,
 }
 
 void ReadyList::Print(std::ostream &out) {
+  PriorityList<SchedInstruction> *OutList = new PriorityList<SchedInstruction>;
+  OutList->CopyList(prirtyLst_, nullptr);
   out << "Ready List: ";
-  for (auto *crntInst = prirtyLst_->GetFrstElmnt(); crntInst != NULL;
-       crntInst = prirtyLst_->GetNxtElmnt()) {
+  for (auto *crntInst = OutList->GetFrstElmnt(); crntInst != NULL;
+       crntInst = OutList->GetNxtElmnt()) {
     out << " " << crntInst->GetNum() << "(" << crntInst->GetClusterGroup()
         << ")";
   }
   out << '\n';
 
-  prirtyLst_->ResetIterator();
+  delete OutList;
 }
 
 void ReadyList::AddLatestSubList_(LinkedList<SchedInstruction> *lst) {

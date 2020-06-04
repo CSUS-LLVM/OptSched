@@ -75,8 +75,6 @@ SchedInstruction::~SchedInstruction() {
 }
 
 bool SchedInstruction::computeWasActive() {
-  if (ClusterGroup == 0) return false;
-
   WasActive = GetActiveCluster() == GetClusterGroup();
   return WasActive;
 }

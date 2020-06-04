@@ -153,6 +153,12 @@ private:
   InstCount peakSpillCost_;
   InstCount spillCostSum_;
   InstCount totalCost_ = -1;
+  int ClusterCost;
+  int ClusterActiveGroup;
+  int ClusterAbsorbCount;
+  int ClusterDLB;
+  int ClusterTotalCost = -1;
+  int ClusterBestCost;
   bool totalCostIsActualCost_ = false;
   ReserveSlot *rsrvSlots_;
 
@@ -276,6 +282,18 @@ public:
   inline void SetSpillCostSum(InstCount cost);
   inline InstCount GetSpillCostSum();
 
+  inline void setClusteringCost(int Cost);
+  inline int getClusteringCost();
+  inline void setCurClusteringGroup(int Group);
+  inline int getCurClusteringGroup();
+  inline void setClusterAbsorbCount(int Absorb);
+  inline int getClusterAbsorbCount();
+  inline void setClusterLwrBound(int ClusterDynamicLowerBound);
+  inline int getClusterLwrBound();
+  inline void setTotalClusterCost(int Cost);
+  inline int getTotalClusterCost();
+  inline bool isClustering();
+
   bool ChkInstRdndncy(SchedInstruction *inst, int brnchNum);
   bool IsNxtSlotStall();
 
@@ -316,6 +334,9 @@ protected:
   friend class EnumTreeNode;
   friend class HistEnumTreeNode;
   friend class CostHistEnumTreeNode;
+
+  // Should we cluster memory operations
+  bool Clustering;
 
   // TODO(max): Document.
   bool isCnstrctd_;
@@ -508,7 +529,7 @@ public:
              InstCount schedUprBound, int16_t sigHashSize,
              SchedPriorities prirts, Pruning PruningStrategy,
              bool SchedForRPOnly, bool enblStallEnum, Milliseconds timeout,
-             InstCount preFxdInstCnt = 0,
+             bool ClusteringEnabled, InstCount preFxdInstCnt = 0,
              SchedInstruction *preFxdInsts[] = NULL);
   virtual ~Enumerator();
   virtual void Reset();
@@ -524,6 +545,8 @@ public:
 
   // (Chris)
   inline bool IsSchedForRPOnly() const { return SchedForRPOnly_; }
+
+  inline bool isClustering() const { return Clustering; }
 
   // Calculates the schedule and returns it in the passed argument.
   FUNC_RESULT FindSchedule(InstSchedule *sched, SchedRegion *rgn) {
@@ -586,6 +609,7 @@ private:
   bool WasObjctvMet_();
   bool BackTrack_();
   InstCount GetBestCost_();
+  int GetBestClusterCost_();
   void CreateRootNode_();
 
   // Check if branching from the current node by scheduling this instruction
@@ -603,7 +627,7 @@ public:
                        SchedPriorities prirts, Pruning PruningStrategy,
                        bool SchedForRPOnly, bool enblStallEnum,
                        Milliseconds timeout, SPILL_COST_FUNCTION spillCostFunc,
-                       InstCount preFxdInstCnt = 0,
+                       bool ClusteringEnabled, InstCount preFxdInstCnt = 0,
                        SchedInstruction *preFxdInsts[] = NULL);
   virtual ~LengthCostEnumerator();
   void Reset();
@@ -616,6 +640,7 @@ public:
   bool IsCostEnum();
   SPILL_COST_FUNCTION GetSpillCostFunc() { return spillCostFunc_; }
   inline InstCount GetBestCost() { return GetBestCost_(); }
+  int getBestClusterCost() { return GetBestClusterCost_(); }
 };
 /*****************************************************************************/
 
@@ -849,6 +874,44 @@ void EnumTreeNode::SetSpillCostSum(InstCount cost) {
 /*****************************************************************************/
 
 InstCount EnumTreeNode::GetSpillCostSum() { return spillCostSum_; }
+/*****************************************************************************/
+
+void EnumTreeNode::setClusteringCost(int Cost) {
+  assert(Cost >= 0);
+  ClusterCost = Cost;
+}
+
+int EnumTreeNode::getClusteringCost() { return ClusterCost; }
+
+void EnumTreeNode::setCurClusteringGroup(int Group) {
+  assert(Group >= 0);
+  ClusterActiveGroup = Group;
+}
+
+int EnumTreeNode::getCurClusteringGroup() { return ClusterActiveGroup; }
+
+void EnumTreeNode::setClusterAbsorbCount(int Absorb) {
+  assert(Absorb >= 0);
+  ClusterAbsorbCount = Absorb;
+}
+
+int EnumTreeNode::getClusterAbsorbCount() { return ClusterAbsorbCount; }
+
+void EnumTreeNode::setClusterLwrBound(int ClusterDynamicLowerBound) {
+  assert(ClusterDynamicLowerBound >= 0);
+  ClusterDLB = ClusterDynamicLowerBound;
+}
+
+int EnumTreeNode::getClusterLwrBound() { return ClusterDLB; }
+
+void EnumTreeNode::setTotalClusterCost(int Cost) {
+  assert(Cost >= 0);
+  ClusterTotalCost = Cost;
+}
+
+int EnumTreeNode::getTotalClusterCost() { return ClusterTotalCost; }
+
+bool EnumTreeNode::isClustering() { return enumrtr_->isClustering(); }
 /*****************************************************************************/
 
 bool EnumTreeNode::IsNxtCycleNew_() {

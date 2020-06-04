@@ -64,6 +64,12 @@ void EnumTreeNode::Init_() {
   isLeaf_ = false;
   cost_ = INVALID_VALUE;
   costLwrBound_ = INVALID_VALUE;
+  ClusterCost = INVALID_VALUE;
+  ClusterActiveGroup = INVALID_VALUE;
+  ClusterAbsorbCount = INVALID_VALUE;
+  ClusterDLB = INVALID_VALUE;
+  ClusterTotalCost = -1;
+  ClusterBestCost = 99999999;
   crntCycleBlkd_ = false;
   rsrvSlots_ = NULL;
   totalCostIsActualCost_ = false;
@@ -434,8 +440,8 @@ Enumerator::Enumerator(DataDepGraph *dataDepGraph, MachineModel *machMdl,
                        InstCount schedUprBound, int16_t sigHashSize,
                        SchedPriorities prirts, Pruning PruningStrategy,
                        bool SchedForRPOnly, bool enblStallEnum,
-                       Milliseconds timeout, InstCount preFxdInstCnt,
-                       SchedInstruction *preFxdInsts[])
+                       Milliseconds timeout, bool ClusteringEnabled,
+                       InstCount preFxdInstCnt, SchedInstruction *preFxdInsts[])
     : ConstrainedScheduler(dataDepGraph, machMdl, schedUprBound) {
   memAllocBlkSize_ = (int)timeout / TIMEOUT_TO_MEMBLOCK_RATIO;
   assert(preFxdInstCnt >= 0);
@@ -454,6 +460,7 @@ Enumerator::Enumerator(DataDepGraph *dataDepGraph, MachineModel *machMdl,
   prune_ = PruningStrategy;
   SchedForRPOnly_ = SchedForRPOnly;
   enblStallEnum_ = enblStallEnum;
+  Clustering = ClusteringEnabled;
 
   isEarlySubProbDom_ = true;
 
@@ -1316,17 +1323,27 @@ void SetTotalCostsAndSuffixes(EnumTreeNode *const currentNode,
     Logger::Info("Leaf node total cost %d", currentNode->GetCost());
 #endif
     currentNode->SetTotalCost(currentNode->GetCost());
+    if (currentNode->isClustering())
+      currentNode->setTotalClusterCost(currentNode->getClusteringCost());
     currentNode->SetTotalCostIsActualCost(true);
   } else {
-    if (!currentNode->GetTotalCostIsActualCost() &&
-        (currentNode->GetTotalCost() == -1 ||
-         currentNode->GetCostLwrBound() < currentNode->GetTotalCost())) {
-#if defined(IS_DEBUG_ARCHIVE)
-      Logger::Info("Inner node doesn't have a real cost yet. Setting total "
-                   "cost to dynamic lower bound %d",
-                   currentNode->GetCostLwrBound());
-#endif
-      currentNode->SetTotalCost(currentNode->GetCostLwrBound());
+    if (!currentNode->GetTotalCostIsActualCost()) {
+      // Set overall weighted sum cost
+      if (currentNode->GetTotalCost() == -1 ||
+          currentNode->GetCostLwrBound() < currentNode->GetTotalCost()) {
+  #if defined(IS_DEBUG_ARCHIVE)
+        Logger::Info("Inner node doesn't have a real cost yet. Setting total "
+                    "cost to dynamic lower bound %d",
+                    currentNode->GetCostLwrBound());
+  #endif
+        currentNode->SetTotalCost(currentNode->GetCostLwrBound());
+      }
+
+      // Set clustering cost
+      if ((currentNode->isClustering() && currentNode->getTotalClusterCost() == -1) || 
+          (currentNode->getClusterLwrBound() < currentNode->getTotalClusterCost())) {
+        currentNode->setTotalClusterCost(currentNode->getClusterLwrBound());
+      }
     }
   }
 
@@ -1359,16 +1376,25 @@ void SetTotalCostsAndSuffixes(EnumTreeNode *const currentNode,
                      currentNode->GetTotalCost());
 #endif
         parentNode->SetTotalCost(currentNode->GetTotalCost());
+        if (currentNode->isClustering())
+          parentNode->setTotalClusterCost(currentNode->getTotalClusterCost());
         parentNode->SetTotalCostIsActualCost(true);
         parentNode->SetSuffix(std::move(parentSuffix));
-      } else if (currentNode->GetTotalCost() < parentNode->GetTotalCost()) {
-#if defined(IS_DEBUG_ARCHIVE)
-        Logger::Info(
-            "Current node has a real cost (%d), and so does parent. (%d)",
-            currentNode->GetTotalCost(), parentNode->GetTotalCost());
-#endif
-        parentNode->SetTotalCost(currentNode->GetTotalCost());
-        parentNode->SetSuffix(std::move(parentSuffix));
+      } else {
+        if (currentNode->GetTotalCost() < parentNode->GetTotalCost()) {
+  #if defined(IS_DEBUG_ARCHIVE)
+          Logger::Info(
+              "Current node has a real cost (%d), and so does parent. (%d)",
+              currentNode->GetTotalCost(), parentNode->GetTotalCost());
+  #endif
+          parentNode->SetTotalCost(currentNode->GetTotalCost());
+          parentNode->SetSuffix(std::move(parentSuffix));
+        }
+
+        // Set clustering cost
+        if (currentNode->isClustering() && currentNode->getTotalClusterCost() < parentNode->getTotalClusterCost()) {
+          parentNode->setTotalClusterCost(currentNode->getTotalClusterCost());
+        }
       }
     }
   }
@@ -1856,7 +1882,7 @@ LengthEnumerator::LengthEnumerator(
     bool SchedForRPOnly, bool enblStallEnum, Milliseconds timeout,
     InstCount preFxdInstCnt, SchedInstruction *preFxdInsts[])
     : Enumerator(dataDepGraph, machMdl, schedUprBound, sigHashSize, prirts,
-                 PruningStrategy, SchedForRPOnly, enblStallEnum, timeout,
+                 PruningStrategy, SchedForRPOnly, enblStallEnum, timeout, false,
                  preFxdInstCnt, preFxdInsts) {
   SetupAllocators_();
   tmpHstryNode_ = new HistEnumTreeNode;
@@ -1941,11 +1967,11 @@ LengthCostEnumerator::LengthCostEnumerator(
     DataDepGraph *dataDepGraph, MachineModel *machMdl, InstCount schedUprBound,
     int16_t sigHashSize, SchedPriorities prirts, Pruning PruningStrategy,
     bool SchedForRPOnly, bool enblStallEnum, Milliseconds timeout,
-    SPILL_COST_FUNCTION spillCostFunc, InstCount preFxdInstCnt,
-    SchedInstruction *preFxdInsts[])
+    SPILL_COST_FUNCTION spillCostFunc, bool ClusteringEnabled,
+    InstCount preFxdInstCnt, SchedInstruction *preFxdInsts[])
     : Enumerator(dataDepGraph, machMdl, schedUprBound, sigHashSize, prirts,
                  PruningStrategy, SchedForRPOnly, enblStallEnum, timeout,
-                 preFxdInstCnt, preFxdInsts) {
+                 ClusteringEnabled, preFxdInstCnt, preFxdInsts) {
   SetupAllocators_();
 
   costChkCnt_ = 0;
@@ -2141,6 +2167,7 @@ bool LengthCostEnumerator::BackTrack_() {
 /*****************************************************************************/
 
 InstCount LengthCostEnumerator::GetBestCost_() { return rgn_->GetBestCost(); }
+int LengthCostEnumerator::GetBestClusterCost_() { return rgn_->getBestClusterCost(); }
 /*****************************************************************************/
 
 void LengthCostEnumerator::CreateRootNode_() {
