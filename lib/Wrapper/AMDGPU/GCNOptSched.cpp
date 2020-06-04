@@ -60,9 +60,11 @@ void ScheduleDAGOptSchedGCN::initSchedulers() {
 void ScheduleDAGOptSchedGCN::addLLVMMutations() {
   // Add DAG mutations that apply to both GCN and OptSched DAG's
 
-  addMutation(createLoadClusterDAGMutation(TII, TRI));
-  addMutation(createStoreClusterDAGMutation(TII, TRI));
-  // addMutation(createAMDGPUMacroFusionDAGMutation());
+  if (EnableMutations) {
+    addMutation(createLoadClusterDAGMutation(TII, TRI));
+    addMutation(createStoreClusterDAGMutation(TII, TRI));
+    // addMutation(createAMDGPUMacroFusionDAGMutation());
+  }
 }
 
 // Execute scheduling passes.
