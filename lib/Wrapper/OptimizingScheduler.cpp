@@ -217,6 +217,8 @@ ScheduleDAGOptSched::ScheduleDAGOptSched(
   MM = OST->createMachineModel(PathCfgMM.c_str());
   MM->convertMachineModel(static_cast<ScheduleDAGInstrs &>(*this),
                           RegClassInfo);
+
+  addLLVMMutations();
 }
 
 void ScheduleDAGOptSched::SetupLLVMDag() {
@@ -235,11 +237,8 @@ void ScheduleDAGOptSched::SetupLLVMDag() {
   // Finalize live-in
   RPTracker.closeTop();
 
-  // Apply llvm DAG post processing.
-  if (EnableMutations) {
-    Topo.InitDAGTopologicalSorting();
-    postprocessDAG();
-  }
+  Topo.InitDAGTopologicalSorting();
+  postprocessDAG();
 }
 
 // Add the two passes used for the two pass scheduling approach
@@ -250,6 +249,19 @@ void ScheduleDAGOptSched::initSchedulers() {
   SchedPasses.push_back(OptSchedMinRP);
   // Second
   SchedPasses.push_back(OptSchedBalanced);
+}
+
+// Add the appropriate LLVM mutations.
+void ScheduleDAGOptSched::addLLVMMutations() {
+
+  // Adds the LLVM mutations if LLVM_MUTATIONS is set
+  if (EnableMutations) {
+    addMutation(createCopyConstrainDAGMutation(TII, TRI));
+    // README: if you need the x86 mutations uncomment the next line.
+    // addMutation(createX86MacroFusionDAGMutation());
+    // You also need to add the next line somewhere above this function
+    //#include "../../../../../llvm/lib/Target/X86/X86MacroFusion.h"
+  }
 }
 
 // schedule called for each basic block
@@ -275,6 +287,7 @@ void ScheduleDAGOptSched::schedule() {
 
   if (!OptSchedEnabled || !scheduleSpecificRegion(RegionName, schedIni)) {
     LLVM_DEBUG(dbgs() << "Skipping region " << RegionName << "\n");
+    ScheduleDAGMILive::schedule();
     return;
   }
 
@@ -369,10 +382,17 @@ void ScheduleDAGOptSched::schedule() {
         dep.setSUnit(&SUnits[nodeNumMap[pred->NodeNum]]);
       }
     }
+  } else {
+    // Only call SetupLLVMDag if ScheduleDAGMILive::schedule() was not invoked.
+    // ScheduleDAGMILive::schedule() will perform the same post processing
+    // steps that SetupLLVMDag() does when called, and if the post processing
+    // is called a second time the post processing will be applied a second
+    // time.  This will lead to the leads to the a different LLVM DAG and will
+    // cause the LLVM heuristic to produce a schedule which is significantly
+    // different from the one produced by LLVM without OptSched.
+    SetupLLVMDag();
   }
 
-  // Build LLVM DAG
-  SetupLLVMDag();
   OST->initRegion(this, MM.get());
   // Convert graph
   auto DDG =
