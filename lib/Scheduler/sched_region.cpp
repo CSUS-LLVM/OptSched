@@ -244,6 +244,16 @@ FUNC_RESULT SchedRegion::FindOptimalSchedule(
 #endif
   }
 
+  if (isSecondPass()) {
+    auto *BDDG = static_cast<OptSchedDDGWrapperBasic *> dataDepGraph;
+    BDDG->addArtificialEdges();
+    rslt = dataDepGraph_->UpdateSetupForSchdulng(needTransitiveClosure);
+    if (rslt != RES_SUCCESS) {
+      Logger::Info("Invalid DAG after adding artificial cluster edges");
+      return rslt;
+    }
+  }
+
   // Step #2: Use ACO to find a schedule if enabled and no optimal schedule is
   // yet to be found.
   if (AcoBeforeEnum && !isLstOptml) {

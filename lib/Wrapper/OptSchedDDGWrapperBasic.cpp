@@ -73,7 +73,7 @@ OptSchedDDGWrapperBasic::OptSchedDDGWrapperBasic(
                                        DAG->getRegPressure().MaxSetPressure);
 }
 
-void OptSchedDDGWrapperBasic::convertSUnits() {
+void OptSchedDDGWrapperBasic::convertSUnits(bool IgnoreArtificialEdges) {
   LLVM_DEBUG(dbgs() << "Building opt_sched DAG\n");
   // The extra 2 are for the artifical root and leaf nodes.
   instCnt_ = nodeCnt_ = DAG->SUnits.size() + 2;
@@ -89,7 +89,7 @@ void OptSchedDDGWrapperBasic::convertSUnits() {
 
   // Create edges.
   for (const auto &SU : DAG->SUnits) {
-    convertEdges(SU);
+    convertEdges(SU, IgnoreArtificialEdges);
   }
 
   // Add artificial root and leaf nodes and edges.
@@ -407,12 +407,32 @@ inline void OptSchedDDGWrapperBasic::setupLeaf() {
       CreateEdge_(i, LeafNum, 0, DEP_OTHER);
 }
 
-void OptSchedDDGWrapperBasic::convertEdges(const SUnit &SU) {
+void OptSchedDDGWrapperBasic::addArtificialEdges() {
+  for (const auto &SU : DAG->SUnits) {
+    convertEdges(SU, true);
+  }
+}
+
+void OptSchedDDGWrapperBasic::convertEdges(const SUnit &SU,
+                                           bool IgnoreArtificialEdges) {
   const MachineInstr *instr = SU.getInstr();
   SUnit::const_succ_iterator I, E;
   for (I = SU.Succs.begin(), E = SU.Succs.end(); I != E; ++I) {
     if (I->getSUnit()->isBoundaryNode())
       continue;
+
+    // Skip artificial nodes when we are only looking for real dependencies
+    if (I->isArtificial() && IgnoreArtificialEdges) {
+      dbgs() << "Ignore Artificials: Skipping instruction instr " << SU.NodeNum
+             << "'s succ instr " << I->getSUnit().NodeNum << '\n';
+      continue;
+    }
+    // Skip non-artificial nodes when we are only looking for artificial nodes
+    else if (!I->isArtificial() && !IgnoreArtificialEdges) {
+      dbgs() << "Ignore non-artificials: Skipping instruction instr "
+             << SU.NodeNum << "'s succ instr " << I->getSUnit().NodeNum << '\n';
+      continue;
+    }
 
     DependenceType DepType;
     switch (I->getKind()) {
