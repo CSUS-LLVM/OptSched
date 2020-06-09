@@ -73,7 +73,8 @@ OptSchedDDGWrapperBasic::OptSchedDDGWrapperBasic(
                                        DAG->getRegPressure().MaxSetPressure);
 }
 
-void OptSchedDDGWrapperBasic::convertSUnits(bool IgnoreArtificialEdges) {
+void OptSchedDDGWrapperBasic::convertSUnits(bool IgnoreRealEdges,
+                                            bool IgnoreArtificialEdges) {
   LLVM_DEBUG(dbgs() << "Building opt_sched DAG\n");
   // The extra 2 are for the artifical root and leaf nodes.
   instCnt_ = nodeCnt_ = DAG->SUnits.size() + 2;
@@ -89,7 +90,7 @@ void OptSchedDDGWrapperBasic::convertSUnits(bool IgnoreArtificialEdges) {
 
   // Create edges.
   for (const auto &SU : DAG->SUnits) {
-    convertEdges(SU, IgnoreArtificialEdges);
+    convertEdges(SU, IgnoreRealEdges, IgnoreArtificialEdges);
   }
 
   // Add artificial root and leaf nodes and edges.
@@ -409,11 +410,12 @@ inline void OptSchedDDGWrapperBasic::setupLeaf() {
 
 void OptSchedDDGWrapperBasic::addArtificialEdges() {
   for (const auto &SU : DAG->SUnits) {
-    convertEdges(SU, true);
+    convertEdges(SU, true, false);
   }
 }
 
 void OptSchedDDGWrapperBasic::convertEdges(const SUnit &SU,
+                                           bool IgnoreRealEdges,
                                            bool IgnoreArtificialEdges) {
   const MachineInstr *instr = SU.getInstr();
   SUnit::const_succ_iterator I, E;
@@ -421,18 +423,11 @@ void OptSchedDDGWrapperBasic::convertEdges(const SUnit &SU,
     if (I->getSUnit()->isBoundaryNode())
       continue;
 
-    // Skip artificial nodes when we are only looking for real dependencies
-    if (I->isArtificial() && IgnoreArtificialEdges) {
-      dbgs() << "Ignore Artificials: Skipping instruction instr " << SU.NodeNum
-             << "'s succ instr " << I->getSUnit().NodeNum << '\n';
+    bool IsArtificial = I->isArtificial() || I->isCluster();
+    if (IgnoreArtificialEdges && IsArtificial)
       continue;
-    }
-    // Skip non-artificial nodes when we are only looking for artificial nodes
-    else if (!I->isArtificial() && !IgnoreArtificialEdges) {
-      dbgs() << "Ignore non-artificials: Skipping instruction instr "
-             << SU.NodeNum << "'s succ instr " << I->getSUnit().NodeNum << '\n';
+    else if (IgnoreRealEdges && !IsArtificial)
       continue;
-    }
 
     DependenceType DepType;
     switch (I->getKind()) {
