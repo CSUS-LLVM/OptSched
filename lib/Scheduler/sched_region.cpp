@@ -2,6 +2,7 @@
 #include <memory>
 #include <utility>
 
+#include "Wrapper/OptSchedDDGWrapperBasic.h"
 #include "opt-sched/Scheduler/aco.h"
 #include "opt-sched/Scheduler/bb_spill.h"
 #include "opt-sched/Scheduler/config.h"
@@ -14,7 +15,6 @@
 #include "opt-sched/Scheduler/sched_region.h"
 #include "opt-sched/Scheduler/stats.h"
 #include "opt-sched/Scheduler/utilities.h"
-#include "Wrapper/OptSchedDDGWrapperBasic.h"
 
 extern bool OPTSCHED_gPrintSpills;
 
