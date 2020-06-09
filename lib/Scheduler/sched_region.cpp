@@ -14,6 +14,7 @@
 #include "opt-sched/Scheduler/sched_region.h"
 #include "opt-sched/Scheduler/stats.h"
 #include "opt-sched/Scheduler/utilities.h"
+#include "Wrapper/OptSchedDDGWrapperBasic.h"
 
 extern bool OPTSCHED_gPrintSpills;
 
@@ -244,9 +245,12 @@ FUNC_RESULT SchedRegion::FindOptimalSchedule(
 #endif
   }
 
-  if (isSecondPass()) {
-    auto *BDDG = static_cast<OptSchedDDGWrapperBasic *> dataDepGraph;
-    BDDG->addArtificialEdges();
+  // After the sequential scheduler in the second pass, add the artificial edges
+  // to the DDG. Some mutations were adding artificial edges which caused a
+  // conflict with the sequential scheduler. Therefore, wait until the
+  // sequential scheduler is done before adding artificial edges.
+  if (IsSecondPass()) {
+    static_cast<OptSchedDDGWrapperBasic *>(dataDepGraph_)->addArtificialEdges();
     rslt = dataDepGraph_->UpdateSetupForSchdulng(needTransitiveClosure);
     if (rslt != RES_SUCCESS) {
       Logger::Info("Invalid DAG after adding artificial cluster edges");
