@@ -899,7 +899,8 @@ void DataDepGraph::CreateEdge(SchedInstruction *frmNode,
 }
 
 void DataDepGraph::CreateEdge_(InstCount frmNodeNum, InstCount toNodeNum,
-                               int ltncy, DependenceType depType) {
+                               int ltncy, DependenceType depType,
+                               bool IsArtificial) {
   GraphEdge *edge;
 
   assert(frmNodeNum < instCnt_);
@@ -928,7 +929,7 @@ void DataDepGraph::CreateEdge_(InstCount frmNodeNum, InstCount toNodeNum,
     Logger::Info("Creating edge from %d to %d of type %d and latency %d",
                  frmNodeNum, toNodeNum, depType, ltncy);
 #endif
-    edge = new GraphEdge(frmNode, toNode, ltncy, depType);
+    edge = new GraphEdge(frmNode, toNode, ltncy, depType, IsArtificial);
 
     frmNode->AddScsr(edge);
     toNode->AddPrdcsr(edge);
@@ -2972,8 +2973,15 @@ bool InstSchedule::VerifyDataDeps_(DataDepGraph *dataDepGraph) {
 
     UDT_GLABEL ltncy;
     DependenceType depType;
-    for (SchedInstruction *scsr = inst->GetFrstScsr(NULL, &ltncy, &depType);
-         scsr != NULL; scsr = inst->GetNxtScsr(NULL, &ltncy, &depType)) {
+    bool IsArtificial;
+    for (SchedInstruction *scsr =
+             inst->GetFrstScsr(NULL, &ltncy, &depType, &IsArtificial);
+         scsr != NULL;
+         scsr = inst->GetNxtScsr(NULL, &ltncy, &depType, &IsArtificial)) {
+      // Artificial nodes are not required for the schedule to be correct
+      if (IsArtificial)
+        continue;
+
       InstCount scsrCycle = GetSchedCycle(scsr);
       if (scsrCycle < (instCycle + ltncy)) {
         Logger::Error("Invalid schedule: Latency from %d to %d not satisfied",
