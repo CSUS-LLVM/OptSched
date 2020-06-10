@@ -907,7 +907,8 @@ void DataDepGraph::CreateEdge(SchedInstruction *frmNode,
 }
 
 void DataDepGraph::CreateEdge_(InstCount frmNodeNum, InstCount toNodeNum,
-                               int ltncy, DependenceType depType) {
+                               int ltncy, DependenceType depType,
+                               bool IsArtificial) {
   GraphEdge *edge;
 
   assert(frmNodeNum < instCnt_);
@@ -936,7 +937,7 @@ void DataDepGraph::CreateEdge_(InstCount frmNodeNum, InstCount toNodeNum,
     Logger::Info("Creating edge from %d to %d of type %d and latency %d",
                  frmNodeNum, toNodeNum, depType, ltncy);
 #endif
-    edge = new GraphEdge(frmNode, toNode, ltncy, depType);
+    edge = new GraphEdge(frmNode, toNode, ltncy, depType, IsArtificial);
 
     frmNode->AddScsr(edge);
     toNode->AddPrdcsr(edge);
