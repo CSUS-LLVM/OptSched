@@ -8,14 +8,11 @@ Last Update:  Sept. 2013
 #ifndef OPTSCHED_BASIC_SCHED_BASIC_DATA_H
 #define OPTSCHED_BASIC_SCHED_BASIC_DATA_H
 
-// For class string.
-#include <string>
-// For class ostream.
 #include "opt-sched/Scheduler/defines.h"
 #include "opt-sched/Scheduler/graph.h"
 #include "opt-sched/Scheduler/hash_table.h"
 #include "opt-sched/Scheduler/machine_model.h"
-#include <iostream>
+#include <string>
 
 namespace llvm {
 namespace opt_sched {
@@ -208,12 +205,14 @@ public:
   //   depType: the type of dependence between this node and the successor.
   SchedInstruction *GetFrstScsr(InstCount *prdcsrNum = NULL,
                                 UDT_GLABEL *ltncy = NULL,
-                                DependenceType *depType = NULL);
+                                DependenceType *depType = NULL,
+                                bool *IsArtificial = nullptr);
   // Returns the next successor of this instruction node and moves the
   // successor iterator forward. Fills parameters as above.
   SchedInstruction *GetNxtScsr(InstCount *prdcsrNum = NULL,
                                UDT_GLABEL *ltncy = NULL,
-                               DependenceType *depType = NULL);
+                               DependenceType *depType = NULL,
+                               bool *IsArtificial = nullptr);
 
   // Returns the last successor of this instruction node and moves the
   // successor iterator to the end of the list. If prdcsrNum is provided, this
@@ -436,7 +435,6 @@ protected:
   string opCode_;
 
   bool WasActive;
- 
 
   /// The cluster group that the current instruction is a part of.
   /// Default of 0 means that it is not part of any cluster.

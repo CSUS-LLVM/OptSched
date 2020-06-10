@@ -19,7 +19,7 @@ SchedInstruction::SchedInstruction(InstCount num, const string &name,
   opCode_ = opCode;
   instType_ = instType;
   ClusterGroup = 0;
-  MayCluster = false; 
+  MayCluster = false;
 
   frwrdLwrBound_ = INVALID_VALUE;
   bkwrdLwrBound_ = INVALID_VALUE;
@@ -384,7 +384,8 @@ SchedInstruction *SchedInstruction::GetNxtPrdcsr(InstCount *scsrNum,
 
 SchedInstruction *SchedInstruction::GetFrstScsr(InstCount *prdcsrNum,
                                                 UDT_GLABEL *ltncy,
-                                                DependenceType *depType) {
+                                                DependenceType *depType,
+                                                bool *IsArtificial) {
   GraphEdge *edge = GetFrstScsrEdge();
   if (!edge)
     return NULL;
@@ -394,12 +395,15 @@ SchedInstruction *SchedInstruction::GetFrstScsr(InstCount *prdcsrNum,
     *ltncy = edge->label;
   if (depType)
     *depType = (DependenceType)edge->label2;
+  if (IsArtificial)
+    *IsArtificial = edge->IsArtificial;
   return (SchedInstruction *)(edge->to);
 }
 
 SchedInstruction *SchedInstruction::GetNxtScsr(InstCount *prdcsrNum,
                                                UDT_GLABEL *ltncy,
-                                               DependenceType *depType) {
+                                               DependenceType *depType,
+                                               bool *IsArtificial) {
   GraphEdge *edge = GetNxtScsrEdge();
   if (!edge)
     return NULL;
@@ -409,6 +413,8 @@ SchedInstruction *SchedInstruction::GetNxtScsr(InstCount *prdcsrNum,
     *ltncy = edge->label;
   if (depType)
     *depType = (DependenceType)edge->label2;
+  if (IsArtificial)
+    *IsArtificial = edge->IsArtificial;
   return (SchedInstruction *)(edge->to);
 }
 

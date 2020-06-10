@@ -295,7 +295,9 @@ public:
   // Memory clustering helper functions
   int getMinClusterCount() { return MinClusterCount; }
   void setMinClusterCount(int Max) { MinClusterCount = Max; }
-  int getTotalInstructionsInAllClusters() { return TotalInstructionsInAllClusters; }
+  int getTotalInstructionsInAllClusters() {
+    return TotalInstructionsInAllClusters;
+  }
   void setTotalInstructionsInAllClusters(int Max) {
     TotalInstructionsInAllClusters = Max;
   }
@@ -407,7 +409,7 @@ protected:
                                 InstCount fileUB, int blkNum);
   FUNC_RESULT FinishNode_(InstCount nodeNum, InstCount edgeCnt = -1);
   void CreateEdge_(InstCount frmInstNum, InstCount toInstNum, int ltncy,
-                   DependenceType depType);
+                   DependenceType depType, bool IsArtificial = false);
 
   FUNC_RESULT Finish_();
 

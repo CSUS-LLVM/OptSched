@@ -214,7 +214,7 @@ DataDepGraph::~DataDepGraph() {
   delete[] instCntPerType_;
 }
 
-int DataDepGraph::getTotalInstructionsInCluster(int Cluster) { 
+int DataDepGraph::getTotalInstructionsInCluster(int Cluster) {
   assert(Cluster > 0);
   return MaxInstructionsInEachClusters[Cluster];
 }
@@ -2980,8 +2980,15 @@ bool InstSchedule::VerifyDataDeps_(DataDepGraph *dataDepGraph) {
 
     UDT_GLABEL ltncy;
     DependenceType depType;
-    for (SchedInstruction *scsr = inst->GetFrstScsr(NULL, &ltncy, &depType);
-         scsr != NULL; scsr = inst->GetNxtScsr(NULL, &ltncy, &depType)) {
+    bool IsArtificial;
+    for (SchedInstruction *scsr =
+             inst->GetFrstScsr(NULL, &ltncy, &depType, &IsArtificial);
+         scsr != NULL;
+         scsr = inst->GetNxtScsr(NULL, &ltncy, &depType, &IsArtificial)) {
+      // Artificial nodes are not required for the schedule to be correct
+      if (IsArtificial)
+        continue;
+
       InstCount scsrCycle = GetSchedCycle(scsr);
       if (scsrCycle < (instCycle + ltncy)) {
         Logger::Error("Invalid schedule: Latency from %d to %d not satisfied",
@@ -3213,7 +3220,6 @@ bool DataDepGraph::DoesFeedUser(SchedInstruction *inst) {
     // If there is a successor instruction that decreases live intervals
     // or one that does not increase live intervals, then return true.
     return true;
-
   }
 // Return false if there is no recursive successor of inst
 // that uses a live register.

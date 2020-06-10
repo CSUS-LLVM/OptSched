@@ -460,7 +460,8 @@ void OptSchedDDGWrapperBasic::convertEdges(const SUnit &SU,
     else
       Latency = 1; // unit latency = ignore ilp
 
-    CreateEdge_(SU.NodeNum, I->getSUnit()->NodeNum, Latency, DepType);
+    CreateEdge_(SU.NodeNum, I->getSUnit()->NodeNum, Latency, DepType,
+                IsArtificial);
   }
 }
 
