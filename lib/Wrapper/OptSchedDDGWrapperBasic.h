@@ -13,8 +13,8 @@
 #include "opt-sched/Scheduler/graph_trans.h"
 #include "llvm/CodeGen/MachineInstr.h"
 #include "llvm/CodeGen/MachineScheduler.h"
-#include "llvm/CodeGen/TargetRegisterInfo.h"
 #include "llvm/CodeGen/TargetFrameLowering.h"
+#include "llvm/CodeGen/TargetRegisterInfo.h"
 #include <map>
 #include <set>
 #include <vector>
@@ -48,7 +48,8 @@ public:
   /// Dump Optsched register def/use information for the region.
   void dumpOptSchedRegisters() const;
 
-  void convertSUnits() override;
+  void convertSUnits(bool IgnoreRealEdges, bool IgnoreArtificialEdges) override;
+  void addArtificialEdges();
   void convertRegFiles() override;
   int findPossibleClusters(bool IsLoad) override;
 
@@ -125,7 +126,8 @@ protected:
   void convertSUnit(const llvm::SUnit &SU);
 
   // Create edges between optsched graph nodes using SUnit successors.
-  void convertEdges(const llvm::SUnit &SU);
+  void convertEdges(const llvm::SUnit &SU, bool IgnoreRealEdges,
+                    bool IgnoreArtificialEdges);
 
   // Count number or registers defined by the region boundary.
   void countBoundaryLiveness(std::vector<int> &RegDefCounts,
@@ -145,11 +147,11 @@ protected:
     std::vector<SchedInstruction *> consumers;
   };
 
-  /// Count of the total clusters possible 
+  /// Count of the total clusters possible
   int ClusterCount;
 
-// Copied from
-// https://github.com/RadeonOpenCompute/llvm/blob/roc-ocl-2.4.0/lib/CodeGen/MachineScheduler.cpp#L1467
+  // Copied from
+  // https://github.com/RadeonOpenCompute/llvm/blob/roc-ocl-2.4.0/lib/CodeGen/MachineScheduler.cpp#L1467
   struct MemOpInfo {
     const SUnit *SU;
     MachineOperand *BaseOp;
@@ -191,9 +193,9 @@ protected:
 };
 
 // Exclude certain registers from being visible to the scheduler. Use LLVM's
-// register pressure tracker to find the MAX register pressure for each register
-// type (pressure set). If the MAX pressure is below a certain threshold don't
-// track that register.
+// register pressure tracker to find the MAX register pressure for each
+// register type (pressure set). If the MAX pressure is below a certain
+// threshold don't track that register.
 class LLVMRegTypeFilter {
 private:
   const MachineModel *MM;

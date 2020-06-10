@@ -78,7 +78,8 @@ OptSchedDDGWrapperBasic::OptSchedDDGWrapperBasic(
   ClusterCount = 0;
 }
 
-void OptSchedDDGWrapperBasic::convertSUnits() {
+void OptSchedDDGWrapperBasic::convertSUnits(bool IgnoreRealEdges,
+                                            bool IgnoreArtificialEdges) {
   LLVM_DEBUG(dbgs() << "Building opt_sched DAG\n");
   // The extra 2 are for the artifical root and leaf nodes.
   instCnt_ = nodeCnt_ = DAG->SUnits.size() + 2;
@@ -94,7 +95,7 @@ void OptSchedDDGWrapperBasic::convertSUnits() {
 
   // Create edges.
   for (const auto &SU : DAG->SUnits) {
-    convertEdges(SU);
+    convertEdges(SU, IgnoreRealEdges, IgnoreArtificialEdges);
   }
 
   // Add artificial root and leaf nodes and edges.
@@ -412,11 +413,25 @@ inline void OptSchedDDGWrapperBasic::setupLeaf() {
       CreateEdge_(i, LeafNum, 0, DEP_OTHER);
 }
 
-void OptSchedDDGWrapperBasic::convertEdges(const SUnit &SU) {
+void OptSchedDDGWrapperBasic::addArtificialEdges() {
+  for (const auto &SU : DAG->SUnits) {
+    convertEdges(SU, true, false);
+  }
+}
+
+void OptSchedDDGWrapperBasic::convertEdges(const SUnit &SU,
+                                           bool IgnoreRealEdges,
+                                           bool IgnoreArtificialEdges) {
   const MachineInstr *instr = SU.getInstr();
   SUnit::const_succ_iterator I, E;
   for (I = SU.Succs.begin(), E = SU.Succs.end(); I != E; ++I) {
     if (I->getSUnit()->isBoundaryNode())
+      continue;
+
+    bool IsArtificial = I->isArtificial() || I->isCluster();
+    if (IgnoreArtificialEdges && IsArtificial)
+      continue;
+    else if (IgnoreRealEdges && !IsArtificial)
       continue;
 
     DependenceType DepType;
@@ -538,7 +553,7 @@ int OptSchedDDGWrapperBasic::clusterNeighboringMemOps(
     const SUnit *SUb = MemOpRecords[Idx + 1].SU;
     dbgs() << "  Checking possible clustering of (" << SUa->NodeNum << ") and ("
            << SUb->NodeNum << ")\n";
-           
+
     // Pass constant of 1 to AMD's function to determine clustering to remove
     // the limit of 15. Our enumerator can determine when it has reached the
     // limit instead of depending on AMD.

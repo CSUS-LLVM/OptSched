@@ -126,7 +126,8 @@ nextIfDebug(MachineBasicBlock::iterator I,
   return I;
 }
 
-static bool scheduleSpecificRegion(const StringRef RegionName, const Config &SchedIni) {
+static bool scheduleSpecificRegion(const StringRef RegionName,
+                                   const Config &SchedIni) {
   const bool ScheduleSpecificRegions =
       SchedIni.GetBool("SCHEDULE_SPECIFIC_REGIONS");
 
@@ -376,11 +377,13 @@ void ScheduleDAGOptSched::schedule() {
   // Convert graph
   auto DDG =
       OST->createDDGWrapper(C, this, MM.get(), LatencyPrecision, RegionName);
-  DDG->convertSUnits();
-  DDG->convertRegFiles();
 
   // Find all clusterable instructions for the second pass.
   if (SecondPass) {
+    // In the second pass, ignore artificial edges before running the sequential
+    // heuristic list scheduler.
+    DDG->convertSUnits(false, true);
+
     dbgs() << "Finding load clusters.\n";
     int TotalLoadsInstructionsClusterable = DDG->findPossibleClusters(true);
     if (TotalLoadsInstructionsClusterable == 0)
@@ -411,7 +414,10 @@ void ScheduleDAGOptSched::schedule() {
             DataDepGraphInstance->getTotalInstructionsInCluster(begin));
       }
     }
-  }
+  } else
+    DDG->convertSUnits(false, false);
+
+  DDG->convertRegFiles();
 
   auto *BDDG = static_cast<OptSchedDDGWrapperBasic *>(DDG.get());
   addGraphTransformations(BDDG);

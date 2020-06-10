@@ -2,6 +2,7 @@
 #include <memory>
 #include <utility>
 
+#include "Wrapper/OptSchedDDGWrapperBasic.h"
 #include "opt-sched/Scheduler/aco.h"
 #include "opt-sched/Scheduler/bb_spill.h"
 #include "opt-sched/Scheduler/config.h"
@@ -243,6 +244,19 @@ FUNC_RESULT SchedRegion::FindOptimalSchedule(
     dataDepGraph_->PrintLwrBounds(DIR_FRWRD, Logger::GetLogStream(),
                                   "CP Lower Bounds");
 #endif
+  }
+
+  // After the sequential scheduler in the second pass, add the artificial edges
+  // to the DDG. Some mutations were adding artificial edges which caused a
+  // conflict with the sequential scheduler. Therefore, wait until the
+  // sequential scheduler is done before adding artificial edges.
+  if (IsSecondPass()) {
+    static_cast<OptSchedDDGWrapperBasic *>(dataDepGraph_)->addArtificialEdges();
+    rslt = dataDepGraph_->UpdateSetupForSchdulng(needTransitiveClosure);
+    if (rslt != RES_SUCCESS) {
+      Logger::Info("Invalid DAG after adding artificial cluster edges");
+      return rslt;
+    }
   }
 
   // Step #2: Use ACO to find a schedule if enabled and no optimal schedule is
@@ -649,6 +663,7 @@ FUNC_RESULT SchedRegion::Optimize_(Milliseconds startTime,
     }
     stats::unsolvedProblemSize.Record(dataDepGraph_->GetInstCnt());
   }
+
   return rslt;
 }
 
