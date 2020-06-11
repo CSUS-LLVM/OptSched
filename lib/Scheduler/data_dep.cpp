@@ -849,7 +849,6 @@ void DataDepGraph::CreateEdge(SchedInstruction *frmNode,
 #if defined(IS_DEBUG) || defined(IS_DEBUG_DAG)
   InstCount frmNodeNum = frmNode->GetNum();
   InstCount toNodeNum = toNode->GetNum();
-#endif
 
 #ifdef IS_DEBUG_DAG
   Logger::Info("Creating extra edge from %d to %d of type %d and latency %d",
@@ -861,6 +860,7 @@ void DataDepGraph::CreateEdge(SchedInstruction *frmNode,
 
   assert(toNodeNum < instCnt_);
   assert(nodes_[toNodeNum] != NULL);
+#endif
 
 #ifdef IS_DEBUG_LATENCIES
   stats::dependenceTypeLatencies.Add(GetDependenceTypeName(depType), ltncy);
