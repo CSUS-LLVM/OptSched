@@ -635,7 +635,7 @@ int OptSchedDDGWrapperBasic::findPossibleClusters(bool IsLoad) {
 
     unsigned ChainPredID = DAG->SUnits.size();
     for (const SDep &Pred : SU.Preds) {
-      if (Pred.isCtrl()) {
+      if (Pred.isCtrl() && !(Pred.isArtificial() || Pred.isCluster())) {
         ChainPredID = Pred.getSUnit()->NodeNum;
         break;
       }

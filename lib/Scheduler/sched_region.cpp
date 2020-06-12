@@ -210,6 +210,9 @@ FUNC_RESULT SchedRegion::FindOptimalSchedule(
 
     hurstcTime = Utilities::GetProcessorTime() - hurstcStart;
     stats::heuristicTime.Record(hurstcTime);
+    if (IsSecondPass())
+      printCurrentClustering();
+
     if (hurstcTime > 0)
       Logger::Info("Heuristic_Time %d", hurstcTime);
 

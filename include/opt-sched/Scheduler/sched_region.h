@@ -52,6 +52,7 @@ public:
   // Destroys the region. Must be overriden by child classes.
   virtual ~SchedRegion() {}
 
+  virtual void printCurrentClustering() = 0;
   // Returns the dependence graph of this region.
   inline DataDepGraph *GetDepGraph() { return dataDepGraph_; }
   // Returns the lower bound on the cost of this region.
@@ -130,7 +131,7 @@ private:
 
   // The absolute cost lower bound to be used as a ref for normalized costs.
   InstCount costLwrBound_ = 0;
-  
+
   // The best results found so far.
   InstCount bestCost_;
   int BestClusterCost;
@@ -184,9 +185,11 @@ protected:
 
   void setBestClusterCost(int BestCost) { BestClusterCost = BestCost; }
 
-  void SetBestSchedLength(InstCount bestSchedLngth) { bestSchedLngth_ = bestSchedLngth; }
+  void SetBestSchedLength(InstCount bestSchedLngth) {
+    bestSchedLngth_ = bestSchedLngth;
+  }
 
-  const SchedPriorities& GetEnumPriorities() const { return enumPrirts_; }
+  const SchedPriorities &GetEnumPriorities() const { return enumPrirts_; }
 
   int16_t GetSigHashSize() const { return sigHashSize_; }
 

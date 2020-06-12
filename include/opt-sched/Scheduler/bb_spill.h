@@ -43,10 +43,10 @@ private:
   int ClusterGroupCount;
 
   /// Print the current clusters found so far in the schedule.
-  void printCurrentClustering();
+  void printCurrentClustering() override;
 
   void initForClustering();
-  
+
   /// Calculate the lower bound cost for memory operations clustering and
   /// return the lower bound cost. Does not take into account the clustering
   /// weight.
@@ -69,7 +69,7 @@ private:
   int calculateClusterDLB();
 
   /// Current cluster size
-  unsigned int CurrentClusterSize; 
+  unsigned int CurrentClusterSize;
 
   /// The minimum amount of cluster blocks possible.
   int MinClusterBlocks;
@@ -100,7 +100,7 @@ private:
 
     /// Instruction number that ended this cluster. Used to check if we should
     /// restore the cluster state when backtracking.
-    int InstNum; 
+    int InstNum;
 
     int Start;
 
@@ -110,7 +110,8 @@ private:
 
     /// Constructor for this struct
     PastClusters(int Cluster, int Size, int Instructions, int CycleStart)
-        : ClusterGroup(Cluster), ClusterSize(Size), InstNum(Instructions), Start(CycleStart) {}
+        : ClusterGroup(Cluster), ClusterSize(Size), InstNum(Instructions),
+          Start(CycleStart) {}
   };
 
   /// Vector containing the (n-1) past clusters
@@ -195,7 +196,8 @@ private:
   void InitForCostCmputtn_();
   InstCount CmputDynmcCost_();
 
-  void UpdateSpillInfoForSchdul_(SchedInstruction *inst, bool trackCnflcts, int Start);
+  void UpdateSpillInfoForSchdul_(SchedInstruction *inst, bool trackCnflcts,
+                                 int Start);
   void UpdateSpillInfoForUnSchdul_(SchedInstruction *inst);
   void SetupPhysRegs_();
   void CmputCrntSpillCost_();

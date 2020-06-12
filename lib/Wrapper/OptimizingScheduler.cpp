@@ -44,13 +44,13 @@ bool OPTSCHED_gPrintSpills;
 
 // An array of possible OptSched heuristic names
 constexpr struct {
-  const char* Name;
+  const char *Name;
   LISTSCHED_HEURISTIC HID;
-} HeuristicNames[] = {
-    {"CP", LSH_CP},     {"LUC", LSH_LUC}, {"UC", LSH_UC}, {"NID", LSH_NID},
-    {"CPR", LSH_CPR},   {"ISO", LSH_ISO}, {"SC", LSH_SC}, {"LS", LSH_LS},
-    {"LLVM", LSH_LLVM}, {"CLUSTER", LSH_CLUSTER}
-};
+} HeuristicNames[] = {{"CP", LSH_CP},     {"LUC", LSH_LUC},
+                      {"UC", LSH_UC},     {"NID", LSH_NID},
+                      {"CPR", LSH_CPR},   {"ISO", LSH_ISO},
+                      {"SC", LSH_SC},     {"LS", LSH_LS},
+                      {"LLVM", LSH_LLVM}, {"CLUSTER", LSH_CLUSTER}};
 
 // Default path to the the configuration directory for opt-sched.
 static constexpr const char *DEFAULT_CFG_DIR = "~/.optsched-cfg/";
@@ -395,7 +395,8 @@ void ScheduleDAGOptSched::schedule() {
       dbgs() << "  No store clustering possible\n";
 
     Logger::Info("Total clusterable instructions: %d loads, %d stores",
-        TotalLoadsInstructionsClusterable, TotalStoreInstructionsClusterable);
+                 TotalLoadsInstructionsClusterable,
+                 TotalStoreInstructionsClusterable);
 
     // Get the DDG instance so that we can set and get information that will be
     // read later on during enumeration.
@@ -410,7 +411,8 @@ void ScheduleDAGOptSched::schedule() {
     if (end > 0) {
       Logger::Info("Total clusters in region: %d", end);
       for (int begin = 1; begin <= end; begin++) {
-        Logger::Info("  Cluster %d has total instructions %d", begin,
+        Logger::Info(
+            "  Cluster %d has total instructions %d", begin,
             DataDepGraphInstance->getTotalInstructionsInCluster(begin));
       }
     }
