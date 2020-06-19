@@ -30,7 +30,17 @@ def parse_blocks(log):
     '''
     Splits the block into individual blocks and parses each block via parse_events().
     '''
-    return [parse_events(block) for block in log]
+    return [parse_events(block) for block in split_blocks(log)]
+
+def keep_only_singular_events(logs):
+    '''
+    Converts a the event `dict[event_id --> list[event-json]]` to
+    `dict[event_id --> event-json]` dropping any event which has a duplicated event_id.
+    '''
+    result = dict()
+    for k, v in logs.items():
+        if len(v) == 1: result[k] = v[0]
+    return result
 
 def parse_as_singular_events(logs):
     '''
