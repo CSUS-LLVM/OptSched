@@ -21,7 +21,7 @@ dags2 = {}
 def dags_info(logtext):
     dags = {}
 
-    unfiltered = parse_blocks(logtext)
+    unfiltered = [keep_only_singular_events(block) for block in parse_blocks(logtext)]
     blocks = [block for block in unfiltered if 'CostLowerBound' in block]
 
     if len(blocks) != len(unfiltered):
