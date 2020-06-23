@@ -15,6 +15,7 @@ Last Update:  Sept. 2013
 #include "opt-sched/Scheduler/defines.h"
 #include "opt-sched/Scheduler/lnkd_lst.h"
 #include "opt-sched/Scheduler/sched_basic_data.h"
+#include "llvm/ADT/SmallVector.h"
 #include <cstdio>
 
 namespace llvm {
@@ -87,13 +88,14 @@ private:
   SchedPriorities prirts_;
 
   // The priority list containing the actual instructions.
-  PriorityList<SchedInstruction> *prirtyLst_;
+  PriorityList<SchedInstruction> prirtyLst_;
 
   // TODO(max): Document.
-  LinkedList<SchedInstruction> *latestSubLst_;
+  LinkedList<SchedInstruction> latestSubLst_;
 
   // Array of pointers to KeyedEntry objects
-  KeyedEntry<SchedInstruction, unsigned long> **keyedEntries_;
+  llvm::SmallVector<KeyedEntry<SchedInstruction, unsigned long> *, 0>
+      keyedEntries_;
 
   // Is there a priority scheme that needs to be changed dynamically
   //    bool isDynmcPrirty_;
