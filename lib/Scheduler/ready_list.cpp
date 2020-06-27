@@ -127,9 +127,8 @@ void ReadyList::CopyList(ReadyList *otherList) {
   assert(otherList != NULL);
 
   // Copy the ready list and create the array of keyed entries. If a dynamic
-  // heuristic is not used then the second parameter should be a nullptr and the
-  // array will not be created.
-  prirtyLst_.CopyList(&otherList->prirtyLst_, keyedEntries_.data());
+  // heuristic is not used then the second parameter should be an empty array.
+  prirtyLst_.CopyList(&otherList->prirtyLst_, keyedEntries_);
 }
 
 unsigned long ReadyList::CmputKey_(SchedInstruction *inst, bool isUpdate,

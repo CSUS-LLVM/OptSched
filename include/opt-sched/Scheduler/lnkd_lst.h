@@ -12,6 +12,7 @@ Last Update:  May  2020
 
 #include "opt-sched/Scheduler/defines.h"
 #include "opt-sched/Scheduler/logger.h"
+#include "llvm/ADT/ArrayRef.h"
 #include <cstring>
 
 namespace llvm {
@@ -178,8 +179,9 @@ public:
   T *GetNxtPriorityElmnt(K &key);
   // Copies all the data from another list. The existing list must be empty.
   // Also insert the entries into an array if it one is passed.
-  void CopyList(PriorityList<T, K> const *const otherLst,
-                KeyedEntry<T, unsigned long> **keyedEntries_ = nullptr);
+  void
+  CopyList(PriorityList<T, K> const *const otherLst,
+           llvm::MutableArrayRef<KeyedEntry<T, unsigned long> *> keyedEntries_);
 
 protected:
   KeyedEntry<T, K> *allocKeyEntries_;
@@ -638,7 +640,7 @@ void PriorityList<T, K>::BoostEntry(KeyedEntry<T, K> *entry, K newKey) {
 template <class T, class K>
 void PriorityList<T, K>::CopyList(
     PriorityList<T, K> const *const otherLst,
-    KeyedEntry<T, unsigned long> **keyedEntries_) {
+    llvm::MutableArrayRef<KeyedEntry<T, unsigned long> *> keyedEntries_) {
   assert(LinkedList<T>::elmntCnt_ == 0);
 
   for (KeyedEntry<T, K> *entry = (KeyedEntry<T, K> *)otherLst->topEntry_;
@@ -647,8 +649,12 @@ void PriorityList<T, K>::CopyList(
     K key = entry->key;
     KeyedEntry<T, K> *newEntry = AllocEntry_(elmnt, key);
     LinkedList<T>::AppendEntry_(newEntry);
-    if (keyedEntries_)
-      keyedEntries_[entry->element->GetNum()] = newEntry;
+    if (!keyedEntries_.empty()) {
+      const auto elementNum = entry->element->GetNum();
+      assert(0 <= elementNum &&
+             static_cast<size_t>(elementNum) < keyedEntries_.size());
+      keyedEntries_[elementNum] = newEntry;
+    }
 
     if (entry == otherLst->rtrvEntry_) {
       LinkedList<T>::rtrvEntry_ = newEntry;
