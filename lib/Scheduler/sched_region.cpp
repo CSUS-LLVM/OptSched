@@ -201,6 +201,30 @@ FUNC_RESULT SchedRegion::FindOptimalSchedule(
     if (hurstcTime > 0)
       Logger::Info("Heuristic_Time %d", hurstcTime);
 
+  }
+
+  // After the sequential scheduler in the second pass, add the artificial edges
+  // to the DDG. Some mutations were adding artificial edges which caused a
+  // conflict with the sequential scheduler. Therefore, wait until the
+  // sequential scheduler is done before adding artificial edges.
+  if (IsSecondPass()) {
+    static_cast<OptSchedDDGWrapperBasic *>(dataDepGraph_)->addArtificialEdges();
+    rslt = dataDepGraph_->UpdateSetupForSchdulng(needTransitiveClosure);
+    if (rslt != RES_SUCCESS) {
+      Logger::Info("Invalid DAG after adding artificial cluster edges");
+      return rslt;
+    }
+  }
+
+  // This must be done after SetupForSchdulng() or UpdateSetupForSchdulng() to
+  // avoid resetting lower bound values.
+  if (!BbSchedulerEnabled)
+    costLwrBound_ = CmputCostLwrBound();
+  else
+    CmputLwrBounds_(false);
+
+  // Cost calculation must be below lower bounds calculation
+  if (HeuristicSchedulerEnabled || IsSecondPass()) {
     heuristicScheduleLength = lstSched->GetCrntLngth();
     InstCount hurstcExecCost;
     // Compute cost for Heuristic list scheduler, this must be called before
@@ -234,25 +258,6 @@ FUNC_RESULT SchedRegion::FindOptimalSchedule(
 #endif
   }
 
-  // After the sequential scheduler in the second pass, add the artificial edges
-  // to the DDG. Some mutations were adding artificial edges which caused a
-  // conflict with the sequential scheduler. Therefore, wait until the
-  // sequential scheduler is done before adding artificial edges.
-  if (IsSecondPass()) {
-    static_cast<OptSchedDDGWrapperBasic *>(dataDepGraph_)->addArtificialEdges();
-    rslt = dataDepGraph_->UpdateSetupForSchdulng(needTransitiveClosure);
-    if (rslt != RES_SUCCESS) {
-      Logger::Info("Invalid DAG after adding artificial cluster edges");
-      return rslt;
-    }
-  }
-
-  // This must be done after SetupForSchdulng() or UpdateSetupForSchdulng() to
-  // avoid resetting lower bound values.
-  if (!BbSchedulerEnabled)
-    costLwrBound_ = CmputCostLwrBound();
-  else
-    CmputLwrBounds_(false);
 
   // Log the lower bound on the cost, allowing tools reading the log to compare
   // absolute rather than relative costs.
