@@ -177,17 +177,6 @@ FUNC_RESULT SchedRegion::FindOptimalSchedule(
   CmputAbslutUprBound_();
   schedLwrBound_ = dataDepGraph_->GetSchedLwrBound();
 
-  // We can calculate lower bounds here since it is only dependent
-  // on schedLwrBound_
-  if (!BbSchedulerEnabled)
-    costLwrBound_ = CmputCostLwrBound();
-  else
-    CmputLwrBounds_(false);
-
-  // Log the lower bound on the cost, allowing tools reading the log to compare
-  // absolute rather than relative costs.
-  Logger::Info("Lower bound of cost before scheduling: %d", costLwrBound_);
-
   // Step #1: Find the heuristic schedule if enabled.
   // Note: Heuristic scheduler is required for the two-pass scheduler
   // to use the sequential list scheduler which inserts stalls into
@@ -257,6 +246,17 @@ FUNC_RESULT SchedRegion::FindOptimalSchedule(
       return rslt;
     }
   }
+
+  // This must be done after SetupForSchdulng() or UpdateSetupForSchdulng() to
+  // avoid resetting lower bound values.
+  if (!BbSchedulerEnabled)
+    costLwrBound_ = CmputCostLwrBound();
+  else
+    CmputLwrBounds_(false);
+
+  // Log the lower bound on the cost, allowing tools reading the log to compare
+  // absolute rather than relative costs.
+  Logger::Info("Lower bound of cost before scheduling: %d", costLwrBound_);
 
   // Step #2: Use ACO to find a schedule if enabled and no optimal schedule is
   // yet to be found.
