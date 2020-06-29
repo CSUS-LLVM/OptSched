@@ -200,7 +200,6 @@ FUNC_RESULT SchedRegion::FindOptimalSchedule(
     stats::heuristicTime.Record(hurstcTime);
     if (hurstcTime > 0)
       Logger::Info("Heuristic_Time %d", hurstcTime);
-
   }
 
   // After the sequential scheduler in the second pass, add the artificial edges
@@ -257,7 +256,6 @@ FUNC_RESULT SchedRegion::FindOptimalSchedule(
                                   "CP Lower Bounds");
 #endif
   }
-
 
   // Log the lower bound on the cost, allowing tools reading the log to compare
   // absolute rather than relative costs.
