@@ -2978,7 +2978,7 @@ bool InstSchedule::VerifyDataDeps_(DataDepGraph *dataDepGraph) {
              inst->GetFrstScsr(NULL, &ltncy, &depType, &IsArtificial);
          scsr != NULL;
          scsr = inst->GetNxtScsr(NULL, &ltncy, &depType, &IsArtificial)) {
-      // Artificial nodes are not required for the schedule to be correct
+      // Artificial edges are not required for the schedule to be correct
       if (IsArtificial)
         continue;
 
