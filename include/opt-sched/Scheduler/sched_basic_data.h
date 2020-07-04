@@ -202,12 +202,14 @@ public:
   //   depType: the type of dependence between this node and the successor.
   SchedInstruction *GetFrstScsr(InstCount *prdcsrNum = NULL,
                                 UDT_GLABEL *ltncy = NULL,
-                                DependenceType *depType = NULL);
+                                DependenceType *depType = NULL,
+                                bool *IsArtificial = nullptr);
   // Returns the next successor of this instruction node and moves the
   // successor iterator forward. Fills parameters as above.
   SchedInstruction *GetNxtScsr(InstCount *prdcsrNum = NULL,
                                UDT_GLABEL *ltncy = NULL,
-                               DependenceType *depType = NULL);
+                               DependenceType *depType = NULL,
+                               bool *IsArtificial = nullptr);
 
   // Returns the last successor of this instruction node and moves the
   // successor iterator to the end of the list. If prdcsrNum is provided, this

@@ -391,7 +391,7 @@ protected:
                                 InstCount fileUB, int blkNum);
   FUNC_RESULT FinishNode_(InstCount nodeNum, InstCount edgeCnt = -1);
   void CreateEdge_(InstCount frmInstNum, InstCount toInstNum, int ltncy,
-                   DependenceType depType);
+                   DependenceType depType, bool IsArtificial = false);
 
   FUNC_RESULT Finish_();
 

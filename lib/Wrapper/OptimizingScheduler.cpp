@@ -397,7 +397,14 @@ void ScheduleDAGOptSched::schedule() {
   // Convert graph
   auto DDG =
       OST->createDDGWrapper(C, this, MM.get(), LatencyPrecision, RegionName);
-  DDG->convertSUnits();
+
+  // In the second pass, ignore artificial edges before running the sequential
+  // heuristic list scheduler.
+  if (SecondPass)
+    DDG->convertSUnits(false, true);
+  else
+    DDG->convertSUnits(false, false);
+
   DDG->convertRegFiles();
 
   auto *BDDG = static_cast<OptSchedDDGWrapperBasic *>(DDG.get());
