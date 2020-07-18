@@ -25,7 +25,7 @@ extern bool OPTSCHED_gPrintSpills;
 using namespace llvm::opt_sched;
 
 // The denominator used when calculating cost weight.
-static const int COST_WGHT_BASE = 10;
+static const int COST_WGHT_BASE = 100;
 
 // The max number of instructions in a cluster
 static const unsigned MAX_INSTR_IN_CLUSTER = 15;
@@ -70,12 +70,10 @@ BBWithSpill::BBWithSpill(const OptSchedTarget *OST_, DataDepGraph *dataDepGraph,
   schduldEntryInstCnt_ = 0;
   schduldExitInstCnt_ = 0;
   schduldInstCnt_ = 0;
-  Config &schedIni = SchedulerOptions::getInstance();
-  ClusterMemoryOperations = schedIni.GetBool("CLUSTER_MEMORY_OPS");
-  ClusteringWeight = schedIni.GetInt("CLUSTER_WEIGHT");
   ClusterGroupCount = dataDepGraph_->getMinClusterCount();
   MinClusterBlocks = 0;
-  if (ClusterMemoryOperations && ClusterGroupCount > 0) {
+//  if (ClusterMemoryOperations && ClusterGroupCount > 0) {
+  if (ClusterGroupCount > 0) {
     ClusterCount.resize(ClusterGroupCount + 1);
     ClusterInstrRemainderCount.resize(ClusterGroupCount + 1);
     MinClusterBlocks = calculateClusterStaticLB();
@@ -453,6 +451,7 @@ InstCount BBWithSpill::CmputCost_(InstSchedule *sched, COST_COMP_MODE compMode,
   if (IsSecondPass() && ClusterMemoryOperations) {
     cost += CurrentClusterCost * ClusteringWeight;
     assert(calculateClusterDLB() == CurrentClusterCost);
+    sched->setClusterSize(CurrentClusterCost);
   }
 
   sched->SetSpillCosts(spillCosts_);
@@ -486,6 +485,25 @@ void BBWithSpill::CmputCrntSpillCost_() {
   }
 }
 /*****************************************************************************/
+
+void BBWithSpill::computeAndPrintClustering(InstSchedule *Sched) {
+  InstCount instNum;
+  InstCount cycleNum;
+  InstCount slotNum;
+  SchedInstruction *inst;
+  bool temp = ClusterMemoryOperations;
+
+  ClusterMemoryOperations = true;
+  InitForCostCmputtn_();
+  for (instNum = Sched->GetFrstInst(cycleNum, slotNum);
+       instNum != INVALID_VALUE;
+       instNum = Sched->GetNxtInst(cycleNum, slotNum)) {
+    inst = dataDepGraph_->GetInstByIndx(instNum);
+    SchdulInst(inst, cycleNum, slotNum, false);
+  }
+  printCurrentClustering();
+  ClusterMemoryOperations = temp;
+}
 
 void BBWithSpill::saveCluster(SchedInstruction *inst) {
   if (LastCluster)
@@ -1077,28 +1095,14 @@ FUNC_RESULT BBWithSpill::Enumerate_(Milliseconds startTime,
     HandlEnumrtrRslt_(rslt, trgtLngth);
 
     if (GetBestCost() == 0 || rslt == RES_ERROR ||
-        (lngthDeadline == rgnDeadline && rslt == RES_TIMEOUT)) { //||
-      //(rslt == RES_SUCCESS && IsSecondPass())) {
-
-      // If doing two pass optsched and on the second pass then terminate if a
-      // schedule is found with the same min-RP found in first pass.
-      /*
-      if (rslt == RES_SUCCESS && IsSecondPass()) {
-        Logger::Info("Schedule found in second pass, terminating BB loop.");
-
-        if (trgtLngth  < schedUprBound_)
-          Logger::Info("Schedule found with length %d is shorter than current
-      schedule with length %d.", trgtLngth, schedUprBound_);
-      }*/
-
+        (lngthDeadline == rgnDeadline && rslt == RES_TIMEOUT)) {
       break;
     }
 
     enumrtr_->Reset();
     enumCrntSched_->Reset();
 
-    if (!IsSecondPass())
-      CmputSchedUprBound_();
+    CmputSchedUprBound_();
 
     iterCnt++;
     costLwrBound += 1;
@@ -1152,7 +1156,6 @@ InstCount BBWithSpill::UpdtOptmlSched(InstSchedule *crntSched,
     SetBestSchedLength(crntSched->GetCrntLngth());
     enumBestSched_->Copy(crntSched);
     bestSched_ = enumBestSched_;
-    printCurrentClustering();
   }
 
   return GetBestCost();

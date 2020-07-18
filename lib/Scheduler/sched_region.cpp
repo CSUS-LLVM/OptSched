@@ -49,6 +49,7 @@ SchedRegion::SchedRegion(MachineModel *machMdl, DataDepGraph *dataDepGraph,
   schedUprBound_ = INVALID_VALUE;
 
   spillCostFunc_ = spillCostFunc;
+  PrintClustering = false;
 }
 
 void SchedRegion::UseFileBounds_() {
@@ -124,6 +125,9 @@ FUNC_RESULT SchedRegion::FindOptimalSchedule(
   // heuristic scheduler or ACO before the branch & bound enumerator must be
   // enabled.
   Config &schedIni = SchedulerOptions::getInstance();
+  PrintClustering = schedIni.GetBool("PRINT_CLUSTER");
+  ClusterMemoryOperations = schedIni.GetBool("CLUSTER_MEMORY_OPS");
+  ClusteringWeight = schedIni.GetInt("CLUSTER_WEIGHT");
   bool HeuristicSchedulerEnabled = schedIni.GetBool("HEUR_ENABLED");
   bool AcoSchedulerEnabled = schedIni.GetBool("ACO_ENABLED");
   bool BbSchedulerEnabled = isBbEnabled(schedIni, rgnTimeout);
@@ -178,17 +182,6 @@ FUNC_RESULT SchedRegion::FindOptimalSchedule(
   CmputAbslutUprBound_();
   schedLwrBound_ = dataDepGraph_->GetSchedLwrBound();
 
-  // We can calculate lower bounds here since it is only dependent
-  // on schedLwrBound_
-  if (!BbSchedulerEnabled)
-    costLwrBound_ = CmputCostLwrBound();
-  else
-    CmputLwrBounds_(false);
-
-  // Log the lower bound on the cost, allowing tools reading the log to compare
-  // absolute rather than relative costs.
-  Logger::Info("Lower bound of cost before scheduling: %d", costLwrBound_);
-
   // Step #1: Find the heuristic schedule if enabled.
   // Note: Heuristic scheduler is required for the two-pass scheduler
   // to use the sequential list scheduler which inserts stalls into
@@ -210,18 +203,46 @@ FUNC_RESULT SchedRegion::FindOptimalSchedule(
 
     hurstcTime = Utilities::GetProcessorTime() - hurstcStart;
     stats::heuristicTime.Record(hurstcTime);
-    if (IsSecondPass())
-      printCurrentClustering();
 
     if (hurstcTime > 0)
       Logger::Info("Heuristic_Time %d", hurstcTime);
+  }
 
+  // After the sequential scheduler in the second pass, add the artificial edges
+  // to the DDG. Some mutations were adding artificial edges which caused a
+  // conflict with the sequential scheduler. Therefore, wait until the
+  // sequential scheduler is done before adding artificial edges.
+  if (IsSecondPass()) {
+    static_cast<OptSchedDDGWrapperBasic *>(dataDepGraph_)->addArtificialEdges();
+    rslt = dataDepGraph_->UpdateSetupForSchdulng(needTransitiveClosure);
+    if (rslt != RES_SUCCESS) {
+      Logger::Info("Invalid DAG after adding artificial cluster edges");
+      return rslt;
+    }
+  }
+
+  // This must be done after SetupForSchdulng() or UpdateSetupForSchdulng() to
+  // avoid resetting lower bound values.
+  if (!BbSchedulerEnabled)
+    costLwrBound_ = CmputCostLwrBound();
+  else
+    CmputLwrBounds_(false);
+
+  // Log the lower bound on the cost, allowing tools reading the log to compare
+  // absolute rather than relative costs.
+  Logger::Info("Lower bound of cost before scheduling: %d", costLwrBound_);
+
+  // Cost calculation must be below lower bounds calculation
+  if (HeuristicSchedulerEnabled || IsSecondPass()) {
     heuristicScheduleLength = lstSched->GetCrntLngth();
     InstCount hurstcExecCost;
     // Compute cost for Heuristic list scheduler, this must be called before
     // calling GetCost() on the InstSchedule instance.
     CmputNormCost_(lstSched, CCM_DYNMC, hurstcExecCost, true);
     hurstcCost_ = lstSched->GetCost();
+
+    if (IsSecondPass() && PrintClustering)
+      computeAndPrintClustering(lstSched);
 
     // This schedule is optimal so ACO will not be run
     // so set bestSched here.
@@ -230,6 +251,8 @@ FUNC_RESULT SchedRegion::FindOptimalSchedule(
       bestSched = bestSched_ = lstSched;
       bestSchedLngth_ = heuristicScheduleLength;
       bestCost_ = hurstcCost_;
+      if (IsSecondPass() && ClusterMemoryOperations)
+        bestSched->setClusterSize(lstSched->getClusterSize());
     }
 
     FinishHurstc_();
@@ -247,19 +270,6 @@ FUNC_RESULT SchedRegion::FindOptimalSchedule(
     dataDepGraph_->PrintLwrBounds(DIR_FRWRD, Logger::GetLogStream(),
                                   "CP Lower Bounds");
 #endif
-  }
-
-  // After the sequential scheduler in the second pass, add the artificial edges
-  // to the DDG. Some mutations were adding artificial edges which caused a
-  // conflict with the sequential scheduler. Therefore, wait until the
-  // sequential scheduler is done before adding artificial edges.
-  if (IsSecondPass()) {
-    static_cast<OptSchedDDGWrapperBasic *>(dataDepGraph_)->addArtificialEdges();
-    rslt = dataDepGraph_->UpdateSetupForSchdulng(needTransitiveClosure);
-    if (rslt != RES_SUCCESS) {
-      Logger::Info("Invalid DAG after adding artificial cluster edges");
-      return rslt;
-    }
   }
 
   // Step #2: Use ACO to find a schedule if enabled and no optimal schedule is
@@ -297,6 +307,8 @@ FUNC_RESULT SchedRegion::FindOptimalSchedule(
       bestSched = bestSched_ = AcoSchedule;
       bestSchedLngth_ = AcoScheduleLength_;
       bestCost_ = AcoScheduleCost_;
+      if (IsSecondPass() && ClusterMemoryOperations)
+        bestSched->setClusterSize(AcoSchedule->getClusterSize());
     }
   }
 
@@ -312,6 +324,8 @@ FUNC_RESULT SchedRegion::FindOptimalSchedule(
       bestSched = bestSched_ = lstSched;
       bestSchedLngth_ = heuristicScheduleLength;
       bestCost_ = hurstcCost_;
+      if (IsSecondPass() && ClusterMemoryOperations)
+        bestSched->setClusterSize(lstSched->getClusterSize());
     }
     // B) Heuristic was never run. In that case, just use ACO and run with its
     // results, into B&B.
@@ -319,6 +333,8 @@ FUNC_RESULT SchedRegion::FindOptimalSchedule(
       bestSched = bestSched_ = AcoSchedule;
       bestSchedLngth_ = AcoScheduleLength_;
       bestCost_ = AcoScheduleCost_;
+      if (IsSecondPass() && ClusterMemoryOperations)
+        bestSched->setClusterSize(AcoSchedule->getClusterSize());
       // C) Neither scheduler was optimal. In that case, compare the two
       // schedules and use the one that's better as the input (initialSched) for
       // B&B.
@@ -327,6 +343,8 @@ FUNC_RESULT SchedRegion::FindOptimalSchedule(
       bestSched = bestSched_;
       bestSchedLngth_ = bestSched_->GetCrntLngth();
       bestCost_ = bestSched_->GetCost();
+      if (IsSecondPass() && ClusterMemoryOperations)
+        bestSched->setClusterSize(bestSched_->getClusterSize());
     }
   }
   // Step #3: Compute the cost upper bound.
@@ -453,6 +471,9 @@ FUNC_RESULT SchedRegion::FindOptimalSchedule(
 
     enumTime = Utilities::GetProcessorTime() - enumStart;
     stats::enumerationTime.Record(enumTime);
+
+    if (IsSecondPass() && PrintClustering && enumBestSched_ != NULL)
+      computeAndPrintClustering(enumBestSched_);
   }
 
   // Step 5: Run ACO if schedule from enumerator is not optimal
@@ -727,11 +748,6 @@ bool SchedRegion::CmputUprBounds_(InstSchedule *schedule, bool useFileBounds) {
     // If the heuristic schedule is optimal, we are done!
     schedUprBound_ = bestSchedLngth_;
     return true;
-  } else if (IsSecondPass()) {
-    // In the second pass, the upper bound is the length of the min-RP schedule
-    // that was found in the first pass with stalls inserted.
-    schedUprBound_ = schedule->GetCrntLngth();
-    return false;
   } else {
     CmputSchedUprBound_();
     return false;

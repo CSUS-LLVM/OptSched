@@ -647,6 +647,9 @@ private:
   // The schedule's spill cost according to the cost function used
   InstCount spillCost_;
 
+  // The number of clusters
+  int ClusterSize;
+
   // An array of peak reg pressures for all reg types in the schedule
   InstCount *peakRegPressures_;
 
@@ -694,6 +697,8 @@ public:
   InstCount GetExecCost() const;
   void SetSpillCost(InstCount cost);
   InstCount GetSpillCost() const;
+  void setClusterSize(int size);
+  int getClusterSize() const;
 
   void ResetInstIter();
   InstCount GetFrstInst(InstCount &cycleNum, InstCount &slotNum);

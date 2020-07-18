@@ -3059,6 +3059,10 @@ void InstSchedule::SetSpillCost(InstCount cost) { spillCost_ = cost; }
 
 InstCount InstSchedule::GetSpillCost() const { return spillCost_; }
 
+void InstSchedule::setClusterSize(int size) { ClusterSize = size; }
+
+int InstSchedule::getClusterSize() const { return ClusterSize; }
+
 /*******************************************************************************
  * Previously inlined functions
  ******************************************************************************/

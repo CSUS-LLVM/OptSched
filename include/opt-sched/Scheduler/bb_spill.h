@@ -42,6 +42,8 @@ private:
   llvm::SmallVector<int, 32> ClusterInstrRemainderCount;
   int ClusterGroupCount;
 
+  void computeAndPrintClustering(InstSchedule *Sched) override;
+
   /// Print the current clusters found so far in the schedule.
   void printCurrentClustering() override;
 
@@ -82,13 +84,6 @@ private:
   int ClusterActiveGroup;
 
   int StartCycle;
-
-  /// Flag to enable or disable clustering memory operations in the ILP pass.
-  /// Reads from the sched.ini file then set the flag accordingly.
-  bool ClusterMemoryOperations;
-
-  /// The weight for memory ops clustering.
-  int ClusteringWeight;
 
   /// Data struct to contain information about the previous clusters
   struct PastClusters {

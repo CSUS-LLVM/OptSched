@@ -52,6 +52,10 @@ public:
   // Destroys the region. Must be overriden by child classes.
   virtual ~SchedRegion() {}
 
+  bool PrintClustering;
+
+  virtual void computeAndPrintClustering(InstSchedule *Sched) = 0;
+
   virtual void printCurrentClustering() = 0;
   // Returns the dependence graph of this region.
   inline DataDepGraph *GetDepGraph() { return dataDepGraph_; }
@@ -163,6 +167,11 @@ protected:
   InstSchedule *enumBestSched_;
   // The best schedule found so far (may be heuristic or enumerator generated)
   InstSchedule *bestSched_;
+  /// Flag to enable or disable clustering memory operations in the ILP pass.
+  /// Reads from the sched.ini file then set the flag accordingly.
+  bool ClusterMemoryOperations;
+  /// The weight for memory ops clustering.
+  int ClusteringWeight;
 
   // TODO(max): Document.
   InstCount schedLwrBound_;
