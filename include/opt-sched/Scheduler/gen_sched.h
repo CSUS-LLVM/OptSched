@@ -17,8 +17,9 @@ Last Update:  Mar. 2011
 #define OPTSCHED_BASIC_GEN_SCHED_H
 
 #include "opt-sched/Scheduler/defines.h"
-#include "opt-sched/Scheduler/lnkd_lst.h"
+#include "opt-sched/Scheduler/cuda_lnkd_lst.cuh"
 #include "opt-sched/Scheduler/sched_basic_data.h"
+#include <cuda_runtime.h>
 
 namespace llvm {
 namespace opt_sched {
@@ -51,11 +52,14 @@ class InstScheduler {
 public:
   // Constructs a scheduler for the given machine and dependence graph, with
   // the specified upper bound.
+  __host__ __device__
   InstScheduler(DataDepStruct *dataDepGraph, MachineModel *machMdl,
                 InstCount schedUprBound);
   // Deallocates memory used by the scheduler.
+  __host__ __device__
   virtual ~InstScheduler();
 
+  __host__ __device__
   InstCount GetTotInstCnt() { return totInstCnt_; }
 
 protected:
@@ -93,6 +97,7 @@ protected:
   bool includesUnpipelined_;
 
   // Returns whether all instructions have been scheduled.
+  __host__ __device__
   bool IsSchedComplete_();
 };
 
@@ -102,12 +107,15 @@ class ConstrainedScheduler : public InstScheduler {
 public:
   // Constructs a constrained scheduler for the given machine and dependence
   // graph, with the specified upper bound.
+  __host__ __device__
   ConstrainedScheduler(DataDepGraph *dataDepGraph, MachineModel *machMdl,
                        InstCount schedUprBound);
   // Deallocates memory used by the scheduler.
+  __host__ __device__
   virtual ~ConstrainedScheduler();
 
   // Calculates the schedule and returns it in the passed argument.
+  __host__ __device__
   virtual FUNC_RESULT FindSchedule(InstSchedule *sched, SchedRegion *rgn) = 0;
 
 protected:
@@ -158,63 +166,79 @@ protected:
 
   // Resets slot availability and cycle blocking states to prepare the
   // scheduler for a new cycle.
+  __host__ __device__
   void InitNewCycle_();
 
   // Schedules an instruction in a given cycle and notifies its successors
   // to update their readiness status. This will cause each of these
   // successors to become partially ready or completely ready depending on
   // whether this instruction was the last unscheduled predecessor.
+  __host__ __device__
   void SchdulInst_(SchedInstruction *inst, InstCount cycleNum);
 
   // Undoes the effects of scheduling an instruction by notifying its
   // successors to update their readiness status, and removing them from the
   // first-ready lists if necessary.
+  __host__ __device__
   void UnSchdulInst_(SchedInstruction *inst);
 
   // Allocates memory for the reserve slots.
+  __host__ __device__
   void AllocRsrvSlots_();
   // Initializes the previously allocated reserve slots.
+  __host__ __device__
   void ResetRsrvSlots_();
 
   // Fills a new reserve slot with the appropriate cycle numbers (starts at
   // current slot and lasts for the length of the given instruction's latency
   // plus 1. No-op if given a pipelined instruction.
+  __host__ __device__
   void DoRsrvSlots_(SchedInstruction *inst);
   // Empties a previously filled reserve slot. No-op if given a pipelined
   // instruction.
+  __host__ __device__
   void UndoRsrvSlots_(SchedInstruction *inst);
 
   // Initialized the scheduler for a new iteration. Should be called whenever
   // a new iteration of the scheduler is started.
+  __host__ __device__
   bool Initialize_(InstCount trgtSchedLngth = INVALID_VALUE,
                    LinkedList<SchedInstruction> *fxdLst = NULL);
 
   // Moves forward by one slot and updates the cycle and slot numbers. Returns
   // true if the cycle is advanced.
+  __host__ __device__
   bool MovToNxtSlot_(SchedInstruction *inst);
 
   // Moves backward by one slot and updates the cycle and slot numbers.
   // Returns true if this causes a move back to the previous cycle.
+  __host__ __device__
   bool MovToPrevSlot_(int prevRealSlotNum);
 
   // Cleans up the first-ready array of the current cycle (if any).
+  __host__ __device__
   void CleanupCycle_(InstCount cycleNum);
 
   // Checks the legality of issuing an instruction of a given issue type.
+  __host__ __device__
   virtual bool ChkInstLglty_(SchedInstruction *inst) const;
 
   // Early check for instruction legality.
+  __host__ __device__
   bool IsTriviallyLegal_(const SchedInstruction *inst) const;
 
   // Checks the legality of the current schedule.
+  __host__ __device__
   bool ChkSchedLglty_(bool isEmptyCycle);
 
   // Updates the slot availability information to reflect the scheduling of
   // the given instruction.
+  __host__ __device__
   void UpdtSlotAvlblty_(SchedInstruction *inst);
 
   // A pure virtual function for updating the ready list. Each concrete
   // scheduler should define its own version.
+  __host__ __device__
   virtual void UpdtRdyLst_(InstCount cycleNum, int slotNum) = 0;
 };
 

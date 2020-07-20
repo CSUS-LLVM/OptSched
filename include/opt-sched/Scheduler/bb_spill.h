@@ -16,6 +16,7 @@ Last Update:  Apr. 2011
 #include <map>
 #include <set>
 #include <vector>
+#include <cuda_runtime.h>
 
 namespace llvm {
 namespace opt_sched {
@@ -124,12 +125,15 @@ public:
   InstCount UpdtOptmlSched(InstSchedule *crntSched,
                            LengthCostEnumerator *enumrtr);
   bool ChkCostFsblty(InstCount trgtLngth, EnumTreeNode *treeNode);
+  __host__ __device__
   void SchdulInst(SchedInstruction *inst, InstCount cycleNum, InstCount slotNum,
                   bool trackCnflcts);
   void UnschdulInst(SchedInstruction *inst, InstCount cycleNum,
                     InstCount slotNum, EnumTreeNode *trgtNode);
   void SetSttcLwrBounds(EnumTreeNode *node);
+  __host__ __device__
   bool ChkInstLglty(SchedInstruction *inst);
+  __host__ __device__
   void InitForSchdulng();
 
 protected:

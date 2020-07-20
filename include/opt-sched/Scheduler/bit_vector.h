@@ -33,8 +33,10 @@ public:
   // Sets all bits to 0.
   virtual void Reset();
   // Sets the bit at the given index to the given value.
+  __host__ __device__
   void SetBit(int index, bool value = true);
   // Returns the value of the bit at a given index.
+  __host__ __device__
   bool GetBit(int index) const;
   // Returns the number of one bits in the bit vector.
   int GetOneCnt() const;
@@ -63,6 +65,7 @@ protected:
   int oneCnt_;
 
   // Gets a Unit-sized bitmask for a given bit, inverted if val = false.
+  __host__ __device__
   static Unit GetMask_(int bitNum, bool val);
   // The number of bits per storage unit.
   static const int BITS_IN_UNIT = sizeof(Unit) * 8;
@@ -110,6 +113,7 @@ inline void BitVector::Reset() {
   oneCnt_ = 0;
 }
 
+__host__ __device__
 inline void BitVector::SetBit(int index, bool bitVal) {
   assert(index < bitCnt_);
   int unitNum = index / BITS_IN_UNIT;
@@ -127,6 +131,7 @@ inline void BitVector::SetBit(int index, bool bitVal) {
   }
 }
 
+__host__ __device__
 inline bool BitVector::GetBit(int index) const {
   assert(index < bitCnt_);
   int unitNum = index / BITS_IN_UNIT;
@@ -188,6 +193,7 @@ inline bool BitVector::operator==(const BitVector &other) const {
   return (memcmp(vctr_, other.vctr_, byteCnt) == 0);
 }
 
+__host__ __device__
 inline BitVector::Unit BitVector::GetMask_(int bitNum, bool bitVal) {
   assert(bitNum < BITS_IN_UNIT);
   Unit mask = ((Unit)1) << bitNum;

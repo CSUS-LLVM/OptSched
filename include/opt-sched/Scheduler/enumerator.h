@@ -16,6 +16,7 @@ Last Update:  Apr. 2020
 #include "opt-sched/Scheduler/relaxed_sched.h"
 #include <iostream>
 #include <vector>
+#include <cuda_runtime.h>
 
 namespace llvm {
 namespace opt_sched {
@@ -44,6 +45,11 @@ enum ENUMTREE_NODEMODE { ETN_PRELIM, ETN_ACTIVE, ETN_HISTORY };
 struct TightndInst {
   SchedInstruction *inst;
   InstCount tightBound;
+
+  void CopyPointersToDevice(TightndInst *dev_inst){
+      Logger::Fatal("Unimplemented.\n");
+      return;
+  }
 };
 
 class Enumerator;
@@ -69,6 +75,13 @@ private:
     inline SchedInstruction *GetInst();
     inline bool wasRlxInfsbl() { return wasRlxInfsbl_; }
     inline bool IsRsrcDmntd(SchedInstruction *cnddtInst);
+
+    //not implemented for this class
+    void CopyPointersToDevice(ExaminedInst *dev_inst){
+        Logger::Fatal("Unimplemented.\n");
+        return;
+    }
+
   };
 
   // A pointer to the instruction whose scheduling has led from the previous
@@ -297,6 +310,13 @@ public:
   inline const SuffixType &GetSuffix() const { return suffix_; }
   inline void SetSuffix(const SuffixType &suffix) { suffix_ = suffix; }
   inline void SetSuffix(SuffixType &&suffix) { suffix_ = std::move(suffix); }
+
+  //Not Implemented for EnumTreeNode
+  void CopyPointersToDevice(EnumTreeNode * dev_inst){
+    Logger::Fatal("Unimplemented.\n");
+    return;
+  }
+
 };
 /*****************************************************************************/
 
@@ -443,6 +463,7 @@ protected:
   // slot will break feasiblity from issue slot availbility point of view
   bool ProbeIssuSlotFsblty_(SchedInstruction *inst);
 
+  __host__ __device__
   inline void UpdtRdyLst_(InstCount cycleNum, int slotNum);
 
   // Identify the current position in the schedule by linearizing the cycle
@@ -504,13 +525,16 @@ protected:
   virtual void InitNewNode_(EnumTreeNode *newNode);
 
 public:
+  __host__ __device__
   Enumerator(DataDepGraph *dataDepGraph, MachineModel *machMdl,
              InstCount schedUprBound, int16_t sigHashSize,
              SchedPriorities prirts, Pruning PruningStrategy,
              bool SchedForRPOnly, bool enblStallEnum, Milliseconds timeout,
              InstCount preFxdInstCnt = 0,
              SchedInstruction *preFxdInsts[] = NULL);
+  __host__ __device__
   virtual ~Enumerator();
+  __host__ __device__
   virtual void Reset();
 
   // Get the number of nodes that have been examined
@@ -526,6 +550,7 @@ public:
   inline bool IsSchedForRPOnly() const { return SchedForRPOnly_; }
 
   // Calculates the schedule and returns it in the passed argument.
+  __host__ __device__
   FUNC_RESULT FindSchedule(InstSchedule *sched, SchedRegion *rgn) {
     return RES_ERROR;
   }
@@ -549,13 +574,16 @@ private:
   void FreeHistNode_(HistEnumTreeNode *histNode);
 
 public:
+  __host__ __device__
   LengthEnumerator(DataDepGraph *dataDepGraph, MachineModel *machMdl,
                    InstCount schedUprBound, int16_t sigHashSize,
                    SchedPriorities prirts, Pruning PruningStrategy,
                    bool SchedForRPOnly, bool enblStallEnum,
                    Milliseconds timeout, InstCount preFxdInstCnt = 0,
                    SchedInstruction *preFxdInsts[] = NULL);
+  __host__ __device__
   virtual ~LengthEnumerator();
+  __host__ __device__
   void Reset();
 
   // Given a schedule with some instructions possibly fixed, find a
@@ -598,6 +626,7 @@ private:
   void InitNewNode_(EnumTreeNode *newNode);
 
 public:
+  __host__ __device__
   LengthCostEnumerator(DataDepGraph *dataDepGraph, MachineModel *machMdl,
                        InstCount schedUprBound, int16_t sigHashSize,
                        SchedPriorities prirts, Pruning PruningStrategy,
@@ -605,7 +634,9 @@ public:
                        Milliseconds timeout, SPILL_COST_FUNCTION spillCostFunc,
                        InstCount preFxdInstCnt = 0,
                        SchedInstruction *preFxdInsts[] = NULL);
+  __host__ __device__
   virtual ~LengthCostEnumerator();
+  __host__ __device__
   void Reset();
 
   // Given a schedule with some instructions possibly fixed, find a
@@ -912,6 +943,7 @@ inline InstCount Enumerator::GetCrntCycleNum_() { return crntCycleNum_; }
 inline int Enumerator::GetCrntSlotNum_() { return crntSlotNum_; }
 /*****************************************************************************/
 
+__host__ __device__
 inline void Enumerator::UpdtRdyLst_(InstCount cycleNum, int slotNum) {
   InstCount prevCycleNum = cycleNum - 1;
   LinkedList<SchedInstruction> *lst1 = NULL;

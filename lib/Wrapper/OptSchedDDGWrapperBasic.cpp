@@ -157,7 +157,7 @@ void OptSchedDDGWrapperBasic::countDefs() {
 
   for (int i = 0; i < MM->GetRegTypeCnt(); i++) {
     LLVM_DEBUG(if (RegDefCounts[i]) dbgs()
-                   << "Reg Type " << MM->GetRegTypeName(i).c_str() << "->"
+                   << "Reg Type " << MM->GetRegTypeName(i) << "->"
                    << RegDefCounts[i] << " registers\n";);
 
     RegFiles[i].SetRegCnt(RegDefCounts[i]);

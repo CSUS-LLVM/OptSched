@@ -53,6 +53,13 @@ public:
   SetSuffix(const std::shared_ptr<std::vector<SchedInstruction *>> &suffix);
   std::vector<InstCount> GetPrefix() const;
 
+  //not implemented for this class
+  void CopyPointersToDevice(HistEnumTreeNode *dev_node){
+      Logger::Fatal("Unimplemented.\n");
+      return;
+  }
+
+
 protected:
   HistEnumTreeNode *prevNode_;
 
@@ -103,6 +110,12 @@ public:
   // Does the sub-problem at this node dominate the given node's?
   bool DoesDominate(EnumTreeNode *node, Enumerator *enumrtr);
   void SetCostInfo(EnumTreeNode *node, bool isTemp, Enumerator *enumrtr);
+
+  //Not Implemented for CostHistEnumTreeNode
+  void CopyPointersToDevice(CostHistEnumTreeNode *dev_node){
+    Logger::Fatal("Unimplemented.\n");
+    return;
+  }
 
 protected:
   // Why do we need to copy this data from region->tree_node->hist_node

@@ -13,6 +13,7 @@ Last Update:  Jan. 2020
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/SmallVector.h"
 #include <memory>
+#include <cuda_runtime.h>
 
 namespace llvm {
 namespace opt_sched {
@@ -29,8 +30,11 @@ public:
   ACOScheduler(DataDepGraph *dataDepGraph, MachineModel *machineModel,
                InstCount upperBound, SchedPriorities priorities,
                bool vrfySched);
+  __host__ __device__
   virtual ~ACOScheduler();
+  __host__ __device__
   FUNC_RESULT FindSchedule(InstSchedule *schedule, SchedRegion *region);
+  __host__ __device__
   inline void UpdtRdyLst_(InstCount cycleNum, int slotNum);
   // Set the initial schedule for ACO
   // Default is NULL if none are set.

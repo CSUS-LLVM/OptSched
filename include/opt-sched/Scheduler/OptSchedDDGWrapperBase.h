@@ -7,6 +7,8 @@
 #ifndef LLVM_OPT_SCHED_DDG_WRAPPER_BASE_H
 #define LLVM_OPT_SCHED_DDG_WRAPPER_BASE_H
 
+#include <cuda_runtime.h>
+
 namespace llvm {
 namespace opt_sched {
 

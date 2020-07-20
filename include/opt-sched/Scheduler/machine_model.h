@@ -14,15 +14,16 @@ Last Update:  Mar. 2011
 #include <iostream>
 // For class string.
 #include <string>
+//cstring lib for char arrays
+#include <string.h>
 // For class vector.
 #include "opt-sched/Scheduler/defines.h"
-#include <vector>
+#include <cuda_runtime.h>
 
 namespace llvm {
 namespace opt_sched {
 
 using std::string;
-using std::vector;
 
 // The possible types of dependence between two machine instructions.
 enum DependenceType {
@@ -55,7 +56,7 @@ const int MAX_ISSUTYPE_CNT = 20;
 // A description of an instruction type.
 struct InstTypeInfo {
   // The name of the instruction type.
-  string name;
+  char name[50];
   // Whether instructions of this type can be scheduled only in a particular
   // context.
   bool isCntxtDep;
@@ -87,22 +88,28 @@ public:
   // Returns the number of instruction types.
   int GetInstTypeCnt() const;
   // Returns the number of issue types (pipelines).
+  __host__ __device__
   int GetIssueTypeCnt() const;
   // Returns the machine's issue rate. I.e. the total number of issue slots
   // for all issue types.
+  __host__ __device__
   int GetIssueRate() const;
   // Returns the number of register types.
+  __host__ __device__
   int16_t GetRegTypeCnt() const;
   // Returns the number of registers of a given type.
+  __host__ __device__
   int GetPhysRegCnt(int16_t regType) const;
   // Returns the name of a given register type.
-  const string &GetRegTypeName(int16_t regType) const;
+  __host__ __device__
+  const char *GetRegTypeName(int16_t regType) const;
   // Returns the register type given its name.
   int16_t GetRegTypeByName(const char *const regTypeName) const;
   // Returns the number of issue slots for a given issue type.
   int GetSlotsPerCycle(IssueType type) const;
   // Returns the total number of issue slots and fills the passed array with
   // the number of issue slots for each issue type.
+  __host__ __device__
   int GetSlotsPerCycle(int slotsPerCycle[]) const;
   // Returns the latency of an instruction, given that the dependence on it is
   // of the specified type.
@@ -114,6 +121,7 @@ public:
   // Returns the issue type given its name.
   IssueType GetIssueTypeByName(const char *const issuTypeName) const;
   // Returns the issue type of a given instruction type.
+  __host__ __device__
   IssueType GetIssueType(InstType instTypeCode) const;
   // Returns the instruction type given the name of the instruction as well
   // as the name of the previous instruction (used for context-dependent
@@ -136,24 +144,30 @@ public:
   // information for Sun compiler DAGs which do not have it.
   bool IsFloat(InstType instTypeCode) const;
   // Returns whether the given instruction is pipelined.
+  __host__ __device__
   bool IsPipelined(InstType instTypeCode) const;
   // Returns whether the given instruction blocks the cycle, such that no
   // other instructions can be scheduled in the same cycle.
+  __host__ __device__
   bool BlocksCycle(InstType instTypeCode) const;
   // Returns whether the given instruction is supported.
   bool IsSupported(InstType instTypeCode) const;
   // Returns whether the given instruction is real. Non-real instructions,
   // like entry, exit and JOIN on the Sun SPARC compiler, are used as markers
   // and are not actually issued by the CPU.
+  __host__ __device__
   bool IsRealInst(InstType instTypeCode) const;
   // The machine model is simple if the issue rate is 1, the number of issue
   // types is 1, and the number of issue slots is 1.
   inline bool IsSimple() const {
-    return issueRate_ == 1 && issueTypes_.size() == 1 &&
+    return issueRate_ == 1 && issueTypes_size_ == 1 &&
            issueTypes_[0].slotsCount == 1 && !includesUnpipelined_;
   }
   // Add a new instruction type.
   void AddInstType(InstTypeInfo &instTypeInfo);
+
+  //copy pointers to device, link to passed device pointer
+  void CopyPointersToDevice(MachineModel *dev_machMdl);
 
 protected:
   // Creates an uninitialized machine model. For use by subclasses.
@@ -162,7 +176,7 @@ protected:
   // A description of a register type.
   struct RegTypeInfo {
     // The name of the register.
-    string name;
+    char name[50];
     // How many register of this type the machine has.
     int count;
   };
@@ -170,7 +184,7 @@ protected:
   // A description of a register type.
   struct IssueTypeInfo {
     // The name of the issue type.
-    string name;
+    char name[50];
     // How many slots of this issue type the machine has per cycle.
     int slotsCount;
   };
@@ -185,12 +199,20 @@ protected:
   // Whether the machine model includes unpipelined instructions.
   bool includesUnpipelined_ = false;
 
-  // A vector of instruction type descriptions.
-  vector<InstTypeInfo> instTypes_;
-  // A vector of register types with their names and counts.
-  vector<RegTypeInfo> registerTypes_;
-  // A vector of issue types with their names and slot counts.
-  vector<IssueTypeInfo> issueTypes_;
+  // An array of instruction type descriptions.
+  InstTypeInfo *instTypes_;
+  //keep track of instTypes_ size
+  int instTypes_size_;
+  //keep track of allocated size of instTypes_
+  int instTypes_alloc_;
+  // An array of register types with their names and counts.
+  RegTypeInfo *registerTypes_;
+  //keep track of registerTypes_ size
+  int registerTypes_size_;
+  // An array of issue types with their names and slot counts.
+  IssueTypeInfo *issueTypes_;
+  //keep track of issueTypes_ size
+  int issueTypes_size_;
 };
 
 } // namespace opt_sched

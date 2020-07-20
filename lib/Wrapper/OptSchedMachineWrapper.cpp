@@ -34,7 +34,7 @@ void dumpInstType(InstTypeInfo &instType, MachineModel *mm) {
                 Is Pipelined %s\n \
                 Supported: %s\n \
                 Blocks Cycle: %s\n",
-               instType.name.c_str(), instType.isCntxtDep ? "True" : "False",
+               instType.name, instType.isCntxtDep ? "True" : "False",
                mm->GetIssueTypeNameByCode(instType.issuType), instType.ltncy,
                instType.pipelined ? "True" : "False",
                instType.sprtd ? "True" : "False",
@@ -55,6 +55,7 @@ OptSchedMachineModel::OptSchedMachineModel(const char *configFile)
 
 void OptSchedMachineModel::convertMachineModel(
     const ScheduleDAGInstrs &dag, const RegisterClassInfo *regClassInfo) {
+  
   const TargetMachine &target = dag.TM;
 
   mdlName_ = target.getTarget().getName();
@@ -73,6 +74,7 @@ void OptSchedMachineModel::convertMachineModel(
                     mdlName_.c_str());
   }
 
+/* old vector based method
   InstTypeInfo instType;
 
   instType.name = "Default";
@@ -82,8 +84,45 @@ void OptSchedMachineModel::convertMachineModel(
   instType.pipelined = true;
   instType.sprtd = true;
   instType.blksCycle = false;
-  instTypes_.push_back(instType);
+  //instTypes_.push_back(instType); replace vectors with arrays
+*/
 
+  if (instTypes_size_ == instTypes_alloc_) {  //double size of array if full
+    if (instTypes_alloc_ > 0)
+      instTypes_alloc_ *= 2;
+    else
+      instTypes_alloc_ = 2;
+    InstTypeInfo *newArray = new InstTypeInfo[instTypes_alloc_];
+    //copy old array to new array
+    for (int i = 0; i < instTypes_size_; i++) {
+      strncpy((char *)newArray[i].name, (const char *)instTypes_[i].name, 50);
+
+      newArray[i].isCntxtDep = instTypes_[i].isCntxtDep;
+      newArray[i].issuType = instTypes_[i].issuType;
+      newArray[i].ltncy = instTypes_[i].ltncy;
+      newArray[i].pipelined = instTypes_[i].pipelined;
+      newArray[i].sprtd = instTypes_[i].sprtd;
+      newArray[i].blksCycle = instTypes_[i].blksCycle;
+    }
+    //delete old array
+    if (instTypes_size_ > 0)
+      delete[] instTypes_;
+    //set new array as instTypes_
+    instTypes_ = newArray;
+  }
+
+  //copy element to next open slot
+  strncpy((char *)instTypes_[instTypes_size_].name, "Default", 50);
+  
+  instTypes_[instTypes_size_].isCntxtDep = false;
+  instTypes_[instTypes_size_].issuType = 0;
+  instTypes_[instTypes_size_].ltncy = 1;
+  instTypes_[instTypes_size_].pipelined = true;
+  instTypes_[instTypes_size_].sprtd = true;
+  instTypes_[instTypes_size_].blksCycle = false;
+  instTypes_size_++;
+
+/* old vector based method
   instType.name = "artificial";
   instType.isCntxtDep = false;
   instType.issuType = 0;
@@ -91,34 +130,79 @@ void OptSchedMachineModel::convertMachineModel(
   instType.pipelined = true;
   instType.sprtd = true;
   instType.blksCycle = false;
-  instTypes_.push_back(instType);
+  //instTypes_.push_back(instType); replace vectors with arrays
+*/
+
+  if (instTypes_size_ == instTypes_alloc_) {  //double size of array if full
+    if (instTypes_alloc_ > 0)
+      instTypes_alloc_ *= 2;
+    else
+      instTypes_alloc_ = 2;
+    InstTypeInfo *newArray = new InstTypeInfo[instTypes_alloc_];
+    //copy old array to new array
+    for (int i = 0; i < instTypes_size_; i++) {
+      strncpy((char *)newArray[i].name, (const char *)instTypes_[i].name, 50);
+      
+      newArray[i].isCntxtDep = instTypes_[i].isCntxtDep;
+      newArray[i].issuType = instTypes_[i].issuType;
+      newArray[i].ltncy = instTypes_[i].ltncy;
+      newArray[i].pipelined = instTypes_[i].pipelined;
+      newArray[i].sprtd = instTypes_[i].sprtd;
+      newArray[i].blksCycle = instTypes_[i].blksCycle;
+    }
+    //delete old array
+    if (instTypes_size_ > 0)
+      delete[] instTypes_;
+    //set new array as instTypes_
+    instTypes_ = newArray;
+  }
+
+  //copy element to next open slot
+  strncpy((char*)instTypes_[instTypes_size_].name, "artificial", 50);
+
+  instTypes_[instTypes_size_].isCntxtDep = false;
+  instTypes_[instTypes_size_].issuType = 0;
+  instTypes_[instTypes_size_].ltncy = 1;
+  instTypes_[instTypes_size_].pipelined = true;
+  instTypes_[instTypes_size_].sprtd = true;
+  instTypes_[instTypes_size_].blksCycle = false;
+  instTypes_size_++;
+
 
   // Clear The registerTypes list to read registers limits from the LLVM machine
   // model
-  registerTypes_.clear();
+  delete[] registerTypes_;
+  registerTypes_size_ = 0;
 
   if (mdlName_ == "amdgcn") {
-    RegTypeInfo SGPR32;
-    SGPR32.name = "SGPR32";
-    SGPR32.count = 80;
-    registerTypes_.push_back(SGPR32);
+    registerTypes_size_ = 2;
+    registerTypes_ = new RegTypeInfo[registerTypes_size_];
+    //RegTypeInfo SGPR32;
+    //SGPR32.name = "SGPR32";
+    //SGPR32.count = 80;
+    strncpy((char *)registerTypes_[0].name, "SGPR32", 50);
+    registerTypes_[0].count = 80;
 
-    RegTypeInfo VGPR32;
-    VGPR32.name = "VGPR32";
-    VGPR32.count = 24;
-    registerTypes_.push_back(VGPR32);
+    //RegTypeInfo VGPR32;
+    //VGPR32.name = "VGPR32";
+    //VGPR32.count = 24;
+    strncpy((char *)registerTypes_[1].name, "VGPR32", 50);
+    registerTypes_[1].count = 24;
   } else {
     const auto *TRI = dag.TRI;
+    registerTypes_size_ = (int)TRI->getNumRegPressureSets();
+    registerTypes_ = new RegTypeInfo[registerTypes_size_];
     for (unsigned pSet = 0; pSet < TRI->getNumRegPressureSets(); ++pSet) {
       RegTypeInfo regType;
-      regType.name = TRI->getRegPressureSetName(pSet);
+      strncpy((char *)regType.name, TRI->getRegPressureSetName(pSet), 50);
       int pressureLimit = regClassInfo->getRegPressureSetLimit(pSet);
       // set registers with 0 limit to 1 to support flags and special cases
       if (pressureLimit > 0)
         regType.count = pressureLimit;
       else
         regType.count = 1;
-      registerTypes_.push_back(regType);
+      strncpy((char *)registerTypes_[(int)pSet].name, (const  char *)regType.name, 50);
+      registerTypes_[(int)pSet].count = regType.count;
     }
   }
 }
@@ -175,7 +259,7 @@ InstType CortexA7MMGenerator::generateInstrType(const MachineInstr *instr) {
   if (InstType != INVALID_INST_TYPE)
     return InstType;
   else {
-    LLVM_DEBUG(dbgs() << "Generating instr type for " << instrName.c_str());
+    LLVM_DEBUG(dbgs() << "Generating instr type for " << instrName);
 
     SUnit *SU = DAG->getSUnit(const_cast<MachineInstr *>(instr));
     const MCInstrDesc *instDesc = DAG->getInstrDesc(SU);
@@ -186,7 +270,7 @@ InstType CortexA7MMGenerator::generateInstrType(const MachineInstr *instr) {
 
     // Create the new instruction type
     InstTypeInfo InstTypeI;
-    InstTypeI.name = instrName;
+    strncpy((char *)InstTypeI.name, instrName.c_str(), 50);
     const InstrStage *E = IID->endStage(IDX);
     InstTypeI.issuType = generateIssueType(--E);
     InstTypeI.isCntxtDep = false;

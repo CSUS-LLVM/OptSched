@@ -1,4 +1,9 @@
-cmake_minimum_required(VERSION 3.4.3)
+cmake_minimum_required(VERSION 3.9)
+project(OptSched LANGUAGES CXX CUDA)
+#find_package(CUDA REQUIRED)
+#include_directories("${CUDA_INCLUDE_DIRS}")
+
+include(CTest)
 
 option(OPTSCHED_INCLUDE_TESTS "Generate build targets for the OptSched unit tests." ON)
 
@@ -19,8 +24,14 @@ ENDIF()
 SET(OPT_SCHED_DEBUG_FLAGS "")
 
 # If asserts are enabled opt-sched must be built with "IS_DEBUG".
-SET(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -DIS_DEBUG")
+SET(CMAKE_CXX_FLAGS_DEBUG " -DIS_DEBUG")
 SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OPT_SCHED_DEBUG_FLAGS}")
+
+#does not work as intended flags
+#SET(CMAKE_CUDA_FLAGS "-G -Xcompiler \"-fPIC ${CMAKE_CUDA_FLAGS}\" --relocatable-device-code=true")
+
+SET(CUDA_SEPARABLE_COMPILATION ON)
+#SET(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
 IF(CMAKE_BUILD_TYPE EQUAL "DEBUG")
   set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
@@ -36,21 +47,21 @@ SET(OPT_SCHED_SRCS Scheduler/aco.cpp
   Scheduler/config.cpp
   Scheduler/data_dep.cpp
   Scheduler/enumerator.cpp
-  Scheduler/gen_sched.cpp
+  Scheduler/cuda_gen_sched.cu
   Scheduler/graph.cpp
   Scheduler/graph_trans.cpp
   Scheduler/hist_table.cpp
-  Scheduler/list_sched.cpp
+  Scheduler/cuda_list_sched.cu
   Scheduler/logger.cpp
   Scheduler/reg_alloc.cpp
   Scheduler/utilities.cpp
-  Scheduler/machine_model.cpp
+  Scheduler/cuda_machine_model.cu
   Scheduler/random.cpp
-  Scheduler/ready_list.cpp
-  Scheduler/register.cpp
+  Scheduler/cuda_ready_list.cu
+  Scheduler/cuda_register.cu
   Scheduler/relaxed_sched.cpp
-  Scheduler/sched_basic_data.cpp
-  Scheduler/sched_region.cpp
+  Scheduler/cuda_sched_basic_data.cu
+  Scheduler/cuda_sched_region.cu
   Scheduler/stats.cpp
   Wrapper/OptimizingScheduler.cpp
   Wrapper/OptSchedMachineWrapper.cpp
@@ -81,7 +92,7 @@ IF("AMDGPU" IN_LIST LLVM_TARGETS_TO_BUILD)
                                           Wrapper/AMDGPU/OptSchedDDGWrapperGCN.cpp)
     SET(OPT_SCHED_INCLUDE_DIRS ${OPT_SCHED_INCLUDE_DIRS} ${CMAKE_CURRENT_SOURCE_DIR}/lib
                                 ${LLVM_MAIN_SRC_DIR}/lib/Target/AMDGPU
-                                ${LLVM_BINARY_DIR}/lib/Target/AMDGPU)
+                                ${CMAKE_CURRENT_BINARY_DIR}/../../lib/Target/AMDGPU)
   ENDIF()
 ENDIF()
 

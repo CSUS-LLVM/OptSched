@@ -19,6 +19,7 @@
 #include <set>
 #include <sstream>
 #include <utility>
+#include <cuda_runtime.h>
 
 extern bool OPTSCHED_gPrintSpills;
 
@@ -316,6 +317,7 @@ InstCount BBWithSpill::CmputCostLwrBound() {
 }
 /*****************************************************************************/
 
+__host__ __device__
 void BBWithSpill::InitForSchdulng() {
   InitForCostCmputtn_();
 
@@ -721,6 +723,7 @@ void BBWithSpill::UpdateSpillInfoForUnSchdul_(SchedInstruction *inst) {
 }
 /*****************************************************************************/
 
+__host__ __device__
 void BBWithSpill::SchdulInst(SchedInstruction *inst, InstCount cycleNum,
                              InstCount slotNum, bool trackCnflcts) {
   crntCycleNum_ = cycleNum;
@@ -947,6 +950,7 @@ void BBWithSpill::SetSttcLwrBounds(EnumTreeNode *) {
 
 /*****************************************************************************/
 
+__host__ __device__
 bool BBWithSpill::ChkInstLglty(SchedInstruction *inst) {
   return true;
   /*

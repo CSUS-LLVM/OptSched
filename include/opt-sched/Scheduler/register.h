@@ -14,6 +14,7 @@ Last Update:  Jun. 2017
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/SmallVector.h"
 #include <memory>
+#include <cuda_runtime.h>
 
 using namespace llvm;
 
@@ -31,6 +32,7 @@ public:
   int16_t GetType() const;
   void SetType(int16_t type);
 
+  __host__ __device__
   int GetNum() const;
   void SetNum(int num);
 
@@ -42,9 +44,11 @@ public:
   void SetPhysicalNumber(int physicalNumber);
 
   void AddUse(const SchedInstruction *inst);
+  __host__ __device__
   int GetUseCnt() const;
   const InstSetType &GetUseList() const;
   size_t GetSizeOfUseList() const;
+  __host__ __device__
   int GetCrntUseCnt() const;
 
   void AddDef(const SchedInstruction *inst);
@@ -66,6 +70,7 @@ public:
   bool IsLiveIn() const;
   void SetIsLiveIn(bool liveIn);
   // Live out registers are used by the artifical exit node.
+  __host__ __device__
   bool IsLiveOut() const;
   void SetIsLiveOut(bool liveOut);
 

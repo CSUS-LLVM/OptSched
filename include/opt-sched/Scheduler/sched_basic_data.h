@@ -16,6 +16,8 @@ Last Update:  Sept. 2013
 #include "opt-sched/Scheduler/hash_table.h"
 #include "opt-sched/Scheduler/machine_model.h"
 #include <iostream>
+#include <cuda_runtime.h>
+#include <string.h>
 
 namespace llvm {
 namespace opt_sched {
@@ -135,45 +137,59 @@ public:
   //   fileUB: The static upper bound on this instruction's scheduling as
   //     provided in the input file.
   //   model: The machine model used by this instruction.
-  SchedInstruction(InstCount num, const string &name, InstType instType,
-                   const string &opCode, InstCount maxInstCnt, int nodeID,
+  __host__ __device__
+  SchedInstruction(InstCount num, const char *name, InstType instType,
+                   const char *opCode, InstCount maxInstCnt, int nodeID,
                    InstCount fileSchedCycle, InstCount fileSchedOrder,
                    InstCount fileLB, InstCount fileUB, MachineModel *model);
   // Deallocates the memory used by the instruction and destroys the object.
+  __host__ __device__
   ~SchedInstruction();
 
   // Prepares the instruction for scheduling. Should be called only once in
   // the lifetime of an instruction object.
+  __host__ __device__
   void SetupForSchdulng(InstCount instCnt, bool isCP_FromScsr,
                         bool isCP_FromPrdcsr);
 
   // Sets the instruction's bounds to the ones specified in the input file.
+  __host__ __device__
   bool UseFileBounds();
 
   // Initializes the instruction for a new scheduling iteration. Sometimes,
   // early infeasibility might get detected by this function, in which case it
   // returns false. Otherwise, returns true.
+  __host__ __device__
   bool InitForSchdulng(InstCount schedLngth = INVALID_VALUE,
                        LinkedList<SchedInstruction> *fxdLst = NULL);
 
   // Returns the name of the instruction.
+  __host__ __device__
   const char *GetName() const;
   // Returns the opcode of the instruction.
+  __host__ __device__
   const char *GetOpCode() const;
   // Returns the ID of the node as specified in the constructor.
+  __host__ __device__
   int GetNodeID() const;
+  __host__ __device__
   void SetNodeID(int nodeID);
   // Returns the sum of latencies from this instruction.
+  __host__ __device__
   int GetLtncySum() const;
   // Returns the maximum latency from this instruction.
+  __host__ __device__
   int GetMaxLtncy() const;
   // Returns the scheduling order for this instruction as provided in the
   // input file.
+  __host__ __device__
   InstCount GetFileSchedOrder() const;
   // Returns the scheduled cycle for this instruction as provided in the input
   // file.
+  __host__ __device__
   InstCount GetFileSchedCycle() const;
   // Returns the instruction's forward or backward lower bound.
+  __host__ __device__
   InstCount GetLwrBound(DIRECTION dir) const;
 
   /***************************************************************************
@@ -186,11 +202,13 @@ public:
   //     successor list.
   //   ltncy: the latency from the predecessor to this instruction.
   //   depType: the type of dependence between this node and the predecessor.
+  __host__ __device__
   SchedInstruction *GetFrstPrdcsr(InstCount *scsrNum = NULL,
                                   UDT_GLABEL *ltncy = NULL,
                                   DependenceType *depType = NULL);
   // Returns the next predecessor of this instruction node and moves the
   // predecessor iterator forward. Fills parameters as above.
+  __host__ __device__
   SchedInstruction *GetNxtPrdcsr(InstCount *scsrNum = NULL,
                                  UDT_GLABEL *ltncy = NULL,
                                  DependenceType *depType = NULL);
@@ -202,11 +220,13 @@ public:
   //     predecessor list.
   //   ltncy: the latency from this instruction to the successor.
   //   depType: the type of dependence between this node and the successor.
+  __host__ __device__
   SchedInstruction *GetFrstScsr(InstCount *prdcsrNum = NULL,
                                 UDT_GLABEL *ltncy = NULL,
                                 DependenceType *depType = NULL);
   // Returns the next successor of this instruction node and moves the
   // successor iterator forward. Fills parameters as above.
+  __host__ __device__
   SchedInstruction *GetNxtScsr(InstCount *prdcsrNum = NULL,
                                UDT_GLABEL *ltncy = NULL,
                                DependenceType *depType = NULL);
@@ -215,51 +235,64 @@ public:
   // successor iterator to the end of the list. If prdcsrNum is provided, this
   // instruction's number (order) in the successor's predecessor list is
   // written to it.
+  __host__ __device__
   SchedInstruction *GetLastScsr(InstCount *prdcsrNum = NULL);
   // Returns the previous predecessor of this instruction node and moves the
   // predecessor iterator backward. Fills prdcsrNum as above.
+  __host__ __device__
   SchedInstruction *GetPrevScsr(InstCount *prdcsrNum = NULL);
 
   // Returns the first predecessor or successor of this instruction node,
   // depending on the value of dir, filling in the latency from the
   // predecessor to this instruction into ltncy, if provided. Resets the
   // predecessor or successor iterator (the two iterator are independent).
+  __host__ __device__
   SchedInstruction *GetFrstNghbr(DIRECTION dir, UDT_GLABEL *ltncy = NULL);
   // Returns the next predecessor or successor of this instruction node,
   // depending on the value of dir, filling in the latency from the
   // predecessor to this instruction into ltncy, if provided. Moves the
   // predecessor iterator forward (the two iterator are independent).
+  __host__ __device__
   SchedInstruction *GetNxtNghbr(DIRECTION dir, UDT_GLABEL *ltncy = NULL);
   /***************************************************************************/
 
   // Sets the instruction's current forward and backward lower bounds to the
   // specified values.
+  __host__ __device__
   void SetBounds(InstCount flb, InstCount blb);
   // Sets one of the instruction's lower bounds.
+  __host__ __device__
   void SetLwrBound(DIRECTION dir, InstCount bound, bool isAbslut = true);
   // Sets the instruction's lower bounds to the absolute lower bounds.
+  __host__ __device__
   void RestoreAbsoluteBounds();
 
   // Returns whether this instruction is flagged as being ready.
+  __host__ __device__
   bool IsInReadyList() const;
   // Flags this instruction as being ready.
+  __host__ __device__
   void PutInReadyList();
   // Flags this instruction as NOT being ready.
+  __host__ __device__
   void RemoveFromReadyList();
 
   // Calculates the instruction's critical path distance from the root,
   // assuming that the critical paths of all of its predecessors have been
   // calculated.
+  __host__ __device__
   InstCount CmputCrtclPathFrmRoot();
 
   // Calculates the instruction's critical path distance from the leaf,
   // assuming that the critical paths of all of its successors have been
   // calculated.
+  __host__ __device__
   InstCount CmputCrtclPathFrmLeaf();
 
   // Returns the critical path distance of this instruction from the root of
   // leaf, depending on dir. Assumes that the path has already been
   // calculated.
+  __host__ __device__
   InstCount GetCrtclPath(DIRECTION dir) const;
 
   // Notifies this instruction that one of its predecessors has been scheduled
@@ -267,52 +300,70 @@ public:
   // function will return true and set rdyCycle to the cycle in which this
   // instruction will become ready. Otherwise it will return false and set
   // rdyCycle to -1, indicating that it isn't yet known when it will be ready.
+  __host__ __device__
   bool PrdcsrSchduld(InstCount prdcsrNum, InstCount cycle, InstCount &rdyCycle);
   // Undoes the effect of PrdcsrSchduld().
+  __host__ __device__
   bool PrdcsrUnSchduld(InstCount prdcsrNum, InstCount &rdyCycle);
 
   // Notifies this instruction that one of its successors has been scheduled.
   // Returns true if that was the last successor to schedule.
+  __host__ __device__
   bool ScsrSchduld();
 
   // Schedules the instruction to a given cycle and clot number.
+  __host__ __device__
   void Schedule(InstCount cycleNum, InstCount slotNum);
   // Mark this instruction as unscheduled.
+  __host__ __device__
   void UnSchedule();
 
   // Sets the instruction type to a given value.
+  __host__ __device__
   void SetInstType(InstType type);
   // Returns the type of the instruction.
+  __host__ __device__
   InstType GetInstType() const;
   // Sets the instruction issue type to a given value.
+  __host__ __device__
   void SetIssueType(IssueType type);
   // Returns the issue type of the instruction.
+  __host__ __device__
   IssueType GetIssueType() const;
 
   // Returns whether the instruction has been scheduled. If the cycle argument
   // is provided, it is filled with the cycle to which this instruction has
   // been scheduled.
+  __host__ __device__
   bool IsSchduld(InstCount *cycle = NULL) const;
 
   // Returns the cycle to which this instruction has been scheduled.
+  __host__ __device__
   InstCount GetSchedCycle() const;
   // Returns the slot to which this instruction has been scheduled.
+  __host__ __device__
   InstCount GetSchedSlot() const;
 
   // Returns the number of the deadline cycle for this instruction.
+  __host__ __device__
   InstCount GetCrntDeadline() const;
   // Returns the release time for this instruction.
+  __host__ __device__
   InstCount GetCrntReleaseTime() const;
   // Returns the relaxed cycle number for this instruction.
   // TODO(ghassan): Elaborate.
+  __host__ __device__
   InstCount GetRlxdCycle() const;
   // Sets the relaxed cycle number for this instruction.
   // TODO(ghassan): Elaborate.
+  __host__ __device__
   void SetRlxdCycle(InstCount cycle);
 
   // Returns the instruction's current lower bound in the given direction.
+  __host__ __device__
   InstCount GetCrntLwrBound(DIRECTION dir) const;
   // Sets the instruction's current lower bound in the given direction.
+  __host__ __device__
   void SetCrntLwrBound(DIRECTION dir, InstCount bound);
 
   // Tightens the lower bound of this instruction to the given new lower bound
@@ -320,41 +371,52 @@ public:
   // is added to the given list to be used for efficient untightening. This
   // function returns with false as soon as infeasiblity (w.r.t the given
   // schedule length) is detected, otherwise it returns true.
+  __host__ __device__
   bool TightnLwrBound(DIRECTION dir, InstCount newLwrBound,
                       LinkedList<SchedInstruction> *tightndLst,
                       LinkedList<SchedInstruction> *fxdLst, bool enforce);
   // Like TightnLwrBound(), but also recursively propagates tightening through
   // the subgraph rooted at this instruction.
+  __host__ __device__
   bool TightnLwrBoundRcrsvly(DIRECTION dir, InstCount newLwrBound,
                              LinkedList<SchedInstruction> *tightndLst,
                              LinkedList<SchedInstruction> *fxdLst,
                              bool enforce);
   // Untightens any tightened lower bound.
+  __host__ __device__
   void UnTightnLwrBounds();
   // Marks the instruction as not tightened.
+  __host__ __device__
   void CmtLwrBoundTightnng();
 
   // Sets the instruction's signature.
+  __host__ __device__
   void SetSig(InstSignature sig);
   // Returns the instruction's signature.
+  __host__ __device__
   InstSignature GetSig() const;
 
   // TODO(ghassan): Document.
+  __host__ __device__
   InstCount GetFxdCycle() const;
   // TODO(ghassan): Document.
+  __host__ __device__
   bool IsFxd() const;
 
   // Tightens the lower bound and deadline and recursively propagates these
   // tightenings to the neighbors and checking for feasibility at each point.
+  __host__ __device__
   bool ApplyPreFxng(LinkedList<SchedInstruction> *tightndLst,
                     LinkedList<SchedInstruction> *fxdLst);
 
   // TODO(ghassan): Document.
+  __host__ __device__
   InstCount GetPreFxdCycle() const;
 
   // Probes the successors of this instruction to see if their current lower
   // bounds will get tightened (delayed) if this instruction was scheduled in
   // the given cycle.
+  __host__ __device__
   bool ProbeScsrsCrntLwrBounds(InstCount cycle);
 
   /***************************************************************************
@@ -362,65 +424,92 @@ public:
    ***************************************************************************/
   // TODO(max): Verify that these are indeed entry/exit-related.
   // TODO(ghassan): Document.
+  __host__ __device__
   InstCount GetRltvCrtclPath(DIRECTION dir, SchedInstruction *ref);
 
   // Calculates the instruction's critical path distance from the given entry
   // node assuming that the critical paths of all of its predecessors have
   // been calculated.
+  __host__ __device__
   InstCount CmputCrtclPathFrmRcrsvPrdcsr(SchedInstruction *ref);
 
   // Calculates the instruction's critical path distance from the given exit
   // node assuming that the critical paths of all of its successors have been
   // calculated.
+  __host__ __device__
   InstCount CmputCrtclPathFrmRcrsvScsr(SchedInstruction *ref);
   /***************************************************************************/
 
   // Returns whether the instruction blocks a scheduling cycle, i.e. prevents
   // any other instructions from running during the same cycle.
+  __host__ __device__
   bool BlocksCycle() const;
   // Returns whether the instruction is pipelined.
+  __host__ __device__
   bool IsPipelined() const;
 
+  __host__ __device__
   bool MustBeInBBEntry() const;
+  __host__ __device__
   bool MustBeInBBExit() const;
+  __host__ __device__
   void SetMustBeInBBEntry(bool val);
+  __host__ __device__
   void SetMustBeInBBExit(bool val);
 
   // Add a register definition to this instruction node.
+  __host__ __device__
   void AddDef(Register *reg);
   // Add a register usage to this instruction node.
+  __host__ __device__
   void AddUse(Register *reg);
   // Returns whether this instruction defines the specified register.
+  __host__ __device__
   bool FindDef(Register *reg) const;
   // Returns whether this instruction uses the specified register.
+  __host__ __device__
   bool FindUse(Register *reg) const;
   // Retrieves the list of registers defined by this node. The array is put
   // into defs and the number of elements is returned.
+  __host__ __device__
   int16_t GetDefs(Register **&defs);
   // Retrieves the list of registers used by this node. The array is put
   // into uses and the number of elements is returned.
+  __host__ __device__
   int16_t GetUses(Register **&uses);
 
+  __host__ __device__
   int16_t GetDefCnt() { return defCnt_; }
+  __host__ __device__
   int16_t GetUseCnt() { return useCnt_; }
 
   // Return the adjusted use count. The number of uses minus live-out uses.
+  __host__ __device__
   int16_t GetAdjustedUseCnt() { return adjustedUseCnt_; }
   // Computer the adjusted use count. Update "adjustedUseCnt_".
+  __host__ __device__
   void ComputeAdjustedUseCnt(SchedInstruction *inst);
 
+  __host__ __device__
   int16_t CmputLastUseCnt();
-  int16_t GetLastUseCnt() { return lastUseCnt_; }
+  __host__ __device__
+  int16_t GetLastUseCnt();
+  //def to cuda_sched_basic_data.cu for nvcc compilation
+  //int16_t GetLastUseCnt() { return lastUseCnt_; }
 
+  __host__ __device__
   InstType GetCrtclPathFrmRoot() { return crtclPathFrmRoot_; }
+
+  //copy relevant pointers to device and link to dev_inst
+  int CopyPointersToDevice(SchedInstruction * dev_inst);
 
   friend class SchedRange;
 
 protected:
   // The "name" of this instruction. Usually a string indicating its type.
-  string name_;
+  char name_[50];
   // The mnemonic of this instruction, e.g. "add" or "jmp".
-  string opCode_;
+  char opCode_[50];
   // A numberical ID for this instruction.
   int nodeID_;
   // The type of this instruction.
@@ -561,6 +650,7 @@ protected:
   bool mustBeInBBExit_;
 
   // TODO(ghassan): Document.
+  __host__ __device__
   InstCount CmputCrtclPath_(DIRECTION dir, SchedInstruction *ref = NULL);
   // Allocate the memory needed for data structures used in this node.
   // Arguments as follows:
@@ -569,16 +659,21 @@ protected:
   //     paths from successors.
   //   isCP_FromPrdcsr: Whether this instruction will keep track of critical
   //     paths from predecessors.
+  __host__ __device__
   void AllocMem_(InstCount instCnt, bool isCP_FromScsr, bool isCP_FromPrdcsr);
   // Deallocates the memory used by the node's data structures.
+  __host__ __device__
   void DeAllocMem_();
   // Sets the predecessor order numbers on the edges between this node and its
   // predecessors.
+  __host__ __device__
   void SetPrdcsrNums_();
   // Sets the successor order numbers on the edges between this node and its
   // successors.
+  __host__ __device__
   void SetScsrNums_();
   // Computer the adjusted use count. Update "adjustedUseCnt_".
+  __host__ __device__
   void ComputeAdjustedUseCnt_();
 };
 
@@ -590,18 +685,23 @@ protected:
 class SchedRange {
 public:
   // Creates a scheduling range for a given instruction.
+  __host__ __device__
   SchedRange(SchedInstruction *inst);
 
   // Sets the range's boudns to the given values. If the range is then
   // "fixed" with respect to schedLngth, adds its instruction to fxdLst.
+  __host__ __device__
   bool SetBounds(InstCount frwrdLwrBound, InstCount bkwrdLwrBound,
                  InstCount schedLngth, LinkedList<SchedInstruction> *fxdLst);
   // Sets the range's boudns to the given values.
+  __host__ __device__
   void SetBounds(InstCount frwrdLwrBound, InstCount bkwrdLwrBound);
 
   // Sets the forward bound of the range.
+  __host__ __device__
   void SetFrwrdBound(InstCount bound);
   // Sets the backward bound of the range.
+  __host__ __device__
   void SetBkwrdBound(InstCount bound);
 
   // Tightens the lower bound of this range to the given new lower bound if it
@@ -609,32 +709,42 @@ public:
   // added to the given list to be used for efficient untightening. This
   // function returns with false as soon as infeasiblity (w.r.t the given
   // schedule length) is detected, otherwise it returns true.
+  __host__ __device__
   bool TightnLwrBound(DIRECTION dir, InstCount newLwrBound,
                       LinkedList<SchedInstruction> *tightndLst,
                       LinkedList<SchedInstruction> *fxdLst, bool enforce);
   // Like TightnLwrBound(), but also recursively propagates tightening through
   // the subgraph rooted at the instruction using this range.
+  __host__ __device__
   bool TightnLwrBoundRcrsvly(DIRECTION dir, InstCount newLwrBound,
                              LinkedList<SchedInstruction> *tightndLst,
                              LinkedList<SchedInstruction> *fxdLst,
                              bool enforce);
 
   // Returns the forward or backward lower bound of this range.
+  __host__ __device__
   InstCount GetLwrBound(DIRECTION dir) const;
   // Sets the forward or backward lower bound of this range.
+  __host__ __device__
   void SetLwrBound(DIRECTION dir, InstCount bound);
   // Returns the deadline cycle for this range.
+  __host__ __device__
   InstCount GetDeadline() const;
   // TODO(ghassan): Document.
+  __host__ __device__
   bool IsFxd() const;
   // Untightens any tightened lower bound.
+  __host__ __device__
   void UnTightnLwrBounds();
   // Marks the range as not tightened.
+  __host__ __device__
   void CmtLwrBoundTightnng();
   // TODO(ghassan): Document.
+  __host__ __device__
   bool Fix(InstCount cycle, LinkedList<SchedInstruction> *tightndLst,
            LinkedList<SchedInstruction> *fxdLst);
   // Returns whether the range is tightened in the given direction.
+  __host__ __device__
   bool IsTightnd(DIRECTION dir) const;
 
 protected:
@@ -668,10 +778,13 @@ protected:
   SchedInstruction *inst_;
 
   // Returns the sum of the range's forward and backward lower bounds.
+  __host__ __device__
   InstCount GetLwrBoundSum_() const;
   // Returns whether the bounds of this range may produce a feasible schedule.
+  __host__ __device__
   bool IsFsbl_() const;
   // Initializes the range members to a default state.
+  __host__ __device__
   void InitVars_();
 };
 

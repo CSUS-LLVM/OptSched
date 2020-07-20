@@ -13,9 +13,10 @@ Last Update:  Sept. 2013
 #define OPTSCHED_BASIC_READY_LIST_H
 
 #include "opt-sched/Scheduler/defines.h"
-#include "opt-sched/Scheduler/lnkd_lst.h"
+#include "opt-sched/Scheduler/cuda_lnkd_lst.cuh"
 #include "opt-sched/Scheduler/sched_basic_data.h"
 #include <cstdio>
+#include <cuda_runtime.h>
 
 namespace llvm {
 namespace opt_sched {
@@ -26,61 +27,84 @@ class ReadyList {
 public:
   // Constructs a ready list for the specified dependence graph with the
   // specified priorities.
+  __host__ __device__
   ReadyList(DataDepGraph *dataDepGraph, SchedPriorities prirts);
   // Destroys the ready list and deallocates the memory used by it.
+  __host__ __device__
   ~ReadyList();
 
   // Resets the list and removes all elements from it.
+  __host__ __device__
   void Reset();
 
   // Adds an instruction to the ready list.
+  __host__ __device__
   void AddInst(SchedInstruction *inst);
 
   // Adds a list of instructions to the ready list.
+  __host__ __device__
   void AddList(LinkedList<SchedInstruction> *lst);
 
   // An iterator that allows accessing the instructions at the current time
   // in priority order. The first call will return the top priority
   // instruction, the next will return the instruction with the second rank,
   // and so on.
+  __host__ __device__
   SchedInstruction *GetNextPriorityInst();
+  __host__ __device__
   SchedInstruction *GetNextPriorityInst(unsigned long &key);
 
   // Removes the instruction returned by the last call to
   // GetNextPriorityInst().
+  __host__ __device__
   void RemoveNextPriorityInst();
 
   // Returns the number of instructions currently in the list.
+  __host__ __device__
   InstCount GetInstCnt() const;
 
   // Resets the list iterator to point back to the first instruction.
+  __host__ __device__
   void ResetIterator();
 
   // Adds instructions at the bottoms of the given two lists which have
   // not been added to the ready list already, and advance the internal time.
   // TODO(max): Elaborate.
+  __host__ __device__
   void AddLatestSubLists(LinkedList<SchedInstruction> *lst1,
                          LinkedList<SchedInstruction> *lst2);
 
   // Removes the most recently added sublist of instructions.
   // TODO(max): Elaborate.
+  __host__ __device__
   void RemoveLatestSubList();
 
   // Copies this list to another. Both lists must be empty.
+  __host__ __device__
   void CopyList(ReadyList *otherLst);
 
   // Searches the list for an instruction, returning whether it has been found
   // or not and writing the number of times it was found into hitCnt.
+  __host__ __device__
   bool FindInst(SchedInstruction *inst, int &hitCnt);
 
   // Update instruction priorities within the list
   // Called only if the priorities change dynamically during scheduling
+  __host__ __device__
   void UpdatePriorities();
 
+  __host__ __device__
   unsigned long MaxPriority();
 
   // Prints out the ready list, nicely formatted, into an output stream.
+  __host__
   void Print(std::ostream &out);
+
+  __device__
+  void DevPrint();
+
+  //Copies all objects rdyLst points at to CUDA device.
+  void CopyPointersToDevice(ReadyList *dev_rdyLst, DataDepGraph *dataDepGraph);
 
 private:
   // An ordered vector of priorities
@@ -117,14 +141,17 @@ private:
   int16_t inptSchedOrderBits_;
 
   // Constructs the priority-list key based on the schemes listed in prirts_.
+  __host__ __device__
   unsigned long CmputKey_(SchedInstruction *inst, bool isUpdate, bool &changed);
 
   // Adds instructions at the bottom of a given list which have not been added
   // to the ready list already.
+  __host__ __device__
   void AddLatestSubList_(LinkedList<SchedInstruction> *lst);
 
   // Calculates a new priority key given an existing key of size keySize by
   // appending bitCnt bits holding the value val, assuming val < maxVal.
+  __host__ __device__
   static void AddPrirtyToKey_(unsigned long &key, int16_t &keySize,
                               int16_t bitCnt, unsigned long val,
                               unsigned long maxVal);

@@ -1,14 +1,12 @@
 #include "opt-sched/Scheduler/graph.h"
 #include "opt-sched/Scheduler/bit_vector.h"
 #include "opt-sched/Scheduler/defines.h"
-#include "opt-sched/Scheduler/cuda_lnkd_lst.cuh"
+#include "opt-sched/Scheduler/lnkd_lst.h"
 #include "opt-sched/Scheduler/logger.h"
 #include <cstdio>
-#include <cuda_runtime.h>
 
 using namespace llvm::opt_sched;
 
-__host__ __device__
 GraphNode::GraphNode(UDT_GNODES num, UDT_GNODES maxNodeCnt) {
   num_ = num;
   scsrLblSum_ = 0;
@@ -25,7 +23,6 @@ GraphNode::GraphNode(UDT_GNODES num, UDT_GNODES maxNodeCnt) {
   isRcrsvPrdcsr_ = NULL;
 }
 
-__host__ __device__
 GraphNode::~GraphNode() {
   DelScsrLst();
   delete scsrLst_;
@@ -40,7 +37,6 @@ GraphNode::~GraphNode() {
     delete isRcrsvPrdcsr_;
 }
 
-__host__ __device__
 void GraphNode::DelPrdcsrLst() {
   for (GraphEdge *crntEdge = prdcsrLst_->GetFrstElmnt(); crntEdge != NULL;
        crntEdge = prdcsrLst_->GetNxtElmnt()) {
@@ -50,7 +46,6 @@ void GraphNode::DelPrdcsrLst() {
   prdcsrLst_->Reset();
 }
 
-__host__ __device__
 void GraphNode::DelScsrLst() {
   for (GraphEdge *crntEdge = scsrLst_->GetFrstElmnt(); crntEdge != NULL;
        crntEdge = scsrLst_->GetNxtElmnt()) {
@@ -60,7 +55,6 @@ void GraphNode::DelScsrLst() {
   scsrLst_->Reset();
 }
 
-__host__ __device__
 void GraphNode::DepthFirstVisit(GraphNode *tplgclOrdr[],
                                 UDT_GNODES &tplgclIndx) {
   color_ = COL_GRAY;
@@ -87,12 +81,10 @@ void GraphNode::DepthFirstVisit(GraphNode *tplgclOrdr[],
   tplgclIndx--;
 }
 
-__host__ __device__
 void GraphNode::FindRcrsvNghbrs(DIRECTION dir, DirAcycGraph *graph) {
   FindRcrsvNghbrs_(this, dir, graph);
 }
 
-__host__ __device__
 void GraphNode::AddRcrsvNghbr(GraphNode *nghbr, DIRECTION dir) {
   LinkedList<GraphNode> *rcrsvNghbrLst = GetRcrsvNghbrLst(dir);
   BitVector *isRcrsvNghbr = GetRcrsvNghbrBitVector(dir);
@@ -101,7 +93,6 @@ void GraphNode::AddRcrsvNghbr(GraphNode *nghbr, DIRECTION dir) {
   isRcrsvNghbr->SetBit(nghbr->GetNum());
 }
 
-__host__ __device__
 void GraphNode::AllocRcrsvInfo(DIRECTION dir, UDT_GNODES nodeCnt) {
   if (dir == DIR_FRWRD) {
     if (rcrsvScsrLst_ != NULL) {
@@ -130,7 +121,6 @@ void GraphNode::AllocRcrsvInfo(DIRECTION dir, UDT_GNODES nodeCnt) {
   }
 }
 
-__host__ __device__
 bool GraphNode::IsScsrDmntd(GraphNode *cnddtDmnnt) {
   if (cnddtDmnnt == this)
     return true;
@@ -157,7 +147,6 @@ bool GraphNode::IsScsrDmntd(GraphNode *cnddtDmnnt) {
   return true;
 }
 
-__host__ __device__
 bool GraphNode::FindScsr_(GraphNode *&crntScsr, UDT_GNODES trgtNum,
                           UDT_GLABEL trgtLbl) {
   UDT_GNODES crntNum = INVALID_VALUE;
@@ -189,7 +178,6 @@ bool GraphNode::FindScsr_(GraphNode *&crntScsr, UDT_GNODES trgtNum,
   return false;
 }
 
-__host__ __device__
 void GraphNode::FindRcrsvNghbrs_(GraphNode *root, DIRECTION dir,
                                  DirAcycGraph *graph) {
   LinkedList<GraphEdge> *nghbrLst = (dir == DIR_FRWRD) ? scsrLst_ : prdcsrLst_;
@@ -230,7 +218,6 @@ void GraphNode::FindRcrsvNghbrs_(GraphNode *root, DIRECTION dir,
   }
 }
 
-__host__ __device__
 bool GraphNode::IsScsrEquvlnt(GraphNode *othrNode) {
   UDT_GLABEL thisLbl = 0;
   UDT_GLABEL othrLbl = 0;
@@ -252,7 +239,6 @@ bool GraphNode::IsScsrEquvlnt(GraphNode *othrNode) {
   return true;
 }
 
-__host__ __device__
 bool GraphNode::IsPrdcsrEquvlnt(GraphNode *othrNode) {
   UDT_GLABEL thisLbl = 0;
   UDT_GLABEL othrLbl = 0;
@@ -280,7 +266,6 @@ bool GraphNode::IsPrdcsrEquvlnt(GraphNode *othrNode) {
   return true;
 }
 
-__host__ __device__
 GraphEdge *GraphNode::FindScsr(GraphNode *trgtNode) {
   GraphEdge *crntEdge;
 
@@ -294,7 +279,6 @@ GraphEdge *GraphNode::FindScsr(GraphNode *trgtNode) {
   return NULL;
 }
 
-__host__ __device__
 GraphEdge *GraphNode::FindPrdcsr(GraphNode *trgtNode) {
   GraphEdge *crntEdge;
 
@@ -308,7 +292,6 @@ GraphEdge *GraphNode::FindPrdcsr(GraphNode *trgtNode) {
   return NULL; // not found in the neighbor list
 }
 
-__host__ __device__
 void GraphNode::PrntScsrLst(FILE *outFile) {
   for (GraphEdge *crnt = scsrLst_->GetFrstElmnt(); crnt != NULL;
        crnt = scsrLst_->GetNxtElmnt()) {
@@ -319,7 +302,6 @@ void GraphNode::PrntScsrLst(FILE *outFile) {
   fprintf(outFile, "\n");
 }
 
-__host__ __device__
 void GraphNode::LogScsrLst() {
   Logger::Info("Successor List For Node #%d", num_);
   for (GraphNode *thisScsr = GetFrstScsr(); thisScsr != NULL;
@@ -328,7 +310,29 @@ void GraphNode::LogScsrLst() {
   }
 }
 
-__host__ __device__
+void GraphNode::CopyPointersToDevice(void *dev_entry){
+  //declare pointer for element->scsrLst_
+  //we only need elmntCnt_ so no need to copy pointers
+  PriorityList<GraphEdge, unsigned long> *dev_scsrLst = NULL;
+  //allocate device memory
+  if (cudaSuccess !=
+      cudaMalloc((void**)&dev_scsrLst, sizeof(PriorityList<GraphEdge>))){
+    printf("Error allocating device memory for dev_scsrLst!\n");
+  }
+  //copy scsrLst_ to device
+  if (cudaSuccess !=
+      cudaMemcpy(dev_scsrLst, scsrLst_, sizeof(PriorityList<GraphEdge>),
+                 cudaMemcpyHostToDevice)){
+    printf("Error copying scsrLst_ to device!\n");
+  }
+  //update dev_entry->element->scsrLst_ pointer
+  if (cudaSuccess !=
+      cudaMemcpy(&(dev_entry->element->scsrLst_), &dev_scsrLst,
+                 sizeof(PriorityList<GraphEdge, unsigned long> *), cudaMemcpyHostToDevice)){
+    printf("Error updating dev_entry->element->scsrLst_ on device!\n");
+  }
+}
+
 DirAcycGraph::DirAcycGraph() {
   nodeCnt_ = 0;
   edgeCnt_ = 0;
@@ -340,13 +344,11 @@ DirAcycGraph::DirAcycGraph() {
   cycleDetected_ = false;
 }
 
-__host__ __device__
 DirAcycGraph::~DirAcycGraph() {
   if (tplgclOrdr_ != NULL)
     delete[] tplgclOrdr_;
 }
 
-__host__ __device__
 void DirAcycGraph::CreateEdge_(UDT_GNODES frmNodeNum, UDT_GNODES toNodeNum,
                                UDT_GLABEL label) {
   GraphEdge *newEdg;
@@ -365,7 +367,6 @@ void DirAcycGraph::CreateEdge_(UDT_GNODES frmNodeNum, UDT_GNODES toNodeNum,
   toNode->AddPrdcsr(newEdg);
 }
 
-__host__ __device__
 FUNC_RESULT DirAcycGraph::DepthFirstSearch() {
   if (tplgclOrdr_ == NULL)
     tplgclOrdr_ = new GraphNode *[nodeCnt_];
@@ -386,7 +387,6 @@ FUNC_RESULT DirAcycGraph::DepthFirstSearch() {
   return RES_SUCCESS;
 }
 
-__host__ __device__
 FUNC_RESULT DirAcycGraph::FindRcrsvNghbrs(DIRECTION dir) {
   for (UDT_GNODES i = 0; i < nodeCnt_; i++) {
     GraphNode *node = nodes_[i];
@@ -418,7 +418,6 @@ FUNC_RESULT DirAcycGraph::FindRcrsvNghbrs(DIRECTION dir) {
     return RES_SUCCESS;
 }
 
-__host__ __device__
 void DirAcycGraph::Print(FILE *outFile) {
   fprintf(outFile, "Number of Nodes= %d    Number of Edges= %d\n", nodeCnt_,
           edgeCnt_);
@@ -429,7 +428,6 @@ void DirAcycGraph::Print(FILE *outFile) {
   }
 }
 
-__host__ __device__
 void DirAcycGraph::LogGraph() {
   Logger::Info("Number of Nodes= %d   Number of Edges= %d\n", nodeCnt_,
                edgeCnt_);

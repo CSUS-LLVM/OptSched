@@ -10,7 +10,7 @@ Last Update:  Mar. 2011
 #define OPTSCHED_GENERIC_MEM_MNGR_H
 
 #include "opt-sched/Scheduler/defines.h"
-#include "opt-sched/Scheduler/lnkd_lst.h"
+#include "opt-sched/Scheduler/cuda_lnkd_lst.cuh"
 #include "opt-sched/Scheduler/logger.h"
 #include <cstring>
 

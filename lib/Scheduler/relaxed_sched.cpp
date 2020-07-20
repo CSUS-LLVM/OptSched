@@ -2,6 +2,7 @@
 #include "opt-sched/Scheduler/logger.h"
 #include "opt-sched/Scheduler/utilities.h"
 #include <algorithm>
+#include <cuda_runtime.h>
 
 using namespace llvm::opt_sched;
 
@@ -72,6 +73,7 @@ RelaxedScheduler::RelaxedScheduler(DataDepStruct *dataDepGraph,
 }
 /*****************************************************************************/
 
+__host__ __device__
 RelaxedScheduler::~RelaxedScheduler() {
   assert(instLst_ != NULL);
   delete instLst_;
@@ -256,6 +258,7 @@ RJ_RelaxedScheduler::RJ_RelaxedScheduler(
 }
 /*****************************************************************************/
 
+__host__ __device__
 RJ_RelaxedScheduler::~RJ_RelaxedScheduler() {}
 /*****************************************************************************/
 
@@ -600,6 +603,7 @@ LC_RelaxedScheduler::LC_RelaxedScheduler(DataDepStruct *dataDepGraph,
 }
 /*****************************************************************************/
 
+__host__ __device__
 LC_RelaxedScheduler::~LC_RelaxedScheduler() {
   assert(subGraphInstLst_ != NULL);
   delete subGraphInstLst_;
@@ -777,6 +781,7 @@ LPP_RelaxedScheduler::LPP_RelaxedScheduler(DataDepStruct *dataDepGraph,
 }
 /*****************************************************************************/
 
+__host__ __device__
 LPP_RelaxedScheduler::~LPP_RelaxedScheduler() {
   delete subGraphInstLst_;
   delete[] crntFrwrdLwrBounds_;

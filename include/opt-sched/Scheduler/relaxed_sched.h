@@ -11,6 +11,7 @@ Last Update:  Mar. 2011
 #include "opt-sched/Scheduler/data_dep.h"
 #include "opt-sched/Scheduler/gen_sched.h"
 #include "opt-sched/Scheduler/hash_table.h"
+#include <cuda_runtime.h>
 
 namespace llvm {
 namespace opt_sched {
@@ -97,6 +98,7 @@ public:
   RelaxedScheduler(DataDepStruct *dataDepGraph, MachineModel *machMdl,
                    InstCount uprBound, DIRECTION schedDir,
                    RLXD_SCHED_TYPE schedType, InstCount maxInstCnt);
+  __host__ __device__
   virtual ~RelaxedScheduler();
 
   // Find a feasible relaxed schedule and return its length
@@ -122,6 +124,7 @@ public:
                       InstCount uprBound, DIRECTION schedDir,
                       RLXD_SCHED_TYPE schedType,
                       InstCount maxInstCnt = INVALID_VALUE);
+  __host__ __device__
   ~RJ_RelaxedScheduler();
 
   inline void Initialize(bool setPrirtyLst);
@@ -166,6 +169,7 @@ private:
 public:
   LC_RelaxedScheduler(DataDepStruct *dataDepGraph, MachineModel *machMdl,
                       InstCount uprBound, DIRECTION schedDir);
+  __host__ __device__
   ~LC_RelaxedScheduler();
 
   // Find a relaxed schedule of all instructions and return its length
@@ -222,6 +226,7 @@ private:
 public:
   LPP_RelaxedScheduler(DataDepStruct *dataDepGraph, MachineModel *machMdl,
                        InstCount uprBound, DIRECTION schedDir);
+  __host__ __device__
   ~LPP_RelaxedScheduler();
 
   // Find a minimum-length relaxed schedule of all instructions and return its

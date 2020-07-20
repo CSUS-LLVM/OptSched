@@ -15,6 +15,7 @@ Last Update:  Mar. 2011
 #include "opt-sched/Scheduler/sched_basic_data.h"
 #include "llvm/ADT/SmallVector.h"
 #include <memory>
+#include <cuda_runtime.h>
 
 namespace llvm {
 namespace opt_sched {
@@ -112,21 +113,28 @@ public:
   // TODO(max): Document.
   virtual ~DataDepStruct();
 
-  virtual InstCount GetInstCnt();
+  __host__ __device__
+  InstCount GetInstCnt();
   virtual InstCount GetOrgnlInstCnt();
+  __host__ __device__
   virtual SchedInstruction *GetInstByIndx(InstCount instIndx) = 0;
   virtual SchedInstruction *GetInstByTplgclOrdr(InstCount ordr) = 0;
   virtual SchedInstruction *GetInstByRvrsTplgclOrdr(InstCount ordr) = 0;
 
+  __host__ __device__
   virtual SchedInstruction *GetRootInst() = 0;
+  __host__ __device__
   virtual SchedInstruction *GetLeafInst() = 0;
 
+  __host__ __device__
   void GetInstCntPerIssuType(InstCount instCntPerIssuType[]);
+  __host__ __device__
   bool IncludesUnpipelined();
 
   virtual bool IsInGraph(SchedInstruction *inst) = 0;
   virtual InstCount GetInstIndx(SchedInstruction *inst) = 0;
   DEP_GRAPH_TYPE GetType();
+  __host__ __device__
   InstCount GetAbslutSchedUprBound();
   void SetAbslutSchedUprBound(InstCount bound);
   virtual void GetLwrBounds(InstCount *&frwrdLwrBounds,
@@ -190,7 +198,11 @@ public:
   float GetWeight() const;
 
   // Given an instruction number, return a pointer to the instruction object.
+  __host__ __device__
   SchedInstruction *GetInstByIndx(InstCount instIndx);
+  //Circumvent polymorphism on device to workaround virtual function copy
+  __device__
+  SchedInstruction *Dev_GetInstByIndx(InstCount instIndx);
 
   SchedInstruction *GetInstByTplgclOrdr(InstCount ordr);
   SchedInstruction *GetInstByRvrsTplgclOrdr(InstCount ordr);
@@ -211,10 +223,20 @@ public:
   void GetCrntLwrBounds(DIRECTION dir, InstCount crntlwrBounds[]);
   void SetCrntLwrBounds(DIRECTION dir, InstCount crntlwrBounds[]);
 
+  __host__ __device__
   SchedInstruction *GetRootInst();
+  //Circumvent polymorphism on device to workaround virtual function copy
+  __device__
+  SchedInstruction *Dev_GetRootInst();
+  __host__ __device__
   SchedInstruction *GetLeafInst();
+  //Circumvent polymorphism on device to workaround virtual function copy
+  __device__
+  SchedInstruction *Dev_GetLeafInst();
 
+  __host__ __device__
   UDT_GLABEL GetMaxLtncySum();
+  __host__ __device__
   UDT_GLABEL GetMaxLtncy();
 
   bool DoesFeedUser(SchedInstruction *inst);
@@ -280,9 +302,11 @@ public:
   int GetEntryInstCnt() { return entryInstCnt_; }
   int GetExitInstCnt() { return exitInstCnt_; }
 
+  __host__ __device__
   InstCount GetMaxFileSchedOrder() { return maxFileSchedOrder_; }
   void PrintEdgeCntPerLtncyInfo();
 
+  __host__ __device__
   int16_t GetMaxUseCnt() { return maxUseCnt_; }
   int16_t GetRegTypeCnt() { return machMdl_->GetRegTypeCnt(); }
   int GetPhysRegCnt(int16_t regType) {
@@ -290,6 +314,8 @@ public:
   }
 
   RegisterFile *getRegFiles() { return RegFiles.get(); }
+
+  void CopyPointersToDevice(DataDepGraph *dev_dataDepGraph);
 
 protected:
   // TODO(max): Get rid of this.
@@ -442,10 +468,15 @@ protected:
   InstCount *dynmcBkwrdLwrBounds_;
   LinkedList<SchedInstruction> *fxdLst_;
 
-  typedef struct {
+  struct LostInst{
     SchedInstruction *inst;
     InstCount indx;
-  } LostInst;
+
+    void CopyPointersToDevice(LostInst *dev_inst){
+      Logger::Fatal("Unimplemented.\n");
+      return;
+    }
+  };
 
   Stack<LostInst> *lostInsts_;
 
@@ -549,11 +580,14 @@ public:
                         InstCount &instGapSize);
 
   InstCount GetLwrBound();
+  __host__ __device__
   SchedInstruction *GetInstByIndx(InstCount instIndx);
   SchedInstruction *GetInstByTplgclOrdr(InstCount ordr);
   SchedInstruction *GetInstByRvrsTplgclOrdr(InstCount ordr);
 
+  __host__ __device__
   SchedInstruction *GetRootInst();
+  __host__ __device__
   SchedInstruction *GetLeafInst();
   bool IsInGraph(SchedInstruction *inst);
   InstCount GetInstIndx(SchedInstruction *inst);
@@ -569,6 +603,7 @@ public:
   void InstLost(SchedInstruction *inst);
   void UndoInstLost(SchedInstruction *inst);
   InstCount GetAvlblSlots(IssueType issuType);
+  //Copy pointers required by device code to device
 };
 /*****************************************************************************/
 
@@ -650,7 +685,9 @@ private:
                             InstCount &slotNum);
 
 public:
+  __host__ __device__
   InstSchedule(MachineModel *machMdl, DataDepGraph *dataDepGraph, bool vrfy);
+  __host__ __device__
   ~InstSchedule();
   bool operator==(InstSchedule &b) const;
 
@@ -659,6 +696,7 @@ public:
 
   // Add an instruction sequentially to the current issue slot.
   // If the current slot contains a fixed instruction this function fails
+  __host__ __device__
   bool AppendInst(InstCount instNum);
 
   bool AppendInst(SchedInstruction *inst);
@@ -667,6 +705,7 @@ public:
   bool RemoveLastInst();
 
   // Get the cycle in which the given instruction (by number) is scheduled
+  __host__ __device__
   InstCount GetSchedCycle(InstCount instNum);
   InstCount GetSchedCycle(SchedInstruction *inst);
 
@@ -696,7 +735,8 @@ public:
   int GetSpillCandidateCount();
   void SetSpillCandidateCount(int cnflctCnt);
 
-  void Print(std::ostream &out, const char *const title);
+  __host__ __device__
+  void Print();
   void PrintInstList(FILE *file, DataDepGraph *dataDepGraph,
                      const char *title) const;
   void PrintRegPressures() const;

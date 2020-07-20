@@ -11,12 +11,13 @@ Last Update:  Jan. 2020
 #define OPTSCHED_SCHED_REGION_SCHED_REGION_H
 
 #include "opt-sched/Scheduler/defines.h"
-#include "opt-sched/Scheduler/lnkd_lst.h"
+#include "opt-sched/Scheduler/cuda_lnkd_lst.cuh"
 #include "opt-sched/Scheduler/sched_basic_data.h"
 // For DataDepGraph, LB_ALG.
 #include "opt-sched/Scheduler/data_dep.h"
 // For Enumerator, LengthCostEnumerator, EnumTreeNode and Pruning.
 #include "opt-sched/Scheduler/enumerator.h"
+#include <cuda_runtime.h>
 
 namespace llvm {
 namespace opt_sched {
@@ -81,6 +82,7 @@ public:
   // TODO(max): Document.
   virtual bool ChkCostFsblty(InstCount trgtLngth, EnumTreeNode *treeNode) = 0;
   // TODO(max): Document.
+  __host__ __device__
   virtual void SchdulInst(SchedInstruction *inst, InstCount cycleNum,
                           InstCount slotNum, bool trackCnflcts) = 0;
   // TODO(max): Document.
@@ -91,8 +93,10 @@ public:
 
   // Do region-specific checking for the legality of scheduling the
   // given instruction in the current issue slot
+  __host__ __device__
   virtual bool ChkInstLglty(SchedInstruction *inst) = 0;
 
+  __host__ __device__
   virtual void InitForSchdulng() = 0;
 
   virtual bool ChkSchedule_(InstSchedule *bestSched,

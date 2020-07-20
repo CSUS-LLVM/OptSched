@@ -5,6 +5,9 @@
 #include "opt-sched/Scheduler/sched_region.h"
 #include "opt-sched/Scheduler/stats.h"
 
+//include external CUDA
+#include "opt-sched/Scheduler/cuda_kernels.h"
+
 using namespace llvm::opt_sched;
 
 ListScheduler::ListScheduler(DataDepGraph *dataDepGraph, MachineModel *machMdl,
@@ -34,6 +37,8 @@ FUNC_RESULT ListScheduler::FindSchedule(InstSchedule *sched, SchedRegion *rgn) {
 
   crntSched_ = sched;
   rgn_ = rgn;
+
+  //InitiateVectorAddKernel();
 
   Initialize_();
 

@@ -10,6 +10,7 @@ Last Update:  Mar. 2017
 
 #include "opt-sched/Scheduler/defines.h"
 #include <chrono>
+#include <cuda_runtime.h>
 
 namespace llvm {
 namespace opt_sched {
@@ -25,6 +26,7 @@ Milliseconds GetProcessorTime();
 extern std::chrono::high_resolution_clock::time_point startTime;
 } // namespace Utilities
 
+__host__ __device__
 inline uint16_t Utilities::clcltBitsNeededToHoldNum(uint64_t value) {
   uint16_t bitsNeeded = 0;
 

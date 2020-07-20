@@ -12,6 +12,7 @@
 #include "opt-sched/Scheduler/stats.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/Debug.h"
+#include <cuda_runtime.h>
 
 // only print pressure if enabled by sched.ini
 extern bool OPTSCHED_gPrintSpills;
@@ -61,6 +62,7 @@ DataDepStruct::~DataDepStruct() {
     delete[] bkwrdLwrBounds_;
 }
 
+__host__ __device__
 void DataDepStruct::GetInstCntPerIssuType(InstCount instCntPerIssuType[]) {
   for (int16_t i = 0; i < issuTypeCnt_; i++) {
     instCntPerIssuType[i] = instCntPerIssuType_[i];
@@ -207,7 +209,6 @@ DataDepGraph::~DataDepGraph() {
     }
     delete[] insts_;
   }
-
   delete[] instCntPerType_;
 }
 
@@ -1295,6 +1296,96 @@ void DataDepGraph::PrintEdgeCntPerLtncyInfo() {
     totEdgeCnt += edgeCntPerLtncy_[i];
   }
   Logger::Info("Total edge count: %d", totEdgeCnt);
+}
+
+void DataDepGraph::CopyPointersToDevice(DataDepGraph *dev_dataDepGraph) {
+  SchedInstruction **dev_insts = NULL;
+
+  //allocate device memory
+  if (cudaSuccess != cudaMalloc((void**)&dev_insts, instCnt_ * sizeof(SchedInstruction *)))
+    printf("Failed to allocated dev mem for dev_insts: %s\n", cudaGetErrorString(cudaGetLastError()));
+
+  //copy array to device
+  if (cudaSuccess != cudaMemcpy(dev_insts, insts_, instCnt_ * sizeof(SchedInstruction *), cudaMemcpyHostToDevice))
+    printf("Failed to copy insts_ to device: %s\n", cudaGetErrorString(cudaGetLastError()));
+
+  //loop through insts_ and copy individual SchedInstruction to the device
+  SchedInstruction *dev_inst = NULL;
+  for (int i = 0; i < instCnt_; i++) {
+    if (insts_[i]) {
+      //allocate device mem for inst
+      if (cudaSuccess != cudaMalloc((void**)&dev_inst, sizeof(SchedInstruction)))
+        printf("Failed to allocate dev mem for dev_inst: %s\n", cudaGetErrorString(cudaGetLastError()));
+
+      //copy insts_[i] to device
+      if (cudaSuccess != cudaMemcpy(dev_inst, insts_[i], sizeof(SchedInstruction), cudaMemcpyHostToDevice))
+        printf("Failed to copy insts_[%d] to device: %s\n", i, cudaGetErrorString(cudaGetLastError()));
+
+      //update pointer on device
+      if (cudaSuccess != cudaMemcpy(&(dev_insts[i]), &dev_inst, sizeof(SchedInstruction *), cudaMemcpyHostToDevice))
+        printf("Failed to update dev_ddg->insts_[%d] pointer on device: %s\n", i, cudaGetErrorString(cudaGetLastError()));
+
+      //copy pointers of insts_[i] to device
+      insts_[i]->CopyPointersToDevice(dev_inst);
+    }
+  }
+
+  //update pointer on device
+  if (cudaSuccess != cudaMemcpy(&(dev_dataDepGraph->insts_), &dev_insts, sizeof(SchedInstruction **), cudaMemcpyHostToDevice))
+    printf("Failed to update dev_dataDepGraph->insts_ on device: %s\n", cudaGetErrorString(cudaGetLastError()));
+
+  //debug
+  printf("insts_ has been copied to device!\n");
+
+  InstCount *dev_instCntPerIssuType = NULL;
+
+  //allocate memory on the device
+  if (cudaSuccess != cudaMalloc((void**)&dev_instCntPerIssuType, issuTypeCnt_ * sizeof(InstCount)))
+    printf("Failed to allocate dev mem for dev_instCntPerIssuType: %s\n", cudaGetErrorString(cudaGetLastError()));
+
+  //copy instCntPerIssuType to device
+  if (cudaSuccess != cudaMemcpy(dev_instCntPerIssuType, instCntPerIssuType_, issuTypeCnt_ * sizeof(InstCount), cudaMemcpyHostToDevice))
+    printf("Failed to copy instCntPerIssuType_ to device: %s\n", cudaGetErrorString(cudaGetLastError()));
+
+  //update device pointer
+  if (cudaSuccess != cudaMemcpy(&(dev_dataDepGraph->instCntPerIssuType_), &dev_instCntPerIssuType, sizeof(InstCount *), cudaMemcpyHostToDevice))
+    printf("Failed to update dev_dataDepGraph->instCntPerIssuType_ on device: %s\n", cudaGetErrorString(cudaGetLastError()));
+
+  printf("instCntPerIssuType_ has been copied to device!\n");
+
+  SchedInstruction *dev_root = NULL;
+
+  //allocate device memory
+  if (cudaSuccess != cudaMalloc((void**)&dev_root, sizeof(SchedInstruction)))
+    printf("Failed to allocate dev mem for dev_root: %s\n", cudaGetErrorString(cudaGetLastError()));
+
+  //copy root_ to device
+  if (cudaSuccess != cudaMemcpy(dev_root, root_, sizeof(SchedInstruction), cudaMemcpyHostToDevice))
+    printf("Failed to copy root_ to device: %s\n", cudaGetErrorString(cudaGetLastError()));
+
+  //update pointer on device
+  if (cudaSuccess != cudaMemcpy(&(dev_dataDepGraph->root_), &dev_root, sizeof(SchedInstruction *), cudaMemcpyHostToDevice))
+    printf("Failed to update dev_DDG->root_ on device: %s\n", cudaGetErrorString(cudaGetLastError()));
+
+  //TODO: implement
+  ((SchedInstruction *)root_)->CopyPointersToDevice(dev_root);
+  
+  SchedInstruction *dev_leaf = NULL;
+
+  //allocate device memory
+  if (cudaSuccess != cudaMalloc((void**)&dev_leaf, sizeof(SchedInstruction)))
+    printf("Failed to allocate dev mem for dev_leaf: %s\n", cudaGetErrorString(cudaGetLastError()));
+
+  //copy root_ to device
+  if (cudaSuccess != cudaMemcpy(dev_leaf, leaf_, sizeof(SchedInstruction), cudaMemcpyHostToDevice))
+    printf("Failed to copy leaf_ to device: %s\n", cudaGetErrorString(cudaGetLastError()));
+
+  //update pointer on device
+  if (cudaSuccess != cudaMemcpy(&(dev_dataDepGraph->leaf_), &dev_leaf, sizeof(SchedInstruction *), cudaMemcpyHostToDevice))
+    printf("Failed to update dev_DDG->leaf_ on device: %s\n", cudaGetErrorString(cudaGetLastError()));
+
+  //TODO: implement
+  ((SchedInstruction*)leaf_)->CopyPointersToDevice(dev_leaf);
 }
 
 InstCount DataDepGraph::GetRltvCrtclPath(SchedInstruction *ref,
@@ -2592,6 +2683,7 @@ InstCount DataDepSubGraph::GetDistFrmLeaf(SchedInstruction *inst) {
   return distFrmLeaf;
 }
 
+__host__ __device__
 InstSchedule::InstSchedule(MachineModel *machMdl, DataDepGraph *dataDepGraph,
                            bool vrfy) {
   machMdl_ = machMdl;
@@ -2629,6 +2721,7 @@ InstSchedule::InstSchedule(MachineModel *machMdl, DataDepGraph *dataDepGraph,
   spillCnddtCnt_ = 0;
 }
 
+__host__ __device__
 InstSchedule::~InstSchedule() {
   delete[] instInSlot_;
   delete[] slotForInst_;
@@ -2648,6 +2741,7 @@ bool InstSchedule::operator==(InstSchedule &b) const {
   return true;
 }
 
+__host__ __device__
 bool InstSchedule::AppendInst(InstCount instNum) {
   assert(crntSlotNum_ < totSlotCnt_);
   instInSlot_[crntSlotNum_] = instNum;
@@ -2757,7 +2851,6 @@ void InstSchedule::Copy(InstSchedule *src) {
   execCost_ = src->execCost_;
   spillCost_ = src->spillCost_;
 }
-
 void InstSchedule::SetSpillCosts(InstCount spillCosts[]) {
   totSpillCost_ = 0;
   for (InstCount i = 0; i < totInstCnt_; i++) {
@@ -2797,17 +2890,22 @@ void InstSchedule::SetSpillCandidateCount(int spillCnddtCnt) {
 }
 
 // TODO(austin) move logger print of schedule to different function
-void InstSchedule::Print(std::ostream &out, const char *const label) {
+__host__ __device__
+void InstSchedule::Print() {
   InstCount slotInCycle = 0;
   InstCount cycleNum = 0;
   InstCount i;
 
   // out << '\n' << label << " Schedule";
-  Logger::Info("Printing Schedule");
+#ifdef __CUDA_ARCH__  
+  printf("Printing Device Schedule\n");
+#else
+  printf("Printing Host Schedule\n");
+#endif
 
   for (i = 0; i < crntSlotNum_; i++) {
     if (slotInCycle == 0)
-      Logger::Info("Cycle# %d : %d", cycleNum, instInSlot_[i]);
+      printf("Cycle# %d : %d\n", cycleNum, instInSlot_[i]);
     /*
     out << "\nCycle# " << cycleNum << ":  ";
 
@@ -2832,7 +2930,7 @@ void InstSchedule::PrintRegPressures() const {
   Logger::Info("OptSched max reg pressures:");
   InstCount i;
   for (i = 0; i < machMdl_->GetRegTypeCnt(); i++) {
-    Logger::Info("%s: Peak %d Limit %d", machMdl_->GetRegTypeName(i).c_str(),
+    Logger::Info("%s: Peak %d Limit %d", machMdl_->GetRegTypeName(i),
                  peakRegPressures_[i], machMdl_->GetPhysRegCnt(i));
   }
 }
@@ -3003,6 +3101,7 @@ InstCount InstSchedule::GetSchedCycle(SchedInstruction *inst) {
   return GetSchedCycle(inst->GetNum());
 }
 
+__host__ __device__
 InstCount InstSchedule::GetSchedCycle(InstCount instNum) {
   assert(instNum < totInstCnt_);
   InstCount slotNum = slotForInst_[instNum];
@@ -3049,10 +3148,12 @@ InstCount InstSchedule::GetSpillCost() const { return spillCost_; }
 
 DEP_GRAPH_TYPE DataDepStruct::GetType() { return type_; }
 
+__host__ __device__
 InstCount DataDepStruct::GetInstCnt() { return instCnt_; }
 
 InstCount DataDepStruct::GetOrgnlInstCnt() { return instCnt_; }
 
+__host__ __device__
 InstCount DataDepStruct::GetAbslutSchedUprBound() { return schedUprBound_; }
 
 void DataDepStruct::SetAbslutSchedUprBound(InstCount bound) {
@@ -3067,11 +3168,23 @@ void DataDepStruct::GetLwrBounds(InstCount *&frwrdLwrBounds,
   assert(bkwrdLwrBounds != NULL);
 }
 
+__host__ __device__
 SchedInstruction *DataDepGraph::GetRootInst() {
   return (SchedInstruction *)root_;
 }
 
+__device__
+SchedInstruction *DataDepGraph::Dev_GetRootInst() {
+  return (SchedInstruction *)root_;
+}
+
+__host__ __device__
 SchedInstruction *DataDepGraph::GetLeafInst() {
+  return (SchedInstruction *)leaf_;
+}
+
+__device__
+SchedInstruction *DataDepGraph::Dev_GetLeafInst() {
   return (SchedInstruction *)leaf_;
 }
 
@@ -3101,8 +3214,15 @@ void DataDepGraph::CmputCrtclPaths_() {
 
 int DataDepGraph::GetBscBlkCnt() { return bscBlkCnt_; }
 
+__host__ __device__
 SchedInstruction *DataDepGraph::GetInstByIndx(InstCount instIndx) {
-  assert(instIndx >= 0 && instIndx < instCnt_);
+  //assert(instIndx >= 0 && instIndx < instCnt_);
+  return insts_[instIndx];
+}
+
+__device__
+SchedInstruction *DataDepGraph::Dev_GetInstByIndx(InstCount instIndx) {
+  //assert(instIndx >= 0 && instIndx < instCnt_);
   return insts_[instIndx];
 }
 
@@ -3132,8 +3252,10 @@ void DataDepGraph::SetCrntLwrBounds(DIRECTION dir, InstCount crntLwrBounds[]) {
   }
 }
 
+__host__ __device__
 UDT_GLABEL DataDepGraph::GetMaxLtncy() { return maxLtncy_; }
 
+__host__ __device__
 UDT_GLABEL DataDepGraph::GetMaxLtncySum() { return maxLtncySum_; }
 
 InstCount DataDepGraph::GetSchedLwrBound() { return schedLwrBound_; }
@@ -3228,10 +3350,13 @@ SchedInstruction *DataDepSubGraph::GetInstByRvrsTplgclOrdr(InstCount ordr) {
   return insts_[indx];
 }
 
+__host__ __device__
 SchedInstruction *DataDepSubGraph::GetRootInst() { return rootInst_; }
 
+__host__ __device__
 SchedInstruction *DataDepSubGraph::GetLeafInst() { return leafInst_; }
 
+__host__ __device__
 SchedInstruction *DataDepSubGraph::GetInstByIndx(InstCount indx) {
   assert(indx >= 0 && indx < instCnt_);
   return insts_[indx];
@@ -3297,6 +3422,7 @@ InstCount DataDepSubGraph::GetLostInstCnt_() {
   return lostInsts_->GetElmntCnt();
 }
 
+__host__ __device__
 bool DataDepStruct::IncludesUnpipelined() { return includesUnpipelined_; }
 
 bool DataDepGraph::IncludesUnsupported() { return includesUnsupported_; }
