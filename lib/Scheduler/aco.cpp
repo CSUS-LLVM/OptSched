@@ -283,9 +283,7 @@ FUNC_RESULT ACOScheduler::FindSchedule(InstSchedule *schedule_out,
         iterationBest = std::move(schedule);
       }
     }
-#if !USE_ACS
-    UpdatePheremone(iterationBest);
-#endif
+    UpdatePheremone(iterationBest.get());
     /* PrintSchedule(iterationBest); */
     /* std::cout << iterationBest->GetCost() << std::endl; */
     // TODO DRY
@@ -308,9 +306,6 @@ FUNC_RESULT ACOScheduler::FindSchedule(InstSchedule *schedule_out,
       if (noImprovement > noImprovementMax)
         break;
     }
-#if USE_ACS
-    UpdatePheremone(bestSchedule.get());
-#endif
     iterations++;
   }
   PrintSchedule(bestSchedule.get());
