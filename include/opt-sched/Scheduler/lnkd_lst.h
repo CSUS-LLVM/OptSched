@@ -13,8 +13,10 @@ Last Update:  May  2020
 #include "opt-sched/Scheduler/defines.h"
 #include "opt-sched/Scheduler/logger.h"
 #include "llvm/ADT/ArrayRef.h"
+#include "llvm/ADT/iterator.h"
 #include "llvm/Support/ErrorHandling.h"
 #include <cstring>
+#include <iterator>
 
 namespace llvm {
 namespace opt_sched {
@@ -61,10 +63,43 @@ template <class T, class K = unsigned long> struct KeyedEntry : Entry<T> {
   virtual void SetPrev(Entry<T> *e) { Entry<T>::prev = (Entry<T> *)e; }
 };
 
+template <class T> class LinkedList;
+
+template <class T>
+class LinkedListIterator
+    : public llvm::iterator_facade_base<LinkedListIterator<T>,
+                                        std::bidirectional_iterator_tag, T> {
+public:
+  LinkedListIterator(const LinkedList<T> *list, Entry<T> *current)
+      : list_{list}, current_{current} {}
+
+  bool operator==(const LinkedListIterator<T> &R) const {
+    assert(list_ == R.list_);
+    return current_ == R.current_;
+  }
+
+  T &operator*() const { return *current_->element; }
+
+  LinkedListIterator<T> &operator++();
+
+  LinkedListIterator<T> &operator--();
+
+  const LinkedList<T> *GetList() const { return list_; }
+
+  Entry<T> *GetEntry() const { return current_; }
+
+private:
+  const LinkedList<T> *list_;
+  Entry<T> *current_;
+};
+
 // A generic doubly-linked list container class. If created with a constant
 // size, uses an array instead. Tracks a "current" entry similar to an iterator.
 template <class T> class LinkedList {
 public:
+  using iterator = LinkedListIterator<T>;
+  using const_iterator = iterator;
+
   // Constructs a linked list, by default using a dynamic size.
   LinkedList(int maxSize = INVALID_VALUE);
   // A virtual destructor, to support inheritance.
@@ -110,6 +145,17 @@ public:
   // is found in hitCnt. Returns true if the element is found at least once.
   virtual bool FindElmnt(const T *const element, int &hitCnt) const;
 
+  LinkedListIterator<T> begin() const { return {this, topEntry_}; }
+
+  LinkedListIterator<T> end() const { return {this, nullptr}; }
+
+  // Removes the element at the specified location, returning the iterator to
+  // the next entry.
+  LinkedListIterator<T> RemoveAt(LinkedListIterator<T> it);
+
+  Entry<T> *GetTopEntry() const { return topEntry_; }
+  Entry<T> *GetBottomEntry() const { return bottomEntry_; }
+
 protected:
   int maxSize_;
   Entry<T> *allocEntries_;
@@ -135,6 +181,18 @@ protected:
   // Allocates all entries for a fixed-sized list.
   virtual void AllocEntries_();
 };
+
+template <class T>
+inline LinkedListIterator<T> &LinkedListIterator<T>::operator++() {
+  current_ = current_ ? current_->GetNext() : list_->GetTopEntry();
+  return *this;
+}
+
+template <class T>
+inline LinkedListIterator<T> &LinkedListIterator<T>::operator--() {
+  current_ = current_ ? current_->GetPrev() : list_->GetBottomEntry();
+  return *this;
+}
 
 // A queue class that provides a helper head extraction method.
 template <class T> class Queue : public LinkedList<T> {
@@ -373,6 +431,20 @@ template <class T> inline void LinkedList<T>::RmvCrntElmnt() {
   Entry<T> *prevEntry = rtrvEntry_->GetPrev();
   RmvEntry_(rtrvEntry_);
   rtrvEntry_ = prevEntry;
+}
+
+template <class T>
+inline LinkedListIterator<T> LinkedList<T>::RemoveAt(LinkedListIterator<T> it) {
+  Entry<T> *cur = it.GetEntry();
+
+  assert(cur != nullptr);
+  assert(it.GetList() == this);
+
+  LinkedListIterator<T> next = std::next(it);
+
+  RmvEntry_(cur);
+
+  return next;
 }
 
 template <class T> void LinkedList<T>::AppendEntry_(Entry<T> *newEntry) {
