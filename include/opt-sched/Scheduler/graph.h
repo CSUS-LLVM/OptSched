@@ -94,6 +94,9 @@ public:
   // Returns the number of edges in this node's successor list.
   UDT_GEDGES GetScsrCnt() const;
 
+  bool RemoveSuccTo(GraphNode *succ);
+  bool RemovePredFrom(GraphNode *pred);
+
   // Adds a new edge to the predecessor list.
   void ApndPrdcsr(GraphEdge *edge);
   // Adds a new edge to the predecessor list and does some magic.
@@ -389,6 +392,26 @@ inline void GraphNode::RmvLastScsr(GraphNode *scsr, bool delEdg) {
   if (delEdg)
     delete scsrLst_->GetLastElmnt();
   scsrLst_->RmvLastElmnt();
+}
+
+inline bool GraphNode::RemoveSuccTo(GraphNode *succ) {
+  auto pos = llvm::find_if(
+      *scsrLst_, [succ](const GraphEdge &edge) { return edge.to == succ; });
+  if (pos != scsrLst_->end()) {
+    scsrLst_->RemoveAt(pos);
+  }
+
+  return pos != scsrLst_->end();
+}
+
+inline bool GraphNode::RemovePredFrom(GraphNode *pred) {
+  auto pos = llvm::find_if(
+      *prdcsrLst_, [pred](const GraphEdge &edge) { return edge.from == pred; });
+  if (pos != prdcsrLst_->end()) {
+    prdcsrLst_->RemoveAt(pos);
+  }
+
+  return pos != prdcsrLst_->end();
 }
 
 inline void GraphNode::ApndPrdcsr(GraphEdge *edge) {
