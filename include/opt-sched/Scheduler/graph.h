@@ -142,6 +142,9 @@ public:
   // Returns a pointer to the next successor of the node. Must be called after
   // GetFrstScsr() which starts the successor iterator.
   GraphNode *GetNxtScsr();
+  // Gets an iterable range of the successors of this node
+  const LinkedList<GraphEdge> &GetSuccessors() const;
+  LinkedList<GraphEdge> &GetSuccessors();
   // Checks if a given node is successor-equivalent to this node. Two nodes
   // are successor-equivalent if they have identical successor lists.
   bool IsScsrEquvlnt(GraphNode *othrNode);
@@ -151,6 +154,9 @@ public:
   // Returns a pointer to the next predecessor of the node. Must be called after
   // GetFrstPrdcsr() which starts the predecessor iterator.
   GraphNode *GetNxtPrdcsr(UDT_GLABEL &label);
+  // Gets an iterable range of the successors of this node
+  const LinkedList<GraphEdge> &GetPredecessors() const;
+  LinkedList<GraphEdge> &GetPredecessors();
   // Checks if a given node is predecessor-equivalent to this node. Two nodes
   // are predecessor-equivalent if they have identical predecessor lists.
   bool IsPrdcsrEquvlnt(GraphNode *othrNode);
@@ -200,10 +206,14 @@ public:
   // Returns the node's recursive predecessor or successor list, depending on
   // the specified direction.
   LinkedList<GraphNode> *GetRcrsvNghbrLst(DIRECTION dir);
+  LinkedList<GraphNode> *GetRecursiveSuccessors();
+  LinkedList<GraphNode> *GetRecursivePredecessors();
   // Returns the node's recursive predecessor or successor bitset, depending
   // on the specified direction. Nodes which are in the list have the bits
   // indexed by their number set.
   BitVector *GetRcrsvNghbrBitVector(DIRECTION dir);
+  BitVector *GetRecursiveSuccessorsBitVector();
+  BitVector *GetRecursivePredecessorsBitVector();
 
   // Performs a depth-first visit starting from this node, which includes
   // visiting all of its successors recursively and deducing a topological
@@ -466,6 +476,12 @@ inline GraphNode *GraphNode::GetNxtScsr(UDT_GLABEL &label) {
   return edge->to;
 }
 
+inline const LinkedList<GraphEdge> &GraphNode::GetSuccessors() const {
+  return *scsrLst_;
+}
+
+inline LinkedList<GraphEdge> &GraphNode::GetSuccessors() { return *scsrLst_; }
+
 inline GraphNode *GraphNode::GetFrstPrdcsr(UDT_GLABEL &label) {
   GraphEdge *edge = prdcsrLst_->GetFrstElmnt();
   if (edge == NULL)
@@ -480,6 +496,14 @@ inline GraphNode *GraphNode::GetNxtPrdcsr(UDT_GLABEL &label) {
     return NULL;
   label = edge->label;
   return edge->to;
+}
+
+inline const LinkedList<GraphEdge> &GraphNode::GetPredecessors() const {
+  return *prdcsrLst_;
+}
+
+inline LinkedList<GraphEdge> &GraphNode::GetPredecessors() {
+  return *prdcsrLst_;
 }
 
 inline GraphNode *GraphNode::GetFrstScsr() {
@@ -504,8 +528,24 @@ inline LinkedList<GraphNode> *GraphNode::GetRcrsvNghbrLst(DIRECTION dir) {
   return dir == DIR_FRWRD ? rcrsvScsrLst_ : rcrsvPrdcsrLst_;
 }
 
+inline LinkedList<GraphNode> *GraphNode::GetRecursiveSuccessors() {
+  return rcrsvScsrLst_;
+}
+
+inline LinkedList<GraphNode> *GraphNode::GetRecursivePredecessors() {
+  return rcrsvPrdcsrLst_;
+}
+
 inline BitVector *GraphNode::GetRcrsvNghbrBitVector(DIRECTION dir) {
   return dir == DIR_FRWRD ? isRcrsvScsr_ : isRcrsvPrdcsr_;
+}
+
+inline BitVector *GraphNode::GetRecursiveSuccessorsBitVector() {
+  return isRcrsvScsr_;
+}
+
+inline BitVector *GraphNode::GetRecursivePredecessorsBitVector() {
+  return isRcrsvPrdcsr_;
 }
 
 inline bool GraphNode::IsRcrsvPrdcsr(GraphNode *node) const {
