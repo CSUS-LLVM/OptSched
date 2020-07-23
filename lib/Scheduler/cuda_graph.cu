@@ -435,3 +435,21 @@ void DirAcycGraph::LogGraph() {
     nodes_[i]->LogScsrLst();
   }
 }
+
+/*
+void GraphEdge::CopyPointersToDevice(GraphEdge *dev_edge) {
+  GraphNode *dev_to = NULL;
+
+  //allocate device memory
+  if (cudaSuccess != cudaMalloc((void**)dev_to, sizeof(GraphNode)))
+    printf("Error allocating dev mem for dev_to: %s\n", cudaGetErrorString(cudaGetLastError()));
+
+  //copy to to device
+  if (cudaSuccess != cudaMemcpy(dev_to, to, sizeof(GraphNode), cudaMemcpyHostToDevice))
+    printf("Error copying to to device: %s\n", cudaGetErrorString(cudaGetLastError()));
+
+  //update device pointer
+  if (cudaSuccess != cudaMemcpy(&(dev_edge->to), &dev_to, sizeof(GraphNode *), cudaMemcpyHostToDevice))
+    printf("Error updating dev_edge->to on device: %s\n", cudaGetErrorString(cudaGetLastError()));
+}
+*/

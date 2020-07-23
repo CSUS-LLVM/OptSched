@@ -4,6 +4,7 @@
 #include "opt-sched/Scheduler/machine_model.h"
 #include "opt-sched/Scheduler/ready_list.h"
 #include "opt-sched/Scheduler/sched_region.h"
+#include "opt-sched/Scheduler/bb_spill.h"
 
 using namespace llvm::opt_sched;
 
@@ -188,15 +189,10 @@ bool ConstrainedScheduler::Initialize_(InstCount trgtSchedLngth,
   crntCycleNum_ = 0;
   InitNewCycle_();
 
-  //debug
 #ifdef __CUDA_ARCH__
-  printf("Calling rgn_->InitForSchdulng\n");
-#endif
-
+  ((BBWithSpill *)rgn_)->Dev_InitForSchdulng();
+#else
   rgn_->InitForSchdulng();
-
-#ifdef __CUDA_ARCH__
-  printf("done with rgn_->InitForSchdulng\n");
 #endif
 
   return true;
@@ -352,6 +348,9 @@ void ConstrainedScheduler::CleanupCycle_(InstCount cycleNum) {
 __host__ __device__
 bool ConstrainedScheduler::IsTriviallyLegal_(
     const SchedInstruction *inst) const {
+  //debug
+  printf("Inside IsTriviallyLegal_\n");
+	
   // Scheduling a stall is always legal.
   if (inst == NULL)
     return true;
@@ -367,12 +366,22 @@ bool ConstrainedScheduler::IsTriviallyLegal_(
 
 __host__ __device__
 bool ConstrainedScheduler::ChkInstLglty_(SchedInstruction *inst) const {
+
+  //debug
+  printf("Inside ChkInstLglty_\n");	
+
   if (IsTriviallyLegal_(inst))
     return true;
+
+  //debug
+  printf("Reached point 1\n");
 
   // Do region-specific legality check
   if (rgn_->ChkInstLglty(inst) == false)
     return false;
+
+  //debug
+  printf("Reached point 2\n");
 
   // Account for instructions that block the whole cycle.
   if (isCrntCycleBlkd_)

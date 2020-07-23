@@ -262,8 +262,11 @@ FUNC_RESULT ACOScheduler::FindSchedule(InstSchedule *schedule_out,
 #endif
   for (int i = 0; i < pheremone_size; i++)
     pheremone_[i] = initialValue_;
-  std::cerr << "initialValue_" << initialValue_ << std::endl;
+#if __CUDA_ARCH__
 
+#else
+  std::cerr << "initialValue_" << initialValue_ << std::endl;
+#endif
   std::unique_ptr<InstSchedule> bestSchedule = std::move(InitialSchedule);
   if (bestSchedule) {
     UpdatePheremone(bestSchedule.get());

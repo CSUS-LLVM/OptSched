@@ -12,22 +12,11 @@ ListScheduler::ListScheduler(DataDepGraph *dataDepGraph, MachineModel *machMdl,
                              InstCount schedUprBound, SchedPriorities prirts)
     : ConstrainedScheduler(dataDepGraph, machMdl, schedUprBound) {
   
-  //debug
-#ifdef __CUDA_ARCH__
-  printf("In ListScheduler constructor\n");
-#endif
-	    
   crntSched_ = NULL;
 
   prirts_ = prirts;
 
   rdyLst_ = new ReadyList(dataDepGraph_, prirts);
-
-  //debug
-#ifdef __CUDA_ARCH__
-  printf("Done with ListScheduler constructor\n");
-#endif
-
 }
 
 __host__ __device__

@@ -111,6 +111,8 @@ public:
   // Initialie variables for the second pass of the two-pass-optsched
   void InitSecondPass();
 
+  virtual void CopyPointersToDevice(SchedRegion* dev_rgn) = 0;
+
 private:
   // The algorithm to use for calculated lower bounds.
   LB_ALG lbAlg_;
@@ -242,7 +244,9 @@ protected:
   virtual void SetupForSchdulng_() = 0;
 
   // (Chris) Get the SLIL for each set
-  virtual const std::vector<int> &GetSLIL_() const = 0;
+  virtual const int *GetSLIL_() const = 0;
+  //get size of SLIL array
+  virtual const int GetSLIL_size_() const = 0;
 
   FUNC_RESULT runACO(InstSchedule *ReturnSched, InstSchedule *InitSched);
 };

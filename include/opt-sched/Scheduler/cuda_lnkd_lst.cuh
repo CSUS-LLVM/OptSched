@@ -120,7 +120,7 @@ public:
 
   // Returns the number of elements currently in the list.
   __host__ __device__
-  virtual int GetElmntCnt() const;
+  int GetElmntCnt() const;
   // Returns the first/top/head element. Does not affect the "current"
   // element.
   __host__ __device__
@@ -132,7 +132,7 @@ public:
 
   // Returns the first/top/head element and sets the "current" element to it.
   __host__ __device__
-  virtual T *GetFrstElmnt();
+  T *GetFrstElmnt();
   // Returns the last/bottom/tail element and sets the "current" element to
   // it.
   __host__ __device__

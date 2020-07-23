@@ -46,7 +46,7 @@ public:
   // Get target specific cost from peak register pressure (e.g. occupancy for
   // AMDGPU)
   virtual InstCount
-  getCost(const llvm::SmallVectorImpl<unsigned> &PRP) const = 0;
+  getCost(const unsigned *PRP) const = 0;
 
   // Targets that wish to discard the finalized schedule for any reason can
   // override this.

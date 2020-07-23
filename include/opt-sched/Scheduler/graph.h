@@ -65,11 +65,22 @@ struct GraphEdge {
     return node == from ? to : from;
   }
   
-  //Not Implemented for GraphEdge
-  void CopyPointersToDevice(GraphEdge *dev_node){
-        Logger::Fatal("Unimplemented.\n");
-        return;
-  }
+  //copy GraphNode *to, *from;
+  void CopyPointersToDevice(GraphEdge *dev_edge)  {
+   /* GraphNode *dev_to = NULL;
+ 
+    //allocate device memory
+    if (cudaSuccess != cudaMalloc((void**)dev_to, sizeof(GraphNode)))
+      printf("Error allocating dev mem for dev_to: %s\n", cudaGetErrorString(cudaGetLastError()));
+ 
+    //copy to to device
+    if (cudaSuccess != cudaMemcpy(dev_to, to, sizeof(GraphNode), cudaMemcpyHostToDevice))
+      printf("Error copying to to device: %s\n", cudaGetErrorString(cudaGetLastError()));
+ 
+    //update device pointer
+    if (cudaSuccess != cudaMemcpy(&(dev_edge->to), &dev_to, sizeof(GraphNode *), cudaMemcpyHostToDevice))
+      printf("Error updating dev_edge->to on device: %s\n", cudaGetErrorString(cudaGetLastError()));
+  */}
 };
 
 // TODO(max): Refactor. This has far too much stuff for a simple node.
@@ -283,10 +294,12 @@ public:
 private:
   // The node number. Should be unique within a single graph.
   UDT_GNODES num_;
+  //moved to protected for CopyPointersToDevice
   // A list of the immediate successors of this node.
   //PriorityList<GraphEdge> *scsrLst_;
   // A list of the immediate predecessors of this node.
-  LinkedList<GraphEdge> *prdcsrLst_;
+  //LinkedList<GraphEdge> *prdcsrLst_;
+  
   // A list of all recursively successors of this node.
   LinkedList<GraphNode> *rcrsvScsrLst_;
   // A list of all recursively predecessors of this node.
@@ -313,6 +326,8 @@ private:
 protected:
   //needed to be moved to protected so SchedInstruction can copy it to device
   PriorityList<GraphEdge> *scsrLst_;
+  LinkedList<GraphEdge> *prdcsrLst_;
+
   // TODO(max): Document what this is.
   __host__ __device__
   bool FindScsr_(GraphNode *&crntScsr, UDT_GNODES trgtNum, UDT_GLABEL trgtLbl);

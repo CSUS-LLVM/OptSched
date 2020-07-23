@@ -12,6 +12,8 @@ Last Update:  Mar. 2011
 #include "opt-sched/Scheduler/mem_mngr.h"
 #include <cstring>
 #include <memory>
+#include <cuda_runtime.h>
+
 
 namespace llvm {
 namespace opt_sched {
@@ -42,6 +44,10 @@ public:
   int GetOneCnt() const;
   // Returns the number of bits in the vector.
   int GetSize() const;
+  //returns unitCnt_
+  int GetUnitCnt() const;
+  //returns a copy of vctr_, used for copying to device
+  unsigned int *GetVctrCpy();
   // Create a bit vector that is the "bitwise and" of this bit vector and
   // another bit vector.
   std::unique_ptr<BitVector> And(BitVector *otherBitVector) const;
@@ -53,10 +59,11 @@ public:
   BitVector &operator=(const BitVector &src);
   // Compares two bit vectors.
   bool operator==(const BitVector &othr) const;
+  Unit *vctr_;
 
 protected:
   // The buffer in which the bits are stored.
-  Unit *vctr_;
+  //Unit *vctr_; Couldnt get BitVector::CopyPointersToDevice to work due to multiple definition error, moving to public so i can update from bbspill
   // The number of bits.
   int bitCnt_;
   // The number of units of the actual integer data type used.
@@ -175,6 +182,8 @@ BitVector::And(BitVector *otherBitVector) const {
 
 inline int BitVector::GetSize() const { return bitCnt_; }
 
+inline int BitVector::GetUnitCnt() const { return unitCnt_; }
+
 inline int BitVector::GetOneCnt() const { return oneCnt_; }
 
 inline BitVector &BitVector::operator=(const BitVector &src) {
@@ -183,6 +192,13 @@ inline BitVector &BitVector::operator=(const BitVector &src) {
   memcpy(vctr_, src.vctr_, byteCnt);
   oneCnt_ = src.oneCnt_;
   return *this;
+}
+
+inline unsigned int *BitVector::GetVctrCpy() {
+  unsigned int *cpy = new Unit[unitCnt_];
+  for (int i = 0; i < unitCnt_; i++)
+    cpy[i] = vctr_[i];
+  return cpy;
 }
 
 inline bool BitVector::operator==(const BitVector &other) const {
@@ -218,6 +234,9 @@ public:
   void SetBit(int index, bool bitVal, int weight);
   int GetWghtedCnt() const;
   virtual void Reset() override;
+  //circumvent virtual functions so we can call reset on device
+  __device__
+  void Dev_Reset();
 
 private:
   // The weighted sum of 1 in the vector times their weight
@@ -255,6 +274,20 @@ inline int WeightedBitVector::GetWghtedCnt() const { return wghtedCnt_; }
 
 inline void WeightedBitVector::Reset() {
   BitVector::Reset();
+  wghtedCnt_ = 0;
+}
+
+__device__
+inline void WeightedBitVector::Dev_Reset() {
+  if (oneCnt_ == 0)
+    return;
+
+  for (int i = 0; i < unitCnt_; i++) {
+    vctr_[i] = 0;
+  }
+
+  oneCnt_ = 0;
+	
   wghtedCnt_ = 0;
 }
 

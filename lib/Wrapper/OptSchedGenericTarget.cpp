@@ -40,13 +40,13 @@ public:
   }
   void finalizeRegion(const InstSchedule *Schedule) override {}
   // For generic target find total PRP.
-  InstCount getCost(const llvm::SmallVectorImpl<unsigned> &PRP) const override;
+  InstCount getCost(const unsigned *PRP) const override;
 };
 
 } // end anonymous namespace
 
 InstCount OptSchedGenericTarget::getCost(
-    const llvm::SmallVectorImpl<unsigned> &PRP) const {
+    const unsigned *PRP) const {
   InstCount TotalPRP = 0;
   for (int16_t T = 0; T < MM->GetRegTypeCnt(); ++T)
     TotalPRP += PRP[T];

@@ -261,77 +261,7 @@ FUNC_RESULT SchedRegion::FindOptimalSchedule(
     if (cudaSuccess != cudaMemcpy(&(dev_rgn->machMdl_), &dev_machMdl, sizeof(MachineModel *), cudaMemcpyHostToDevice))
       printf("Error updating dev_rgn->machMdl_ on device: %s\n", cudaGetErrorString(cudaGetLastError()));
 
-    //copy peakRegPressures_ to device
-    InstCount *dev_peakRegPressures = NULL;
-
-    //allocate device mem
-    if (cudaSuccess != cudaMalloc((void**)&dev_peakRegPressures, regTypeCnt_ * sizeof(InstCount)))
-      printf("Error allocating dev mem for dev_peakRegPressures: %s\n", cudaGetErrorString(cudaGetLastError()));
-
-    //copy array to device
-    if (cudaSuccess != cudaMemcpy(dev_peakRegPressures, peakRegPressures_, regTypeCnt_ * sizeof(InstCount), cudaMemcpyHostToDevice))
-      printf("Error copying peakRegPressures to device: %s\n", cudaGetErrorString(cudaGetLastError()));
-
-    //update device pointer
-    if (cudaSuccess != cudaMemcpy(&(dev_rgn->peakRegPressures_), &dev_peakRegPressures, sizeof(InstCount *), cudaMemcpyHostToDevice))
-      printf("Error updating dev_rgn->peakRegPressures_: %s\n", cudaGetErrorString(cudaGetLastError()));
-
-    //copy spillCosts_ to device
-    InstCount *dev_spillCosts = NULL;
-
-    //allocate dev mem
-    if (cudaSuccess != cudaMalloc((void**)&dev_spillCosts, dataDepGraph_->GetInstCnt() * sizeof(InstCount)))
-      printf("Error allocating dev mem for dev_spillCosts: %s\n", cudaGetErrorString(cudaGetLastError()));
-
-    //copy array to device
-    if (cudaSuccess != cudaMemcpy(dev_spillCosts, spillCosts_, dataDepGraph_->GetInstCnt() * sizeof(InstCount), cudaMemcpyHostToDevice))
-      printf("Error copying spillCosts_ to device: %s\n", cudaGetErrorString(cudaGetLastError()));
-
-    //update device pointer
-    if (cudaSuccess != cudaMemcpy(&(dev_rgn->spillCosts_), &dev_spillCosts, sizeof(InstCount *), cudaMemcpyHostToDevice))
-      printf("Error updating dev_rgn->spillCosts_: %s\n", cudaGetErrorString(cudaGetLastError()));
-
-    //copy liveRegs to device
-    WeightedBitVector *dev_liveRegs = NULL;
-
-    //allocate dev mem
-    if (cudaSuccess != cudaMalloc((void**)&dev_liveRegs, regTypeCnt_ * sizeof(WeightedBitVector)))
-      printf("Error allocating dev mem for dev_liveRegs: %s\n", cudaGetErrorString(cudaGetLastError()));
-
-    //copy array
-    if (cudaSuccess != cudaMemcpy(dev_liveRegs, liveRegs_, regTypeCnt_ * sizeof(WeightedBitVector), cudaMemcpyHostToDevice))
-      printf("Error copying liveRegs_ to device: %s\n", cudaGetErrorString(cudaGetLastError()));
-
-    //update device pointer
-    if (cudaSuccess != cudaMemcpy(&(dev_rgn->liveRegs_), &dev_liveRegs, sizeof(WeightedBitVector *), cudaMemcpyHostToDevice))
-      printf("Error updating dev_rng->liveRegs_ on device: %s\n", cudaGetErrorString(cudaGetLastError()));
-
-    //Copy pointers in each liveRegs_[i] to device
-    for (int i = 0; i < regTypeCnt_; i++) {
-      //TODO: Implement
-      //liveRegs_[]->CopyPointersToDevice(dev_liveRegs);
-    }
-
-    //copy liveRegs to device
-    WeightedBitVector *dev_livePhysRegs = NULL;
-
-    //allocate dev mem
-    if (cudaSuccess != cudaMalloc((void**)&dev_livePhysRegs, regTypeCnt_ * sizeof(WeightedBitVector)))
-      printf("Error allocating dev mem for dev_livePhysRegs: %s\n", cudaGetErrorString(cudaGetLastError()));
-
-    //copy array
-    if (cudaSuccess != cudaMemcpy(dev_livePhysRegs, livePhysRegs_, regTypeCnt_ * sizeof(WeightedBitVector), cudaMemcpyHostToDevice))
-      printf("Error copying livePhysRegs_ to device: %s\n", cudaGetErrorString(cudaGetLastError()));
-
-    //update device pointer
-    if (cudaSuccess != cudaMemcpy(&(dev_rgn->livePhysRegs_), &dev_livePhysRegs, sizeof(WeightedBitVector *), cudaMemcpyHostToDevice))
-      printf("Error updating dev_rng->livePhysRegs_ on device: %s\n", cudaGetErrorString(cudaGetLastError()));
-
-    //Copy pointers in each livePhysRegs_[i] to device
-    for (int i = 0; i < regTypeCnt_; i++) {
-      //TODO: Implement
-      //livePhysRegs_[]->CopyPointersToDevice(dev_livePhysRegs);
-    }
+    CopyPointersToDevice(dev_rgn);
 
     //step 2) launch device kernel
     printf("Launching device kernel\n");

@@ -29,6 +29,7 @@ public:
 
   using InstSetType = SmallPtrSet<const SchedInstruction *, 8>;
 
+  __host__ __device__
   int16_t GetType() const;
   void SetType(int16_t type);
 
@@ -36,10 +37,12 @@ public:
   int GetNum() const;
   void SetNum(int num);
 
+  __host__ __device__
   int GetWght() const;
   void SetWght(int wght);
 
   bool IsPhysical() const;
+  __host__ __device__
   int GetPhysicalNumber() const;
   void SetPhysicalNumber(int physicalNumber);
 
@@ -56,15 +59,19 @@ public:
   const InstSetType &GetDefList() const;
   size_t GetSizeOfDefList() const;
 
+  __host__ __device__
   void AddCrntUse();
   void DelCrntUse();
+  __host__ __device__
   void ResetCrntUseCnt();
 
   void IncrmntCrntLngth();
   void DcrmntCrntLngth();
+  __host__ __device__
   void ResetCrntLngth();
   int GetCrntLngth() const;
 
+  __host__ __device__
   bool IsLive() const;
   // Live in registers are defined by the artifical entry node.
   bool IsLiveIn() const;
@@ -142,10 +149,13 @@ public:
   Register *GetReg(int num) const;
   Register *FindLiveReg(int physNum) const;
 
+  __host__ __device__
   void ResetCrntUseCnts();
+  __host__ __device__
   void ResetCrntLngths();
 
   int FindPhysRegCnt();
+  __host__ __device__
   int GetPhysRegCnt() const;
 
   void SetupConflicts();
@@ -154,15 +164,20 @@ public:
   int GetConflictCnt();
 
   // The number of registers in this register file.
-  int getCount() const { return static_cast<int>(Regs.size()); }
+  __host__ __device__
+  int getCount() const { return Regs_size_; }
   // Increase the size of the register file by one and
   // return the RegNum of the created register.
   Register *getNext();
 
+  void CopyPointersToDevice(RegisterFile *dev_regFile);
+
 private:
   int16_t regType_;
   int physRegCnt_;
-  mutable SmallVector<std::unique_ptr<Register>, 8> Regs;
+  mutable Register **Regs;
+  int Regs_alloc_;
+  int Regs_size_;
 };
 
 } // namespace opt_sched

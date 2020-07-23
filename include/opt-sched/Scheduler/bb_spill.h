@@ -56,7 +56,9 @@ private:
 
   // Sum of lengths of live ranges. This vector is indexed by register type,
   // and each type will have its sum of live interval lengths computed.
-  std::vector<int> sumOfLiveIntervalLengths_;
+  int *sumOfLiveIntervalLengths_;
+  //keeps track of array size
+  int sumOfLiveIntervalLengths_size_;
 
   InstCount staticSlilLowerBound_ = 0;
 
@@ -73,7 +75,7 @@ private:
 
   InstCount *spillCosts_;
   // Current register pressure for each register type.
-  SmallVector<unsigned, 8> regPressures_;
+  unsigned *regPressures_;
   InstCount *peakRegPressures_;
   InstCount crntStepNum_;
   InstCount peakSpillCost_;
@@ -135,11 +137,19 @@ public:
   bool ChkInstLglty(SchedInstruction *inst);
   __host__ __device__
   void InitForSchdulng();
+  __device__
+  void Dev_InitForSchdulng();
+
+  void CopyPointersToDevice(SchedRegion* dev_rgn);
 
 protected:
   // (Chris)
-  inline virtual const std::vector<int> &GetSLIL_() const {
+  inline virtual const int *GetSLIL_() const {
     return sumOfLiveIntervalLengths_;
+  }
+
+  inline virtual const int GetSLIL_size_() const {
+    return sumOfLiveIntervalLengths_size_;
   }
 };
 

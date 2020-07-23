@@ -422,8 +422,8 @@ int SchedInstruction::CopyPointersToDevice(SchedInstruction *dev_inst){
                     cudaGetErrorString(cudaGetLastError()));
     }
   }
+
   //declare pointer for element->scsrLst_
-  //we only need elmntCnt_ so no need to copy pointers
   PriorityList<GraphEdge> *dev_scsrLst = NULL;
   //allocate device memory
   if (cudaSuccess !=
@@ -444,6 +444,34 @@ int SchedInstruction::CopyPointersToDevice(SchedInstruction *dev_inst){
     printf("Error updating dev_entry->element->scsrLst_ on device: %s\n",
                     cudaGetErrorString(cudaGetLastError()));
   }
+
+  //copy scsrLst_ pointers to device
+  GraphNode::scsrLst_->LinkedList<GraphEdge>::CopyPointersToDevice((LinkedList<GraphEdge> *)dev_scsrLst);
+
+  //declare pointer for element->prdcsrLst_
+  PriorityList<GraphEdge> *dev_prdcsrLst = NULL;
+  //allocate device memory
+  if (cudaSuccess !=
+      cudaMallocManaged((void**)&dev_prdcsrLst, sizeof(LinkedList<GraphEdge>))) {
+    printf("Error allocating device memory for dev_prdcsrLst: %s\n",
+                    cudaGetErrorString(cudaGetLastError()));
+  }
+  //copy prdcsrLst_ to device
+  if (cudaSuccess !=
+      cudaMemcpy(dev_prdcsrLst, GraphNode::prdcsrLst_, sizeof(LinkedList<GraphEdge>),
+                 cudaMemcpyHostToDevice)) {
+    printf("Error copying prdcsrLst_ to device: %s\n",
+                    cudaGetErrorString(cudaGetLastError()));
+  }
+  //update dev_entry->element->prdcsrLst_ pointer
+  if (cudaSuccess != cudaMemcpy(&(dev_inst->prdcsrLst_), &dev_prdcsrLst,
+                     sizeof(LinkedList<GraphEdge>*),cudaMemcpyHostToDevice)) {
+    printf("Error updating dev_entry->element->prdcsrLst_ on device: %s\n",
+                    cudaGetErrorString(cudaGetLastError()));
+  }
+
+  //copy prdcsrLst_ pointers to device
+  GraphNode::prdcsrLst_->CopyPointersToDevice(dev_prdcsrLst);
 
   //copy SchedRange to device, update its inst_ pointer
   SchedRange *dev_crntRange = NULL;
@@ -701,13 +729,30 @@ void SchedInstruction::SetBounds(InstCount flb, InstCount blb) {
 __host__ __device__
 bool SchedInstruction::PrdcsrSchduld(InstCount prdcsrNum, InstCount cycle,
                                      InstCount &rdyCycle) {
+  //debug
+  printf("Inside PrdcsrSchduld\n");
+
   assert(prdcsrNum < prdcsrCnt_);
+
+  //debug
+  printf("Reached point 1\n");
+
   rdyCyclePerPrdcsr_[prdcsrNum] = cycle + ltncyPerPrdcsr_[prdcsrNum];
+  
+  //debug
+  printf("Reached point 2\n");
+  
   prevMinRdyCyclePerPrdcsr_[prdcsrNum] = minRdyCycle_;
+
+  //debug
+  printf("Reached point 3\n");
 
   if (rdyCyclePerPrdcsr_[prdcsrNum] > minRdyCycle_) {
     minRdyCycle_ = rdyCyclePerPrdcsr_[prdcsrNum];
   }
+
+  //debug
+  printf("Reached point 4\n");
 
   rdyCycle = minRdyCycle_;
   unschduldPrdcsrCnt_--;
