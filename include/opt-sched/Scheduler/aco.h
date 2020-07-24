@@ -15,7 +15,9 @@ Last Update:  Jan. 2020
 #include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/SmallVector.h"
+#include <map>
 #include <memory>
+#include <utility>
 
 namespace llvm {
 namespace opt_sched {
@@ -48,7 +50,15 @@ private:
 
   //pheremone Graph Debugging start
   llvm::SmallSet<std::string, 20> dbgKernels;
+  llvm::SmallSet<std::pair<InstCount, InstCount>, 0> antEdges;
+  llvm::SmallSet<std::pair<InstCount, InstCount>, 0> crntAntEdges;
+  llvm::SmallSet<std::pair<InstCount, InstCount>, 0> iterAntEdges;
+  llvm::SmallSet<std::pair<InstCount, InstCount>, 0> bestSched;
+  std::map<std::pair<InstCount, InstCount>, double> lastHeu;
+  bool isDbg=false;
   std::string outPath;
+  std::string graphDisplayAnnotation(int frm, int to);
+  std::string getHeuIfPossible(int frm, int to);
   void writePheremoneGraph(std::string stage);
   void writePGraphRecursive(FILE* out, SchedInstruction* ins,
                             llvm::SetVector<SchedInstruction*>& visited);
