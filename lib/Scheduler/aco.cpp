@@ -185,6 +185,9 @@ std::unique_ptr<InstSchedule> ACOScheduler::FindOneSchedule() {
   Initialize_();
   rgn_->InitForSchdulng();
 
+  // graph debugging
+  SmallVector<InstCount, 0> chosenPath;
+
   llvm::SmallVector<Choice, 0> ready;
   while (!IsSchedComplete_()) {
     // convert the ready list from a custom priority queue to a std::vector,
