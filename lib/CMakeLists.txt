@@ -5,4 +5,3 @@ else()
 endif()
 
 add_dependencies(OptSched ${OPT_SCHED_TARGET_DEPS})
-

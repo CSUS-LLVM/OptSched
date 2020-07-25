@@ -54,21 +54,20 @@ ACOScheduler::ACOScheduler(DataDepGraph *dataDepGraph,
   ants_per_iteration = schedIni.GetInt("ACO_ANT_PER_ITERATION");
   print_aco_trace = schedIni.GetBool("ACO_TRACE");
 
-  //pheremone Graph Debugging start
+  // pheremone Graph Debugging start
   std::string tgtRgns = schedIni.GetString("ACO_DBG_REGIONS");
   outPath = schedIni.GetString("ACO_DBG_REGIONS_OUT_PATH");
-  if(tgtRgns!="NONE"){
+  if (tgtRgns != "NONE") {
     std::size_t startIdx = 0;
     std::size_t sepIdx = tgtRgns.find("|");
-    while(sepIdx!=std::string::npos){
-      dbgRgns.insert(tgtRgns.substr(startIdx,sepIdx-startIdx));
-      startIdx = sepIdx+1;
+    while (sepIdx != std::string::npos) {
+      dbgRgns.insert(tgtRgns.substr(startIdx, sepIdx - startIdx));
+      startIdx = sepIdx + 1;
       sepIdx = tgtRgns.find("|", startIdx);
     }
   }
   isDbg = dbgRgns.count(dataDepGraph_->GetDagID());
-  //pheremone Graph Debugging end
-
+  // pheremone Graph Debugging end
 
   /*
   std::cerr << "useOldAlg===="<<useOldAlg<<"\n\n";
@@ -186,7 +185,7 @@ std::unique_ptr<InstSchedule> ACOScheduler::FindOneSchedule() {
   Initialize_();
   rgn_->InitForSchdulng();
 
-  //graph debugging
+  // graph debugging
   SmallVector<InstCount, 0> chosenPath;
 
   llvm::SmallVector<Choice, 0> ready;
@@ -203,8 +202,9 @@ std::unique_ptr<InstSchedule> ACOScheduler::FindOneSchedule() {
         c.inst = inst;
         c.heuristic = (double)heuristic / maxPriority;
         ready.push_back(c);
-        if (isDbg&&lastInst)
-          lastHeu[std::make_pair(lastInst->GetNum(),inst->GetNum())]=c.heuristic;
+        if (isDbg && lastInst)
+          lastHeu[std::make_pair(lastInst->GetNum(), inst->GetNum())] =
+              c.heuristic;
       }
       inst = rdyLst_->GetNextPriorityInst(heuristic);
     }
@@ -229,9 +229,9 @@ std::unique_ptr<InstSchedule> ACOScheduler::FindOneSchedule() {
       pheremone_t *pheremone = &Pheremone(lastInst, inst);
       *pheremone = (1 - local_decay) * *pheremone + local_decay * initialValue_;
 #endif
-      if(isDbg&&lastInst!=NULL) {
-        antEdges.insert(std::make_pair(lastInst->GetNum(),inst->GetNum()));
-        crntAntEdges.insert(std::make_pair(lastInst->GetNum(),inst->GetNum()));
+      if (isDbg && lastInst != NULL) {
+        antEdges.insert(std::make_pair(lastInst->GetNum(), inst->GetNum()));
+        crntAntEdges.insert(std::make_pair(lastInst->GetNum(), inst->GetNum()));
       }
       lastInst = inst;
     }
@@ -309,7 +309,8 @@ FUNC_RESULT ACOScheduler::FindSchedule(InstSchedule *schedule_out,
       if (iterationBest == nullptr ||
           schedule->GetCost() < iterationBest->GetCost()) {
         iterationBest = std::move(schedule);
-        if(isDbg) iterAntEdges = crntAntEdges;
+        if (isDbg)
+          iterAntEdges = crntAntEdges;
       }
     }
     UpdatePheremone(iterationBest.get());
@@ -326,7 +327,8 @@ FUNC_RESULT ACOScheduler::FindSchedule(InstSchedule *schedule_out,
                    "iteration:%d",
                    bestSchedule->GetCost(), bestSchedule->GetSpillCost(),
                    bestSchedule->GetCrntLngth(), iterations);
-      if(isDbg) bestSched = iterAntEdges;
+      if (isDbg)
+        bestSched = iterAntEdges;
 
       noImprovement = 0;
     } else {
@@ -337,7 +339,7 @@ FUNC_RESULT ACOScheduler::FindSchedule(InstSchedule *schedule_out,
         break;
     }
 
-    writePheremoneGraph("iteration"+std::to_string(iterations));
+    writePheremoneGraph("iteration" + std::to_string(iterations));
     iterations++;
   }
   PrintSchedule(bestSchedule.get());
@@ -465,55 +467,56 @@ void ACOScheduler::setInitialSched(InstSchedule *Sched) {
 }
 
 void ACOScheduler::writePheremoneGraph(std::string stage) {
-  if(!isDbg)
+  if (!isDbg)
     return;
 
-  std::string fullOutPath = outPath+"/"+dataDepGraph_->GetDagID()+"@"+stage+".dot";
-  FILE* out = fopen(fullOutPath.c_str(), "w");
-  if(!out){
+  std::string fullOutPath =
+      outPath + "/" + dataDepGraph_->GetDagID() + "@" + stage + ".dot";
+  FILE *out = fopen(fullOutPath.c_str(), "w");
+  if (!out) {
     Logger::Info("Could now open file to write pheremone display at %s."
-                 " Skipping.", fullOutPath.c_str());
+                 " Skipping.",
+                 fullOutPath.c_str());
     return;
   }
 
-  //already added set
-  llvm::SetVector<SchedInstruction*> visited;
+  // already added set
+  llvm::SetVector<SchedInstruction *> visited;
 
-  //header for .dot file
+  // header for .dot file
   fprintf(out, "digraph pheremone_matrix {\n");
   fprintf(out, "label=\"%s@%s\"\n", dataDepGraph_->GetDagID(), stage.c_str());
   fprintf(out, "ranksep=1.0\n");
-/*
-  for(InstCount i=-1; i<count_; ++i){
-    for(InstCount j=0; j<count_; ++j){
-      fprintf(out,"\t%d -> %d [label=\"%.4f\"];\n", i, j, Pheremone(i,j));
+  /*
+    for(InstCount i=-1; i<count_; ++i){
+      for(InstCount j=0; j<count_; ++j){
+        fprintf(out,"\t%d -> %d [label=\"%.4f\"];\n", i, j, Pheremone(i,j));
+      }
     }
-  }
-*/
+  */
 
-  //find the recursive neighbors
+  // find the recursive neighbors
   dataDepGraph_->FindRcrsvNghbrs(DIR_FRWRD);
   dataDepGraph_->FindRcrsvNghbrs(DIR_BKWRD);
 
   writePGraphRecursive(out, dataDepGraph_->GetRootInst(), visited);
 
-  //footer for .dot file
+  // footer for .dot file
   fprintf(out, "}\n");
   fclose(out);
 
-  //wipe out antEdges
+  // wipe out antEdges
   antEdges.clear();
   crntAntEdges.clear();
   iterAntEdges.clear();
   lastHeu.clear();
 }
 
-std::string ACOScheduler::graphDisplayAnnotation(int frm, int to)
-{
+std::string ACOScheduler::graphDisplayAnnotation(int frm, int to) {
   std::string annotation;
-  std::pair<InstCount, InstCount> thisEdge=std::make_pair(frm,to);
+  std::pair<InstCount, InstCount> thisEdge = std::make_pair(frm, to);
 
-  if (bestSched.count(thisEdge)&&iterAntEdges.count(thisEdge))
+  if (bestSched.count(thisEdge) && iterAntEdges.count(thisEdge))
     return "penwidth=2.0 color=\"#00FFFF\"";
   else if (iterAntEdges.count(thisEdge))
     return "penwidth=2.0 color=\"#00FF00\"";
@@ -525,45 +528,51 @@ std::string ACOScheduler::graphDisplayAnnotation(int frm, int to)
     return "color=\"#000000\"";
 }
 
-std::string ACOScheduler::getHeuIfPossible(int frm, int to)
-{
-  std::pair<InstCount, InstCount> thisEdge=std::make_pair(frm,to);
-  if(lastHeu.count(thisEdge)) {
+std::string ACOScheduler::getHeuIfPossible(int frm, int to) {
+  std::pair<InstCount, InstCount> thisEdge = std::make_pair(frm, to);
+  if (lastHeu.count(thisEdge)) {
     return std::string("|") + std::to_string(lastHeu[thisEdge]);
-  }
-  else return "";
+  } else
+    return "";
 }
 
-void ACOScheduler::writePGraphRecursive(FILE* out, SchedInstruction* ins,
-                                        llvm::SetVector<SchedInstruction*>& visited){
-  InstCount i=ins->GetNum();
+void ACOScheduler::writePGraphRecursive(
+    FILE *out, SchedInstruction *ins,
+    llvm::SetVector<SchedInstruction *> &visited) {
+  InstCount i = ins->GetNum();
 
-  //do not add edges out twice
-  if(visited.count(ins)) return;
-  //add self to set so edges are not double counted
+  // do not add edges out twice
+  if (visited.count(ins))
+    return;
+  // add self to set so edges are not double counted
   visited.insert(ins);
 
-  //create edges for other orderings
-  for(SchedInstruction* vIns : visited){
-    if(!(ins->IsRcrsvPrdcsr(vIns)||ins->IsRcrsvScsr(vIns)))
-    {
-      InstCount vVtx=vIns->GetNum();
-      std::string toAnno  = graphDisplayAnnotation(i,vVtx);
-      std::string frmAnno = graphDisplayAnnotation(vVtx,i);
-      std::string toHeu  = getHeuIfPossible(i,vVtx);
-      std::string frmHeu = getHeuIfPossible(vVtx,i);
+  // create edges for other orderings
+  for (SchedInstruction *vIns : visited) {
+    if (!(ins->IsRcrsvPrdcsr(vIns) || ins->IsRcrsvScsr(vIns))) {
+      InstCount vVtx = vIns->GetNum();
+      std::string toAnno = graphDisplayAnnotation(i, vVtx);
+      std::string frmAnno = graphDisplayAnnotation(vVtx, i);
+      std::string toHeu = getHeuIfPossible(i, vVtx);
+      std::string frmHeu = getHeuIfPossible(vVtx, i);
 
-      fprintf(out, "\t%d -> %d [label=\"%f%s\" constraint=false style=dotted %s];\n", i, vVtx, Pheremone(i,vVtx), toHeu.c_str(),  toAnno.c_str());
-      fprintf(out, "\t%d -> %d [label=\"%f%s\" constraint=false style=dotted %s];\n", vVtx, i, Pheremone(vVtx,i), frmHeu.c_str(), frmAnno.c_str());
+      fprintf(out,
+              "\t%d -> %d [label=\"%f%s\" constraint=false style=dotted %s];\n",
+              i, vVtx, Pheremone(i, vVtx), toHeu.c_str(), toAnno.c_str());
+      fprintf(out,
+              "\t%d -> %d [label=\"%f%s\" constraint=false style=dotted %s];\n",
+              vVtx, i, Pheremone(vVtx, i), frmHeu.c_str(), frmAnno.c_str());
     }
   }
 
-  //add edges to children
-  for(SchedInstruction* child = ins->GetFrstScsr(); child!=NULL; child= ins->GetNxtScsr()){
-    InstCount j=child->GetNum();
-    std::string sAnno = graphDisplayAnnotation(i,j);
-    std::string sHeu  = getHeuIfPossible(i,j);
-    fprintf(out, "\t%d -> %d [label=\"%f%s\" %s];\n", i, j, Pheremone(i,j), sHeu.c_str(), sAnno.c_str());
-    writePGraphRecursive(out,child,visited);
+  // add edges to children
+  for (SchedInstruction *child = ins->GetFrstScsr(); child != NULL;
+       child = ins->GetNxtScsr()) {
+    InstCount j = child->GetNum();
+    std::string sAnno = graphDisplayAnnotation(i, j);
+    std::string sHeu = getHeuIfPossible(i, j);
+    fprintf(out, "\t%d -> %d [label=\"%f%s\" %s];\n", i, j, Pheremone(i, j),
+            sHeu.c_str(), sAnno.c_str());
+    writePGraphRecursive(out, child, visited);
   }
 }
