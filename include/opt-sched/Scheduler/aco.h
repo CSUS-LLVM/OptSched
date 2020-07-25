@@ -14,7 +14,6 @@ Last Update:  Jan. 2020
 #include "llvm/ADT/SmallSet.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/ArrayRef.h"
-#include "llvm/ADT/SmallVector.h"
 #include <map>
 #include <memory>
 #include <utility>
@@ -49,7 +48,7 @@ private:
   void PrintPheremone();
 
   //pheremone Graph Debugging start
-  llvm::SmallSet<std::string, 20> dbgKernels;
+  llvm::SmallSet<std::string, 0> dbgRgns;
   llvm::SmallSet<std::pair<InstCount, InstCount>, 0> antEdges;
   llvm::SmallSet<std::pair<InstCount, InstCount>, 0> crntAntEdges;
   llvm::SmallSet<std::pair<InstCount, InstCount>, 0> iterAntEdges;

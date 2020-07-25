@@ -55,18 +55,18 @@ ACOScheduler::ACOScheduler(DataDepGraph *dataDepGraph,
   print_aco_trace = schedIni.GetBool("ACO_TRACE");
 
   //pheremone Graph Debugging start
-  std::string tgtKernels = schedIni.GetString("ACO_DBG_KERNELS");
-  outPath = schedIni.GetString("ACO_DBG_KERNELS_OUT_PATH");
-  if(tgtKernels!="NONE"){
+  std::string tgtRgns = schedIni.GetString("ACO_DBG_REGIONS");
+  outPath = schedIni.GetString("ACO_DBG_REGIONS_OUT_PATH");
+  if(tgtRgns!="NONE"){
     std::size_t startIdx = 0;
-    std::size_t sepIdx = tgtKernels.find("|");
+    std::size_t sepIdx = tgtRgns.find("|");
     while(sepIdx!=std::string::npos){
-      dbgKernels.insert(tgtKernels.substr(startIdx,sepIdx-startIdx));
+      dbgRgns.insert(tgtRgns.substr(startIdx,sepIdx-startIdx));
       startIdx = sepIdx+1;
-      sepIdx = tgtKernels.find("|", startIdx);
+      sepIdx = tgtRgns.find("|", startIdx);
     }
   }
-  isDbg = dbgKernels.count(dataDepGraph_->GetDagID());
+  isDbg = dbgRgns.count(dataDepGraph_->GetDagID());
   //pheremone Graph Debugging end
 
 
@@ -465,7 +465,7 @@ void ACOScheduler::setInitialSched(InstSchedule *Sched) {
 }
 
 void ACOScheduler::writePheremoneGraph(std::string stage) {
-  if(!dbgKernels.count(dataDepGraph_->GetDagID()))
+  if(!isDbg)
     return;
 
   std::string fullOutPath = outPath+"/"+dataDepGraph_->GetDagID()+"@"+stage+".dot";
