@@ -21,8 +21,11 @@ static cl::opt<bool>
                          cl::init(false), cl::Hidden);
 
 static ScheduleDAGInstrs *createOptSchedGCN(MachineSchedContext *C) {
-  return new ScheduleDAGOptSchedGCN(
+  ScheduleDAGMILive *DAG = new ScheduleDAGOptSchedGCN(
       C, llvm::make_unique<GCNMaxOccupancySchedStrategy>(C));
+  DAG->addMutation(createLoadClusterDAGMutation(DAG->TII, DAG->TRI));
+  DAG->addMutation(createStoreClusterDAGMutation(DAG->TII, DAG->TRI));
+  return DAG;
 }
 
 // Register the machine scheduler.
@@ -54,17 +57,6 @@ void ScheduleDAGOptSchedGCN::initSchedulers() {
   SchedPasses.push_back(OptSchedMaxOcc);
   // Second
   SchedPasses.push_back(OptSchedBalanced);
-}
-
-// Add the appropriate LLVM mutations.
-void ScheduleDAGOptSchedGCN::addLLVMMutations() {
-  // Add DAG mutations that apply to both GCN and OptSched DAG's
-
-  if (EnableMutations) {
-    addMutation(createLoadClusterDAGMutation(TII, TRI));
-    addMutation(createStoreClusterDAGMutation(TII, TRI));
-    // addMutation(createAMDGPUMacroFusionDAGMutation());
-  }
 }
 
 // Execute scheduling passes.

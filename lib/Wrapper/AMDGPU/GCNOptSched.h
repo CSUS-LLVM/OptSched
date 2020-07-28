@@ -31,9 +31,6 @@ public:
   // Setup and select schedulers.
   void initSchedulers() override;
 
-  // Add the appropriate LLVM mutations. Called if LLVM_MUTATIONS is set
-  void addLLVMMutations() override;
-
   // TODO: After we refactor OptSched scheduler options put each scheduling
   // pass into its own class.
 
