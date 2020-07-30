@@ -533,7 +533,8 @@ int SchedInstruction::CopyPointersToDevice(SchedInstruction *dev_inst){
 __host__ __device__
 SchedInstruction *SchedInstruction::GetFrstPrdcsr(InstCount *scsrNum,
                                                   UDT_GLABEL *ltncy,
-                                                  DependenceType *depType) {
+                                                  DependenceType *depType,
+						  InstCount *toNodeNum) {
   GraphEdge *edge = GetFrstPrdcsrEdge();
   if (!edge)
     return NULL;
@@ -543,13 +544,16 @@ SchedInstruction *SchedInstruction::GetFrstPrdcsr(InstCount *scsrNum,
     *ltncy = edge->label;
   if (depType)
     *depType = (DependenceType)edge->label2;
+  if (toNodeNum)
+    *toNodeNum = edge->to->GetNum();
   return (SchedInstruction *)(edge->from);
 }
 
 __host__ __device__
 SchedInstruction *SchedInstruction::GetNxtPrdcsr(InstCount *scsrNum,
                                                  UDT_GLABEL *ltncy,
-                                                 DependenceType *depType) {
+                                                 DependenceType *depType,
+						 InstCount *toNodeNum) {
   GraphEdge *edge = GetNxtPrdcsrEdge();
   if (!edge)
     return NULL;
@@ -559,13 +563,16 @@ SchedInstruction *SchedInstruction::GetNxtPrdcsr(InstCount *scsrNum,
     *ltncy = edge->label;
   if (depType)
     *depType = (DependenceType)edge->label2;
+  if (toNodeNum)
+    *toNodeNum = edge->to->GetNum();
   return (SchedInstruction *)(edge->from);
 }
 
 __host__ __device__
 SchedInstruction *SchedInstruction::GetFrstScsr(InstCount *prdcsrNum,
                                                 UDT_GLABEL *ltncy,
-                                                DependenceType *depType) {
+                                                DependenceType *depType,
+						InstCount *toNodeNum) {
   GraphEdge *edge = GetFrstScsrEdge();
   if (!edge)
     return NULL;
@@ -575,13 +582,16 @@ SchedInstruction *SchedInstruction::GetFrstScsr(InstCount *prdcsrNum,
     *ltncy = edge->label;
   if (depType)
     *depType = (DependenceType)edge->label2;
+  if (toNodeNum)
+    *toNodeNum = edge->to->GetNum();
   return (SchedInstruction *)(edge->to);
 }
 
 __host__ __device__
 SchedInstruction *SchedInstruction::GetNxtScsr(InstCount *prdcsrNum,
                                                UDT_GLABEL *ltncy,
-                                               DependenceType *depType) {
+                                               DependenceType *depType,
+					       InstCount *toNodeNum) {
   GraphEdge *edge = GetNxtScsrEdge();
   if (!edge)
     return NULL;
@@ -591,6 +601,8 @@ SchedInstruction *SchedInstruction::GetNxtScsr(InstCount *prdcsrNum,
     *ltncy = edge->label;
   if (depType)
     *depType = (DependenceType)edge->label2;
+  if (toNodeNum)
+    *toNodeNum = edge->to->GetNum();
   return (SchedInstruction *)(edge->to);
 }
 
@@ -938,6 +950,14 @@ InstCount SchedInstruction::GetFileSchedOrder() const {
 __host__ __device__
 InstCount SchedInstruction::GetFileSchedCycle() const {
   return fileSchedCycle_;
+}
+
+InstCount SchedInstruction::GetFileUB() const {
+  return fileUprBound_;
+}
+
+InstCount SchedInstruction::GetFileLB() const {
+  return fileLwrBound_;
 }
 
 __host__ __device__

@@ -188,6 +188,9 @@ public:
   // file.
   __host__ __device__
   InstCount GetFileSchedCycle() const;
+  //get inst's file UB and LB for copying node data
+  InstCount GetFileUB() const;
+  InstCount GetFileLB() const;
   // Returns the instruction's forward or backward lower bound.
   __host__ __device__
   InstCount GetLwrBound(DIRECTION dir) const;
@@ -205,13 +208,15 @@ public:
   __host__ __device__
   SchedInstruction *GetFrstPrdcsr(InstCount *scsrNum = NULL,
                                   UDT_GLABEL *ltncy = NULL,
-                                  DependenceType *depType = NULL);
+                                  DependenceType *depType = NULL,
+				  InstCount *toNodeNum = NULL);
   // Returns the next predecessor of this instruction node and moves the
   // predecessor iterator forward. Fills parameters as above.
   __host__ __device__
   SchedInstruction *GetNxtPrdcsr(InstCount *scsrNum = NULL,
                                  UDT_GLABEL *ltncy = NULL,
-                                 DependenceType *depType = NULL);
+                                 DependenceType *depType = NULL,
+				 InstCount *toNodeNum = NULL);
 
   // Returns the first successor of this instruction node and resets the
   // successor iterator. Writes edge properties into the parameters if
@@ -223,13 +228,15 @@ public:
   __host__ __device__
   SchedInstruction *GetFrstScsr(InstCount *prdcsrNum = NULL,
                                 UDT_GLABEL *ltncy = NULL,
-                                DependenceType *depType = NULL);
+                                DependenceType *depType = NULL,
+				InstCount *toNodeNum = NULL);
   // Returns the next successor of this instruction node and moves the
   // successor iterator forward. Fills parameters as above.
   __host__ __device__
   SchedInstruction *GetNxtScsr(InstCount *prdcsrNum = NULL,
                                UDT_GLABEL *ltncy = NULL,
-                               DependenceType *depType = NULL);
+                               DependenceType *depType = NULL,
+			       InstCount *toNodeNum = NULL);
 
   // Returns the last successor of this instruction node and moves the
   // successor iterator to the end of the list. If prdcsrNum is provided, this

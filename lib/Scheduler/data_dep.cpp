@@ -2,6 +2,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <iostream>
+#include <string.h>
 
 #include "opt-sched/Scheduler/data_dep.h"
 #include "opt-sched/Scheduler/graph_trans.h"
@@ -36,6 +37,7 @@ static const char *GetDependenceTypeName(DependenceType depType) {
   llvm_unreachable("Unknown dependence type!");
 }
 
+__host__ __device__
 DataDepStruct::DataDepStruct(MachineModel *machMdl) {
   machMdl_ = machMdl;
   issuTypeCnt_ = (int16_t)machMdl->GetIssueTypeCnt();
@@ -54,6 +56,7 @@ DataDepStruct::DataDepStruct(MachineModel *machMdl) {
   includesUnpipelined_ = false;
 }
 
+__host__ __device__
 DataDepStruct::~DataDepStruct() {
   delete[] instCntPerIssuType_;
   if (frwrdLwrBounds_ != NULL)
@@ -145,6 +148,7 @@ InstCount DataDepStruct::CmputAbslutUprBound_() {
   return schedUprBound_;
 }
 
+__host__ __device__
 DataDepGraph::DataDepGraph(MachineModel *machMdl, LATENCY_PRECISION ltncyPrcsn)
     : DataDepStruct(machMdl) {
   int i;
@@ -179,7 +183,13 @@ DataDepGraph::DataDepGraph(MachineModel *machMdl, LATENCY_PRECISION ltncyPrcsn)
 
   dagFileFormat_ = DFF_BB;
   wasSetupForSchduling_ = false;
-  strcpy(dagID_, "unknown");
+  //strcpy(dagID_, "unknown");
+  //replace strcpy with my own, since it is a __host__ func
+  char src[10] = "unknown";
+  i = 0;
+  do {
+    dagID_[i] = src[i];}
+  while (src[i++] != 0);
 
   instTypeCnt_ = (int16_t)machMdl->GetInstTypeCnt();
   instCntPerType_ = new InstCount[instTypeCnt_];
@@ -198,9 +208,10 @@ DataDepGraph::DataDepGraph(MachineModel *machMdl, LATENCY_PRECISION ltncyPrcsn)
   entryInstCnt_ = 0;
   exitInstCnt_ = 0;
 
-  RegFiles = llvm::make_unique<RegisterFile[]>(machMdl_->GetRegTypeCnt());
+  RegFiles = new RegisterFile[machMdl_->GetRegTypeCnt()];
 }
 
+__host__ __device__
 DataDepGraph::~DataDepGraph() {
   if (insts_ != NULL) {
     for (InstCount i = 0; i < instCnt_; i++) {
@@ -823,6 +834,7 @@ FUNC_RESULT DataDepGraph::SkipGraph(SpecsBuffer *buf, bool &endOfFileReached) {
   return RES_SUCCESS;
 }
 
+__host__ __device__
 SchedInstruction *DataDepGraph::CreateNode_(
     InstCount instNum, const char *const instName, InstType instType,
     const char *const opCode, int nodeID, InstCount fileSchedOrder,
@@ -844,6 +856,7 @@ SchedInstruction *DataDepGraph::CreateNode_(
   return newInstPtr;
 }
 
+__host__ __device__
 void DataDepGraph::CreateEdge(SchedInstruction *frmNode,
                               SchedInstruction *toNode, int ltncy,
                               DependenceType depType) {
@@ -1299,7 +1312,7 @@ void DataDepGraph::PrintEdgeCntPerLtncyInfo() {
 }
 
 void DataDepGraph::CopyPointersToDevice(DataDepGraph *dev_dataDepGraph) {
-  SchedInstruction **dev_insts = NULL;
+/*  SchedInstruction **dev_insts = NULL;
 
   //allocate device memory
   if (cudaSuccess != cudaMalloc((void**)&dev_insts, instCnt_ * sizeof(SchedInstruction *)))
@@ -1336,7 +1349,7 @@ void DataDepGraph::CopyPointersToDevice(DataDepGraph *dev_dataDepGraph) {
 
   //debug
   printf("insts_ has been copied to device!\n");
-
+*/
   InstCount *dev_instCntPerIssuType = NULL;
 
   //allocate memory on the device
@@ -1351,7 +1364,7 @@ void DataDepGraph::CopyPointersToDevice(DataDepGraph *dev_dataDepGraph) {
   if (cudaSuccess != cudaMemcpy(&(dev_dataDepGraph->instCntPerIssuType_), &dev_instCntPerIssuType, sizeof(InstCount *), cudaMemcpyHostToDevice))
     printf("Failed to update dev_dataDepGraph->instCntPerIssuType_ on device: %s\n", cudaGetErrorString(cudaGetLastError()));
 
-  printf("instCntPerIssuType_ has been copied to device!\n");
+/*  printf("instCntPerIssuType_ has been copied to device!\n");
 
   SchedInstruction *dev_root = NULL;
 
@@ -1386,6 +1399,50 @@ void DataDepGraph::CopyPointersToDevice(DataDepGraph *dev_dataDepGraph) {
 
   //TODO: implement
   ((SchedInstruction*)leaf_)->CopyPointersToDevice(dev_leaf);
+*/
+}
+
+void DataDepGraph::CreateNodeData(NodeData *nodeData) {
+  SchedInstruction *inst;
+
+  for (InstCount i = 0; i < instCnt_; i++) {
+    inst = GetInstByIndx(i);
+    nodeData[i].instNum_ = inst->GetNum();
+    strncpy(nodeData[i].instName_, inst->GetName(), 50);
+    nodeData[i].instType_ = inst->GetInstType();
+    strncpy(nodeData[i].opCode_, inst->GetOpCode(), 50);
+    nodeData[i].nodeID_ = inst->GetNodeID();
+    nodeData[i].fileSchedOrder_ = inst->GetFileSchedOrder();
+    nodeData[i].fileSchedCycle_ = inst->GetFileSchedCycle();
+    nodeData[i].fileUB_ = inst->GetFileUB();
+    nodeData[i].fileLB_ = inst->GetFileLB();
+    nodeData[i].prdcsrCnt_ = (int)inst->GetPrdcsrCnt();
+    nodeData[i].prdcsrs_ = new EdgeData[nodeData[i].prdcsrCnt_];
+
+    if(nodeData[i].prdcsrCnt_ > 0) {
+      //get prdcsr data
+      inst->GetFrstPrdcsr(NULL, &(nodeData[i].prdcsrs_[0].ltncy_), &(nodeData[i].prdcsrs_[0].depType_), &(nodeData[i].prdcsrs_[0].toNodeNum_));
+      for (int j = 1; j < nodeData[i].prdcsrCnt_; j++) {
+        inst->GetNxtPrdcsr(NULL, &(nodeData[i].prdcsrs_[j].ltncy_), &(nodeData[i].prdcsrs_[j].depType_), &(nodeData[i].prdcsrs_[j].toNodeNum_));
+      }
+    }
+  }
+}
+
+//reconstruct the DDG on device using nodeData
+__device__
+void DataDepGraph::ReconstructOnDevice_(InstCount instCnt, NodeData *nodeData) {
+  AllocArrays_(instCnt);
+
+  SchedInstruction *inst;
+  for (InstCount i = 0; i < instCnt; i++) {
+    CreateNode_(nodeData[i].instNum_, nodeData[i].instName_, nodeData[i].instType_, nodeData[i].opCode_, nodeData[i].nodeID_, 
+		nodeData[i].fileSchedOrder_, nodeData[i].fileSchedCycle_, nodeData[i].fileLB_, nodeData[i].fileUB_, 0);
+/* debug test, failed
+    inst = new SchedInstruction(nodeData[i].instNum_, (const char *)&(nodeData[i].instName_), nodeData[i].instType_, (const char *)&(nodeData[i].opCode_), instCnt, nodeData[i].nodeID_,
+                nodeData[i].fileSchedOrder_, nodeData[i].fileSchedCycle_, nodeData[i].fileLB_, nodeData[i].fileUB_, machMdl_);
+*/
+  }
 }
 
 InstCount DataDepGraph::GetRltvCrtclPath(SchedInstruction *ref,
@@ -1460,8 +1517,12 @@ DataDepSubGraph::DataDepSubGraph(DataDepGraph *fullGraph, InstCount maxInstCnt,
 #endif
 }
 
+__host__ __device__
 DataDepSubGraph::~DataDepSubGraph() {
+#ifdef __CUDA_ARCH__
+#else
   DelRootAndLeafInsts_(true);
+#endif
 
   delete[] insts_;
   delete[] numToIndx_;

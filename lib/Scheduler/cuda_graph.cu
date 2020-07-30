@@ -333,6 +333,7 @@ void GraphNode::CopyPointersToDevice(void *dev_entry){
   }
 }
 
+__host__ __device__
 DirAcycGraph::DirAcycGraph() {
   nodeCnt_ = 0;
   edgeCnt_ = 0;
@@ -344,6 +345,7 @@ DirAcycGraph::DirAcycGraph() {
   cycleDetected_ = false;
 }
 
+__host__ __device__
 DirAcycGraph::~DirAcycGraph() {
   if (tplgclOrdr_ != NULL)
     delete[] tplgclOrdr_;

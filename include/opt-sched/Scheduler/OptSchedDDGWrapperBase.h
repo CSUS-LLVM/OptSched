@@ -14,7 +14,8 @@ namespace opt_sched {
 
 class OptSchedDDGWrapperBase {
 public:
-  virtual ~OptSchedDDGWrapperBase() = default;
+  __host__ __device__
+  virtual ~OptSchedDDGWrapperBase() {}
 
   virtual void convertSUnits() = 0;
 

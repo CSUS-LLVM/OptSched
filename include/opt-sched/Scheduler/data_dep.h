@@ -94,6 +94,61 @@ const int MAX_LATENCY_VALUE = 10;
 // The total number of possible graph transformations.
 const int NUM_GRAPH_TRANS = 1;
 
+//struct for transfer of prdcsr/scrsr data to device
+struct EdgeData {
+  InstCount toNodeNum_;
+  int ltncy_;
+  DependenceType depType_;
+};
+
+//data structure for transfer of inst node data to device
+struct NodeData {
+  InstCount instNum_;
+  char instName_[50];
+  InstType instType_;
+  char opCode_[50];
+  int nodeID_;
+  InstCount fileSchedOrder_;
+  InstCount fileSchedCycle_;
+  InstCount fileLB_;
+  InstCount fileUB_; 
+  EdgeData *prdcsrs_;
+  int prdcsrCnt_;
+  EdgeData *scsrs_;
+  int scsrCnt_;
+
+  //copies prdcsrs_ and scsrs_ arrays to device
+  void CopyPointersToDevice(NodeData *dev_nodeData) {
+    EdgeData *dev_prdcsrs = NULL;
+
+    //allocate device memory
+    if (cudaSuccess != cudaMalloc((void**)&dev_prdcsrs, prdcsrCnt_ * sizeof(EdgeData)))
+      printf("Error allocating dev mem for dev_prdcsrs: %s\n", cudaGetErrorString(cudaGetLastError()));
+
+    //copy array to device
+    if (cudaSuccess != cudaMemcpy(dev_prdcsrs, prdcsrs_, prdcsrCnt_ * sizeof(EdgeData), cudaMemcpyHostToDevice))
+      printf("Error copying prdcsrs_ to device: %s\n", cudaGetErrorString(cudaGetLastError()));
+
+    //update device pointer
+    if (cudaSuccess != cudaMemcpy(&(dev_nodeData->prdcsrs_), &dev_prdcsrs, sizeof(EdgeData *), cudaMemcpyHostToDevice))
+      printf("Error updating dev_nodeData->prdcsrs_: %s", cudaGetErrorString(cudaGetLastError()));
+
+    EdgeData *dev_scsrs = NULL;
+
+    //allocate device memory
+    if (cudaSuccess != cudaMalloc((void**)&dev_scsrs, scsrCnt_ * sizeof(EdgeData)))
+      printf("Error allocating dev mem for dev_scsrs: %s\n", cudaGetErrorString(cudaGetLastError()));
+
+    //copy array to device
+    if (cudaSuccess != cudaMemcpy(dev_scsrs, scsrs_, scsrCnt_ * sizeof(EdgeData), cudaMemcpyHostToDevice))
+      printf("Error copying scsrs_ to device: %s\n", cudaGetErrorString(cudaGetLastError()));
+
+    //update device pointer
+    if (cudaSuccess != cudaMemcpy(&(dev_nodeData->scsrs_), &dev_scsrs, sizeof(EdgeData *), cudaMemcpyHostToDevice))
+      printf("Error updating dev_nodeData->scsrs_: %s", cudaGetErrorString(cudaGetLastError()));
+  }
+};
+
 // Forward declarations used to reduce the number of #includes.
 class MachineModel;
 class SpecsBuffer;
@@ -109,8 +164,10 @@ class GraphTrans;
 class DataDepStruct {
 public:
   // TODO(max): Document.
+  __host__ __device__
   DataDepStruct(MachineModel *machMdl);
   // TODO(max): Document.
+  __host__ __device__
   virtual ~DataDepStruct();
 
   __host__ __device__
@@ -181,8 +238,19 @@ class DataDepGraph : public llvm::opt_sched::OptSchedDDGWrapperBase,
                      public DirAcycGraph,
                      public DataDepStruct {
 public:
+  __host__ __device__
   DataDepGraph(MachineModel *machMdl, LATENCY_PRECISION ltncyPcsn);
+  __host__ __device__
   virtual ~DataDepGraph();
+
+  //Prevent DDG from being abstract, these should not actually be invoked
+  virtual void convertSUnits() {
+    Logger::Fatal("Wrong convertSUnits called");
+  }
+
+  virtual void convertRegFiles() {
+    Logger::Fatal("Wrong convertRegFiles called");
+  }
 
   // Reads the data dependence graph from a text file.
   FUNC_RESULT ReadFrmFile(SpecsBuffer *buf, bool &endOfFileReached);
@@ -261,6 +329,8 @@ public:
 
   int GetFileCostUprBound();
 
+  LATENCY_PRECISION GetLtncyPrcsn() const { return ltncyPrcsn_;}
+
   // Add edges to enforce the original program order, assuming that
   // it is represented by the instruction numbers
   void EnforceProgOrder();
@@ -313,9 +383,17 @@ public:
     return machMdl_->GetPhysRegCnt(regType);
   }
 
-  RegisterFile *getRegFiles() { return RegFiles.get(); }
+  RegisterFile *getRegFiles() { return RegFiles; }
 
   void CopyPointersToDevice(DataDepGraph *dev_dataDepGraph);
+
+  //creates an array of NodeData which hold the information
+  //about the DDG in order to create DDG on device
+  void CreateNodeData(NodeData *nodeData);
+
+  //used to setup DDG on device
+  __device__
+  void ReconstructOnDevice_(InstCount instCnt, NodeData *nodeData);
 
 protected:
   // TODO(max): Get rid of this.
@@ -398,8 +476,9 @@ protected:
 
   // Tracks all registers in the scheduling region. Each RegisterFile
   // object holds all registers for a given register type.
-  std::unique_ptr<RegisterFile[]> RegFiles;
+  RegisterFile *RegFiles;
 
+  __host__ __device__
   void AllocArrays_(InstCount instCnt);
   FUNC_RESULT ParseF2Nodes_(SpecsBuffer *specsBuf, MachineModel *machMdl);
   FUNC_RESULT ParseF2Edges_(SpecsBuffer *specsBuf, MachineModel *machMdl);
@@ -410,12 +489,14 @@ protected:
                             InstCount &nodeNum, InstType &instType,
                             NXTLINE_TYPE &nxtLine);
 
+  __host__ __device__
   SchedInstruction *CreateNode_(InstCount instNum, const char *const instName,
                                 InstType instType, const char *const opCode,
                                 int nodeID, InstCount fileSchedOrder,
                                 InstCount fileSchedCycle, InstCount fileLB,
                                 InstCount fileUB, int blkNum);
   FUNC_RESULT FinishNode_(InstCount nodeNum, InstCount edgeCnt = -1);
+  __host__ __device__
   void CreateEdge_(InstCount frmInstNum, InstCount toInstNum, int ltncy,
                    DependenceType depType);
 
@@ -564,6 +645,7 @@ protected:
 public:
   DataDepSubGraph(DataDepGraph *fullGraph, InstCount maxInstCnt,
                   MachineModel *machMdl);
+  __host__ __device__
   virtual ~DataDepSubGraph();
   void InitForSchdulng(bool clearAll);
   void SetupForDynmcLwrBounds(InstCount schedUprBound);

@@ -268,6 +268,7 @@ InstType MachineModel::getDefaultIssueType() const {
 
 const string &MachineModel::GetModelName() const { return mdlName_; }
 
+__host__ __device__
 int MachineModel::GetInstTypeCnt() const { return instTypes_size_; }
 
 __host__ __device__

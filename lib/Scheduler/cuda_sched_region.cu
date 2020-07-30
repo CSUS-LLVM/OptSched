@@ -82,13 +82,27 @@ static bool isBbEnabled(Config &schedIni, Milliseconds rgnTimeout) {
 }
 
 __global__
-void DevListSched(MachineModel *dev_machMdl, DataDepGraph *dev_dataDepGraph, SchedRegion *dev_rgn, InstCount schedUprBound, SchedPriorities prirts, bool vrfy) {
+void DevListSched(MachineModel *dev_machMdl, SchedRegion *dev_rgn, 
+		  InstCount schedUprBound, SchedPriorities prirts, 
+		  bool vrfy, LATENCY_PRECISION ltncyPcsn, 
+		  NodeData *dev_nodeData, DataDepGraph *dev_dataDepGraph) {
+  //this causes all CUDA API calls to fail, assigning "NULL" instead allows them to complete
+  //properly, but then kernel clearly crashes since InstSchedule is passed a NULL ptr
+  //DataDepGraph *dev_dataDepGraph = new DataDepGraph(dev_machMdl, ltncyPcsn); 
+
+  //TODO:Initialize DDG using dev_nodeData and dev_regData
+  dev_dataDepGraph->ReconstructOnDevice_(dev_dataDepGraph->GetInstCnt(), dev_nodeData);
+
+  //debug
+  printf("dev_dataDepGraph constructed!\n");  
+
   InstSchedule *dev_lstSched = new InstSchedule(dev_machMdl, dev_dataDepGraph, vrfy);
 
   //debug
   printf("dev_lstSched created!\n");
 
-  ConstrainedScheduler *dev_lstSchdulr = new ListScheduler(dev_dataDepGraph, dev_machMdl, schedUprBound, prirts);
+  ConstrainedScheduler *dev_lstSchdulr = new ListScheduler(dev_dataDepGraph, dev_machMdl, 
+		                                           schedUprBound, prirts);
 
   //debug
   printf("dev_lstSchdulr created!\n");
@@ -214,6 +228,7 @@ FUNC_RESULT SchedRegion::FindOptimalSchedule(
    
  
     //****Begin Code for ListScheduling on Device****
+
     //Step 1a) Copy MachineModel to Device
     MachineModel *dev_machMdl = NULL;
     //allocate space on device
@@ -232,7 +247,7 @@ FUNC_RESULT SchedRegion::FindOptimalSchedule(
     DataDepGraph *dev_dataDepGraph = NULL;
 
     //allocate device memory
-    if (cudaSuccess != cudaMalloc((void**)&dev_dataDepGraph, sizeof(DataDepGraph)))
+    if (cudaSuccess != cudaMallocManaged((void**)&dev_dataDepGraph, sizeof(DataDepGraph)))
       printf("Failed to allocate device mem for dev_dataDepGraph: %s\n", cudaGetErrorString(cudaGetLastError()));
 
     //copy DDG to device
@@ -242,6 +257,25 @@ FUNC_RESULT SchedRegion::FindOptimalSchedule(
     //copy all pointers to device
     dataDepGraph_->CopyPointersToDevice(dev_dataDepGraph);
 
+    //Step 1b) create and copy DDG data arrays to device for dev DDG creation
+    NodeData *nodeData = new NodeData[dataDepGraph_->GetInstCnt()];
+
+    dataDepGraph_->CreateNodeData(nodeData);
+
+    NodeData *dev_nodeData = NULL;
+
+    //allocate dev mem
+    if (cudaSuccess != cudaMallocManaged((void**)&dev_nodeData, dataDepGraph_->GetInstCnt() * sizeof(NodeData)))
+      printf("Failed to allocate device mem for dev_nodeData: %s\n", cudaGetErrorString(cudaGetLastError()));
+
+    //copy nodeData to device
+    if (cudaSuccess != cudaMemcpy(dev_nodeData, nodeData, dataDepGraph_->GetInstCnt() * sizeof(NodeData), cudaMemcpyHostToDevice))
+      printf("Failed to copy nodeData to device: %s\n", cudaGetErrorString(cudaGetLastError()));
+/*
+    //copy EdgeData arrays inside NodeData struct to device
+    for (int i = 0; i < dataDepGraph_->GetInstCnt(); i++)
+      nodeData[i].CopyPointersToDevice(&dev_nodeData[i]);
+*/
     //step 1c) Copy this(BBWithSpill::SchedRegion) to device
     BBWithSpill *dev_rgn = NULL;
 
@@ -265,7 +299,7 @@ FUNC_RESULT SchedRegion::FindOptimalSchedule(
 
     //step 2) launch device kernel
     printf("Launching device kernel\n");
-    DevListSched<<<1,1>>>(dev_machMdl, dev_dataDepGraph, dev_rgn, abslutSchedUprBound_, GetHeuristicPriorities(), vrfySched_);
+    DevListSched<<<1,1>>>(dev_machMdl, dev_rgn, abslutSchedUprBound_, GetHeuristicPriorities(), vrfySched_, dataDepGraph_->GetLtncyPrcsn(), dev_nodeData, dev_dataDepGraph);
     cudaDeviceSynchronize();
     printf("Post Kernel Error: %s\n", cudaGetErrorString(cudaGetLastError()));
 

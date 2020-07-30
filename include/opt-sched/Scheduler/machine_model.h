@@ -86,6 +86,7 @@ public:
   // Returns the name of the machine model.
   const string &GetModelName() const;
   // Returns the number of instruction types.
+  __host__ __device__
   int GetInstTypeCnt() const;
   // Returns the number of issue types (pipelines).
   __host__ __device__
