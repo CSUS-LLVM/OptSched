@@ -82,6 +82,7 @@ private:
   bool print_aco_trace;
   std::unique_ptr<InstSchedule> InitialSchedule;
   bool VrfySched_;
+  pheromone_t ScRelMax;
 };
 
 } // namespace opt_sched
