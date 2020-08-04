@@ -300,7 +300,7 @@ void MachineModel::CopyPointersToDevice(MachineModel *dev_machMdl) {
 	   cudaGetErrorString(cudaGetLastError()));
 
   //update pointer dev_machMdl->instTypes_ to device pointer
-  if (cudaSuccess != cudaMemcpy(&dev_machMdl->instTypes_, &dev_instTypes, 
+  if (cudaSuccess != cudaMemcpy(&(dev_machMdl->instTypes_), &dev_instTypes, 
 			        sizeof(InstTypeInfo *), 
 				cudaMemcpyHostToDevice))
     printf("Error updating dev_machMdl->instTypes_: %s\n",

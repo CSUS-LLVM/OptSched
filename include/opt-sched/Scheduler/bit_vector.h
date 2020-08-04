@@ -24,12 +24,15 @@ public:
   typedef unsigned int Unit;
 
   // Constructs a bit vector of a given length.
+  __host__ __device__
   BitVector(int length = 0);
   // Deallocates the vector.
+  __host__ __device__
   virtual ~BitVector();
 
   // Reconstructs the vector to hold a vector of the new length. All old data
   // is discarded.
+  __host__ __device__
   void Construct(int length);
 
   // Sets all bits to 0.
@@ -86,6 +89,7 @@ inline BitVector::BitVector(int length) {
   Construct(length);
 }
 
+__host__ __device__
 inline void BitVector::Construct(int length) {
   bitCnt_ = length;
   unitCnt_ = (bitCnt_ + BITS_IN_UNIT - 1) / BITS_IN_UNIT;
@@ -229,7 +233,9 @@ inline BitVector::Unit BitVector::GetMask_(int bitNum, bool bitVal) {
 // weight.
 class WeightedBitVector : public BitVector {
 public:
+  __host__ __device__
   WeightedBitVector(int lenght = 0);
+  __host__ __device__
   ~WeightedBitVector();
   void SetBit(int index, bool bitVal, int weight);
   int GetWghtedCnt() const;
@@ -243,10 +249,12 @@ private:
   int wghtedCnt_;
 };
 
+__host__ __device__
 inline WeightedBitVector::WeightedBitVector(int length) : BitVector(length) {
   wghtedCnt_ = 0;
 }
 
+__host__ __device__
 inline WeightedBitVector::~WeightedBitVector() {}
 
 inline void WeightedBitVector::SetBit(int index, bool bitVal, int weight) {

@@ -45,10 +45,10 @@ SET(OPT_SCHED_SRCS Scheduler/aco.cpp
   Scheduler/cuda_bb_spill.cu
   Scheduler/buffers.cpp
   Scheduler/config.cpp
-  Scheduler/data_dep.cpp
+  Scheduler/cuda_data_dep.cu
   Scheduler/enumerator.cpp
   Scheduler/cuda_gen_sched.cu
-  Scheduler/graph.cpp
+  Scheduler/cuda_graph.cu
   Scheduler/graph_trans.cpp
   Scheduler/hist_table.cpp
   Scheduler/cuda_list_sched.cu

@@ -208,6 +208,12 @@ DataDepGraph::DataDepGraph(MachineModel *machMdl, LATENCY_PRECISION ltncyPrcsn)
   entryInstCnt_ = 0;
   exitInstCnt_ = 0;
 
+#ifdef __CUDA_ARCH__
+  graphTrans_ = NULL;
+#else
+  graphTrans_ = new SmallVector<std::unique_ptr<GraphTrans>, 0>;
+#endif
+
   RegFiles = new RegisterFile[machMdl_->GetRegTypeCnt()];
 }
 
@@ -1419,6 +1425,8 @@ void DataDepGraph::CreateNodeData(NodeData *nodeData) {
     nodeData[i].fileLB_ = inst->GetFileLB();
     nodeData[i].prdcsrCnt_ = (int)inst->GetPrdcsrCnt();
     nodeData[i].prdcsrs_ = new EdgeData[nodeData[i].prdcsrCnt_];
+    nodeData[i].scsrCnt_ = (int)inst->GetScsrCnt();
+    nodeData[i].scsrs_ = new EdgeData[nodeData[i].scsrCnt_];
 
     if(nodeData[i].prdcsrCnt_ > 0) {
       //get prdcsr data
@@ -1427,18 +1435,58 @@ void DataDepGraph::CreateNodeData(NodeData *nodeData) {
         inst->GetNxtPrdcsr(NULL, &(nodeData[i].prdcsrs_[j].ltncy_), &(nodeData[i].prdcsrs_[j].depType_), &(nodeData[i].prdcsrs_[j].toNodeNum_));
       }
     }
+
+    if(nodeData[i].scsrCnt_ > 0) {
+      //get scsr data
+      inst->GetFrstScsr(NULL, &(nodeData[i].scsrs_[0].ltncy_), &(nodeData[i].scsrs_[0].depType_), &(nodeData[i].scsrs_[0].toNodeNum_));
+      for (int j = 1; j < nodeData[i].scsrCnt_; j++) {
+        inst->GetNxtScsr(NULL, &(nodeData[i].scsrs_[j].ltncy_), &(nodeData[i].scsrs_[j].depType_), &(nodeData[i].scsrs_[j].toNodeNum_));
+      }
+    }
   }
 }
 
 //reconstruct the DDG on device using nodeData
 __device__
 void DataDepGraph::ReconstructOnDevice_(InstCount instCnt, NodeData *nodeData) {
+  //debug
+  printf("Inside Reconstruct on device, Allocating arrays\n");
+
   AllocArrays_(instCnt);
 
-  SchedInstruction *inst;
+  //debug
+  printf("Allocated arrays, starting creation of nodes. Num of nodes: %d\n", (int)instCnt);
+
+  SchedInstruction *inst = NULL;
+  //create nodes
   for (InstCount i = 0; i < instCnt; i++) {
-    CreateNode_(nodeData[i].instNum_, nodeData[i].instName_, nodeData[i].instType_, nodeData[i].opCode_, nodeData[i].nodeID_, 
+    //debug
+    printf("Creating node %d\n", i);
+
+    inst = CreateNode_(nodeData[i].instNum_, nodeData[i].instName_, nodeData[i].instType_, nodeData[i].opCode_, nodeData[i].nodeID_, 
 		nodeData[i].fileSchedOrder_, nodeData[i].fileSchedCycle_, nodeData[i].fileLB_, nodeData[i].fileUB_, 0);
+
+    //set root_
+    if (nodeData[i].prdcsrCnt_ == 0)
+      root_ = (GraphNode *)inst;
+
+    //set leaf_
+    if (nodeData[i].scsrCnt_ == 0)
+      leaf_ = (GraphNode *)inst;
+
+    //debug
+    printf("Node created\n");
+  }
+
+  //create edges
+  for (InstCount i = 0; i < instCnt; i++) {
+    for (int j = 0; j < nodeData[i].scsrCnt_; j++) {
+      CreateEdge_(nodeData[i].instNum_, nodeData[i].scsrs_[j].toNodeNum_, nodeData[i].scsrs_[j].ltncy_, nodeData[i].scsrs_[j].depType_);
+    }
+
+    for (int j = 0; j < nodeData[i].prdcsrCnt_; j++) {
+      CreateEdge_(nodeData[i].instNum_, nodeData[i].prdcsrs_[j].toNodeNum_, nodeData[i].prdcsrs_[j].ltncy_, nodeData[i].prdcsrs_[j].depType_);
+    }
   }
 }
 

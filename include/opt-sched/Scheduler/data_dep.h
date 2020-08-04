@@ -120,32 +120,34 @@ struct NodeData {
   //copies prdcsrs_ and scsrs_ arrays to device
   void CopyPointersToDevice(NodeData *dev_nodeData) {
     EdgeData *dev_prdcsrs = NULL;
+ 
+    if (prdcsrCnt_ > 0) {
+      //allocate device memory
+      if (cudaSuccess != cudaMallocManaged((void**)&dev_prdcsrs, prdcsrCnt_ * sizeof(EdgeData)))
+        printf("Error allocating dev mem for dev_prdcsrs: %s\n", cudaGetErrorString(cudaGetLastError()));
 
-    //allocate device memory
-    if (cudaSuccess != cudaMalloc((void**)&dev_prdcsrs, prdcsrCnt_ * sizeof(EdgeData)))
-      printf("Error allocating dev mem for dev_prdcsrs: %s\n", cudaGetErrorString(cudaGetLastError()));
+      //copy array to device
+      if (cudaSuccess != cudaMemcpy(dev_prdcsrs, prdcsrs_, prdcsrCnt_ * sizeof(EdgeData), cudaMemcpyHostToDevice))
+        printf("Error copying prdcsrs_ to device: %s\n", cudaGetErrorString(cudaGetLastError()));
 
-    //copy array to device
-    if (cudaSuccess != cudaMemcpy(dev_prdcsrs, prdcsrs_, prdcsrCnt_ * sizeof(EdgeData), cudaMemcpyHostToDevice))
-      printf("Error copying prdcsrs_ to device: %s\n", cudaGetErrorString(cudaGetLastError()));
-
-    //update device pointer
-    if (cudaSuccess != cudaMemcpy(&(dev_nodeData->prdcsrs_), &dev_prdcsrs, sizeof(EdgeData *), cudaMemcpyHostToDevice))
-      printf("Error updating dev_nodeData->prdcsrs_: %s", cudaGetErrorString(cudaGetLastError()));
+      //update device pointer
+      dev_nodeData->prdcsrs_ = dev_prdcsrs;
+    }
 
     EdgeData *dev_scsrs = NULL;
 
-    //allocate device memory
-    if (cudaSuccess != cudaMalloc((void**)&dev_scsrs, scsrCnt_ * sizeof(EdgeData)))
-      printf("Error allocating dev mem for dev_scsrs: %s\n", cudaGetErrorString(cudaGetLastError()));
+    if (scsrCnt_ > 0) {
+      //allocate device memory
+      if (cudaSuccess != cudaMallocManaged((void**)&dev_scsrs, scsrCnt_ * sizeof(EdgeData)))
+        printf("Error allocating dev mem for dev_scsrs: %s\n", cudaGetErrorString(cudaGetLastError()));
 
-    //copy array to device
-    if (cudaSuccess != cudaMemcpy(dev_scsrs, scsrs_, scsrCnt_ * sizeof(EdgeData), cudaMemcpyHostToDevice))
-      printf("Error copying scsrs_ to device: %s\n", cudaGetErrorString(cudaGetLastError()));
+      //copy array to device
+      if (cudaSuccess != cudaMemcpy(dev_scsrs, scsrs_, scsrCnt_ * sizeof(EdgeData), cudaMemcpyHostToDevice))
+        printf("Error copying scsrs_ to device: %s\n", cudaGetErrorString(cudaGetLastError()));
 
-    //update device pointer
-    if (cudaSuccess != cudaMemcpy(&(dev_nodeData->scsrs_), &dev_scsrs, sizeof(EdgeData *), cudaMemcpyHostToDevice))
-      printf("Error updating dev_nodeData->scsrs_: %s", cudaGetErrorString(cudaGetLastError()));
+      //update device pointer
+      dev_nodeData->scsrs_ = dev_scsrs;
+    }
   }
 };
 
@@ -283,7 +285,7 @@ public:
 
   // Returns transformations that we will apply to the graph
   SmallVector<std::unique_ptr<GraphTrans>, 0> *GetGraphTrans() {
-    return &graphTrans_;
+    return graphTrans_;
   }
 
   void EnableBackTracking();
@@ -436,8 +438,7 @@ protected:
   InstCount knwnSchedLngth_;
 
   // A list of DDG mutations
-  SmallVector<std::unique_ptr<GraphTrans>, 0> graphTrans_;
-
+  SmallVector<std::unique_ptr<GraphTrans>, 0> *graphTrans_;
   MachineModel *machMdl_;
 
   bool backTrackEnbl_;

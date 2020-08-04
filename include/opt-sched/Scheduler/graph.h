@@ -269,11 +269,9 @@ public:
 
   // Writes a comma-separated list of (direct) successor node numbers to the
   // specified file stream.
-  __host__ __device__
   void PrntScsrLst(FILE *outFile);
   // Writes a nicely formatted list of (direct) successor node numbers to the
   // info log.
-  __host__ __device__
   void LogScsrLst();
 
   // Returns the number of predecessors in this instruction's transitive
@@ -408,11 +406,9 @@ public:
   inline void CycleDetected() { cycleDetected_ = true; }
 
   // Prints a nicely formatted description of the graph to the specified file.
-  __host__ __device__
   void Print(FILE *outFile);
 
   // Log formatted description of the graph.
-  __host__ __device__
   void LogGraph();
 
   // A utility function to reverse direction from forward to backward and vice

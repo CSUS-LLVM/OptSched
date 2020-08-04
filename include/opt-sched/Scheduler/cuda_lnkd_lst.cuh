@@ -925,7 +925,10 @@ template <class T, class K>
 __host__ __device__
 PriorityList<T, K>::PriorityList(int maxSize) : LinkedList<T>(maxSize) {	
   if (LinkedList<T>::maxSize_ != INVALID_VALUE) {
+    //cannot use delete on device
+#ifndef __CUDA_ARCH__
     delete[] LinkedList<T>::allocEntries_;
+#endif
     LinkedList<T>::allocEntries_ = new Entry<T>[0];
     AllocEntries_();
   } else {

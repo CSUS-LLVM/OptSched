@@ -7,6 +7,7 @@
 
 using namespace llvm::opt_sched;
 
+__host__ __device__
 GraphNode::GraphNode(UDT_GNODES num, UDT_GNODES maxNodeCnt) {
   num_ = num;
   scsrLblSum_ = 0;
@@ -23,6 +24,7 @@ GraphNode::GraphNode(UDT_GNODES num, UDT_GNODES maxNodeCnt) {
   isRcrsvPrdcsr_ = NULL;
 }
 
+__host__ __device__
 GraphNode::~GraphNode() {
   DelScsrLst();
   delete scsrLst_;
@@ -310,6 +312,7 @@ void GraphNode::LogScsrLst() {
   }
 }
 
+/*
 void GraphNode::CopyPointersToDevice(void *dev_entry){
   //declare pointer for element->scsrLst_
   //we only need elmntCnt_ so no need to copy pointers
@@ -332,7 +335,7 @@ void GraphNode::CopyPointersToDevice(void *dev_entry){
     printf("Error updating dev_entry->element->scsrLst_ on device!\n");
   }
 }
-
+*/
 __host__ __device__
 DirAcycGraph::DirAcycGraph() {
   nodeCnt_ = 0;
@@ -351,6 +354,7 @@ DirAcycGraph::~DirAcycGraph() {
     delete[] tplgclOrdr_;
 }
 
+__host__ __device__
 void DirAcycGraph::CreateEdge_(UDT_GNODES frmNodeNum, UDT_GNODES toNodeNum,
                                UDT_GLABEL label) {
   GraphEdge *newEdg;
