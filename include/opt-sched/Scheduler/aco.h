@@ -48,19 +48,19 @@ private:
   void PrintPheremone();
 
   // pheremone Graph Debugging start
-  llvm::SmallSet<std::string, 0> dbgRgns;
-  llvm::SmallSet<std::pair<InstCount, InstCount>, 0> antEdges;
-  llvm::SmallSet<std::pair<InstCount, InstCount>, 0> crntAntEdges;
-  llvm::SmallSet<std::pair<InstCount, InstCount>, 0> iterAntEdges;
-  llvm::SmallSet<std::pair<InstCount, InstCount>, 0> bestSched;
-  std::map<std::pair<InstCount, InstCount>, double> lastHeu;
-  bool isDbg = false;
-  std::string outPath;
-  std::string graphDisplayAnnotation(int frm, int to);
-  std::string getHeuIfPossible(int frm, int to);
-  void writePheremoneGraph(std::string stage);
-  void writePGraphRecursive(FILE *out, SchedInstruction *ins,
-                            llvm::SetVector<SchedInstruction *> &visited);
+  llvm::SmallSet<std::string, 0> DbgRgns;
+  llvm::SmallSet<std::pair<InstCount, InstCount>, 0> AntEdges;
+  llvm::SmallSet<std::pair<InstCount, InstCount>, 0> CrntAntEdges;
+  llvm::SmallSet<std::pair<InstCount, InstCount>, 0> IterAntEdges;
+  llvm::SmallSet<std::pair<InstCount, InstCount>, 0> BestAntEdges;
+  std::map<std::pair<InstCount, InstCount>, double> LastHeu;
+  bool IsDbg = false;
+  std::string OutPath;
+  std::string graphDisplayAnnotation(int Frm, int To);
+  std::string getHeuIfPossible(int Frm, int To);
+  void writePheremoneGraph(std::string Stage);
+  void writePGraphRecursive(FILE *Out, SchedInstruction *Ins,
+                            llvm::SetVector<SchedInstruction *> &Visited);
 
   // pheremone Graph Debugging end
 

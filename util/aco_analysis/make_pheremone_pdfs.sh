@@ -5,11 +5,14 @@
 #Author:        Paul McHugh
 #Last Update:	July 24, 2020
 #**************************************************************************************
-#Must be run in the directory containing the '.dot' files you want to process
-#Requires write permission in the current directory.
+#If run with one argument which is a directory the script will generate the pdfs in
+#the selected directory. if no argument is present the script generates pdf in the
+#current directory
+#Current/selected must directory contain the '.dot' files you want to process
+#Requires write permission in the current/selected directory.
 
 #check to see if we have the proper packages installed
-if dot -V &> /dev/null || pdfunite -v &> /dev/null;
+if ! ( dot -V &> /dev/null && pdfunite -v &> /dev/null ) ;
 then
 	echo -e "\e[31mYou are missing either graphviz or poppler-utils\e[m"
 	echo "Install the necessary packages with the command:"
@@ -17,6 +20,10 @@ then
 	exit
 fi
 
+if [ ! -z "$1" ] && [ -d "$1" ];
+then
+	cd "$1"
+fi
 
 regions=`ls *"@initial.dot" *"@iteration"*.dot | cut -d@ -f1 |uniq`
 for region in $regions
