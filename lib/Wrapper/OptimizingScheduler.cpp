@@ -66,7 +66,14 @@ static constexpr const char *DEFAULT_CFGMM_FNAME = "/machine_model.cfg";
 
 // Create OptSched ScheduleDAG.
 static ScheduleDAGInstrs *createOptSched(MachineSchedContext *C) {
-  return new ScheduleDAGOptSched(C, llvm::make_unique<GenericScheduler>(C));
+  ScheduleDAGMILive *DAG =
+      new ScheduleDAGOptSched(C, llvm::make_unique<GenericScheduler>(C));
+  DAG->addMutation(createCopyConstrainDAGMutation(DAG->TII, DAG->TRI));
+  // README: if you need the x86 mutations uncomment the next line.
+  // addMutation(createX86MacroFusionDAGMutation());
+  // You also need to add the next line somewhere above this function
+  //#include "../../../../../llvm/lib/Target/X86/X86MacroFusion.h"
+  return DAG;
 }
 
 // Register the machine scheduler.
@@ -217,8 +224,6 @@ ScheduleDAGOptSched::ScheduleDAGOptSched(
   MM = OST->createMachineModel(PathCfgMM.c_str());
   MM->convertMachineModel(static_cast<ScheduleDAGInstrs &>(*this),
                           RegClassInfo);
-
-  addLLVMMutations();
 }
 
 void ScheduleDAGOptSched::SetupLLVMDag() {
@@ -237,8 +242,10 @@ void ScheduleDAGOptSched::SetupLLVMDag() {
   // Finalize live-in
   RPTracker.closeTop();
 
-  Topo.InitDAGTopologicalSorting();
-  postprocessDAG();
+  if (EnableMutations) {
+    Topo.InitDAGTopologicalSorting();
+    postprocessDAG();
+  }
 }
 
 // Add the two passes used for the two pass scheduling approach
@@ -249,19 +256,6 @@ void ScheduleDAGOptSched::initSchedulers() {
   SchedPasses.push_back(OptSchedMinRP);
   // Second
   SchedPasses.push_back(OptSchedBalanced);
-}
-
-// Add the appropriate LLVM mutations.
-void ScheduleDAGOptSched::addLLVMMutations() {
-
-  // Adds the LLVM mutations if LLVM_MUTATIONS is set
-  if (EnableMutations) {
-    addMutation(createCopyConstrainDAGMutation(TII, TRI));
-    // README: if you need the x86 mutations uncomment the next line.
-    // addMutation(createX86MacroFusionDAGMutation());
-    // You also need to add the next line somewhere above this function
-    //#include "../../../../../llvm/lib/Target/X86/X86MacroFusion.h"
-  }
 }
 
 // schedule called for each basic block
