@@ -1,7 +1,7 @@
-IF(${PACKAGE_VERSION} VERSION_LESS "8.0")
+if(${PACKAGE_VERSION} VERSION_LESS "8.0")
   add_llvm_loadable_module(OptSched OBJECT ${OPT_SCHED_SRCS})
-ELSE()
+else()
   add_llvm_library(OptSched MODULE OBJECT ${OPT_SCHED_SRCS})
-ENDIF()
+endif()
 
 add_dependencies(OptSched ${OPT_SCHED_TARGET_DEPS})
