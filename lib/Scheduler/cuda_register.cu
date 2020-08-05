@@ -113,11 +113,19 @@ int Register::GetConflictCnt() const { return conflicts_.GetOneCnt(); }
 bool Register::IsSpillCandidate() const { return isSpillCnddt_; }
 
 bool Register::AddToInterval(const SchedInstruction *inst) {
+#ifdef __CUDA_ARCH__
+  return liveIntervalSet_.insert(inst);
+#else
   return liveIntervalSet_.insert(inst).second;
+#endif
 }
 
 bool Register::IsInInterval(const SchedInstruction *inst) const {
+#ifdef __CUDA_ARCH__
+  return liveIntervalSet_.contains(inst);
+#else
   return liveIntervalSet_.count(inst) != 0;
+#endif
 }
 
 const Register::InstSetType &Register::GetLiveInterval() const {
@@ -125,17 +133,26 @@ const Register::InstSetType &Register::GetLiveInterval() const {
 }
 
 bool Register::AddToPossibleInterval(const SchedInstruction *inst) {
+#ifdef __CUDA_ARCH__
+  return possibleLiveIntervalSet_.insert(inst);
+#else
   return possibleLiveIntervalSet_.insert(inst).second;
+#endif
 }
 
 bool Register::IsInPossibleInterval(const SchedInstruction *inst) const {
+#ifdef __CUDA_ARCH__
+  return possibleLiveIntervalSet_.contains(inst);
+#else
   return possibleLiveIntervalSet_.count(inst) != 0;
+#endif
 }
 
 const Register::InstSetType &Register::GetPossibleLiveInterval() const {
   return possibleLiveIntervalSet_;
 }
 
+__host__ __device__
 Register::Register(int16_t type, int num, int physicalNumber) {
   type_ = type;
   num_ = num;
@@ -149,6 +166,7 @@ Register::Register(int16_t type, int num, int physicalNumber) {
   liveOut_ = false;
 }
 
+__host__ __device__
 RegisterFile::RegisterFile() {
   regType_ = 0;
   Regs = NULL;
@@ -156,6 +174,7 @@ RegisterFile::RegisterFile() {
   physRegCnt_ = 0;
 }
 
+__host__ __device__
 RegisterFile::~RegisterFile() {
   if (Regs) {
     for (int i = 0; i < Regs_size_; i++)
@@ -164,10 +183,13 @@ RegisterFile::~RegisterFile() {
   }
 }
 
+__host__ __device__
 int RegisterFile::GetRegCnt() const { return getCount(); }
 
+__host__ __device__
 int16_t RegisterFile::GetRegType() const { return regType_; }
 
+__host__ __device__
 void RegisterFile::SetRegType(int16_t regType) { regType_ = regType; }
 
 __host__ __device__
@@ -210,6 +232,7 @@ Register *RegisterFile::getNext() {
   return Regs[RegNum];
 }
 
+__host__ __device__
 void RegisterFile::SetRegCnt(int regCnt) {
   if (regCnt == 0)
     return;
@@ -228,6 +251,7 @@ void RegisterFile::SetRegCnt(int regCnt) {
   }
 }
 
+__host__ __device__
 Register *RegisterFile::GetReg(int num) const {
   if (num >= 0 && num < getCount()) {
     return Regs[num];
@@ -244,6 +268,7 @@ Register *RegisterFile::FindLiveReg(int physNum) const {
   return NULL;
 }
 
+
 int RegisterFile::FindPhysRegCnt() {
   int maxPhysNum = -1;
   for (int i = 0; i < getCount(); i++) {
@@ -258,6 +283,7 @@ int RegisterFile::FindPhysRegCnt() {
   return physRegCnt_;
 }
 
+__host__ __device__
 int RegisterFile::GetPhysRegCnt() const { return physRegCnt_; }
 
 void RegisterFile::SetupConflicts() {

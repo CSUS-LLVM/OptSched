@@ -132,6 +132,9 @@ struct NodeData {
 
       //update device pointer
       dev_nodeData->prdcsrs_ = dev_prdcsrs;
+
+      //free up host EdgeData
+      delete[] prdcsrs_;
     }
 
     EdgeData *dev_scsrs = NULL;
@@ -147,6 +150,77 @@ struct NodeData {
 
       //update device pointer
       dev_nodeData->scsrs_ = dev_scsrs;
+
+      //free up host EdgeData'
+      delete[] scsrs_;
+    }
+  }
+};
+
+//DS for transfer of register data to device
+struct RegData {
+  int wght_;
+  bool isLiveIn_;
+  bool isLiveOut_;
+  //instNum of insts that use/define the reg
+  InstCount *uses_;
+  int useCnt_;
+  InstCount *defs_;
+  int defCnt_;
+
+  void CopyPointersToDevice(RegData *dev_regData) {
+    InstCount *dev_uses = NULL;
+
+    if (useCnt_ > 0) {
+      if (cudaSuccess != cudaMallocManaged((void**)&dev_uses, useCnt_ * sizeof(InstCount)))
+        printf("Error allocating dev mem for dev_uses: %s\n", cudaGetErrorString(cudaGetLastError()));
+
+      if (cudaSuccess != cudaMemcpy(dev_uses, uses_, useCnt_ * sizeof(InstCount), cudaMemcpyHostToDevice))
+        printf("Error copying uses_ to device: %s\n", cudaGetErrorString(cudaGetLastError()));
+
+      dev_regData->uses_ = dev_uses;
+
+      delete[] uses_;
+    }
+    InstCount *dev_defs = NULL;
+
+    if (defCnt_ > 0) {
+      if (cudaSuccess != cudaMallocManaged((void**)&dev_defs, defCnt_ * sizeof(InstCount)))
+        printf("Error allocating dev mem for dev_defs: %s\n", cudaGetErrorString(cudaGetLastError()));
+
+      if (cudaSuccess != cudaMemcpy(dev_defs, defs_, defCnt_ * sizeof(InstCount), cudaMemcpyHostToDevice))
+        printf("Error copying defs_ to device: %s\n", cudaGetErrorString(cudaGetLastError()));
+
+      dev_regData->defs_ = dev_defs;
+
+      delete[] defs_;
+    }
+  }
+};
+
+//data structure for transfer of register file data to device
+struct RegFileData {
+  int16_t regType_;
+  int regCnt_;
+  RegData *regs_;
+
+  void CopyPointersToDevice(RegFileData *dev_regFileData) {
+    RegData *dev_regs = NULL;
+
+    if (regCnt_ > 0) {
+      if (cudaSuccess != cudaMallocManaged((void**)&dev_regs, regCnt_ * sizeof(RegData)))
+        printf("Error allocating dev mem for dev_regs: %s\n", cudaGetErrorString(cudaGetLastError()));
+
+      if (cudaSuccess != cudaMemcpy(dev_regs, regs_, regCnt_ * sizeof(RegData), cudaMemcpyHostToDevice))
+        printf("Error copying regs_ to device: %s\n", cudaGetErrorString(cudaGetLastError()));
+
+      dev_regFileData->regs_ = dev_regs;
+
+      for (int i = 0; i < regCnt_; i++)
+        regs_[i].CopyPointersToDevice(&dev_regs[i]);
+
+      //free up host regs
+      delete[] regs_;
     }
   }
 };
@@ -229,7 +303,9 @@ protected:
 
   bool includesUnpipelined_;
 
+  __host__ __device__
   InstCount CmputRsrcLwrBound_();
+  __host__ __device__
   virtual InstCount CmputAbslutUprBound_();
 };
 
@@ -279,6 +355,7 @@ public:
 
   // Setup the Dep. Graph for scheduling by doing a topological sort
   // followed by critical path computation
+  __host__ __device__
   FUNC_RESULT SetupForSchdulng(bool cmputTrnstvClsr);
   // Update the Dep after applying graph transformations
   FUNC_RESULT UpdateSetupForSchdulng(bool cmputTrnstvClsr);
@@ -392,10 +469,14 @@ public:
   //creates an array of NodeData which hold the information
   //about the DDG in order to create DDG on device
   void CreateNodeData(NodeData *nodeData);
+  //Creates and array of reg file data with holds the information
+  //about the RegFiles and its Regs in order to recreate
+  //regFiles on device
+  void CreateRegData(RegFileData *regFileData);
 
   //used to setup DDG on device
   __device__
-  void ReconstructOnDevice_(InstCount instCnt, NodeData *nodeData);
+  void ReconstructOnDevice_(InstCount instCnt, NodeData *nodeData, RegFileData *regFileData);
 
 protected:
   // TODO(max): Get rid of this.
@@ -503,12 +584,19 @@ protected:
 
   FUNC_RESULT Finish_();
 
+  __host__ __device__
   void CmputCrtclPaths_();
+  __host__ __device__
   void CmputCrtclPathsFrmRoot_();
+  __host__ __device__
   void CmputCrtclPathsFrmLeaf_();
+  __host__ __device__
   void CmputCrtclPathsFrmRcrsvScsr_(SchedInstruction *ref);
+  __host__ __device__
   void CmputCrtclPathsFrmRcrsvPrdcsr_(SchedInstruction *ref);
+  __host__ __device__
   void CmputRltvCrtclPaths_(DIRECTION dir);
+  __host__ __device__
   void CmputBasicLwrBounds_();
 
   void WriteNodeInfoToF2File_(FILE *file);
@@ -641,6 +729,7 @@ protected:
   void AllocRlxdSchdulr_(LB_ALG lbAlg, RelaxedScheduler *&rlxdSchdulr,
                          RelaxedScheduler *&rvrsRlxdSchdulr);
   void FreeRlxdSchdulr_(LB_ALG lbAlg);
+  __host__ __device__
   InstCount CmputAbslutUprBound_();
 
 public:

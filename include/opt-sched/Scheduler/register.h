@@ -15,6 +15,7 @@ Last Update:  Jun. 2017
 #include "llvm/ADT/SmallVector.h"
 #include <memory>
 #include <cuda_runtime.h>
+#include "opt-sched/Scheduler/device_set.h"
 
 using namespace llvm;
 
@@ -25,20 +26,29 @@ namespace opt_sched {
 // times this register is defined and used.
 class Register {
 public:
+  __host__ __device__
   Register(int16_t type = 0, int num = 0, int physicalNumber = INVALID_VALUE);
 
+#ifdef __CUDA_ARCH__
+  //use my DeviceSet class on device
+  using InstSetType = DevicePtrSet<const SchedInstruction *>;
+#else
   using InstSetType = SmallPtrSet<const SchedInstruction *, 8>;
+#endif
 
   __host__ __device__
   int16_t GetType() const;
+  __host__ __device__
   void SetType(int16_t type);
 
   __host__ __device__
   int GetNum() const;
+  __host__ __device__
   void SetNum(int num);
 
   __host__ __device__
   int GetWght() const;
+  __host__ __device__
   void SetWght(int wght);
 
   bool IsPhysical() const;
@@ -46,6 +56,7 @@ public:
   int GetPhysicalNumber() const;
   void SetPhysicalNumber(int physicalNumber);
 
+  __host__ __device__
   void AddUse(const SchedInstruction *inst);
   __host__ __device__
   int GetUseCnt() const;
@@ -54,6 +65,7 @@ public:
   __host__ __device__
   int GetCrntUseCnt() const;
 
+  __host__ __device__
   void AddDef(const SchedInstruction *inst);
   int GetDefCnt() const;
   const InstSetType &GetDefList() const;
@@ -75,10 +87,12 @@ public:
   bool IsLive() const;
   // Live in registers are defined by the artifical entry node.
   bool IsLiveIn() const;
+  __host__ __device__
   void SetIsLiveIn(bool liveIn);
   // Live out registers are used by the artifical exit node.
   __host__ __device__
   bool IsLiveOut() const;
+  __host__ __device__
   void SetIsLiveOut(bool liveOut);
 
   Register &operator=(const Register &rhs);
@@ -137,15 +151,22 @@ private:
 // Represents a file of registers of a certain type and tracks their usages.
 class RegisterFile {
 public:
+  __host__ __device__
   RegisterFile();
+  __host__ __device__
   ~RegisterFile();
 
+  __host__ __device__
   int GetRegCnt() const;
+  __host__ __device__
   void SetRegCnt(int regCnt);
 
+  __host__ __device__
   int16_t GetRegType() const;
+  __host__ __device__
   void SetRegType(int16_t regType);
 
+  __host__ __device__
   Register *GetReg(int num) const;
   Register *FindLiveReg(int physNum) const;
 
