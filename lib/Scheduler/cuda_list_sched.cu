@@ -41,22 +41,13 @@ FUNC_RESULT ListScheduler::FindSchedule(InstSchedule *sched, SchedRegion *rgn) {
   crntSched_ = sched;
   rgn_ = rgn;
 
+  //debug
+  printf("ListScheduler::FindSchedule: Initializing\n");
+
   Initialize_();
 
   while (!IsSchedComplete_()) {
-    //call to copy readylist to device and update it on device
-    //Call_Kernel();
-    
-    //debug
-    //printf("Host ReadyList before update: ");
-    //rdyLst_->Print(std::cout);
-
     UpdtRdyLst_(crntCycleNum_, crntSlotNum_);
-    
-    //debug
-    //printf("Host ReadyList after update: ");
-    //rdyLst_->Print(std::cout);
-    
     rdyLst_->ResetIterator();
 
     iterCnt++;
@@ -65,7 +56,13 @@ FUNC_RESULT ListScheduler::FindSchedule(InstSchedule *sched, SchedRegion *rgn) {
       maxRdyLstSize = rdyLstSize;
     avgRdyLstSize += rdyLstSize;
 
+    //debug
+    printf("ListScheduler::FindSchedule: Picking inst\n");
+
     SchedInstruction *inst = PickInst();
+
+    //debug
+    printf("ListScheduler::FindSchedule: Picked inst: %d\n", inst->GetNum());
 
     InstCount instNum;
     // If the ready list is empty.
@@ -74,9 +71,31 @@ FUNC_RESULT ListScheduler::FindSchedule(InstSchedule *sched, SchedRegion *rgn) {
     } else {
       isEmptyCycle = false;
       instNum = inst->GetNum();
+
+      //debug
+      printf("ListScheduler::FindSchedule: Calling SchdulInst_\n");
+
       SchdulInst_(inst, crntCycleNum_);
+
+      //debug
+      printf("ListScheduler::FindSchedule: Done with SchdulInst_\n");
+
+      //debug
+      printf("ListScheduler::FindSchedule: Calling inst->Schedule\n");
+
       inst->Schedule(crntCycleNum_, crntSlotNum_);
+
+      //debug
+      printf("ListScheduler::FindSchedule: Done with inst->Schedule\n");
+
+      //debug
+      printf("ListScheduler::FindSchedule: Calling rgn_->SchdulInst()\n");
+
       rgn_->SchdulInst(inst, crntCycleNum_, crntSlotNum_, false);
+
+      //debug
+      printf("ListScheduler::FindSchedule: Done with rgn_->SchdulInst()\n");
+
       DoRsrvSlots_(inst);
       rdyLst_->RemoveNextPriorityInst();
       UpdtSlotAvlblty_(inst);

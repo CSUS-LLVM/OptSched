@@ -55,6 +55,9 @@ public:
 
   // Returns the dependence graph of this region.
   inline DataDepGraph *GetDepGraph() { return dataDepGraph_; }
+  //for updating DDG pointer to device DDG
+  __device__
+  inline void SetDepGraph(DataDepGraph *dev_DDG) {dataDepGraph_ = dev_DDG;}
   // Returns the lower bound on the cost of this region.
   inline int GetCostLwrBound() { return costLwrBound_; }
   // Returns the best cost found so far for this region.

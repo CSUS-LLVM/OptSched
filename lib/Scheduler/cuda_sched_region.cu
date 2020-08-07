@@ -91,6 +91,9 @@ void DevListSched(MachineModel *dev_machMdl, SchedRegion *dev_rgn,
   //properly, but then kernel clearly crashes since InstSchedule is passed a NULL ptr
   DataDepGraph *dev_dataDepGraph = new DataDepGraph(dev_machMdl, ltncyPcsn); 
 
+  //update dev_rgn->dataDepGraph_
+  dev_rgn->SetDepGraph(dev_dataDepGraph);
+  
   //debug
   printf("Dev DDG created, reconstructing\n");
 
@@ -98,6 +101,7 @@ void DevListSched(MachineModel *dev_machMdl, SchedRegion *dev_rgn,
   dev_dataDepGraph->ReconstructOnDevice_(instCnt, dev_nodeData, dev_regFileData);
 
   dev_dataDepGraph->SetupForSchdulng(cmputTrnstvClsr);
+  
   //debug
   printf("dev_dataDepGraph constructed!\n");  
 

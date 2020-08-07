@@ -454,6 +454,7 @@ void BBWithSpill::CmputCrntSpillCost_() {
 }
 /*****************************************************************************/
 
+__host__ __device__
 void BBWithSpill::UpdateSpillInfoForSchdul_(SchedInstruction *inst,
                                             bool trackCnflcts) {
   int16_t regType;

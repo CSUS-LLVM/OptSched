@@ -8,7 +8,6 @@
 
 using namespace llvm::opt_sched;
 
-/*
 __host__ __device__
 InstScheduler::InstScheduler(DataDepStruct *dataDepGraph, MachineModel *machMdl,
                              InstCount schedUprBound) {
@@ -39,52 +38,6 @@ InstScheduler::InstScheduler(DataDepStruct *dataDepGraph, MachineModel *machMdl,
 
   includesUnpipelined_ = dataDepGraph->IncludesUnpipelined();
 }
-*/
-
-__host__ __device__
-InstScheduler::InstScheduler(DataDepStruct *dataDepGraph, MachineModel *machMdl,
-                             InstCount schedUprBound) {
-  assert(dataDepGraph != NULL);
-  assert(machMdl != NULL);
-
-  machMdl_ = machMdl;
-
-  schedUprBound_ = schedUprBound;
-
-  // PATCH.
-  schedUprBound_ += 1;
-
-  totInstCnt_ = dataDepGraph->GetInstCnt();
-
-//if constructing on device, we know a DDG was passed. Circumvent 
-//polymorphism to invoke a non virtual, device version of GetRootInst()
-//and GetLeafInst()
-#ifdef __CUDA_ARCH__
-  rootInst_ = ((DataDepGraph *)dataDepGraph)->Dev_GetRootInst();
-#else
-  rootInst_ = dataDepGraph->GetRootInst();
-#endif
-
-#ifdef __CUDA_ARCH__
-  leafInst_ = ((DataDepGraph *)dataDepGraph)->Dev_GetLeafInst();
-#else
-  leafInst_ = dataDepGraph->GetLeafInst();
-#endif
-
-  issuRate_ = machMdl_->GetIssueRate();
-  issuTypeCnt_ = machMdl_->GetIssueTypeCnt();
-  schduldInstCnt_ = 0;
-
-  slotsPerTypePerCycle_ = new int[issuTypeCnt_];
-  instCntPerIssuType_ = new InstCount[issuTypeCnt_];
-
-  issuTypeCnt_ = machMdl_->GetSlotsPerCycle(slotsPerTypePerCycle_);
-
-  dataDepGraph->GetInstCntPerIssuType(instCntPerIssuType_);
-
-  includesUnpipelined_ = dataDepGraph->IncludesUnpipelined();
-}
-
 
 __host__ __device__
 InstScheduler::~InstScheduler() {
@@ -348,9 +301,6 @@ void ConstrainedScheduler::CleanupCycle_(InstCount cycleNum) {
 __host__ __device__
 bool ConstrainedScheduler::IsTriviallyLegal_(
     const SchedInstruction *inst) const {
-  //debug
-  printf("Inside IsTriviallyLegal_\n");
-	
   // Scheduling a stall is always legal.
   if (inst == NULL)
     return true;

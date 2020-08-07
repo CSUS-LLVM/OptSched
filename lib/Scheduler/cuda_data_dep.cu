@@ -1501,20 +1501,11 @@ void DataDepGraph::CreateRegData(RegFileData *regFileData) {
 __device__
 void DataDepGraph::ReconstructOnDevice_(InstCount instCnt, NodeData *nodeData,
 	                        	RegFileData *regFileData) {
-  //debug
-  printf("Inside Reconstruct on device, Allocating arrays\n");
-
   AllocArrays_(instCnt);
-
-  //debug
-  printf("Allocated arrays, starting creation of nodes. Num of nodes: %d\n", (int)instCnt);
 
   SchedInstruction *inst = NULL;
   //create nodes
   for (InstCount i = 0; i < instCnt; i++) {
-    //debug
-    printf("Creating node %d\n", i);
-
     inst = CreateNode_(nodeData[i].instNum_, nodeData[i].instName_, 
 		       nodeData[i].instType_, nodeData[i].opCode_, 
 		       nodeData[i].nodeID_, nodeData[i].fileSchedOrder_, 
@@ -1528,9 +1519,6 @@ void DataDepGraph::ReconstructOnDevice_(InstCount instCnt, NodeData *nodeData,
     //set leaf_
     if (nodeData[i].scsrCnt_ == 0)
       leaf_ = (GraphNode *)inst;
-
-    //debug
-    printf("Node created\n");
   }
 
   //create edges
@@ -1541,11 +1529,12 @@ void DataDepGraph::ReconstructOnDevice_(InstCount instCnt, NodeData *nodeData,
     }
 
     for (int j = 0; j < nodeData[i].prdcsrCnt_; j++) {
-      CreateEdge_(nodeData[i].instNum_, nodeData[i].prdcsrs_[j].toNodeNum_, 
+      CreateEdge_(nodeData[i].prdcsrs_[j].toNodeNum_, nodeData[i].instNum_,
 		  nodeData[i].prdcsrs_[j].ltncy_, 
 		  nodeData[i].prdcsrs_[j].depType_);
     }
   }
+  
   Register *reg = NULL;
   //recreate RegFiles
   for (int i = 0; i < machMdl_->GetRegTypeCnt(); i++) {

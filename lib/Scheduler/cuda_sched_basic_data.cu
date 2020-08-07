@@ -545,7 +545,7 @@ SchedInstruction *SchedInstruction::GetFrstPrdcsr(InstCount *scsrNum,
   if (depType)
     *depType = (DependenceType)edge->label2;
   if (toNodeNum)
-    *toNodeNum = edge->to->GetNum();
+    *toNodeNum = edge->from->GetNum();
   return (SchedInstruction *)(edge->from);
 }
 
@@ -741,30 +741,14 @@ void SchedInstruction::SetBounds(InstCount flb, InstCount blb) {
 __host__ __device__
 bool SchedInstruction::PrdcsrSchduld(InstCount prdcsrNum, InstCount cycle,
                                      InstCount &rdyCycle) {
-  //debug
-  printf("Inside PrdcsrSchduld\n");
-
   assert(prdcsrNum < prdcsrCnt_);
 
-  //debug
-  printf("Reached point 1\n");
-
   rdyCyclePerPrdcsr_[prdcsrNum] = cycle + ltncyPerPrdcsr_[prdcsrNum];
-  
-  //debug
-  printf("Reached point 2\n");
-  
   prevMinRdyCyclePerPrdcsr_[prdcsrNum] = minRdyCycle_;
-
-  //debug
-  printf("Reached point 3\n");
 
   if (rdyCyclePerPrdcsr_[prdcsrNum] > minRdyCycle_) {
     minRdyCycle_ = rdyCyclePerPrdcsr_[prdcsrNum];
   }
-
-  //debug
-  printf("Reached point 4\n");
 
   rdyCycle = minRdyCycle_;
   unschduldPrdcsrCnt_--;

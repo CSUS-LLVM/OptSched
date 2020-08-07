@@ -106,6 +106,7 @@ private:
   void InitForCostCmputtn_();
   InstCount CmputDynmcCost_();
 
+  __host__ __device__
   void UpdateSpillInfoForSchdul_(SchedInstruction *inst, bool trackCnflcts);
   void UpdateSpillInfoForUnSchdul_(SchedInstruction *inst);
   void SetupPhysRegs_();
