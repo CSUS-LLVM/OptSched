@@ -11,8 +11,12 @@ Last Update:  Jan. 2020
 
 #include "opt-sched/Scheduler/gen_sched.h"
 #include "llvm/ADT/ArrayRef.h"
+#include "llvm/ADT/SetVector.h"
+#include "llvm/ADT/SmallSet.h"
 #include "llvm/ADT/SmallVector.h"
+#include <map>
 #include <memory>
+#include <utility>
 
 namespace llvm {
 namespace opt_sched {
@@ -42,6 +46,23 @@ private:
   double Score(SchedInstruction *from, Choice choice);
 
   void PrintPheremone();
+
+  // pheremone Graph Debugging start
+  llvm::SmallSet<std::string, 0> DbgRgns;
+  llvm::SmallSet<std::pair<InstCount, InstCount>, 0> AntEdges;
+  llvm::SmallSet<std::pair<InstCount, InstCount>, 0> CrntAntEdges;
+  llvm::SmallSet<std::pair<InstCount, InstCount>, 0> IterAntEdges;
+  llvm::SmallSet<std::pair<InstCount, InstCount>, 0> BestAntEdges;
+  std::map<std::pair<InstCount, InstCount>, double> LastHeu;
+  bool IsDbg = false;
+  std::string OutPath;
+  std::string graphDisplayAnnotation(int Frm, int To);
+  std::string getHeuIfPossible(int Frm, int To);
+  void writePheremoneGraph(std::string Stage);
+  void writePGraphRecursive(FILE *Out, SchedInstruction *Ins,
+                            llvm::SetVector<SchedInstruction *> &Visited);
+
+  // pheremone Graph Debugging end
 
   SchedInstruction *SelectInstruction(const llvm::ArrayRef<Choice> &ready,
                                       SchedInstruction *lastInst);
