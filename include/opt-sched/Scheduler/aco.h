@@ -25,8 +25,8 @@ typedef double pheromone_t;
 
 struct Choice {
   SchedInstruction *inst;
-  double heuristic; // range 1 to 2
-  InstCount readyOn; //number of cycles until this instruction becomes ready
+  double heuristic;  // range 1 to 2
+  InstCount readyOn; // number of cycles until this instruction becomes ready
 };
 
 class ACOScheduler : public ConstrainedScheduler {
