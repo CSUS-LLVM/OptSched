@@ -25,7 +25,8 @@ typedef double pheromone_t;
 
 struct Choice {
   SchedInstruction *inst;
-  double heuristic; // range 0 to 1
+  double heuristic; // range 1 to 2
+  InstCount readyOn; //number of cycles until this instruction becomes ready
 };
 
 class ACOScheduler : public ConstrainedScheduler {
@@ -64,8 +65,8 @@ private:
 
   // pheromone Graph Debugging end
 
-  SchedInstruction *SelectInstruction(const llvm::ArrayRef<Choice> &ready,
-                                      SchedInstruction *lastInst);
+  Choice SelectInstruction(const llvm::ArrayRef<Choice> &ready,
+                           SchedInstruction *lastInst);
   void UpdatePheromone(InstSchedule *schedule);
   std::unique_ptr<InstSchedule> FindOneSchedule();
   llvm::SmallVector<pheromone_t, 0> pheromone_;
