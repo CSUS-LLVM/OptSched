@@ -85,7 +85,6 @@ public:
   // TODO(max): Document.
   virtual bool ChkCostFsblty(InstCount trgtLngth, EnumTreeNode *treeNode) = 0;
   // TODO(max): Document.
-  __host__ __device__
   virtual void SchdulInst(SchedInstruction *inst, InstCount cycleNum,
                           InstCount slotNum, bool trackCnflcts) = 0;
   // TODO(max): Document.
@@ -109,6 +108,7 @@ public:
   InstSchedule *AllocNewSched_();
 
   void UpdateScheduleCost(InstSchedule *sched);
+  __host__ __device__
   SPILL_COST_FUNCTION GetSpillCostFunc();
 
   // Initialie variables for the second pass of the two-pass-optsched

@@ -101,6 +101,7 @@ void Register::ResetConflicts() {
   isSpillCnddt_ = false;
 }
 
+__host__ __device__
 void Register::AddConflict(int regNum, bool isSpillCnddt) {
   assert(regNum != num_);
   assert(regNum >= 0);
@@ -120,6 +121,7 @@ bool Register::AddToInterval(const SchedInstruction *inst) {
 #endif
 }
 
+__host__ __device__
 bool Register::IsInInterval(const SchedInstruction *inst) const {
 #ifdef __CUDA_ARCH__
   return liveIntervalSet_.contains(inst);
@@ -140,6 +142,7 @@ bool Register::AddToPossibleInterval(const SchedInstruction *inst) {
 #endif
 }
 
+__host__ __device__
 bool Register::IsInPossibleInterval(const SchedInstruction *inst) const {
 #ifdef __CUDA_ARCH__
   return possibleLiveIntervalSet_.contains(inst);
@@ -304,6 +307,7 @@ int RegisterFile::GetConflictCnt() {
   return cnflctCnt;
 }
 
+__host__ __device__
 void RegisterFile::AddConflictsWithLiveRegs(int regNum, int liveRegCnt) {
   bool isSpillCnddt = (liveRegCnt + 1) > physRegCnt_;
   int conflictCnt = 0;

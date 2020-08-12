@@ -44,8 +44,10 @@ public:
   __host__ __device__
   bool GetBit(int index) const;
   // Returns the number of one bits in the bit vector.
+  __host__ __device__
   int GetOneCnt() const;
   // Returns the number of bits in the vector.
+  __host__ __device__
   int GetSize() const;
   //returns unitCnt_
   int GetUnitCnt() const;
@@ -81,6 +83,7 @@ protected:
   static const int BITS_IN_UNIT = sizeof(Unit) * 8;
 };
 
+__host__ __device__
 inline BitVector::BitVector(int length) {
   bitCnt_ = 0;
   unitCnt_ = 0;
@@ -108,6 +111,7 @@ inline void BitVector::Construct(int length) {
   oneCnt_ = 0;
 }
 
+__host__ __device__
 inline BitVector::~BitVector() {
   if (vctr_ != NULL)
     delete[] vctr_;
@@ -184,10 +188,12 @@ BitVector::And(BitVector *otherBitVector) const {
   return andedVector;
 }
 
+__host__ __device__
 inline int BitVector::GetSize() const { return bitCnt_; }
 
 inline int BitVector::GetUnitCnt() const { return unitCnt_; }
 
+__host__ __device__
 inline int BitVector::GetOneCnt() const { return oneCnt_; }
 
 inline BitVector &BitVector::operator=(const BitVector &src) {
@@ -237,7 +243,9 @@ public:
   WeightedBitVector(int lenght = 0);
   __host__ __device__
   ~WeightedBitVector();
+  __host__ __device__
   void SetBit(int index, bool bitVal, int weight);
+  __host__ __device__
   int GetWghtedCnt() const;
   virtual void Reset() override;
   //circumvent virtual functions so we can call reset on device
@@ -257,6 +265,7 @@ inline WeightedBitVector::WeightedBitVector(int length) : BitVector(length) {
 __host__ __device__
 inline WeightedBitVector::~WeightedBitVector() {}
 
+__host__ __device__
 inline void WeightedBitVector::SetBit(int index, bool bitVal, int weight) {
   assert(index < bitCnt_);
   int unitNum = index / BITS_IN_UNIT;
@@ -278,6 +287,7 @@ inline void WeightedBitVector::SetBit(int index, bool bitVal, int weight) {
   }
 }
 
+__host__ __device__
 inline int WeightedBitVector::GetWghtedCnt() const { return wghtedCnt_; }
 
 inline void WeightedBitVector::Reset() {

@@ -228,8 +228,9 @@ __host__ __device__
 DataDepGraph::~DataDepGraph() {
   if (insts_ != NULL) {
     for (InstCount i = 0; i < instCnt_; i++) {
-      if (insts_[i] != NULL)
+      if (insts_[i] != NULL) {
         delete insts_[i];
+      }
     }
     delete[] insts_;
   }
@@ -1506,11 +1507,25 @@ void DataDepGraph::ReconstructOnDevice_(InstCount instCnt, NodeData *nodeData,
   SchedInstruction *inst = NULL;
   //create nodes
   for (InstCount i = 0; i < instCnt; i++) {
+
+    //debug
+    printf("Creating inst node: %d\n", nodeData[i].instNum_);
+
     inst = CreateNode_(nodeData[i].instNum_, nodeData[i].instName_, 
 		       nodeData[i].instType_, nodeData[i].opCode_, 
 		       nodeData[i].nodeID_, nodeData[i].fileSchedOrder_, 
 		       nodeData[i].fileSchedCycle_, nodeData[i].fileLB_, 
 		       nodeData[i].fileUB_, 0);
+
+    //debug
+    if (!inst) {
+      printf("Node Creation failed for node num %d\n", nodeData[i].instNum_);
+      printf("Printing input:\ninstName_: %s\ninstType: %d\nopCode_: %s\nnodeID: %d\nfileSchedOrder: %d\nfileSChedCycle_: %d\nfileLB: %d\nfileUB: %d\n", 
+	     nodeData[i].instName_, nodeData[i].instType_, 
+	     nodeData[i].opCode_, nodeData[i].nodeID_, 
+	     nodeData[i].fileSchedOrder_, nodeData[i].fileSchedCycle_, 
+	     nodeData[i].fileLB_, nodeData[i].fileUB_);
+    }
 
     //set root_
     if (nodeData[i].prdcsrCnt_ == 0)
@@ -1523,16 +1538,44 @@ void DataDepGraph::ReconstructOnDevice_(InstCount instCnt, NodeData *nodeData,
 
   //create edges
   for (InstCount i = 0; i < instCnt; i++) {
+    //debug
+    printf("Creating nodes for prdcsrs\n");
+
+    for (int j = 0; j < nodeData[i].prdcsrCnt_; j++) {
+
+      //debug
+      printf("Creating edge from %d to %d\n", nodeData[i].prdcsrs_[j].toNodeNum_, nodeData[i].instNum_);
+
+      CreateEdge_(nodeData[i].prdcsrs_[j].toNodeNum_, nodeData[i].instNum_,
+                  nodeData[i].prdcsrs_[j].ltncy_, 
+                  nodeData[i].prdcsrs_[j].depType_);
+    }
+
+    //debug
+    printf("Creating edges to successors\n");
+
     for (int j = 0; j < nodeData[i].scsrCnt_; j++) {
+
+      //debug
+      printf("Creating edge from %d to %d\n", nodeData[i].instNum_, nodeData[i].scsrs_[j].toNodeNum_);
+
       CreateEdge_(nodeData[i].instNum_, nodeData[i].scsrs_[j].toNodeNum_, 
 		  nodeData[i].scsrs_[j].ltncy_, nodeData[i].scsrs_[j].depType_);
     }
+    /*
+    //debug
+    printf("Creating nodes for prdcsrs\n");
 
     for (int j = 0; j < nodeData[i].prdcsrCnt_; j++) {
+
+      //debug
+      printf("Creating edge from %d to %d\n", nodeData[i].prdcsrs_[j].toNodeNum_, nodeData[i].instNum_);
+
       CreateEdge_(nodeData[i].prdcsrs_[j].toNodeNum_, nodeData[i].instNum_,
 		  nodeData[i].prdcsrs_[j].ltncy_, 
 		  nodeData[i].prdcsrs_[j].depType_);
     }
+    */
   }
   
   Register *reg = NULL;

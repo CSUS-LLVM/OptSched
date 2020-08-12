@@ -207,8 +207,13 @@ void GraphNode::FindRcrsvNghbrs_(GraphNode *root, DIRECTION dir,
     BitVector *thisBitVector = this->GetRcrsvNghbrBitVector(dir);
     if (thisBitVector && thisBitVector->GetBit(root->GetNum()) == true) {
       graph->CycleDetected();
+#ifdef __CUDA_ARCH__
+      printf("Detected a cycle between nodes %d and %d in graph\n", 
+		      root->GetNum(), this->GetNum());
+#else
       Logger::Info("Detected a cycle between nodes %d and %d in graph",
                    root->GetNum(), this->GetNum());
+#endif
     }
 
     // Add this node to the recursive neighbor list of the root node of
@@ -385,7 +390,11 @@ FUNC_RESULT DirAcycGraph::DepthFirstSearch() {
   root_->DepthFirstVisit(tplgclOrdr_, tplgclIndx);
 
   if (tplgclIndx != -1) {
+#ifdef __CUDA_ARCH__
+    printf("Invalid DAG Format: Ureachable nodes\n");
+#else
     Logger::Error("Invalid DAG Format: Ureachable nodes");
+#endif
     return RES_ERROR;
   }
 
@@ -441,21 +450,3 @@ void DirAcycGraph::LogGraph() {
     nodes_[i]->LogScsrLst();
   }
 }
-
-/*
-void GraphEdge::CopyPointersToDevice(GraphEdge *dev_edge) {
-  GraphNode *dev_to = NULL;
-
-  //allocate device memory
-  if (cudaSuccess != cudaMalloc((void**)dev_to, sizeof(GraphNode)))
-    printf("Error allocating dev mem for dev_to: %s\n", cudaGetErrorString(cudaGetLastError()));
-
-  //copy to to device
-  if (cudaSuccess != cudaMemcpy(dev_to, to, sizeof(GraphNode), cudaMemcpyHostToDevice))
-    printf("Error copying to to device: %s\n", cudaGetErrorString(cudaGetLastError()));
-
-  //update device pointer
-  if (cudaSuccess != cudaMemcpy(&(dev_edge->to), &dev_to, sizeof(GraphNode *), cudaMemcpyHostToDevice))
-    printf("Error updating dev_edge->to on device: %s\n", cudaGetErrorString(cudaGetLastError()));
-}
-*/

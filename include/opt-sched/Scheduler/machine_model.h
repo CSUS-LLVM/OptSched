@@ -169,6 +169,8 @@ public:
 
   //copy pointers to device, link to passed device pointer
   void CopyPointersToDevice(MachineModel *dev_machMdl);
+  //free pointers allocated by CopyPointersToDevice
+  void FreeDevicePointers();
 
 protected:
   // Creates an uninitialized machine model. For use by subclasses.

@@ -121,6 +121,8 @@ void DevListSched(MachineModel *dev_machMdl, SchedRegion *dev_rgn,
   if (rslt != RES_SUCCESS) {
       printf("Device List scheduling failed!\n");
   }
+
+  free(dev_dataDepGraph);
 }
 
 FUNC_RESULT SchedRegion::FindOptimalSchedule(
@@ -244,7 +246,7 @@ FUNC_RESULT SchedRegion::FindOptimalSchedule(
     //Step 1a) Copy MachineModel to Device
     MachineModel *dev_machMdl = NULL;
     //allocate space on device
-    if (cudaSuccess != cudaMalloc((void**)&dev_machMdl, sizeof(MachineModel)))
+    if (cudaSuccess != cudaMallocManaged((void**)&dev_machMdl, sizeof(MachineModel)))
       printf("Error allocating device space for dev_machMdl: %s\n",
              cudaGetErrorString(cudaGetLastError()));
     //Copy machMdl_ to device
@@ -254,21 +256,7 @@ FUNC_RESULT SchedRegion::FindOptimalSchedule(
 	     cudaGetErrorString(cudaGetLastError()));
     //Copy over all pointers to device
     machMdl_->CopyPointersToDevice(dev_machMdl);
-/*
-    //Step 1b) Copy DDG to device
-    DataDepGraph *dev_dataDepGraph = NULL;
 
-    //allocate device memory
-    if (cudaSuccess != cudaMallocManaged((void**)&dev_dataDepGraph, sizeof(DataDepGraph)))
-      printf("Failed to allocate device mem for dev_dataDepGraph: %s\n", cudaGetErrorString(cudaGetLastError()));
-
-    //copy DDG to device
-    if (cudaSuccess != cudaMemcpy(dev_dataDepGraph, dataDepGraph_, sizeof(DataDepGraph), cudaMemcpyHostToDevice))
-      printf("Failed to copy DDG to device: %s\n", cudaGetErrorString(cudaGetLastError()));
-
-    //copy all pointers to device
-    dataDepGraph_->CopyPointersToDevice(dev_dataDepGraph);
-*/
     //Step 1b) create and copy DDG data arrays to device for dev DDG creation
     //holds data about nodes and edges
     NodeData *nodeData = new NodeData[dataDepGraph_->GetInstCnt()];
@@ -318,17 +306,13 @@ FUNC_RESULT SchedRegion::FindOptimalSchedule(
     BBWithSpill *dev_rgn = NULL;
 
     //allocate device mem
-    if (cudaSuccess != cudaMalloc((void**)&dev_rgn, sizeof(BBWithSpill)))
+    if (cudaSuccess != cudaMallocManaged((void**)&dev_rgn, sizeof(BBWithSpill)))
       printf("Error allocating dev mem for dev_rgn: %s\n", cudaGetErrorString(cudaGetLastError()));
 
     //copy this to device
     if (cudaSuccess != cudaMemcpy(dev_rgn, this, sizeof(BBWithSpill), cudaMemcpyHostToDevice))
       printf("Error copying this to device: %s\n", cudaGetErrorString(cudaGetLastError()));
-/*
-    //update dev_rgn->DDG to dev_DDG
-    if (cudaSuccess != cudaMemcpy(&(dev_rgn->dataDepGraph_), &dev_dataDepGraph, sizeof(DataDepGraph *), cudaMemcpyHostToDevice))
-      printf("Error updating dev_rgn->dataDepGraph_ on device: %s\n", cudaGetErrorString(cudaGetLastError()));
-*/
+
     //update dev_rgn->machMdl_ to dev_machMdl
     if (cudaSuccess != cudaMemcpy(&(dev_rgn->machMdl_), &dev_machMdl, sizeof(MachineModel *), cudaMemcpyHostToDevice))
       printf("Error updating dev_rgn->machMdl_ on device: %s\n", cudaGetErrorString(cudaGetLastError()));
@@ -342,12 +326,18 @@ FUNC_RESULT SchedRegion::FindOptimalSchedule(
     printf("Post Kernel Error: %s\n", cudaGetErrorString(cudaGetLastError()));
 
     //step 3) copy ListSchedule to Host
+    //free up device memory
+    dev_machMdl->FreeDevicePointers();
+    cudaFree(dev_machMdl);
+    //dev_rgn->
+    cudaFree(dev_rgn);
+    //dev_nodeData->FreeDevicePointers();
+    cudaFree(dev_nodeData);
+    //dev_regFileData->FreeDevicePointers();
+    cudaFree(dev_regFileData);
+    
     //TODO: Implement
-    /*
-    if (rslt != RES_SUCCESS) {
-      Logger::Fatal("Device List scheduling failed");
-    }
-    */
+    
     //****End Code for ListScheduling on Device****
 
 
@@ -884,6 +874,7 @@ void SchedRegion::UpdateScheduleCost(InstSchedule *schedule) {
   // no need to return anything as all results can be found in the schedule
 }
 
+__host__ __device__
 SPILL_COST_FUNCTION SchedRegion::GetSpillCostFunc() { return spillCostFunc_; }
 
 void SchedRegion::HandlEnumrtrRslt_(FUNC_RESULT rslt, InstCount trgtLngth) {

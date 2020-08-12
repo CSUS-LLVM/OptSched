@@ -564,7 +564,7 @@ SchedInstruction *SchedInstruction::GetNxtPrdcsr(InstCount *scsrNum,
   if (depType)
     *depType = (DependenceType)edge->label2;
   if (toNodeNum)
-    *toNodeNum = edge->to->GetNum();
+    *toNodeNum = edge->from->GetNum();
   return (SchedInstruction *)(edge->from);
 }
 

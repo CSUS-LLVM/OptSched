@@ -306,40 +306,53 @@ void MachineModel::CopyPointersToDevice(MachineModel *dev_machMdl) {
     printf("Error updating dev_machMdl->instTypes_: %s\n",
 	   cudaGetErrorString(cudaGetLastError()));
 
-  //debug
-  printf("Copied instTypes_ to device!\n");
-
   RegTypeInfo *dev_registerTypes = NULL;
 
   //allocate device memory
-  if (cudaSuccess != cudaMalloc((void**)&dev_registerTypes, registerTypes_size_ * sizeof(RegTypeInfo)))
-    printf("Error allocating device mem for dev_registerTypes: %s\n", cudaGetErrorString(cudaGetLastError()));
+  if (cudaSuccess != cudaMalloc((void**)&dev_registerTypes, 
+			        registerTypes_size_ * sizeof(RegTypeInfo)))
+    printf("Error allocating device mem for dev_registerTypes: %s\n", 
+		    cudaGetErrorString(cudaGetLastError()));
 
   //copy registerTypes_ to device
-  if (cudaSuccess != cudaMemcpy(dev_registerTypes, registerTypes_, registerTypes_size_ * sizeof(RegTypeInfo), cudaMemcpyHostToDevice))
-    printf("Error copying registerTypes_ to device: %s\n", cudaGetErrorString(cudaGetLastError()));
+  if (cudaSuccess != cudaMemcpy(dev_registerTypes, registerTypes_, 
+			        registerTypes_size_ * sizeof(RegTypeInfo), 
+				cudaMemcpyHostToDevice))
+    printf("Error copying registerTypes_ to device: %s\n", 
+		    cudaGetErrorString(cudaGetLastError()));
 
   //update device pointer dev_machMdl->registerTypes_
-  if (cudaSuccess != cudaMemcpy(&dev_machMdl->registerTypes_, &dev_registerTypes, sizeof(RegTypeInfo *), cudaMemcpyHostToDevice))
-    printf("Error updating registerTypes_ pointer on device: %s\n", cudaGetErrorString(cudaGetLastError()));
-
-  //debug
-  printf("Copied registerTypes_ to device!\n");
+  if (cudaSuccess != cudaMemcpy(&dev_machMdl->registerTypes_, 
+			        &dev_registerTypes, sizeof(RegTypeInfo *), 
+				cudaMemcpyHostToDevice))
+    printf("Error updating registerTypes_ pointer on device: %s\n", 
+		    cudaGetErrorString(cudaGetLastError()));
 
   IssueTypeInfo *dev_issueTypes = NULL;
 
   //allocate device memory
-  if (cudaSuccess != cudaMalloc((void**)&dev_issueTypes, issueTypes_size_ * sizeof(IssueTypeInfo)))
-    printf("Error allocating device mem for dev_issueTypes: %s\n", cudaGetErrorString(cudaGetLastError()));
+  if (cudaSuccess != cudaMalloc((void**)&dev_issueTypes, 
+			        issueTypes_size_ * sizeof(IssueTypeInfo)))
+    printf("Error allocating device mem for dev_issueTypes: %s\n", 
+		    cudaGetErrorString(cudaGetLastError()));
 
   //copy issueTypes_ to device
-  if (cudaSuccess != cudaMemcpy(dev_issueTypes, issueTypes_, issueTypes_size_ * sizeof(IssueTypeInfo), cudaMemcpyHostToDevice))
-    printf("Error copying issueTypes_ to device: %s\n", cudaGetErrorString(cudaGetLastError()));
+  if (cudaSuccess != cudaMemcpy(dev_issueTypes, issueTypes_, 
+			        issueTypes_size_ * sizeof(IssueTypeInfo), 
+				cudaMemcpyHostToDevice))
+    printf("Error copying issueTypes_ to device: %s\n", 
+		    cudaGetErrorString(cudaGetLastError()));
 
   //update device pointer dev_machMdl->issueTypes_
-  if (cudaSuccess != cudaMemcpy(&(dev_machMdl->issueTypes_), &dev_issueTypes, sizeof(IssueTypeInfo *), cudaMemcpyHostToDevice))
-    printf("Error updating issueTypes_ pointer on device: %s\n", cudaGetErrorString(cudaGetLastError()));
+  if (cudaSuccess != cudaMemcpy(&(dev_machMdl->issueTypes_), &dev_issueTypes, 
+			        sizeof(IssueTypeInfo *), 
+				cudaMemcpyHostToDevice))
+    printf("Error updating issueTypes_ pointer on device: %s\n", 
+		    cudaGetErrorString(cudaGetLastError()));
+}
 
-  //debug
-  printf("Copied issueTypes_ to device!\n");
+void MachineModel::FreeDevicePointers() {
+  cudaFree(instTypes_);
+  cudaFree(registerTypes_);
+  cudaFree(issueTypes_);
 }

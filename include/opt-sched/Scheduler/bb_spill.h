@@ -103,6 +103,7 @@ private:
   // BBWithSpill-specific Functions:
   InstCount CmputCostLwrBound_(InstCount schedLngth);
   InstCount CmputCostLwrBound_();
+  __host__ __device__
   void InitForCostCmputtn_();
   InstCount CmputDynmcCost_();
 
@@ -110,6 +111,7 @@ private:
   void UpdateSpillInfoForSchdul_(SchedInstruction *inst, bool trackCnflcts);
   void UpdateSpillInfoForUnSchdul_(SchedInstruction *inst);
   void SetupPhysRegs_();
+  __host__ __device__
   void CmputCrntSpillCost_();
   bool ChkSchedule_(InstSchedule *bestSched, InstSchedule *lstSched);
   void CmputCnflcts_(InstSchedule *sched);
@@ -128,9 +130,13 @@ public:
   InstCount UpdtOptmlSched(InstSchedule *crntSched,
                            LengthCostEnumerator *enumrtr);
   bool ChkCostFsblty(InstCount trgtLngth, EnumTreeNode *treeNode);
-  __host__ __device__
   void SchdulInst(SchedInstruction *inst, InstCount cycleNum, InstCount slotNum,
                   bool trackCnflcts);
+  //SchdulInst cannot be called directly on device due to overriding a 
+  //pure virtual function, so a copied BBWithSpill cannot invoke it
+  __device__
+  void Dev_SchdulInst(SchedInstruction *inst, InstCount cycleNum, 
+		      InstCount slotNum, bool trackCnflcts);
   void UnschdulInst(SchedInstruction *inst, InstCount cycleNum,
                     InstCount slotNum, EnumTreeNode *trgtNode);
   void SetSttcLwrBounds(EnumTreeNode *node);

@@ -326,9 +326,11 @@ bool ConstrainedScheduler::ChkInstLglty_(SchedInstruction *inst) const {
   //debug
   printf("Reached point 1\n");
 
+  //rgn_->ChkInstLglty(inst) is defined to always return true
+  //so I am removing this statement for now
   // Do region-specific legality check
-  if (rgn_->ChkInstLglty(inst) == false)
-    return false;
+  //if (rgn_->ChkInstLglty(inst) == false)
+    //return false;
 
   //debug
   printf("Reached point 2\n");

@@ -429,6 +429,7 @@ InstCount BBWithSpill::CmputCost_(InstSchedule *sched, COST_COMP_MODE compMode,
 }
 /*****************************************************************************/
 
+__host__ __device__
 void BBWithSpill::CmputCrntSpillCost_() {
   switch (GetSpillCostFunc()) {
   case SCF_PERP:
@@ -453,7 +454,8 @@ void BBWithSpill::CmputCrntSpillCost_() {
   }
 }
 /*****************************************************************************/
-
+//note: Logger::info/fatal cannot be called on device. using __CUDA_ARCH__ 
+//macro to call printf on device instead
 __host__ __device__
 void BBWithSpill::UpdateSpillInfoForSchdul_(SchedInstruction *inst,
                                             bool trackCnflcts) {
@@ -463,6 +465,7 @@ void BBWithSpill::UpdateSpillInfoForSchdul_(SchedInstruction *inst,
   Register *def, *use;
   int liveRegs;
   InstCount newSpillCost;
+  int accumulator;
 
   defCnt = inst->GetDefs(defs);
   useCnt = inst->GetUses(uses);
@@ -479,13 +482,23 @@ void BBWithSpill::UpdateSpillInfoForSchdul_(SchedInstruction *inst,
     regNum = use->GetNum();
     physRegNum = use->GetPhysicalNumber();
 
-    if (use->IsLive() == false)
+    if (use->IsLive() == false) {
+#ifdef __CUDA_ARCH__
+      printf("Reg %d of type %d is used without being defined\n", regNum, 
+	     regType);
+#else
       Logger::Fatal("Reg %d of type %d is used without being defined", regNum,
                     regType);
+#endif
+    }
 
 #ifdef IS_DEBUG_REG_PRESSURE
+#ifdef __CUDA_ARCH__
+    printf("Inst %d uses reg %d of type %d and %d uses\n", inst->GetNum(), regNum, regType, use->GetUseCnt());
+#else
     Logger::Info("Inst %d uses reg %d of type %d and %d uses", inst->GetNum(),
                  regNum, regType, use->GetUseCnt());
+#endif
 #endif
 
     use->AddCrntUse();
@@ -504,8 +517,13 @@ void BBWithSpill::UpdateSpillInfoForSchdul_(SchedInstruction *inst,
       liveRegs_[regType].SetBit(regNum, false, use->GetWght());
 
 #ifdef IS_DEBUG_REG_PRESSURE
+#ifdef __CUDA_ARCH__
+      printf("Reg type %d now has %d live regs\n", regType, 
+	     liveRegs_[regType].GetOneCnt());
+#else
       Logger::Info("Reg type %d now has %d live regs", regType,
                    liveRegs_[regType].GetOneCnt());
+#endif
 #endif
 
       if (regFiles_[regType].GetPhysRegCnt() > 0 && physRegNum >= 0)
@@ -521,8 +539,13 @@ void BBWithSpill::UpdateSpillInfoForSchdul_(SchedInstruction *inst,
     physRegNum = def->GetPhysicalNumber();
 
 #ifdef IS_DEBUG_REG_PRESSURE
+#ifdef __CUDA_ARCH__
+    printf("Inst %d defines reg %d of type %d and %d uses\n",inst->GetNum(), 
+	   regNum, regType, def->GetUseCnt());
+#else
     Logger::Info("Inst %d defines reg %d of type %d and %d uses",
                  inst->GetNum(), regNum, regType, def->GetUseCnt());
+#endif
 #endif
 
     // if (def->GetUseCnt() > 0) {
@@ -534,8 +557,13 @@ void BBWithSpill::UpdateSpillInfoForSchdul_(SchedInstruction *inst,
     liveRegs_[regType].SetBit(regNum, true, def->GetWght());
 
 #ifdef IS_DEBUG_REG_PRESSURE
+#ifdef __CUDA_ARCH__
+    printf("Reg type %d now has %d live regs\n", regType,
+           liveRegs_[regType].GetOneCnt());
+#else
     Logger::Info("Reg type %d now has %d live regs", regType,
                  liveRegs_[regType].GetOneCnt());
+#endif
 #endif
 
     if (regFiles_[regType].GetPhysRegCnt() > 0 && physRegNum >= 0)
@@ -548,13 +576,26 @@ void BBWithSpill::UpdateSpillInfoForSchdul_(SchedInstruction *inst,
 
 #ifdef IS_DEBUG_SLIL_CORRECT
   if (OPTSCHED_gPrintSpills) {
+#ifdef __CUDA_ARCH__
+    printf("Printing live range lengths for instruction BEFORE calculation.\n");
+#else
     Logger::Info(
         "Printing live range lengths for instruction BEFORE calculation.");
+#endif
     for (int j = 0; j < sumOfLiveIntervalLengths_size_; j++) {
+#ifdef __CUDA_ARCH__
+      printf("SLIL for regType %d %s is currently %d\n", j,
+	     sumOfLiveIntervalLengths_[j]);
+#else
       Logger::Info("SLIL for regType %d %s is currently %d", j,
                    sumOfLiveIntervalLengths_[j]);
+#endif
     }
+#ifdef __CUDA_ARCH__
+    printf();
+#else
     Logger::Info("Now computing spill cost for instruction.");
+#endif
   }
 #endif
 
@@ -581,45 +622,78 @@ void BBWithSpill::UpdateSpillInfoForSchdul_(SchedInstruction *inst,
 
     // FIXME: Can this be taken out of this loop?
     if (GetSpillCostFunc() == SCF_SLIL) {
-      slilSpillCost_ = std::accumulate(sumOfLiveIntervalLengths_,
-                                       &sumOfLiveIntervalLengths_[regTypeCnt_], 
-				       0);
+      //slilSpillCost_ = std::accumulate(sumOfLiveIntervalLengths_,
+      //                                 &sumOfLiveIntervalLengths_[regTypeCnt_], 
+      //	  		         0);
+      accumulator = 0;
+      for (int x = 0; x < regTypeCnt_; x++)
+        accumulator += sumOfLiveIntervalLengths_[x];
+      slilSpillCost_ = accumulator;
     }
   }
 
   if (GetSpillCostFunc() == SCF_TARGET) {
-    newSpillCost = OST->getCost(regPressures_);
+    //Cannot simply call due to polymorphism, replacing with GenericTarget
+    //method for now since I am testing for CPU
+    //TODO: Add ability to calculate GCNTarget getCost when compiling for
+    //AMD GPU
+    //newSpillCost = OST->getCost(regPressures_);
+    accumulator = 0;
+    for (int x = 0; x < regTypeCnt_; x++)
+      accumulator += regPressures_[x];
+    newSpillCost = accumulator;
 
   } else if (GetSpillCostFunc() == SCF_SLIL) {
-    slilSpillCost_ = std::accumulate(sumOfLiveIntervalLengths_,
-                                     &sumOfLiveIntervalLengths_[regTypeCnt_], 
-				     0);
+    //slilSpillCost_ = std::accumulate(sumOfLiveIntervalLengths_,
+    //                                 &sumOfLiveIntervalLengths_[regTypeCnt_], 
+    //				       0);
+    accumulator = 0;
+    for (int x = 0; x < regTypeCnt_; x++)
+      accumulator += sumOfLiveIntervalLengths_[x];
+    slilSpillCost_ = accumulator;
 
   } else if (GetSpillCostFunc() == SCF_PRP) {
-    newSpillCost =
-        std::accumulate(regPressures_, &regPressures_[regTypeCnt_], 0);
+    //newSpillCost =
+    //    std::accumulate(regPressures_, &regPressures_[regTypeCnt_], 0);
+    accumulator = 0;
+    for (int x = 0; x < regTypeCnt_; x++)
+      accumulator += regPressures_[x];
+    newSpillCost = accumulator;
 
   } else if (GetSpillCostFunc() == SCF_PEAK_PER_TYPE) {
     for (int i = 0; i < regTypeCnt_; i++)
-      newSpillCost +=
-          std::max(0, peakRegPressures_[i] - machMdl_->GetPhysRegCnt(i));
+      if (0 < peakRegPressures_[i] - machMdl_->GetPhysRegCnt(i))
+        newSpillCost += peakRegPressures_[i] - machMdl_->GetPhysRegCnt(i);
 
   } else {
     // Default is PERP (Some SCF like SUM rely on PERP being the default here)
-    int i = 0;
-    std::for_each(
-        regPressures_, &regPressures_[regTypeCnt_], [&](InstCount RP) {
-          newSpillCost += std::max(0, RP - machMdl_->GetPhysRegCnt(i++));
-        });
+    //int i = 0;
+    //std::for_each(
+    //    regPressures_, &regPressures_[regTypeCnt_], [&](InstCount RP) {
+    //      newSpillCost += std::max(0, RP - machMdl_->GetPhysRegCnt(i++));
+    //    });
+    for (int i = 0; i < regTypeCnt_; i++) {
+      if (0 < regPressures_[i] - machMdl_->GetPhysRegCnt(i))
+        newSpillCost += regPressures_[i] - machMdl_->GetPhysRegCnt(i);
+    }
   }
 
 #ifdef IS_DEBUG_SLIL_CORRECT
   if (OPTSCHED_gPrintSpills) {
+#ifdef __CUDA_ARCH__
+    printf("Printing live range lengths for instruction AFTER calculation.\n");
+#else
     Logger::Info(
         "Printing live range lengths for instruction AFTER calculation.");
+#endif
     for (int j = 0; j < sumOfLiveIntervalLengths_size_; j++) {
+#ifdef __CUDA_ARCH__
+      printf("SLIL for regType %d is currently %d\n", j,
+	     sumOfLiveIntervalLengths_[j]);
+#else
       Logger::Info("SLIL for regType %d is currently %d", j,
                    sumOfLiveIntervalLengths_[j]);
+#endif
     }
   }
 #endif
@@ -628,12 +702,18 @@ void BBWithSpill::UpdateSpillInfoForSchdul_(SchedInstruction *inst,
   spillCosts_[crntStepNum_] = newSpillCost;
 
 #ifdef IS_DEBUG_REG_PRESSURE
+#ifdef __CUDA_ARCH__
+  printf("Spill cost at step  %d = %d\n", crntStepNum_, newSpillCost);
+#else
   Logger::Info("Spill cost at step  %d = %d", crntStepNum_, newSpillCost);
+#endif
 #endif
 
   totSpillCost_ += newSpillCost;
 
-  peakSpillCost_ = std::max(peakSpillCost_, newSpillCost);
+  //peakSpillCost_ = std::max(peakSpillCost_, newSpillCost);
+  if (peakSpillCost_ < newSpillCost)
+    peakSpillCost_ = newSpillCost;
 
   CmputCrntSpillCost_();
 
@@ -757,8 +837,17 @@ void BBWithSpill::UpdateSpillInfoForUnSchdul_(SchedInstruction *inst) {
 }
 /*****************************************************************************/
 
-__host__ __device__
 void BBWithSpill::SchdulInst(SchedInstruction *inst, InstCount cycleNum,
+                             InstCount slotNum, bool trackCnflcts) {
+  crntCycleNum_ = cycleNum;
+  crntSlotNum_ = slotNum;
+  if (inst == NULL)
+    return;
+  assert(inst != NULL);
+  UpdateSpillInfoForSchdul_(inst, trackCnflcts);
+}
+
+void BBWithSpill::Dev_SchdulInst(SchedInstruction *inst, InstCount cycleNum,
                              InstCount slotNum, bool trackCnflcts) {
   crntCycleNum_ = cycleNum;
   crntSlotNum_ = slotNum;

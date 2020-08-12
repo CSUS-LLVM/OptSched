@@ -99,17 +99,20 @@ public:
 
   void SetupConflicts(int regCnt);
   void ResetConflicts();
+  __host__ __device__
   void AddConflict(int regNum, bool isSpillCnddt);
   int GetConflictCnt() const;
   bool IsSpillCandidate() const;
 
   // Returns true if an insertion actually occurred.
   bool AddToInterval(const SchedInstruction *inst);
+  __host__ __device__
   bool IsInInterval(const SchedInstruction *inst) const;
   const InstSetType &GetLiveInterval() const;
 
   // Returns true if an insertion actually occurred.
   bool AddToPossibleInterval(const SchedInstruction *inst);
+  __host__ __device__
   bool IsInPossibleInterval(const SchedInstruction *inst) const;
   const InstSetType &GetPossibleLiveInterval() const;
 
@@ -181,6 +184,7 @@ public:
 
   void SetupConflicts();
   void ResetConflicts();
+  __host__ __device__
   void AddConflictsWithLiveRegs(int regNum, int liveRegCnt);
   int GetConflictCnt();
 

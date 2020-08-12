@@ -4,6 +4,7 @@
 #include "opt-sched/Scheduler/ready_list.h"
 #include "opt-sched/Scheduler/sched_region.h"
 #include "opt-sched/Scheduler/stats.h"
+#include "opt-sched/Scheduler/bb_spill.h"
 
 using namespace llvm::opt_sched;
 
@@ -62,7 +63,10 @@ FUNC_RESULT ListScheduler::FindSchedule(InstSchedule *sched, SchedRegion *rgn) {
     SchedInstruction *inst = PickInst();
 
     //debug
-    printf("ListScheduler::FindSchedule: Picked inst: %d\n", inst->GetNum());
+    if (inst == NULL)
+      printf("ListScheduler::FindSchedule: Picked STALL\n");
+    else
+      printf("ListScheduler::FindSchedule: Picked inst: %d\n", inst->GetNum());
 
     InstCount instNum;
     // If the ready list is empty.
@@ -91,7 +95,11 @@ FUNC_RESULT ListScheduler::FindSchedule(InstSchedule *sched, SchedRegion *rgn) {
       //debug
       printf("ListScheduler::FindSchedule: Calling rgn_->SchdulInst()\n");
 
+#ifdef __CUDA_ARCH__
+      ((BBWithSpill *)rgn_)->Dev_SchdulInst(inst, crntCycleNum_, crntSlotNum_, false);
+#else
       rgn_->SchdulInst(inst, crntCycleNum_, crntSlotNum_, false);
+#endif
 
       //debug
       printf("ListScheduler::FindSchedule: Done with rgn_->SchdulInst()\n");
