@@ -181,11 +181,11 @@ createStaticNodeSupTrans(DataDepGraph *DataDepGraph, bool IsMultiPass = false) {
 
 void ScheduleDAGOptSched::addGraphTransformations(
     OptSchedDDGWrapperBasic *BDDG) {
-  auto *GraphTransfomations = BDDG->GetGraphTrans();
+  auto *GraphTransformations = BDDG->GetGraphTrans();
 
   if (StaticNodeSup) {
     if (LatencyPrecision == LTP_UNITY) {
-      GraphTransfomations->push_back(
+      GraphTransformations->push_back(
           createStaticNodeSupTrans(BDDG, MultiPassStaticNodeSup));
     } else {
       Logger::Info("Skipping RP-only graph transforms for non-unity pass.");
@@ -516,7 +516,7 @@ void ScheduleDAGOptSched::ScheduleNode(SUnit *SU, unsigned CurCycle) {
 
 // call the default "Fallback Scheduler" on a region
 void ScheduleDAGOptSched::fallbackScheduler() {
-  // If the heurisitc is ISO the order of the SUnits will be
+  // If the heuristic is ISO the order of the SUnits will be
   // the order of LLVM's heuristic schedule. Otherwise reset
   // the BB to LLVM's original order, the order of the SUnits,
   // then call their scheduler.
@@ -748,7 +748,7 @@ bool ScheduleDAGOptSched::rpMismatch(InstSchedule *sched) {
   // LLVM peak register pressure
   const std::vector<unsigned> &RegionPressure =
       RPTracker.getPressure().MaxSetPressure;
-  // OptSched preak registesr pressure
+  // OptSched peak register pressure
   const unsigned *regPressures = nullptr;
   // auto regTypeCount = sched->GetPeakRegPressures(regPressures);
 
@@ -841,7 +841,7 @@ void ScheduleDAGOptSched::scheduleOptSchedBalanced() {
   EnumPriorities = SecondPassEnumPriorities;
 
   // Force the input to the balanced scheduler to be the sequential order of the
-  // (hopefully) good register pressure schedule. We don’t want the list
+  // (hopefully) good register pressure schedule. We don't want the list
   // scheduler to mangle the input because of latency or resource constraints.
   HeurSchedType = SCHED_SEQ;
 

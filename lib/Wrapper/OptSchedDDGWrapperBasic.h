@@ -75,8 +75,8 @@ protected:
   std::vector<int> RegIndices;
 
   // Count each definition of a virtual register with the same resNo
-  // as a seperate register in our model. Each resNo is also associated
-  // with multiple pressure sets which are treated as seperate registers
+  // as a separate register in our model. Each resNo is also associated
+  // with multiple pressure sets which are treated as separate registers
   std::map<unsigned, std::vector<Register *>> LastDef;
 
   // Allow the DAG builder to filter our register types that have low peak

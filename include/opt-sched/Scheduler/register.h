@@ -118,7 +118,7 @@ private:
 
   // (Chris): The possible live interval set is the set of instructions that
   // may or may not be added to the live interval of this register. This is
-  // computed during the common use lower boudn analysis.
+  // computed during the common use lower bound analysis.
   InstSetType possibleLiveIntervalSet_;
 };
 

@@ -370,7 +370,7 @@ bool EnumTreeNode::WasRsrcDmnntNodeExmnd(SchedInstruction *cnddtInst) {
 /*****************************************************************************/
 
 bool EnumTreeNode::IsBranchDominated(SchedInstruction *cnddtInst) {
-  // Check if the given instruction can be fessibly replaced by a previously
+  // Check if the given instruction can be feasibly replaced by a previously
   // examined instruction, which was found to be infeasible, thus proving by
   // contradiction that the given instruction is infeasible for this slot
   ExaminedInst *exmndInst = exmndInsts_->GetFrstElmnt();

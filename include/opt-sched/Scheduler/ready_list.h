@@ -1,7 +1,7 @@
 /*******************************************************************************
 Description:  Defines a ReadyList class, which is one of the main data
               structures that an instruction scheduler needs. The ready list is
-              a sored list of instructions whose data dependences have been
+              a sorted list of instructions whose data dependencies have been
               satisfied (their predecessors in the data dependence graph have
               been scheduled).
 Author:       Ghassan Shobaki

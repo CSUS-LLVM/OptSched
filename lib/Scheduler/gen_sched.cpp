@@ -151,7 +151,7 @@ void ConstrainedScheduler::SchdulInst_(SchedInstruction *inst, InstCount) {
         frstRdyLstPerCycle_[scsrRdyCycle] = new LinkedList<SchedInstruction>;
       }
 
-      // Add this succesor to the first-ready list of the future cycle
+      // Add this successor to the first-ready list of the future cycle
       // in which we now know it will become ready
       frstRdyLstPerCycle_[scsrRdyCycle]->InsrtElmnt(crntScsr);
     }
@@ -170,7 +170,7 @@ void ConstrainedScheduler::UnSchdulInst_(SchedInstruction *inst) {
   assert(inst->IsSchduld());
 
   // Notify each successor of this instruction that it has been unscheduled.
-  // The successors are visted in the reverse order so that each one will be
+  // The successors are visited in the reverse order so that each one will be
   // at the bottom of its first-ready list (if the scheduling of this
   // instruction has caused it to go there).
   for (SchedInstruction *crntScsr = inst->GetLastScsr(&prdcsrNum);

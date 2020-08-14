@@ -215,7 +215,7 @@ public:
   inline bool FoundInstWithUse();
   inline void SetFoundInstWithUse(bool foundInstWithUse);
 
-  // Get the siganture of the parial schedule up to this node
+  // Get the signature of the partial schedule up to this node
   inline InstSignature GetSig();
 
   // Get the time of this node in the schedule (total number of slots
@@ -331,11 +331,11 @@ protected:
   // A pointer to a relaxed scheduler
   RJ_RelaxedScheduler *rlxdSchdulr_;
 
-  // Array hloding the number of issue slots available for each issue type
+  // Array holding the number of issue slots available for each issue type
   // based on the target schedule length and the slots that have been taken
   InstCount avlblSlots_[MAX_ISSUTYPE_CNT];
 
-  // Array hloding the number of insructions that have not been scheduled
+  // Array holding the number of insructions that have not been scheduled
   // for each issue type
   InstCount neededSlots_[MAX_ISSUTYPE_CNT];
 
@@ -620,7 +620,7 @@ public:
 /*****************************************************************************/
 
 /******************************************************************************
-In line Functions
+Inline Functions
 ******************************************************************************/
 
 void EnumTreeNode::ChildInfsbl() {

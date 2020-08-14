@@ -171,13 +171,13 @@ bool StaticNodeSupTrans::NodeIsSuperior_(SchedInstruction *nodeA,
 
   // For every virtual register that belongs to the Use set of B but does not
   // belong to the Use set of A
-  // there must be at least one instruction C that is distint from A nad B and
+  // there must be at least one instruction C that is distinct from A and B and
   // belongs to the
-  // recurisve sucessor lits of both A and B.
+  // recursive successor lits of both A and B.
   //
-  // For every vitrual register that would have its live range lengthened by
+  // For every virtual register that would have its live range lengthened by
   // scheduling B after A,
-  // there must be a register of the same time that would have its live range
+  // there must be a register of the same type that would have its live range
   // shortened by scheduling
   // A before B.
 
