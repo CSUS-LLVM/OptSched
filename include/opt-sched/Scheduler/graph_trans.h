@@ -18,6 +18,15 @@ Last Update:  June. 2017
 namespace llvm {
 namespace opt_sched {
 
+// A and B are independent iff there is no path between A and B (in either
+// direction)
+bool areNodesIndependent(const SchedInstruction *A, const SchedInstruction *B);
+
+// Adds an edge (A --> B) to the graph, updating recursive neighbors.
+// The type of the added edge is OTHER.
+void addSuperiorEdge(DataDepGraph &DDG, SchedInstruction *A,
+                     SchedInstruction *B, int latency = 0);
+
 // An abstract graph transformation class.
 class GraphTrans {
 
@@ -37,14 +46,6 @@ public:
   void SetNumNodesInGraph(InstCount numNodesInGraph);
 
 protected:
-  // Find independent nodes in the graph. Nodes are independent if
-  // no path exists between them.
-  bool AreNodesIndep_(SchedInstruction *inst1, SchedInstruction *inst2);
-
-  // Update the recursive predecessor and successor lists after adding an edge
-  // between A and B.
-  void UpdatePrdcsrAndScsr_(SchedInstruction *nodeA, SchedInstruction *nodeB);
-
   DataDepGraph *GetDataDepGraph_() const;
   SchedRegion *GetSchedRegion_() const;
   InstCount GetNumNodesInGraph_() const;
@@ -88,20 +89,22 @@ public:
 
   FUNC_RESULT ApplyTrans() override;
 
+  static bool isNodeSuperior(DataDepGraph &DDG, int A, int B);
+
 private:
   // Are multiple passes enabled.
   bool IsMultiPass;
 
   // Return true if node A is superior to node B.
-  bool NodeIsSuperior_(SchedInstruction *nodeA, SchedInstruction *nodeB);
+  bool NodeIsSuperior_(SchedInstruction *nodeA, SchedInstruction *nodeB) {
+    return isNodeSuperior(*GetDataDepGraph_(), nodeA->GetNum(),
+                          nodeB->GetNum());
+  }
 
   // Check if there is superiority involving nodes A and B. If yes, choose which
   // edge to add.
   // Returns true if a superior edge was added.
   bool TryAddingSuperiorEdge_(SchedInstruction *nodeA, SchedInstruction *nodeB);
-
-  // Add an edge from node A to B and update the graph.
-  void AddSuperiorEdge_(SchedInstruction *nodeA, SchedInstruction *nodeB);
 
   // Keep trying to find superior nodes until none can be found or there are no
   // more independent nodes.

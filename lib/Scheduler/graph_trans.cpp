@@ -11,6 +11,32 @@
 
 using namespace llvm::opt_sched;
 
+bool llvm::opt_sched::areNodesIndependent(const SchedInstruction *A,
+                                          const SchedInstruction *B) {
+  return A != B && !A->IsRcrsvPrdcsr(B) && !A->IsRcrsvScsr(B);
+}
+
+static void UpdateRecursiveNeighbors(SchedInstruction *A, SchedInstruction *B) {
+  // Update lists for the nodes themselves.
+  A->AddRcrsvScsr(B);
+  B->AddRcrsvPrdcsr(A);
+
+  for (GraphNode &X : *A->GetRecursivePredecessors()) {
+    for (GraphNode &Y : *B->GetRecursiveSuccessors()) {
+      if (!X.IsRcrsvScsr(&Y)) {
+        Y.AddRcrsvPrdcsr(&X);
+        X.AddRcrsvScsr(&Y);
+      }
+    }
+  }
+}
+
+void llvm::opt_sched::addSuperiorEdge(DataDepGraph &DDG, SchedInstruction *A,
+                                      SchedInstruction *B, int latency) {
+  DDG.CreateEdge(A, B, latency, DEP_OTHER);
+  UpdateRecursiveNeighbors(A, B);
+}
+
 GraphTrans::GraphTrans(DataDepGraph *dataDepGraph) {
   assert(dataDepGraph != NULL);
 
@@ -18,47 +44,18 @@ GraphTrans::GraphTrans(DataDepGraph *dataDepGraph) {
   SetNumNodesInGraph(dataDepGraph->GetInstCnt());
 }
 
-bool GraphTrans::AreNodesIndep_(SchedInstruction *inst1,
-                                SchedInstruction *inst2) {
-  // The nodes are independent if there is no path from srcInst to dstInst.
-  if (inst1 != inst2 && !inst1->IsRcrsvPrdcsr(inst2) &&
-      !inst1->IsRcrsvScsr(inst2)) {
-#ifdef IS_DEBUG_GRAPH_TRANS
-    Logger::Info("Nodes %d and %d are independent", inst1->GetNum(),
-                 inst2->GetNum());
-#endif
-    return true;
-  } else
-    return false;
-}
-
-void GraphTrans::UpdatePrdcsrAndScsr_(SchedInstruction *nodeA,
-                                      SchedInstruction *nodeB) {
-  LinkedList<GraphNode> *nodeBScsrLst = nodeB->GetRcrsvNghbrLst(DIR_FRWRD);
-  LinkedList<GraphNode> *nodeAPrdcsrLst = nodeA->GetRcrsvNghbrLst(DIR_BKWRD);
-
-  // Update lists for the nodes themselves.
-  nodeA->AddRcrsvScsr(nodeB);
-  nodeB->AddRcrsvPrdcsr(nodeA);
-
-  for (GraphNode *X = nodeAPrdcsrLst->GetFrstElmnt(); X != NULL;
-       X = nodeAPrdcsrLst->GetNxtElmnt()) {
-
-    for (GraphNode *Y = nodeBScsrLst->GetFrstElmnt(); Y != NULL;
-         Y = nodeBScsrLst->GetNxtElmnt()) {
-      // Check if Y is reachable f
-      if (!X->IsRcrsvScsr(Y)) {
-        Y->AddRcrsvPrdcsr(X);
-        X->AddRcrsvScsr(Y);
-      }
-    }
-  }
-}
-
 StaticNodeSupTrans::StaticNodeSupTrans(DataDepGraph *dataDepGraph,
                                        bool IsMultiPass_)
     : GraphTrans(dataDepGraph) {
   IsMultiPass = IsMultiPass_;
+}
+
+static void addRPSuperiorEdge(DataDepGraph &DDG, SchedInstruction *A,
+                              SchedInstruction *B) {
+#if defined(IS_DEBUG_GRAPH_TRANS_RES) || defined(IS_DEBUG_GRAPH_TRANS)
+  Logger::Info("Node %d is superior to node %d", A->GetNum(), B->GetNum());
+#endif
+  addSuperiorEdge(DDG, A, B);
 }
 
 bool StaticNodeSupTrans::TryAddingSuperiorEdge_(SchedInstruction *nodeA,
@@ -70,10 +67,10 @@ bool StaticNodeSupTrans::TryAddingSuperiorEdge_(SchedInstruction *nodeA,
     std::swap(nodeA, nodeB);
 
   if (NodeIsSuperior_(nodeA, nodeB)) {
-    AddSuperiorEdge_(nodeA, nodeB);
+    addRPSuperiorEdge(*GetDataDepGraph_(), nodeA, nodeB);
     edgeWasAdded = true;
   } else if (NodeIsSuperior_(nodeB, nodeA)) {
-    AddSuperiorEdge_(nodeB, nodeA);
+    addRPSuperiorEdge(*GetDataDepGraph_(), nodeB, nodeA);
     // Swap nodeIDs
     // int tmp = nodeA->GetNodeID();
     // nodeA->SetNodeID(nodeB->GetNodeID());
@@ -82,16 +79,6 @@ bool StaticNodeSupTrans::TryAddingSuperiorEdge_(SchedInstruction *nodeA,
   }
 
   return edgeWasAdded;
-}
-
-void StaticNodeSupTrans::AddSuperiorEdge_(SchedInstruction *nodeA,
-                                          SchedInstruction *nodeB) {
-#if defined(IS_DEBUG_GRAPH_TRANS_RES) || defined(IS_DEBUG_GRAPH_TRANS)
-  Logger::Info("Node %d is superior to node %d", nodeA->GetNum(),
-               nodeB->GetNum());
-#endif
-  GetDataDepGraph_()->CreateEdge(nodeA, nodeB, 0, DEP_OTHER);
-  UpdatePrdcsrAndScsr_(nodeA, nodeB);
 }
 
 FUNC_RESULT StaticNodeSupTrans::ApplyTrans() {
@@ -116,7 +103,7 @@ FUNC_RESULT StaticNodeSupTrans::ApplyTrans() {
 #ifdef IS_DEBUG_GRAPH_TRANS
       Logger::Info("Checking nodes %d:%d", i, j);
 #endif
-      if (AreNodesIndep_(nodeA, nodeB)) {
+      if (areNodesIndependent(nodeA, nodeB)) {
         didAddEdge = TryAddingSuperiorEdge_(nodeA, nodeB);
         // If the nodes are independent and no superiority was found add the
         // nodes to a list for
@@ -133,9 +120,9 @@ FUNC_RESULT StaticNodeSupTrans::ApplyTrans() {
   return RES_SUCCESS;
 }
 
-bool StaticNodeSupTrans::NodeIsSuperior_(SchedInstruction *nodeA,
-                                         SchedInstruction *nodeB) {
-  DataDepGraph *graph = GetDataDepGraph_();
+bool StaticNodeSupTrans::isNodeSuperior(DataDepGraph &DDG, int A, int B) {
+  SchedInstruction *nodeA = DDG.GetInstByIndx(A);
+  SchedInstruction *nodeB = DDG.GetInstByIndx(B);
 
   if (nodeA->GetIssueType() != nodeB->GetIssueType()) {
 #ifdef IS_DEBUG_GRAPH_TRANS
@@ -185,7 +172,7 @@ bool StaticNodeSupTrans::NodeIsSuperior_(SchedInstruction *nodeA,
   // of A.
   // TODO (austin) modify wrapper code so it is easier to identify physical
   // registers.
-  const int regTypes = graph->GetRegTypeCnt();
+  const int regTypes = DDG.GetRegTypeCnt();
 
   const llvm::ArrayRef<const Register *> usesA = nodeA->GetUses();
   const llvm::ArrayRef<const Register *> usesB = nodeB->GetUses();
@@ -291,7 +278,7 @@ void StaticNodeSupTrans::nodeMultiPass_(
       SchedInstruction *nodeA = (*pair).first;
       SchedInstruction *nodeB = (*pair).second;
 
-      if (!AreNodesIndep_(nodeA, nodeB)) {
+      if (!areNodesIndependent(nodeA, nodeB)) {
         pair = indepNodes.erase(pair);
       } else {
         bool result = TryAddingSuperiorEdge_(nodeA, nodeB);
