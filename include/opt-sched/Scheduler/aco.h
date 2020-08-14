@@ -21,7 +21,7 @@ Last Update:  Jan. 2020
 namespace llvm {
 namespace opt_sched {
 
-typedef double pheremone_t;
+typedef double pheromone_t;
 
 struct Choice {
   SchedInstruction *inst;
@@ -41,13 +41,13 @@ public:
   void setInitialSched(InstSchedule *Sched);
 
 private:
-  pheremone_t &Pheremone(SchedInstruction *from, SchedInstruction *to);
-  pheremone_t &Pheremone(InstCount from, InstCount to);
+  pheromone_t &Pheromone(SchedInstruction *from, SchedInstruction *to);
+  pheromone_t &Pheromone(InstCount from, InstCount to);
   double Score(SchedInstruction *from, Choice choice);
 
-  void PrintPheremone();
+  void PrintPheromone();
 
-  // pheremone Graph Debugging start
+  // pheromone Graph Debugging start
   llvm::SmallSet<std::string, 0> DbgRgns;
   llvm::SmallSet<std::pair<InstCount, InstCount>, 0> AntEdges;
   llvm::SmallSet<std::pair<InstCount, InstCount>, 0> CrntAntEdges;
@@ -58,18 +58,18 @@ private:
   std::string OutPath;
   std::string graphDisplayAnnotation(int Frm, int To);
   std::string getHeuIfPossible(int Frm, int To);
-  void writePheremoneGraph(std::string Stage);
+  void writePheromoneGraph(std::string Stage);
   void writePGraphRecursive(FILE *Out, SchedInstruction *Ins,
                             llvm::SetVector<SchedInstruction *> &Visited);
 
-  // pheremone Graph Debugging end
+  // pheromone Graph Debugging end
 
   SchedInstruction *SelectInstruction(const llvm::ArrayRef<Choice> &ready,
                                       SchedInstruction *lastInst);
-  void UpdatePheremone(InstSchedule *schedule);
+  void UpdatePheromone(InstSchedule *schedule);
   std::unique_ptr<InstSchedule> FindOneSchedule();
-  llvm::SmallVector<pheremone_t, 0> pheremone_;
-  pheremone_t initialValue_;
+  llvm::SmallVector<pheromone_t, 0> pheromone_;
+  pheromone_t initialValue_;
   bool use_fixed_bias;
   int count_;
   int heuristicImportance_;
