@@ -49,6 +49,18 @@ SchedRegion::SchedRegion(MachineModel *machMdl, DataDepGraph *dataDepGraph,
   schedUprBound_ = INVALID_VALUE;
 
   spillCostFunc_ = spillCostFunc;
+
+  Config &schedIni = SchedulerOptions::getInstance();
+  DumpDDGs_ = schedIni.GetBool("DUMP_DDGS", false);
+  DDGDumpPath_ = schedIni.GetString("DDG_DUMP_PATH", "");
+
+  if (DumpDDGs_) {
+    if (DDGDumpPath_.empty())
+      llvm::report_fatal_error(
+          "DDG_DUMP_PATH must be set if trying to DUMP_DDGS.", false);
+    if (DDGDumpPath_.back() != '/')
+      DDGDumpPath_.push_back('/');
+  }
 }
 
 void SchedRegion::UseFileBounds_() {
@@ -81,6 +93,28 @@ static bool isBbEnabled(Config &schedIni, Milliseconds rgnTimeout) {
   }
 
   return true;
+}
+
+static void dumpDDG(DataDepGraph *DDG, llvm::StringRef DDGDumpPath,
+                    llvm::StringRef Suffix = "") {
+  std::string Path = DDGDumpPath;
+  Path += DDG->GetDagID();
+
+  if (!Suffix.empty()) {
+    Path += '.';
+    Path += Suffix;
+  }
+
+  Path += ".ddg";
+  // DagID has a `:` in the name, which symbol is not allowed in a path name.
+  // Replace the `:` with a `.` to produce a legal path name.
+  std::replace(Path.begin(), Path.end(), ':', '.');
+
+  Logger::Info("Writing DDG to %s", Path.c_str());
+
+  auto f = fopen(Path.c_str(), "w");
+  DDG->WriteToFile(f, RES_SUCCESS, 1, 0);
+  fclose(f);
 }
 
 FUNC_RESULT SchedRegion::FindOptimalSchedule(
@@ -166,6 +200,10 @@ FUNC_RESULT SchedRegion::FindOptimalSchedule(
     return rslt;
   }
 
+  if (DumpDDGs_) {
+    dumpDDG(dataDepGraph_, DDGDumpPath_);
+  }
+
   // Apply graph transformations
   for (auto &GT : *GraphTransformations) {
     rslt = GT->ApplyTrans();
@@ -178,6 +216,10 @@ FUNC_RESULT SchedRegion::FindOptimalSchedule(
     if (rslt != RES_SUCCESS) {
       Logger::Info("Invalid DAG after graph transformations");
       return rslt;
+    }
+
+    if (DumpDDGs_) {
+      dumpDDG(dataDepGraph_, DDGDumpPath_, GT->Name());
     }
   }
 

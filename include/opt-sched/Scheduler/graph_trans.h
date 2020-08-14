@@ -25,6 +25,8 @@ public:
   GraphTrans(DataDepGraph *dataDepGraph);
   virtual ~GraphTrans(){};
 
+  virtual const char *Name() const = 0;
+
   // Apply the graph transformation to the DataDepGraph.
   virtual FUNC_RESULT ApplyTrans() = 0;
 
@@ -81,6 +83,8 @@ inline void GraphTrans::SetNumNodesInGraph(InstCount numNodesInGraph) {
 class StaticNodeSupTrans : public GraphTrans {
 public:
   StaticNodeSupTrans(DataDepGraph *dataDepGraph, bool IsMultiPass);
+
+  const char *Name() const override { return "rp.nodesup"; }
 
   FUNC_RESULT ApplyTrans() override;
 
