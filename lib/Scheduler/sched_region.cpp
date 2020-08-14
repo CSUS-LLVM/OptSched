@@ -75,7 +75,7 @@ static bool isBbEnabled(Config &schedIni, Milliseconds rgnTimeout) {
     return false;
 
   if (rgnTimeout <= 0) {
-    Logger::Info("Disabling enumerator becuase region timeout is set to zero.");
+    Logger::Info("Disabling enumerator because region timeout is set to zero.");
     return false;
   }
 
@@ -394,7 +394,8 @@ FUNC_RESULT SchedRegion::FindOptimalSchedule(
   InitialScheduleCost = bestCost_;
   InitialScheduleLength = bestSchedLngth_;
 
-  // Step #4: Find the optimal schedule if the heuristc and ACO was not optimal.
+  // Step #4: Find the optimal schedule if the heuristic and ACO was not
+  // optimal.
   if (BbSchedulerEnabled) {
     Milliseconds enumStart = Utilities::GetProcessorTime();
     if (!isLstOptml) {
@@ -819,7 +820,7 @@ void SchedRegion::RegAlloc_(InstSchedule *&bestSched, InstSchedule *&lstSched) {
       bestSched = lstSched;
 #ifdef IS_DEBUG
       Logger::Info(
-          "Taking list schedule becuase of less spilling with simulated RA.");
+          "Taking list schedule because of less spilling with simulated RA.");
 #endif
     }
 }
