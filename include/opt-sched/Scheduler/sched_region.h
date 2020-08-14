@@ -104,7 +104,7 @@ public:
   void UpdateScheduleCost(InstSchedule *sched);
   SPILL_COST_FUNCTION GetSpillCostFunc();
 
-  // Initialie variables for the second pass of the two-pass-optsched
+  // Initialize variables for the second pass of the two-pass-optsched
   void InitSecondPass();
 
 private:
@@ -115,7 +115,7 @@ private:
   // Whether to verify the schedule after calculating it.
   bool vrfySched_;
 
-  // The nomal heuristic scheduling results.
+  // The normal heuristic scheduling results.
   InstCount hurstcCost_;
 
   // total simulated spills.

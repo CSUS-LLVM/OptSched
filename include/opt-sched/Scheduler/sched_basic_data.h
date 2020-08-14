@@ -318,7 +318,7 @@ public:
   // Tightens the lower bound of this instruction to the given new lower bound
   // if it is greater than the current lower bound. Any tightened instruction
   // is added to the given list to be used for efficient untightening. This
-  // function returns with false as soon as infeasiblity (w.r.t the given
+  // function returns with false as soon as infeasibility (w.r.t the given
   // schedule length) is detected, otherwise it returns true.
   bool TightnLwrBound(DIRECTION dir, InstCount newLwrBound,
                       LinkedList<SchedInstruction> *tightndLst,

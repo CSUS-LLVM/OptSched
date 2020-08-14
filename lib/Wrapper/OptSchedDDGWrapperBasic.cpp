@@ -197,7 +197,7 @@ void OptSchedDDGWrapperBasic::addDefsAndUses() {
 
   // Check for any registers that are not used but are also not in LLVM's
   // live-out set.
-  // Optionally, add these registers as uses in the aritificial leaf node.
+  // Optionally, add these registers as uses in the artificial leaf node.
   for (int16_t i = 0; i < MM->GetRegTypeCnt(); i++)
     for (int j = 0; j < RegFiles[i].GetRegCnt(); j++) {
       Register *Reg = RegFiles[i].GetReg(j);

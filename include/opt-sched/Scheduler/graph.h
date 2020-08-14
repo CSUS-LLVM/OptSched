@@ -159,11 +159,11 @@ public:
   bool IsScsrDmntd(GraphNode *cnddtDmnnt);
 
   // Returns the sum of the labels of edges from this node to its successors.
-  // This value is not synamically calculated and is adjusted only through
+  // This value is not dynamically calculated and is adjusted only through
   // AddScsr().
   UDT_GLABEL GetScsrLblSum() const;
   // Returns the sum of the labels of edges from this node to its
-  // predecessors. This value is not synamically calculated and is adjusted
+  // predecessors. This value is not dynamically calculated and is adjusted
   // only through AddPrdcsr().
   UDT_GLABEL GetPrdcsrLblSum() const;
   // Returns the topological order of this node which was calculated by

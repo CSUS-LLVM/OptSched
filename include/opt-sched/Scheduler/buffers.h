@@ -1,6 +1,6 @@
 /*******************************************************************************
 Description:  Defines input buffering classes that can be used for opening,
-              loading, bufering and parsing input files using system-level I/O,
+              loading, buffering and parsing input files using system-level I/O,
               which relies on the programmer to do his own buffering, unlike the
               standard I/O which handles the buffering and hides it from the
               programmer.
@@ -90,7 +90,7 @@ protected:
 };
 
 // A specs buffer is an input buffer for parsing a typical input specification
-// or configurartion file whose format is line based, i.e., includes one spec
+// or configuration file whose format is line based, i.e., includes one spec
 // or setting per line. This class includes one method for parsing one type
 // of specs
 class SpecsBuffer : public InputBuffer {

@@ -458,7 +458,7 @@ void SpecsBuffer::readLine(char *value, int maxPieceCnt) {
     ofst++;
   }
 
-  // Null terminate the concatinated string.
+  // Null terminate the concatenated string.
   value[ofst] = 0;
 
   if (nxtLineType == NXT_ERR) {

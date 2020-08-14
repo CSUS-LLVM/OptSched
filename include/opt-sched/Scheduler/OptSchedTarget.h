@@ -39,7 +39,7 @@ public:
   virtual void initRegion(ScheduleDAGInstrs *DAG, MachineModel *MM) = 0;
   virtual void finalizeRegion(const InstSchedule *Schedule) = 0;
   // FIXME: This is a shortcut to doing the proper thing and creating a RP class
-  // that targets can overrride. It’s hard to justify spending the extra time
+  // that targets can override. It's hard to justify spending the extra time
   // when we will be refactoring RP tracking in general if we do a rewrite to
   // fully integrate the scheduler in LLVM.
   //

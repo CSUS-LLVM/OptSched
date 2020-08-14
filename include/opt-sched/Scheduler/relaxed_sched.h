@@ -193,7 +193,7 @@ private:
 
   KeyedEntry<SchedInstruction> **lstEntries_;
 
-  // Array hloding the number of insructions that have not been scheduled
+  // Array holding the number of insructions that have not been scheduled
   // for each issue type
   InstCount neededSlots_[MAX_ISSUTYPE_CNT];
 
