@@ -16,10 +16,14 @@
 #include "opt-sched/Scheduler/register.h"
 #include "opt-sched/Scheduler/sched_region.h"
 #include "opt-sched/Scheduler/utilities.h"
+#include "llvm/ADT/DenseMap.h"
+#include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringMap.h"
+#include "llvm/ADT/StringRef.h"
 #include "llvm/CodeGen/LiveIntervals.h"
 #include "llvm/CodeGen/MachineRegisterInfo.h"
 #include "llvm/CodeGen/MachineScheduler.h"
+/*#include "llvm/CodeGen/OptSequential.h"*/
 #include "llvm/CodeGen/RegisterClassInfo.h"
 #include "llvm/CodeGen/RegisterPressure.h"
 #include "llvm/CodeGen/ScheduleDAG.h"
@@ -34,10 +38,14 @@
 #include <algorithm>
 #include <chrono>
 #include <string>
+#include "AMDGPU/OptSchedGCNTarget.h"
 
 #define DEBUG_TYPE "optsched"
 
 using namespace llvm::opt_sched;
+
+llvm::SmallVector<llvm::StringRef, 8> UniqueRegionNames;
+llvm::DenseMap<llvm::StringRef, unsigned> RegionCounter;
 
 // hack to print spills
 bool OPTSCHED_gPrintSpills;
@@ -71,8 +79,8 @@ static ScheduleDAGInstrs *createOptSched(MachineSchedContext *C) {
 
 // Register the machine scheduler.
 static MachineSchedRegistry OptSchedMIRegistry("optsched",
-                                               "Use the OptSched scheduler.",
-                                               createOptSched);
+                                           "Use the OptSched scheduler.",
+                                           createOptSched);
 
 // Command line options for opt-sched.
 static cl::opt<std::string> OptSchedCfg(
@@ -258,10 +266,9 @@ void ScheduleDAGOptSched::schedule() {
   ShouldTrackLaneMasks = true;
   Config &schedIni = SchedulerOptions::getInstance();
 
-  ++RegionNumber;
   const std::string RegionName = C->MF->getFunction().getName().data() +
                                  std::string(":") +
-                                 std::to_string(RegionNumber);
+                                 std::to_string(RegionIdx);
 
   // If two pass scheduling is enabled then
   // first just record the scheduling region.
@@ -374,16 +381,21 @@ void ScheduleDAGOptSched::schedule() {
   // Build LLVM DAG
   SetupLLVMDag();
   OST->initRegion(this, MM.get());
+
   // Convert graph
   auto DDG =
       OST->createDDGWrapper(C, this, MM.get(), LatencyPrecision, RegionName);
 
-  // Find all clusterable instructions for the second pass.
-  if (SecondPass) {
-    // In the second pass, ignore artificial edges before running the sequential
-    // heuristic list scheduler.
-    DDG->convertSUnits(false, true);
+  // In the second pass, ignore artificial edges before running the sequential
+  // heuristic list scheduler.
+  if (SecondPass)
+    DDG->convertSUnits(/*IgnoreRealEdges=*/false,
+                       /*IgnoreArtificialEdges=*/true);
+  else
+    DDG->convertSUnits(false, false);
 
+  // Find all clusterable instructions for the second pass.
+  if (SecondPass || (!TwoPassEnabled && schedIni.GetBool("PRINT_CLUSTER"))) {
     dbgs() << "Finding load clusters.\n";
     int TotalLoadsInstructionsClusterable = DDG->findPossibleClusters(true);
     if (TotalLoadsInstructionsClusterable == 0)
@@ -416,8 +428,7 @@ void ScheduleDAGOptSched::schedule() {
             DataDepGraphInstance->getTotalInstructionsInCluster(begin));
       }
     }
-  } else
-    DDG->convertSUnits(false, false);
+  }
 
   DDG->convertRegFiles();
 
@@ -469,10 +480,18 @@ void ScheduleDAGOptSched::schedule() {
     return;
   }
 
+  // BB Enumerator did not find a schedule.
+  // Add the region to the list to be rescheduled.
+  if (SecondPass && !region->enumFoundSchedule() && !IsEasy && !IsThirdPass)
+    RescheduleRegions[RegionIdx] = true;
+
   LLVM_DEBUG(Logger::Info("OptSched succeeded."));
-  OST->finalizeRegion(Sched);
-  if (!OST->shouldKeepSchedule())
-    return;
+
+  if (!IsThirdPass) {
+    OST->finalizeRegion(Sched);
+    if (!OST->shouldKeepSchedule())
+      return;
+  }
 
   // Count simulated spills.
   if (isSimRegAllocEnabled()) {
@@ -570,6 +589,7 @@ void ScheduleDAGOptSched::loadOptSchedConfig() {
   TwoPassEnabled = isTwoPassEnabled();
   TwoPassSchedulingStarted = false;
   SecondPass = false;
+  IsThirdPass = false;
   LatencyPrecision = fetchLatencyPrecision();
   TreatOrderAsDataDeps = schedIni.GetBool("TREAT_ORDER_DEPS_AS_DATA_DEPS");
 
@@ -784,13 +804,14 @@ bool ScheduleDAGOptSched::rpMismatch(InstSchedule *sched) {
 void ScheduleDAGOptSched::finalizeSchedule() {
   if (TwoPassEnabled && OptSchedEnabled) {
     initSchedulers();
+    RescheduleRegions.resize(Regions.size());
 
     LLVM_DEBUG(dbgs() << "Starting two pass scheduling approach\n");
     TwoPassSchedulingStarted = true;
     for (const SchedPassStrategy &S : SchedPasses) {
       MachineBasicBlock *MBB = nullptr;
       // Reset
-      RegionNumber = ~0u;
+      RegionIdx = 0;
 
       for (auto &Region : Regions) {
         RegionBegin = Region.first;

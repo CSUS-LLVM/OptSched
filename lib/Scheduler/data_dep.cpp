@@ -2762,6 +2762,7 @@ void InstSchedule::Copy(InstSchedule *src) {
 
   SetSpillCosts(src->spillCosts_);
   SetPeakRegPressures(src->peakRegPressures_);
+  setClusterSize(src->getClusterSize());
   cost_ = src->cost_;
   execCost_ = src->execCost_;
   spillCost_ = src->spillCost_;
@@ -2835,6 +2836,44 @@ void InstSchedule::Print(std::ostream &out, char const *const label) {
     }
   }
 }
+
+
+ void InstSchedule::Print(std::ostream &out, char const *const title,
+		 DataDepGraph *ddg) {
+  InstCount slotInCycle = 0;
+  InstCount cycleNum = 0;
+  InstCount i;
+
+  // out << '\n' << label << " Schedule";
+  Logger::Info("Printing Schedule");
+
+  for (i = 0; i < crntSlotNum_; i++) {
+    if (slotInCycle == 0) {
+      if (instInSlot_[i] != SCHD_STALL) {
+        InstCount instNum = instInSlot_[i];
+        SchedInstruction *inst = ddg->GetInstByIndx(instNum);
+        Logger::Info("Cycle# %d : %d - %s", cycleNum, instInSlot_[i], inst->GetName());
+      } else
+        Logger::Info("Cycle# %d : %d -", cycleNum, instInSlot_[i]);
+    } 
+    /*
+    out << "\nCycle# " << cycleNum << ":  ";
+
+    if (instInSlot_[i] == SCHD_STALL) {
+      out << "X ";
+    } else {
+      out << instInSlot_[i] << ' ';
+    }
+   */
+
+    slotInCycle++;
+
+    if (slotInCycle == issuRate_) {
+      slotInCycle = 0;
+      cycleNum++;
+    }
+  }
+ }
 
 #if defined(IS_DEBUG_PEAK_PRESSURE) || defined(IS_DEBUG_OPTSCHED_PRESSURES)
 void InstSchedule::PrintRegPressures() const {

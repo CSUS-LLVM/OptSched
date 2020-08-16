@@ -8,7 +8,10 @@
 #include "AMDGPUMacroFusion.h"
 #include "GCNSchedStrategy.h"
 #include "SIMachineFunctionInfo.h"
+#include "OptSchedGCNTarget.h"
+//#include "llvm/CodeGen/OptSequential.h"
 #include "llvm/Support/Debug.h"
+#include <algorithm>
 
 #define DEBUG_TYPE "optsched"
 
@@ -60,6 +63,7 @@ void ScheduleDAGOptSchedGCN::initSchedulers() {
   SchedPasses.push_back(OptSchedMaxOcc);
   // Second
   SchedPasses.push_back(OptSchedBalanced);
+  SchedPasses.push_back(OptSchedReschedule);
 }   
 
 // Execute scheduling passes.
@@ -67,15 +71,42 @@ void ScheduleDAGOptSchedGCN::initSchedulers() {
 void ScheduleDAGOptSchedGCN::finalizeSchedule() {
   if (TwoPassEnabled && OptSchedEnabled) {
     initSchedulers();
+    RescheduleRegions.resize(Regions.size());
+    RescheduleRegions.set();
 
     LLVM_DEBUG(dbgs() << "Starting two pass scheduling approach\n");
     TwoPassSchedulingStarted = true;
     for (const SchedPassStrategy &S : SchedPasses) {
       MachineBasicBlock *MBB = nullptr;
       // Reset
-      RegionNumber = ~0u;
+      RegionIdx = 0;
+      if (S == OptSchedReschedule) {
+        if (RescheduleRegions.none()) {
+	  dbgs() << "No regions to reschedule.\n";
+	  continue;
+	} else {
+          auto GCNOST = static_cast<OptSchedGCNTarget *>(OST.get());
+          unsigned TargetOccupancy = GCNOST->getTargetOcc();
+          if (TargetOccupancy == 1u) {
+            dbgs() << "Cannot lower occupancy to below 1.\n";
+	    continue;
+	  }
+
+          dbgs() << "Beginning rescheduling of regions.\n";
+	  unsigned NewTarget = TargetOccupancy - 1u;
+	  dbgs() << "Decreasing current target occupancy " << TargetOccupancy
+                 << " to new target " << NewTarget << '\n';
+	  GCNOST->limitOccupancy(NewTarget);
+	}
+      }
 
       for (auto &Region : Regions) {
+	/*if (S == OptSchedReschedule && !RescheduleRegions[RegionIdx]) {
+	  dbgs() << "Region " << RegionIdx << " does not need to be rescheduled.\n";
+	  ++RegionIdx;
+	  continue;
+	}*/
+
         RegionBegin = Region.first;
         RegionEnd = Region.second;
 
@@ -98,6 +129,7 @@ void ScheduleDAGOptSchedGCN::finalizeSchedule() {
         LLVM_DEBUG(getRealRegionPressure(RegionBegin, RegionEnd, LIS, "After"));
         Region = std::make_pair(RegionBegin, RegionEnd);
         exitRegion();
+        ++RegionIdx;
       }
       finishBlock();
     }
@@ -114,6 +146,7 @@ void ScheduleDAGOptSchedGCN::finalizeSchedule() {
 }
 
 void ScheduleDAGOptSchedGCN::runSchedPass(SchedPassStrategy S) {
+  RescheduleRegions[RegionIdx] = false;
   switch (S) {
   case GCNMaxOcc:
     scheduleGCNMaxOcc();
@@ -123,6 +156,9 @@ void ScheduleDAGOptSchedGCN::runSchedPass(SchedPassStrategy S) {
     break;
   case OptSchedBalanced:
     scheduleOptSchedBalanced();
+    break;
+  case OptSchedReschedule:
+    scheduleOptSchedReschedule();
     break;
   }
 }
@@ -144,3 +180,10 @@ void ScheduleDAGOptSchedGCN::scheduleOptSchedMaxOcc() {
 void ScheduleDAGOptSchedGCN::scheduleOptSchedBalanced() {
   ScheduleDAGOptSched::scheduleOptSchedBalanced();
 }
+
+void ScheduleDAGOptSchedGCN::scheduleOptSchedReschedule() {
+  IsThirdPass = true;
+  ScheduleDAGOptSched::scheduleOptSchedBalanced();
+  Logger::Info("End of third pass through\n");
+}
+

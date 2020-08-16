@@ -14,6 +14,7 @@
 #include "opt-sched/Scheduler/data_dep.h"
 #include "opt-sched/Scheduler/graph_trans.h"
 #include "opt-sched/Scheduler/sched_region.h"
+#include "llvm/ADT/BitVector.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/CodeGen/MachineScheduler.h"
 #include "llvm/Support/Debug.h"
@@ -59,13 +60,19 @@ protected:
   // pass. Used for the two pass scheduling approach.
   bool SecondPass;
 
+  bool IsThirdPass;
+
   // Region number uniquely identifies DAGs.
-  unsigned RegionNumber = ~0u;
+  size_t RegionIdx;
+
+  // Records if a region is not yet scheduled, or schedule has been reverted,
+  // or we generally desire to reschedule it.
+  llvm::BitVector RescheduleRegions;
 
   MachineSchedContext *C;
 
   // The OptSched target machine.
-  std::unique_ptr<OptSchedTarget> OST;
+  std::shared_ptr<OptSchedTarget> OST;
 
   // into the OptSched machine model
   std::unique_ptr<OptSchedMachineModel> MM;
@@ -251,7 +258,7 @@ public:
   void dumpLLVMRegisters() const;
 
   // Getter for region number
-  int getRegionNum() const { return RegionNumber; }
+  int getRegionNum() const { return RegionIdx; }
 
   // Return the boundary instruction for this region if it is not a sentinel
   // value.

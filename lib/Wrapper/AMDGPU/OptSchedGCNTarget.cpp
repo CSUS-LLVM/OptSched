@@ -3,6 +3,7 @@
 // AMDGCN OptSched target.
 //
 //===----------------------------------------------------------------------===//
+#include "OptSchedGCNTarget.h"
 #include "OptSchedDDGWrapperGCN.h"
 #include "SIMachineFunctionInfo.h"
 #include "Wrapper/OptSchedMachineWrapper.h"
@@ -22,7 +23,7 @@ using namespace llvm::opt_sched;
 
 // This is necessary because we cannot perfectly predict the number of registers
 // of each type that will be allocated.
-static const unsigned GPRErrorMargin = 3;
+static const unsigned GPRErrorMargin = 0;
 
 #ifndef NDEBUG
 static unsigned getOccupancyWeight(unsigned Occupancy) {
@@ -61,56 +62,6 @@ static unsigned getAdjustedOccupancy(const GCNSubtarget *ST, unsigned VGPRCount,
 }
 
 namespace {
-
-class OptSchedGCNTarget : public OptSchedTarget {
-public:
-  std::unique_ptr<OptSchedMachineModel>
-  createMachineModel(const char *ConfigPath) override {
-    return llvm::make_unique<OptSchedMachineModel>(ConfigPath);
-  }
-
-  std::unique_ptr<OptSchedDDGWrapperBase>
-  createDDGWrapper(llvm::MachineSchedContext *Context, ScheduleDAGOptSched *DAG,
-                   OptSchedMachineModel *MM, LATENCY_PRECISION LatencyPrecision,
-                   const std::string &RegionID) override {
-    return llvm::make_unique<OptSchedDDGWrapperGCN>(Context, DAG, MM,
-                                                    LatencyPrecision, RegionID);
-  }
-
-  void initRegion(llvm::ScheduleDAGInstrs *DAG, MachineModel *MM_) override;
-
-  void finalizeRegion(const InstSchedule *Schedule) override;
-
-  // Returns occupancy cost with number of VGPRs and SGPRs from PRP for
-  // a partial or complete schedule.
-  InstCount getCost(const llvm::SmallVectorImpl<unsigned> &PRP) const override;
-
-  void dumpOccupancyInfo(const InstSchedule *Schedule) const;
-
-  // Revert scheduing if we decrease occupancy.
-  bool shouldKeepSchedule() override;
-
-private:
-  const llvm::MachineFunction *MF;
-  SIMachineFunctionInfo *MFI;
-  ScheduleDAGOptSched *DAG;
-  const GCNSubtarget *ST;
-
-  unsigned RegionStartingOccupancy;
-  unsigned RegionEndingOccupancy;
-  unsigned TargetOccupancy;
-
-  // Max occupancy with local memory size;
-  unsigned MaxOccLDS;
-
-  // In RP only (max occupancy) scheduling mode we should try to find
-  // a min-RP schedule without considering perf hints which suggest limiting
-  // occupancy. Returns true if we should consider perf hints.
-  bool shouldLimitWaves() const;
-
-  // Find occupancy with spill cost.
-  unsigned getOccupancyWithCost(const InstCount Cost) const;
-};
 
 std::unique_ptr<OptSchedTarget> createOptSchedGCNTarget() {
   return llvm::make_unique<OptSchedGCNTarget>();
@@ -161,9 +112,9 @@ void OptSchedGCNTarget::initRegion(llvm::ScheduleDAGInstrs *DAG_,
   TargetOccupancy =
       shouldLimitWaves() ? MFI->getMinAllowedOccupancy() : MFI->getOccupancy();
 
-  LLVM_DEBUG(dbgs() << "Region starting occupancy is "
+  dbgs() << "Region starting occupancy is "
                     << RegionStartingOccupancy << "\n"
-                    << "Target occupancy is " << TargetOccupancy << "\n");
+                    << "Target occupancy is " << TargetOccupancy << "\n";
 }
 
 bool OptSchedGCNTarget::shouldLimitWaves() const {
@@ -171,6 +122,16 @@ bool OptSchedGCNTarget::shouldLimitWaves() const {
   // FIXME: Return false because perf hints are not currently strong enough to
   // use as a hard cap. Consider 'OccupancyWeight' heuristic here instead.
   return false;
+}
+
+void OptSchedGCNTarget::setTargetOcc(unsigned Target) {
+  dbgs() << "Setting target occupancy to " << Target << '\n';
+  TargetOccupancy = Target;
+}
+void OptSchedGCNTarget::limitOccupancy(unsigned Limit) {
+  dbgs() << "Limiting occupancy to " << Limit << '\n';
+  MFI->limitOccupancy(Limit);
+  TargetOccupancy = MFI->getOccupancy();
 }
 
 unsigned OptSchedGCNTarget::getOccupancyWithCost(const InstCount Cost) const {
@@ -184,9 +145,9 @@ void OptSchedGCNTarget::finalizeRegion(const InstSchedule *Schedule) {
   // If we decrease occupancy we may revert scheduling.
   unsigned RegionOccupancy =
       std::max(RegionStartingOccupancy, RegionEndingOccupancy);
-  LLVM_DEBUG(if (RegionOccupancy < MFI->getOccupancy()) dbgs()
+  if (RegionOccupancy < MFI->getOccupancy()) dbgs()
              << "Limiting occupancy to " << RegionEndingOccupancy
-             << " waves.\n");
+             << " waves.\n";
   MFI->limitOccupancy(RegionOccupancy);
 }
 

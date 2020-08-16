@@ -381,7 +381,7 @@ void BBWithSpill::InitForSchdulng() {
 /*****************************************************************************/
 
 void BBWithSpill::InitForCostCmputtn_() {
-  if (IsSecondPass() && ClusterMemoryOperations)
+  if (ClusterMemoryOperations && (IsSecondPass() || !TwoPassEnabled))
     initForClustering();
 
   int i;
@@ -434,8 +434,23 @@ InstCount BBWithSpill::CmputNormCost_(InstSchedule *sched,
 
 InstCount BBWithSpill::CmputCost_(InstSchedule *sched, COST_COMP_MODE compMode,
                                   InstCount &execCost, bool trackCnflcts) {
+
+  InstCount instNum;
+  InstCount cycleNum;
+  InstCount slotNum;
+  SchedInstruction *inst;
+
   if (compMode == CCM_STTC) {
-    if (GetSpillCostFunc() == SCF_SPILLS) {
+    if (GetSpillCostFunc() != SCF_SPILLS) {
+      InitForCostCmputtn_();
+
+      for (instNum = sched->GetFrstInst(cycleNum, slotNum);
+           instNum != INVALID_VALUE;
+           instNum = sched->GetNxtInst(cycleNum, slotNum)) {
+        inst = dataDepGraph_->GetInstByIndx(instNum);
+        SchdulInst(inst, cycleNum, slotNum, trackCnflcts);
+      }
+    } else {
       LocalRegAlloc regAlloc(sched, dataDepGraph_);
       regAlloc.SetupForRegAlloc();
       regAlloc.AllocRegs();
@@ -613,7 +628,7 @@ void BBWithSpill::UpdateSpillInfoForSchdul_(SchedInstruction *inst,
 
   // Possibly keep track of the current memory clustering size here
   // and in UpdateSpillInfoForUnSchdul_()
-  if (IsSecondPass() && ClusterMemoryOperations) {
+  if (ClusterMemoryOperations && (IsSecondPass() || !TwoPassEnabled)) {
     // Check if the current instruction is part of a cluster
     if (inst->GetMayCluster()) {
       // Check if there is a current active cluster
@@ -857,7 +872,7 @@ void BBWithSpill::UpdateSpillInfoForUnSchdul_(SchedInstruction *inst) {
   // 2.) Non-Cluster <- Cluster
   // 3.) Different Cluster <- Cluster
   // 4.) Cluster <- Non-cluster
-  if (IsSecondPass() && ClusterMemoryOperations) {
+  if (ClusterMemoryOperations && (IsSecondPass() || !TwoPassEnabled)) {
     // If the instruction we are backtracking from is part of a cluster
     if (inst->GetMayCluster()) {
       if (CurrentClusterSize != 0) {
@@ -1156,6 +1171,8 @@ InstCount BBWithSpill::UpdtOptmlSched(InstSchedule *crntSched,
     SetBestSchedLength(crntSched->GetCrntLngth());
     enumBestSched_->Copy(crntSched);
     bestSched_ = enumBestSched_;
+    if (!enumFoundSchedule())
+      setEnumFoundSchedule();
   }
 
   return GetBestCost();
@@ -1163,7 +1180,7 @@ InstCount BBWithSpill::UpdtOptmlSched(InstSchedule *crntSched,
 
 void BBWithSpill::printCurrentClustering() {
   // Print the instructions in the clusters after finding a schedule.
-  if (IsSecondPass() && ClusterMemoryOperations) {
+  if (ClusterMemoryOperations && (IsSecondPass() || !TwoPassEnabled)) {
     dbgs() << "Printing clustered instructions:\n";
     int i = 1;
     for (const auto &clusters : PastClustersList) {

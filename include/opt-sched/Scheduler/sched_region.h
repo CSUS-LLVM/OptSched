@@ -53,7 +53,7 @@ public:
   virtual ~SchedRegion() {}
 
   bool PrintClustering;
-
+  bool TwoPassEnabled;
   virtual void computeAndPrintClustering(InstSchedule *Sched) = 0;
 
   virtual void printCurrentClustering() = 0;
@@ -113,6 +113,9 @@ public:
   // Initialie variables for the second pass of the two-pass-optsched
   void InitSecondPass();
 
+  bool enumFoundSchedule() { return EnumFoundSchedule; }
+  void setEnumFoundSchedule() { EnumFoundSchedule = true; }
+
 private:
   // The algorithm to use for calculated lower bounds.
   LB_ALG lbAlg_;
@@ -132,6 +135,8 @@ private:
 
   // Used for two-pass-optsched to enable second pass functionalies.
   bool isSecondPass_;
+
+  bool EnumFoundSchedule;
 
   // The absolute cost lower bound to be used as a ref for normalized costs.
   InstCount costLwrBound_ = 0;

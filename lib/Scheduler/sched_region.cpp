@@ -50,6 +50,7 @@ SchedRegion::SchedRegion(MachineModel *machMdl, DataDepGraph *dataDepGraph,
 
   spillCostFunc_ = spillCostFunc;
   PrintClustering = false;
+  EnumFoundSchedule = false;
 }
 
 void SchedRegion::UseFileBounds_() {
@@ -126,6 +127,7 @@ FUNC_RESULT SchedRegion::FindOptimalSchedule(
   // enabled.
   Config &schedIni = SchedulerOptions::getInstance();
   PrintClustering = schedIni.GetBool("PRINT_CLUSTER");
+  TwoPassEnabled = schedIni.GetBool("USE_TWO_PASS");
   ClusterMemoryOperations = schedIni.GetBool("CLUSTER_MEMORY_OPS");
   ClusteringWeight = schedIni.GetInt("CLUSTER_WEIGHT");
   bool HeuristicSchedulerEnabled = schedIni.GetBool("HEUR_ENABLED");
@@ -240,9 +242,6 @@ FUNC_RESULT SchedRegion::FindOptimalSchedule(
     // calling GetCost() on the InstSchedule instance.
     CmputNormCost_(lstSched, CCM_DYNMC, hurstcExecCost, true);
     hurstcCost_ = lstSched->GetCost();
-
-    if (IsSecondPass() && PrintClustering)
-      computeAndPrintClustering(lstSched);
 
     // This schedule is optimal so ACO will not be run
     // so set bestSched here.
@@ -471,9 +470,6 @@ FUNC_RESULT SchedRegion::FindOptimalSchedule(
 
     enumTime = Utilities::GetProcessorTime() - enumStart;
     stats::enumerationTime.Record(enumTime);
-
-    if (IsSecondPass() && PrintClustering && enumBestSched_ != NULL)
-      computeAndPrintClustering(enumBestSched_);
   }
 
   // Step 5: Run ACO if schedule from enumerator is not optimal
@@ -645,6 +641,13 @@ FUNC_RESULT SchedRegion::FindOptimalSchedule(
     Logger::Info("DAG %s PEAK %d", dataDepGraph_->GetDagID(), maxSpillCost);
   }
 #endif
+
+  if (PrintClustering && bestSched != NULL && (IsSecondPass() || !TwoPassEnabled)) {
+    computeAndPrintClustering(bestSched);
+  }
+
+  //if (bestSched != NULL)
+    //bestSched->Print(Logger::GetLogStream(), "FinalSched", dataDepGraph_);
 
   return rslt;
 }
