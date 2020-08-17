@@ -37,8 +37,15 @@ private:
   // Vector of scheduling passes to execute.
   SmallVector<SchedPassStrategy, 4> SchedPasses;
 
-protected:
+  /// Contains the results of the first ILP pass and second analysis ILP pass.
+  /// Used to calculate if we should keep the lower target occupancy schedules
+  /// in the second ILP pass. First element is the first ILP pass and second
+  /// element is the second analysis ILP pass.
+  SmallVector<std::pair<int, int>, 32> ILPAnalysis;
+  /// TODO: Same as above for cost analysis.
+  SmallVector<std::pair<int, int>, 32> CostAnalysis;
 
+protected:
   // Vector of regions recorded for later rescheduling
   SmallVector<
       std::pair<MachineBasicBlock::iterator, MachineBasicBlock::iterator>, 32>
@@ -56,11 +63,15 @@ protected:
   // Path to the machine model specification file for opt-sched.
   SmallString<128> PathCfgMM;
 
+  bool IsFirstPass;
+
   // Bool value indicating that the scheduler is in the second
   // pass. Used for the two pass scheduling approach.
-  bool SecondPass;
+  bool IsSecondPass;
 
   bool IsThirdPass;
+
+  bool isFourthPass;
 
   // Region number uniquely identifies DAGs.
   size_t RegionIdx;
@@ -167,7 +178,8 @@ protected:
 
   SchedPriorities SecondPassPriorities;
 
-  // The heuristic used for the second pass enumerator in the two-pass scheduling approach.
+  // The heuristic used for the second pass enumerator in the two-pass
+  // scheduling approach.
   SchedPriorities SecondPassEnumPriorities;
 
   // Static node superiority RP only graph transformation.

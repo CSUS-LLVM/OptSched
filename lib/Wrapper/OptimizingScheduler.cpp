@@ -24,6 +24,7 @@
 #include "llvm/CodeGen/MachineRegisterInfo.h"
 #include "llvm/CodeGen/MachineScheduler.h"
 /*#include "llvm/CodeGen/OptSequential.h"*/
+#include "AMDGPU/OptSchedGCNTarget.h"
 #include "llvm/CodeGen/RegisterClassInfo.h"
 #include "llvm/CodeGen/RegisterPressure.h"
 #include "llvm/CodeGen/ScheduleDAG.h"
@@ -38,7 +39,6 @@
 #include <algorithm>
 #include <chrono>
 #include <string>
-#include "AMDGPU/OptSchedGCNTarget.h"
 
 #define DEBUG_TYPE "optsched"
 
@@ -79,8 +79,8 @@ static ScheduleDAGInstrs *createOptSched(MachineSchedContext *C) {
 
 // Register the machine scheduler.
 static MachineSchedRegistry OptSchedMIRegistry("optsched",
-                                           "Use the OptSched scheduler.",
-                                           createOptSched);
+                                               "Use the OptSched scheduler.",
+                                               createOptSched);
 
 // Command line options for opt-sched.
 static cl::opt<std::string> OptSchedCfg(
@@ -267,8 +267,7 @@ void ScheduleDAGOptSched::schedule() {
   Config &schedIni = SchedulerOptions::getInstance();
 
   const std::string RegionName = C->MF->getFunction().getName().data() +
-                                 std::string(":") +
-                                 std::to_string(RegionIdx);
+                                 std::string(":") + std::to_string(RegionIdx);
 
   // If two pass scheduling is enabled then
   // first just record the scheduling region.
@@ -388,14 +387,14 @@ void ScheduleDAGOptSched::schedule() {
 
   // In the second pass, ignore artificial edges before running the sequential
   // heuristic list scheduler.
-  if (SecondPass)
+  if (IsSecondPass)
     DDG->convertSUnits(/*IgnoreRealEdges=*/false,
                        /*IgnoreArtificialEdges=*/true);
   else
     DDG->convertSUnits(false, false);
 
   // Find all clusterable instructions for the second pass.
-  if (SecondPass || (!TwoPassEnabled && schedIni.GetBool("PRINT_CLUSTER"))) {
+  if (IsSecondPass || (!TwoPassEnabled && schedIni.GetBool("PRINT_CLUSTER"))) {
     dbgs() << "Finding load clusters.\n";
     int TotalLoadsInstructionsClusterable = DDG->findPossibleClusters(true);
     if (TotalLoadsInstructionsClusterable == 0)
@@ -460,7 +459,7 @@ void ScheduleDAGOptSched::schedule() {
   }
 
   // Used for two-pass-optsched to alter upper bound value.
-  if (SecondPass)
+  if (IsSecondPass)
     region->InitSecondPass();
 
   // Setup time before scheduling
@@ -482,15 +481,29 @@ void ScheduleDAGOptSched::schedule() {
 
   // BB Enumerator did not find a schedule.
   // Add the region to the list to be rescheduled.
-  if (SecondPass && !region->enumFoundSchedule() && !IsEasy && !IsThirdPass)
+  if (IsSecondPass && !region->enumFoundSchedule() && !IsEasy && !IsThirdPass &&
+      !IsFourthPass)
     RescheduleRegions[RegionIdx] = true;
 
   LLVM_DEBUG(Logger::Info("OptSched succeeded."));
 
-  if (!IsThirdPass) {
-    OST->finalizeRegion(Sched);
-    if (!OST->shouldKeepSchedule())
+  OST->finalizeRegion(Sched);
+
+  if (IsFirstPass || IsSecondPass)
+    if (!OST->shouldKeepSchedule()) {
+      if (IsSecondPass) {
+        // We do not keep the schedule so the results of the sequential
+        // heuristic scheduler is the final result for the second pass.
+        ILPAnalysis[RegionIdx].first = HurstcSchedLngth;
+      }
       return;
+    }
+
+  if (IsSecondPass)
+    ILPAnalysis[RegionIdx].first = BestSchedLngth;
+  else if (IsThirdPass) {
+    ILPAnalysis[RegionIdx].second = BestSchedLngth;
+    return;
   }
 
   // Count simulated spills.
@@ -588,8 +601,10 @@ void ScheduleDAGOptSched::loadOptSchedConfig() {
   OptSchedEnabled = isOptSchedEnabled();
   TwoPassEnabled = isTwoPassEnabled();
   TwoPassSchedulingStarted = false;
-  SecondPass = false;
+  IsFirstPass = false;
+  IsSecondPass = false;
   IsThirdPass = false;
+  IsFourthPass = false;
   LatencyPrecision = fetchLatencyPrecision();
   TreatOrderAsDataDeps = schedIni.GetBool("TREAT_ORDER_DEPS_AS_DATA_DEPS");
 
@@ -853,14 +868,17 @@ void ScheduleDAGOptSched::runSchedPass(SchedPassStrategy S) {
   switch (S) {
   case OptSchedMinRP:
     scheduleOptSchedMinRP();
+    Logger::Info("End of first pass through");
     break;
   case OptSchedBalanced:
     scheduleOptSchedBalanced();
+    Logger::Info("End of second pass through");
     break;
   }
 }
 
 void ScheduleDAGOptSched::scheduleOptSchedMinRP() {
+  IsFirstPass = true;
   LatencyPrecision = LTP_UNITY;
   // Set times for the first pass
   RegionTimeout = FirstPassRegionTimeout;
@@ -868,11 +886,11 @@ void ScheduleDAGOptSched::scheduleOptSchedMinRP() {
   HeurSchedType = SCHED_LIST;
 
   schedule();
-  Logger::Info("End of first pass through\n");
+  IsFirstPass = false;
 }
 
 void ScheduleDAGOptSched::scheduleOptSchedBalanced() {
-  SecondPass = true;
+  IsSecondPass = true;
   LatencyPrecision = LTP_ROUGH;
 
   // Set times for the second pass
@@ -899,7 +917,7 @@ void ScheduleDAGOptSched::scheduleOptSchedBalanced() {
   MultiPassStaticNodeSup = false;
 
   schedule();
-  Logger::Info("End of second pass through");
+  IsSecondPass = false;
 }
 
 bool ScheduleDAGOptSched::isSimRegAllocEnabled() const {

@@ -7,8 +7,8 @@
 #include "GCNOptSched.h"
 #include "AMDGPUMacroFusion.h"
 #include "GCNSchedStrategy.h"
-#include "SIMachineFunctionInfo.h"
 #include "OptSchedGCNTarget.h"
+#include "SIMachineFunctionInfo.h"
 //#include "llvm/CodeGen/OptSequential.h"
 #include "llvm/Support/Debug.h"
 #include <algorithm>
@@ -46,7 +46,29 @@ static void getRealRegionPressure(MachineBasicBlock::const_iterator Begin,
 
 ScheduleDAGOptSchedGCN::ScheduleDAGOptSchedGCN(
     llvm::MachineSchedContext *C, std::unique_ptr<MachineSchedStrategy> S)
-    : ScheduleDAGOptSched(C, std::move(S)) {}
+    : ScheduleDAGOptSched(C, std::move(S)) {
+  MinOcc = getMinOcc();
+}
+
+unsigned ScheduleDAGOptSchedGCN::getMinOcc() {
+  SchedulerOptions &schedIni = SchedulerOptions::getInstance();
+  int MinOcc = schedIni.GetInt("MIN_OCCUPANCY_FOR_RESCHEDULE");
+  if (MinOcc <= 10 || MinOcc >= 1)
+    return MinOcc;
+
+  llvm_unreachable(
+      "Unrecognized option for MIN_OCCUPANCY_FOR_RESCHEDULE setting.")
+}
+
+int ScheduleDAGOptSchedGCN::getMinILPImprovement() {
+  SchedulerOptions &schedIni = SchedulerOptions::getInstance();
+  int MinIlpImprovement = schedIni.GetInt("MIN_ILP_IMPROVEMENT");
+  if (MinIlpImprovement <= 100 || MinIlpImprovement >= 1)
+    return MinIlpImprovement;
+
+  llvm_unreachable(
+      "Unrecognized option for MIN_OCCUPANCY_FOR_RESCHEDULE setting.")
+}
 
 void ScheduleDAGOptSchedGCN::initSchedulers() {
   // Add DAG mutations that apply to both GCN and OptSched DAG's
@@ -61,10 +83,11 @@ void ScheduleDAGOptSchedGCN::initSchedulers() {
 
   // First
   SchedPasses.push_back(OptSchedMaxOcc);
-  // Second
+  // Second ILP passes
   SchedPasses.push_back(OptSchedBalanced);
-  SchedPasses.push_back(OptSchedReschedule);
-}   
+  SchedPasses.push_back(OptSchedLowerOccAnalysis);
+  SchedPasses.push_back(OptSchedCommitLowerOcc);
+}
 
 // Execute scheduling passes.
 // Partially copied GCNScheduleDAGMILive::finalizeSchedule
@@ -72,6 +95,8 @@ void ScheduleDAGOptSchedGCN::finalizeSchedule() {
   if (TwoPassEnabled && OptSchedEnabled) {
     initSchedulers();
     RescheduleRegions.resize(Regions.size());
+    ILPAnalysis.resize(Regions.size());
+    CostAnalysis.resize(Regions.size());
     RescheduleRegions.set();
 
     LLVM_DEBUG(dbgs() << "Starting two pass scheduling approach\n");
@@ -80,32 +105,37 @@ void ScheduleDAGOptSchedGCN::finalizeSchedule() {
       MachineBasicBlock *MBB = nullptr;
       // Reset
       RegionIdx = 0;
-      if (S == OptSchedReschedule) {
+      if (S == OptSchedLowerOccAnalysis) {
         if (RescheduleRegions.none()) {
-	  dbgs() << "No regions to reschedule.\n";
-	  continue;
-	} else {
+          dbgs() << "No regions to reschedule.\n";
+          break;
+        } else {
           auto GCNOST = static_cast<OptSchedGCNTarget *>(OST.get());
           unsigned TargetOccupancy = GCNOST->getTargetOcc();
-          if (TargetOccupancy == 1u) {
-            dbgs() << "Cannot lower occupancy to below 1.\n";
-	    continue;
-	  }
+          if (TargetOccupancy <= MinOcc) {
+            dbgs() << "Cannot lower occupancy to below minimum occupancy of "
+                   << MinOCc << '\n';
+            break;
+          }
 
           dbgs() << "Beginning rescheduling of regions.\n";
-	  unsigned NewTarget = TargetOccupancy - 1u;
-	  dbgs() << "Decreasing current target occupancy " << TargetOccupancy
+          unsigned NewTarget = TargetOccupancy - 1u;
+          dbgs() << "Decreasing current target occupancy " << TargetOccupancy
                  << " to new target " << NewTarget << '\n';
-	  GCNOST->limitOccupancy(NewTarget);
-	}
+          GCNOST->limitOccupancy(NewTarget);
+        }
+      } else if (S == OptSchedCommitLowerOcc) {
+        if (!shouldCommitLowerOccSched())
+          break;
       }
 
       for (auto &Region : Regions) {
-	/*if (S == OptSchedReschedule && !RescheduleRegions[RegionIdx]) {
-	  dbgs() << "Region " << RegionIdx << " does not need to be rescheduled.\n";
-	  ++RegionIdx;
-	  continue;
-	}*/
+        /*if (S == OptSchedLowerOccAnalysis && !RescheduleRegions[RegionIdx]) {
+          dbgs() << "Region " << RegionIdx << " does not need to be
+        rescheduled.\n";
+          ++RegionIdx;
+          continue;
+        }*/
 
         RegionBegin = Region.first;
         RegionEnd = Region.second;
@@ -124,7 +154,8 @@ void ScheduleDAGOptSchedGCN::finalizeSchedule() {
           exitRegion();
           continue;
         }
-        LLVM_DEBUG(getRealRegionPressure(RegionBegin, RegionEnd, LIS, "Before"));
+        LLVM_DEBUG(
+            getRealRegionPressure(RegionBegin, RegionEnd, LIS, "Before"));
         runSchedPass(S);
         LLVM_DEBUG(getRealRegionPressure(RegionBegin, RegionEnd, LIS, "After"));
         Region = std::make_pair(RegionBegin, RegionEnd);
@@ -153,12 +184,19 @@ void ScheduleDAGOptSchedGCN::runSchedPass(SchedPassStrategy S) {
     break;
   case OptSchedMaxOcc:
     scheduleOptSchedMaxOcc();
+    Logger::Info("End of first pass through");
     break;
   case OptSchedBalanced:
     scheduleOptSchedBalanced();
+    Logger::Info("End of second pass through");
     break;
-  case OptSchedReschedule:
-    scheduleOptSchedReschedule();
+  case OptSchedLowerOccAnalysis:
+    scheduleOptSchedLowerOccAnalysis();
+    Logger::Info("End of third pass through");
+    break;
+  case OptSchedCommitLowerOcc:
+    scheduleCommitLowerOcc();
+    Logger::Info("End of fourth pass through");
     break;
   }
 }
@@ -181,9 +219,33 @@ void ScheduleDAGOptSchedGCN::scheduleOptSchedBalanced() {
   ScheduleDAGOptSched::scheduleOptSchedBalanced();
 }
 
-void ScheduleDAGOptSchedGCN::scheduleOptSchedReschedule() {
+void ScheduleDAGOptSchedGCN::scheduleOptSchedLowerOccAnalysis() {
   IsThirdPass = true;
   ScheduleDAGOptSched::scheduleOptSchedBalanced();
-  Logger::Info("End of third pass through\n");
+  IsThirdPass = false;
 }
 
+void ScheduleDAGOptSchedGCN::scheduleCommitLowerOcc() {
+  IsFourthPass = true;
+  ScheduleDAGOptSched::scheduleOptSchedBalanced();
+  IsFourthPass = false;
+}
+
+bool ScheduleDAGOptSchedGCN::shouldCommitLowerOccSched() {
+  // First analyze ILP improvements
+  int FirstPassILP = 0;
+  int SecondPassILP = 0;
+  int MinILPImprovement = getMinILPImprovement();
+  for (std::pair<int, int> &RegionLength : ILPAnalysis) {
+    FirstPassILP += RegionLength.first;
+    SecondPassILP += RegionLength.second;
+  }
+  double ILPImprovement =
+      ((FirstPassILP - SecondPassILP) / (double)FirstPassILP) * 100.0;
+  dbgs() << "ILPImprovement from second ILP pass is " << ILPImprovement
+         << ", min improvement is: " << MinILPImprovement << '\n';
+  if (ILPImprovement >= MinILPImprovement)
+    return true;
+
+  return false;
+}

@@ -20,11 +20,23 @@ private:
     GCNMaxOcc,
     OptSchedMaxOcc,
     OptSchedBalanced,
-    OptSchedReschedule
+    OptSchedLowerOccAnalysis,
+    OptSchedCommitLowerOcc
   };
+
+  /// Get the minimum occupancy value from the sched.ini settings file. Check
+  /// if the value is between 1-10 and gives an error if it is not between the
+  /// valid range.
+  unsigned getMinOcc();
+
+  /// Analyze the possible improvements from lowering the target occupancy
+  /// and decide if we should keep the schedules.
+  bool shouldCommitLowerOccSched();
 
   // Vector of scheduling passes to execute.
   SmallVector<SchedPassStrategy, 4> SchedPasses;
+
+  unsigned MinOcc;
 
 public:
   ScheduleDAGOptSchedGCN(llvm::MachineSchedContext *C,
@@ -52,7 +64,12 @@ public:
   // Run OptSched in ILP/RP balanced mode.
   void scheduleOptSchedBalanced() override;
 
-  void scheduleOptSchedReschedule();
+  // Lower occupancy and run OptSched in ILP/RP balanced mode for analysis.
+  void scheduleOptSchedLowerOccAnalysis();
+
+  // Lower occupancy and run OptSched in ILP/RP balanced mode to commit
+  // scheduling in analysis pass.
+  void scheduleCommitLowerOcc();
 };
 
 } // namespace opt_sched
