@@ -97,6 +97,7 @@ void Logger::Fatal(const char *format_string, ...) {
   char message_buffer[MAX_MSGSIZE];
   VPRINT(message_buffer, format_string);
   Output(Logger::FATAL, true, message_buffer);
+  exit(1);
 }
 
 void Logger::Error(const char *format_string, ...) {
