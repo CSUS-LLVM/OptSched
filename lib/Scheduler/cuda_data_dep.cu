@@ -3394,15 +3394,116 @@ void InstSchedule::SetSpillCost(InstCount cost) { spillCost_ = cost; }
 
 InstCount InstSchedule::GetSpillCost() const { return spillCost_; }
 
-void InstSchedule::CopyPointersToHost(InstSchedule *dev_lstSched) {
-  //InstSchedule *dev_lstSched;
+void InstSchedule::CopyPointersToDevice(MachineModel *dev_machMdl) {
+  //copy instInSlot_ to device
+  InstCount *dev_instInSlot = NULL;
 
-  //if (cudaSuccess != cudaGetSymbolAddress((void**)&dev_lstSched, dev_lstSched))
-    //printf("Error copying device schedule pointer to host: %s\n", cudaGetErrorString(cudaGetLastError()));
+  if (cudaSuccess != cudaMalloc((void**)&dev_instInSlot, totSlotCnt_ * sizeof(InstCount)))
+    printf("Error allocating dev_mem for dev_instInSlot: %s\n", 
+		    cudaGetErrorString(cudaGetLastError()));
+
+  if (cudaSuccess != cudaMemcpy(dev_instInSlot, instInSlot_, totSlotCnt_ * sizeof(InstCount), cudaMemcpyHostToDevice))
+    printf("Error copying instInSlot_ to device: %s\n", cudaGetErrorString(cudaGetLastError()));
+
+  delete[] instInSlot_;
+
+  instInSlot_ = dev_instInSlot;
+  //if (cudaSuccess != cudaMemcpy(&instInSlot_, &dev_instInSlot_, sizeof(InstCount *), cudaMemcpyHostToDevice))
+    //printf("Error updating instInSlot_ pointer on device: %s\n", cudaGetErrorString(cudaGetLastError()));
+
+  //copy slotForInst_ to device
+  InstCount *dev_slotForInst = NULL;
+
+  if (cudaSuccess != cudaMalloc((void**)&dev_slotForInst, totInstCnt_ * sizeof(InstCount)))
+    printf("Error allocating dev_mem for dev_slotForInst: %s\n",
+                    cudaGetErrorString(cudaGetLastError()));
+
+  if (cudaSuccess != cudaMemcpy(dev_slotForInst, slotForInst_, totInstCnt_ * sizeof(InstCount), cudaMemcpyHostToDevice))
+    printf("Error copying slotForInst_ to device: %s\n", cudaGetErrorString(cudaGetLastError()));
+
+  delete[] slotForInst_;
+
+  slotForInst_ = dev_slotForInst;
+  //if (cudaSuccess != cudaMemcpy(&slotForInst_, &dev_slotForInst_, sizeof(InstCount *), cudaMemcpyHostToDevice))
+    //printf("Error updating slotForInst_ pointer on device: %s\n", cudaGetErrorString(cudaGetLastError()));
+
+  //copy spillCosts_ to device
+  InstCount *dev_spillCosts = NULL;
+
+  if (cudaSuccess != cudaMalloc((void**)&dev_spillCosts, totInstCnt_ * sizeof(InstCount)))
+    printf("Error allocating dev_mem for dev_spillCosts: %s\n",
+                    cudaGetErrorString(cudaGetLastError()));
+
+  if (cudaSuccess != cudaMemcpy(dev_spillCosts, spillCosts_, totInstCnt_ * sizeof(InstCount), cudaMemcpyHostToDevice))
+    printf("Error copying spillCosts_ to device: %s\n", cudaGetErrorString(cudaGetLastError()));
+
+  delete[] spillCosts_;
+
+  spillCosts_ = dev_spillCosts;
+  //if (cudaSuccess != cudaMemcpy(&spillCosts_, &dev_spillCosts_, sizeof(InstCount *), cudaMemcpyHostToDevice))
+    //printf("Error updating spillCosts_ pointer on device: %s\n", cudaGetErrorString(cudaGetLastError()));
+
+  //copy peakRegPressures_ to device
+  InstCount *dev_peakRegPressures = NULL;
+
+  if (cudaSuccess != cudaMalloc((void**)&dev_peakRegPressures, machMdl_->GetRegTypeCnt() * sizeof(InstCount)))
+    printf("Error allocating dev_mem for dev_peakRegPressures: %s\n",
+                    cudaGetErrorString(cudaGetLastError()));
+
+  if (cudaSuccess != cudaMemcpy(dev_peakRegPressures, peakRegPressures_, machMdl_->GetRegTypeCnt() * sizeof(InstCount), cudaMemcpyHostToDevice))
+    printf("Error copying peakRegPressures_ to device: %s\n", cudaGetErrorString(cudaGetLastError()));
+
+  delete[] peakRegPressures_;
+
+  peakRegPressures_ = dev_peakRegPressures;
+  //if (cudaSuccess != cudaMemcpy(&peakRegPressures_, &dev_peakRegPressures_, sizeof(InstCount *), cudaMemcpyHostToDevice))
+    //printf("Error updating peakRegPressures_ pointer on device: %s\n", cudaGetErrorString(cudaGetLastError()));
+
+  machMdl_ = dev_machMdl;
+  //update machMdl_ to dev_machMdl
+  //if (cudaSuccess != cudaMemcpy(&machMdl_, &dev_machMdl, sizeof(MachineModel *), cudaMemcpyHostToDevice))
+    //printf("Error updating machMdl_ pointer on device: %s\n", cudaGetErrorString(cudaGetLastError()));
+}
+
+void InstSchedule::CopyPointersToHost(MachineModel *machMdl) {
+  //update machMdl_ pointer to host machMdl
+  machMdl_ = machMdl;
+
+  InstCount *host_instInSlot = new InstCount[totSlotCnt_];
   
-
-  if (cudaSuccess != cudaMemcpy(instInSlot_, dev_lstSched->instInSlot_, totSlotCnt_ * sizeof(InstCount), cudaMemcpyDeviceToHost))
+  if (cudaSuccess != cudaMemcpy(host_instInSlot, instInSlot_, totSlotCnt_ * sizeof(InstCount), cudaMemcpyDeviceToHost))
     printf("Error copying instInSlot_ to host: %s\n", cudaGetErrorString(cudaGetLastError()));
+
+  cudaFree(instInSlot_);
+
+  instInSlot_ = host_instInSlot;
+
+  InstCount *host_slotForInst = new InstCount[totInstCnt_];
+
+  if (cudaSuccess != cudaMemcpy(host_slotForInst, slotForInst_, totInstCnt_ * sizeof(InstCount), cudaMemcpyDeviceToHost))
+    printf("Error copying slotForInst_ to host: %s\n", cudaGetErrorString(cudaGetLastError()));
+
+  cudaFree(slotForInst_);
+
+  slotForInst_ = host_slotForInst;
+
+  InstCount *host_spillCosts = new InstCount[totInstCnt_];
+
+  if (cudaSuccess != cudaMemcpy(host_spillCosts, spillCosts_, totInstCnt_ * sizeof(InstCount), cudaMemcpyDeviceToHost))
+    printf("Error copying spillCosts_ to host: %s\n", cudaGetErrorString(cudaGetLastError()));
+
+  cudaFree(spillCosts_);
+
+  spillCosts_ = host_spillCosts;
+
+  InstCount *host_peakRegPressures = new InstCount[machMdl_->GetRegTypeCnt()];
+
+  if (cudaSuccess != cudaMemcpy(host_peakRegPressures, peakRegPressures_, machMdl_->GetRegTypeCnt() * sizeof(InstCount), cudaMemcpyDeviceToHost))
+    printf("Error copying peakRegPressures_ to host: %s\n", cudaGetErrorString(cudaGetLastError()));
+
+  cudaFree(peakRegPressures_);
+
+  peakRegPressures_ = host_peakRegPressures;
 }
 
 /*******************************************************************************

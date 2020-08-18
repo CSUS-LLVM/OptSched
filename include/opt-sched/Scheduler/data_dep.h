@@ -935,8 +935,10 @@ public:
   void PrintRegPressures() const;
   bool Verify(MachineModel *machMdl, DataDepGraph *dataDepGraph);
   void PrintClassData();
+  //copies InstSchedules pointers to device
+  void CopyPointersToDevice(MachineModel *dev_machMdl);
   //copies schedule from device pointer to this object
-  void CopyPointersToHost(InstSchedule *dev_lstSched);
+  void CopyPointersToHost(MachineModel *machMdl);
 };
 /*****************************************************************************/
 

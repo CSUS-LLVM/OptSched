@@ -1210,7 +1210,7 @@ void BBWithSpill::CopyPointersToDevice(SchedRegion* dev_rgn) {
   InstCount *dev_peakRegPressures = NULL;
 
   //allocate device mem
-  if (cudaSuccess != cudaMalloc((void**)&dev_peakRegPressures, regTypeCnt_ * sizeof(InstCount)))
+  if (cudaSuccess != cudaMallocManaged((void**)&dev_peakRegPressures, regTypeCnt_ * sizeof(InstCount)))
     printf("Error allocating dev mem for dev_peakRegPressures: %s\n", cudaGetErrorString(cudaGetLastError()));
 
   //copy array to device
@@ -1225,7 +1225,7 @@ void BBWithSpill::CopyPointersToDevice(SchedRegion* dev_rgn) {
   InstCount *dev_spillCosts = NULL;
 
   //allocate dev mem
-  if (cudaSuccess != cudaMalloc((void**)&dev_spillCosts, dataDepGraph_->GetInstCnt() * sizeof(InstCount)))
+  if (cudaSuccess != cudaMallocManaged((void**)&dev_spillCosts, dataDepGraph_->GetInstCnt() * sizeof(InstCount)))
     printf("Error allocating dev mem for dev_spillCosts: %s\n", cudaGetErrorString(cudaGetLastError()));
 
   //copy array to device
@@ -1240,7 +1240,7 @@ void BBWithSpill::CopyPointersToDevice(SchedRegion* dev_rgn) {
   WeightedBitVector *dev_liveRegs = NULL;
 
   //allocate dev mem
-  if (cudaSuccess != cudaMalloc((void**)&dev_liveRegs, regTypeCnt_ * sizeof(WeightedBitVector)))
+  if (cudaSuccess != cudaMallocManaged((void**)&dev_liveRegs, regTypeCnt_ * sizeof(WeightedBitVector)))
     printf("Error allocating dev mem for dev_liveRegs: %s\n", cudaGetErrorString(cudaGetLastError()));
 
   //copy array
@@ -1259,6 +1259,7 @@ void BBWithSpill::CopyPointersToDevice(SchedRegion* dev_rgn) {
     vctr = liveRegs_[i].GetVctrCpy();
     unitCnt = liveRegs_[i].GetUnitCnt();
 
+    if (unitCnt > 0) {
     //allocate device mem
     if (cudaSuccess != cudaMalloc((void**)&dev_vctr, unitCnt * sizeof(unsigned int)))
       printf("Error allocating dev mem for dev_vctr: %s\n", cudaGetErrorString(cudaGetLastError()));
@@ -1270,7 +1271,7 @@ void BBWithSpill::CopyPointersToDevice(SchedRegion* dev_rgn) {
     //update device pointer
     if (cudaSuccess != cudaMemcpy(&(dev_liveRegs[i].vctr_), &dev_vctr, sizeof(unsigned int *), cudaMemcpyHostToDevice))
       printf("Error updating dev_liveRegs[%d].vctr_: %s\n", i, cudaGetErrorString(cudaGetLastError()));
-
+    }
     //delete vctr copy
     delete[] vctr;
   }
@@ -1279,7 +1280,7 @@ void BBWithSpill::CopyPointersToDevice(SchedRegion* dev_rgn) {
   WeightedBitVector *dev_livePhysRegs = NULL;
 
   //allocate dev mem
-  if (cudaSuccess != cudaMalloc((void**)&dev_livePhysRegs, regTypeCnt_ * sizeof(WeightedBitVector)))
+  if (cudaSuccess != cudaMallocManaged((void**)&dev_livePhysRegs, regTypeCnt_ * sizeof(WeightedBitVector)))
     printf("Error allocating dev mem for dev_livePhysRegs: %s\n", cudaGetErrorString(cudaGetLastError()));
 
   //copy array
@@ -1296,7 +1297,7 @@ void BBWithSpill::CopyPointersToDevice(SchedRegion* dev_rgn) {
     unitCnt = livePhysRegs_[i].GetUnitCnt();
 
     //allocate device mem
-    if (cudaSuccess != cudaMalloc((void**)&dev_vctr, unitCnt * sizeof(unsigned int)))
+    if (cudaSuccess != cudaMallocManaged((void**)&dev_vctr, unitCnt * sizeof(unsigned int)))
       printf("Error allocating dev mem for dev_vctr: %s\n", cudaGetErrorString(cudaGetLastError()));
 
     //copy vctr to device
@@ -1315,7 +1316,7 @@ void BBWithSpill::CopyPointersToDevice(SchedRegion* dev_rgn) {
   int *dev_SLIL = NULL;
 
   //allocate device memory
-  if (cudaSuccess != cudaMalloc((void**)&dev_SLIL, regTypeCnt_ * sizeof(int)))
+  if (cudaSuccess != cudaMallocManaged((void**)&dev_SLIL, regTypeCnt_ * sizeof(int)))
     printf("Error allocating dev mem for dev_SLIL: %s\n", cudaGetErrorString(cudaGetLastError()));
 
   //copy sumOfLiveIntervalLengths to device
@@ -1330,7 +1331,7 @@ void BBWithSpill::CopyPointersToDevice(SchedRegion* dev_rgn) {
   unsigned *dev_regPressures = NULL;
 
   //allocate device memry
-  if (cudaSuccess != cudaMalloc((void**)&dev_regPressures, regTypeCnt_ * sizeof(unsigned)))
+  if (cudaSuccess != cudaMallocManaged((void**)&dev_regPressures, regTypeCnt_ * sizeof(unsigned)))
     printf("Error allocating dev mem for dev_regPressures: %s\n", cudaGetErrorString(cudaGetLastError()));
 
   //copy regPressures_ to device
@@ -1344,18 +1345,33 @@ void BBWithSpill::CopyPointersToDevice(SchedRegion* dev_rgn) {
   printf("Finished copying BBWithSpill!\n");
 }
 
+void BBWithSpill::UpdateSpillInfoFromDevice(BBWithSpill *dev_rgn) {
+  //debug
+  printf("Updating BBWithSpill Spill Info\n");
+  
+  //dev_rgn = (BBWithSpill *)dev_rgn;  
+
+  peakRegPressures_ = dev_rgn->peakRegPressures_;
+  spillCosts_ = dev_rgn->spillCosts_;
+  sumOfLiveIntervalLengths_ = dev_rgn->sumOfLiveIntervalLengths_;
+  regPressures_ = dev_rgn->regPressures_;
+
+  //debug
+  printf("Done updating BBWithSpill Spill info\n");
+}
+
 void BBWithSpill::FreeDevicePointers() {
-  cudaFree(peakRegPressures_);
+/*  cudaFree(peakRegPressures_);
   cudaFree(spillCosts_);
   cudaFree(regPressures_);
   cudaFree(sumOfLiveIntervalLengths_);
-/*TODO: Why does this crash?
+  //TODO: Why does this crash?
   for (int i = 0; i < regTypeCnt_; i++) {
     cudaFree(liveRegs_[i].vctr_);
     cudaFree(livePhysRegs_[i].vctr_);
   }
-  */
+  
   cudaFree(liveRegs_);
   cudaFree(livePhysRegs_);
-  
+  */
 }

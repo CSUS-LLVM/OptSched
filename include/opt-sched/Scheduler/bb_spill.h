@@ -149,8 +149,11 @@ public:
   __device__
   void SetRegFiles(RegisterFile *regFiles) {regFiles_ = regFiles; }
 
-  void CopyPointersToDevice(SchedRegion* dev_rgn);
+  void CopyPointersToDevice(SchedRegion *dev_rgn);
   void FreeDevicePointers();
+  //updates spill info using the results from device
+  //list scheduling
+  void UpdateSpillInfoFromDevice(BBWithSpill *dev_rgn);
 
 protected:
   // (Chris)
