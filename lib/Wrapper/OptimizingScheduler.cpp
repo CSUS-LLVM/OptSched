@@ -610,11 +610,9 @@ bool ScheduleDAGOptSched::isOptSchedEnabled() const {
     return HotFunctions.GetBool(functionName, false);
   } else if (optSchedOption == "NO") {
     return false;
-  } else {
-    LLVM_DEBUG(dbgs() << "Invalid value for USE_OPT_SCHED" << optSchedOption
-                      << "Assuming NO.\n");
-    return false;
   }
+
+  Logger::Fatal("Unrecognized option for USE_OPT_SCHED setting");
 }
 
 bool ScheduleDAGOptSched::isTwoPassEnabled() const {
@@ -625,7 +623,8 @@ bool ScheduleDAGOptSched::isTwoPassEnabled() const {
     return true;
   else if (twoPassOption == "NO")
     return false;
-  llvm_unreachable("Unrecognized option for USE_TWO_PASS setting.");
+
+  Logger::Fatal("Unrecognized option for USE_TWO_PASS setting");
 }
 
 LATENCY_PRECISION ScheduleDAGOptSched::fetchLatencyPrecision() const {
@@ -637,11 +636,9 @@ LATENCY_PRECISION ScheduleDAGOptSched::fetchLatencyPrecision() const {
     return LTP_ROUGH;
   } else if (lpName == "UNIT" || lpName == "UNITY") {
     return LTP_UNITY;
-  } else {
-    LLVM_DEBUG(
-        Logger::Error("Unrecognized latency precision. Defaulted to PRECISE."));
-    return LTP_PRECISE;
   }
+
+  Logger::Fatal("Unrecognized option for LATENCY_PRECISION setting");
 }
 
 LB_ALG ScheduleDAGOptSched::parseLowerBoundAlgorithm() const {
@@ -650,11 +647,9 @@ LB_ALG ScheduleDAGOptSched::parseLowerBoundAlgorithm() const {
     return LBA_RJ;
   } else if (LBalg == "LC") {
     return LBA_LC;
-  } else {
-    LLVM_DEBUG(Logger::Error(
-        "Unrecognized lower bound technique. Defaulted to Rim-Jain."));
-    return LBA_RJ;
   }
+
+  Logger::Fatal("Unrecognized option for LB_ALG setting");
 }
 
 // Helper function to find the next substring which is a heuristic name in Str
@@ -672,7 +667,8 @@ static LISTSCHED_HEURISTIC GetNextHeuristicName(const std::string &Str,
       StartIndex = Walk + 1;
       return LSH.HID;
     }
-  llvm_unreachable("Unknown heuristic.");
+
+  Logger::Fatal("Unrecognized heuristic used!");
 }
 
 SchedPriorities ScheduleDAGOptSched::parseHeuristic(const std::string &Str) {
@@ -717,11 +713,9 @@ SPILL_COST_FUNCTION ScheduleDAGOptSched::parseSpillCostFunc() const {
     return SCF_SLIL;
   } else if (name == "OCC" || name == "TARGET") {
     return SCF_TARGET;
-  } else {
-    LLVM_DEBUG(
-        Logger::Error("Unrecognized spill cost function. Defaulted to PERP."));
-    return SCF_PERP;
   }
+
+  Logger::Fatal("Unrecognized option for SPILL_COST_FUNCTION setting");
 }
 
 bool ScheduleDAGOptSched::shouldPrintSpills() const {
@@ -734,12 +728,9 @@ bool ScheduleDAGOptSched::shouldPrintSpills() const {
   } else if (printSpills == "HOT_ONLY") {
     std::string functionName = C->MF->getFunction().getName();
     return HotFunctions.GetBool(functionName, false);
-  } else {
-    LLVM_DEBUG(
-        Logger::Error("Unknown value for PRINT_SPILL_COUNTS: %s. Assuming NO.",
-                      printSpills.c_str()));
-    return false;
   }
+
+  Logger::Fatal("Unrecognized option for PRINT_SPILL_COUNTS setting");
 }
 
 bool ScheduleDAGOptSched::rpMismatch(InstSchedule *sched) {
