@@ -88,8 +88,7 @@ void DevListSched(MachineModel *dev_machMdl, SchedRegion *dev_rgn,
 		  NodeData *dev_nodeData, RegFileData *dev_regFileData, 
 		  InstCount instCnt, bool cmputTrnstvClsr,
 		  InstSchedule *dev_lstSched) {
-  //this causes all CUDA API calls to fail, assigning "NULL" instead allows them to complete
-  //properly, but then kernel clearly crashes since InstSchedule is passed a NULL ptr
+  
   DataDepGraph *dev_dataDepGraph = new DataDepGraph(dev_machMdl, ltncyPcsn); 
 
   //update dev_rgn->dataDepGraph_
@@ -366,17 +365,8 @@ FUNC_RESULT SchedRegion::FindOptimalSchedule(
       printf("Error copying lstSched to device: %s\n",
              cudaGetErrorString(cudaGetLastError()));
 
-    //lstSched->CopyPointersToDevice(dev_lstSched);
-
     //step 2) launch device kernel
-    //allocate variable to hold dev_lstSched address
-/*
-    InstSchedule **dev_lstSchedAddrPtr = NULL;
-
-    if (cudaSuccess != cudaMalloc((void**)&dev_lstSchedAddrPtr, sizeof(InstSchedule *)))
-      printf("Error allocating dev mem for dev_lstSchedAddrPtr: %s\n",
-             cudaGetErrorString(cudaGetLastError()));
-*/
+	  
     printf("Launching device kernel\n");
     DevListSched<<<1,1>>>(dev_machMdl, dev_rgn, abslutSchedUprBound_, 
 		          GetHeuristicPriorities(), vrfySched_, 
@@ -389,40 +379,27 @@ FUNC_RESULT SchedRegion::FindOptimalSchedule(
     //free up device memory
     dev_machMdl->FreeDevicePointers();
     cudaFree(dev_machMdl);
-    //((BBWithSpill *)dev_rgn)->FreeDevicePointers();
-    //cudaFree(dev_rgn);
     dev_nodeData->FreeDevicePointers();
     cudaFree(dev_nodeData);
     dev_regFileData->FreeDevicePointers();
     cudaFree(dev_regFileData);
     
     //step 3) copy ListSchedule to Host
-    //TODO: Implement
-    //get device pointer
-    //InstSchedule *dev_lstSched = NULL;
-/*
-    if (cudaSuccess != cudaMemcpy(&dev_lstSched, dev_lstSchedAddrPtr, sizeof(InstSchedule *), cudaMemcpyDeviceToHost))
-      printf("Error copying lstSched pointer from device: %s\n",
-	      cudaGetErrorString(cudaGetLastError()));
-
-    //debug
-    printf("dev_lstSched = %d\n", dev_lstSched);
-
-    InstSchedule *host_lstSched = new InstSchedule(machMdl_, dataDepGraph_, vrfySched_);
-*/
     if (cudaSuccess != cudaMemcpy(lstSched, dev_lstSched, sizeof(InstSchedule), cudaMemcpyDeviceToHost))
      printf("Error copying lstSched to host: %s\n",
              cudaGetErrorString(cudaGetLastError())); 
 
     lstSched->CopyPointersToHost(machMdl_);
     lstSched->Print();
-
-    ((BBWithSpill *)(this))->UpdateSpillInfoFromDevice((BBWithSpill *)dev_rgn);
+    
+    //TODO: Implement
+    //((BBWithSpill *)(this))->UpdateSpillInfoFromDevice((BBWithSpill *)dev_rgn);
+	  
     //****End Code for ListScheduling on Device****
 
     //moved to before device ListScheduling starts
     //Milliseconds hurstcStart = Utilities::GetProcessorTime();
-/*
+/*  Now happens on the device
     lstSched = new InstSchedule(machMdl_, dataDepGraph_, vrfySched_);
 
     lstSchdulr = AllocHeuristicScheduler_();
