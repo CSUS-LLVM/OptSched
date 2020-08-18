@@ -146,8 +146,11 @@ public:
   void InitForSchdulng();
   __device__
   void Dev_InitForSchdulng();
+  __device__
+  void SetRegFiles(RegisterFile *regFiles) {regFiles_ = regFiles; }
 
   void CopyPointersToDevice(SchedRegion* dev_rgn);
+  void FreeDevicePointers();
 
 protected:
   // (Chris)

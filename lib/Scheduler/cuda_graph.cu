@@ -26,6 +26,10 @@ GraphNode::GraphNode(UDT_GNODES num, UDT_GNODES maxNodeCnt) {
 
 __host__ __device__
 GraphNode::~GraphNode() {
+  
+  //debug
+  //printf("In ~GraphNode\n");
+
   DelScsrLst();
   delete scsrLst_;
   delete prdcsrLst_;
@@ -37,6 +41,9 @@ GraphNode::~GraphNode() {
     delete isRcrsvScsr_;
   if (isRcrsvPrdcsr_ != NULL)
     delete isRcrsvPrdcsr_;
+
+  //debug
+  //printf("Done with ~GraphNode\n");
 }
 
 void GraphNode::DelPrdcsrLst() {

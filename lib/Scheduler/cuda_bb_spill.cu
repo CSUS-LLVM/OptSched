@@ -592,7 +592,7 @@ void BBWithSpill::UpdateSpillInfoForSchdul_(SchedInstruction *inst,
 #endif
     }
 #ifdef __CUDA_ARCH__
-    printf();
+    printf("Now computing spill cost for instruction.\n");
 #else
     Logger::Info("Now computing spill cost for instruction.");
 #endif
@@ -622,9 +622,11 @@ void BBWithSpill::UpdateSpillInfoForSchdul_(SchedInstruction *inst,
 
     // FIXME: Can this be taken out of this loop?
     if (GetSpillCostFunc() == SCF_SLIL) {
-      //slilSpillCost_ = std::accumulate(sumOfLiveIntervalLengths_,
-      //                                 &sumOfLiveIntervalLengths_[regTypeCnt_], 
-      //	  		         0);
+/* cannot use std:: in device code, replaced with simple loop
+      slilSpillCost_ = std::accumulate(sumOfLiveIntervalLengths_,
+                                       &sumOfLiveIntervalLengths_[regTypeCnt_], 
+          		               0);
+*/
       accumulator = 0;
       for (int x = 0; x < regTypeCnt_; x++)
         accumulator += sumOfLiveIntervalLengths_[x];
@@ -633,33 +635,35 @@ void BBWithSpill::UpdateSpillInfoForSchdul_(SchedInstruction *inst,
   }
 
   if (GetSpillCostFunc() == SCF_TARGET) {
-    //Cannot simply call due to polymorphism, replacing with GenericTarget
-    //method for now since I am testing for CPU
+    //Cannot simply call on device due to polymorphism/virtual methods, 
+    //replacing with GenericTarget method for now since I am testing for CPU
     //TODO: Add ability to calculate GCNTarget getCost when compiling for
     //AMD GPU
     //newSpillCost = OST->getCost(regPressures_);
+
     accumulator = 0;
     for (int x = 0; x < regTypeCnt_; x++)
       accumulator += regPressures_[x];
     newSpillCost = accumulator;
-
   } else if (GetSpillCostFunc() == SCF_SLIL) {
-    //slilSpillCost_ = std::accumulate(sumOfLiveIntervalLengths_,
-    //                                 &sumOfLiveIntervalLengths_[regTypeCnt_], 
-    //				       0);
+/*  cannot use std:: in device code, replaced with simple loop
+    slilSpillCost_ = std::accumulate(sumOfLiveIntervalLengths_,
+                                     &sumOfLiveIntervalLengths_[regTypeCnt_], 
+    				     0);
+*/
     accumulator = 0;
     for (int x = 0; x < regTypeCnt_; x++)
       accumulator += sumOfLiveIntervalLengths_[x];
     slilSpillCost_ = accumulator;
-
   } else if (GetSpillCostFunc() == SCF_PRP) {
-    //newSpillCost =
-    //    std::accumulate(regPressures_, &regPressures_[regTypeCnt_], 0);
+/*  cannot use std:: in device code, replaced with simple loop
+    newSpillCost =
+        std::accumulate(regPressures_, &regPressures_[regTypeCnt_], 0);
+*/
     accumulator = 0;
     for (int x = 0; x < regTypeCnt_; x++)
       accumulator += regPressures_[x];
     newSpillCost = accumulator;
-
   } else if (GetSpillCostFunc() == SCF_PEAK_PER_TYPE) {
     for (int i = 0; i < regTypeCnt_; i++)
       if (0 < peakRegPressures_[i] - machMdl_->GetPhysRegCnt(i))
@@ -667,14 +671,17 @@ void BBWithSpill::UpdateSpillInfoForSchdul_(SchedInstruction *inst,
 
   } else {
     // Default is PERP (Some SCF like SUM rely on PERP being the default here)
-    //int i = 0;
-    //std::for_each(
-    //    regPressures_, &regPressures_[regTypeCnt_], [&](InstCount RP) {
-    //      newSpillCost += std::max(0, RP - machMdl_->GetPhysRegCnt(i++));
-    //    });
+/*  cannot use std:: in device code, replaced with simple loop
+    int i = 0;
+    std::for_each(
+        regPressures_, &regPressures_[regTypeCnt_], [&](InstCount RP) {
+          newSpillCost += std::max(0, RP - machMdl_->GetPhysRegCnt(i++));
+        });
+*/
     for (int i = 0; i < regTypeCnt_; i++) {
-      if (0 < regPressures_[i] - machMdl_->GetPhysRegCnt(i))
+      if (0 < (int)(regPressures_[i] - machMdl_->GetPhysRegCnt(i))) {
         newSpillCost += regPressures_[i] - machMdl_->GetPhysRegCnt(i);
+      }
     }
   }
 
@@ -1333,25 +1340,22 @@ void BBWithSpill::CopyPointersToDevice(SchedRegion* dev_rgn) {
   //update device pointer dev_rgn->sumOfLiveIntervalLengths
   if (cudaSuccess != cudaMemcpy(&(((BBWithSpill *)dev_rgn)->regPressures_), &dev_regPressures, sizeof(unsigned *), cudaMemcpyHostToDevice))
     printf("Error updating dev_rgn->regPressures_: %s\n", cudaGetErrorString(cudaGetLastError()));
-  
-  //copy RegFiles_ to device
-  RegisterFile *dev_regFiles = NULL;
-
-  //allocate device memory
-  if (cudaSuccess != cudaMallocManaged((void**)&dev_regFiles, machMdl_->GetRegTypeCnt() * sizeof(RegisterFile)))
-    printf("Error allocating dev mem for dev_regFiles: %s\n", cudaGetErrorString(cudaGetLastError()));
-
-  //copy RegFiles_ to device
-  if (cudaSuccess != cudaMemcpy(dev_regFiles, regFiles_, machMdl_->GetRegTypeCnt() * sizeof(RegisterFile), cudaMemcpyHostToDevice))
-    printf("Error copying regPressures_ to device: %s\n", cudaGetErrorString(cudaGetLastError()));
-
-  //copy each regFiles_' pointers to device
-  for (int i = 0; i < machMdl_->GetRegTypeCnt(); i++)
-    regFiles_[i].CopyPointersToDevice(&dev_regFiles[i]);
-
-  //update device pointer dev_rgn->regFiles_
-  if (cudaSuccess != cudaMemcpy(&(((BBWithSpill *)dev_rgn)->regFiles_), &dev_regFiles, sizeof(RegisterFile *), cudaMemcpyHostToDevice))
-    printf("Error updating dev_rgn->regFiles_: %s\n", cudaGetErrorString(cudaGetLastError()));
 
   printf("Finished copying BBWithSpill!\n");
+}
+
+void BBWithSpill::FreeDevicePointers() {
+  cudaFree(peakRegPressures_);
+  cudaFree(spillCosts_);
+  cudaFree(regPressures_);
+  cudaFree(sumOfLiveIntervalLengths_);
+/*TODO: Why does this crash?
+  for (int i = 0; i < regTypeCnt_; i++) {
+    cudaFree(liveRegs_[i].vctr_);
+    cudaFree(livePhysRegs_[i].vctr_);
+  }
+  */
+  cudaFree(liveRegs_);
+  cudaFree(livePhysRegs_);
+  
 }

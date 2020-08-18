@@ -155,6 +155,11 @@ struct NodeData {
       delete[] scsrs_;
     }
   }
+
+  void FreeDevicePointers() {
+    cudaFree(prdcsrs_);
+    cudaFree(scsrs_);
+  }
 };
 
 //DS for transfer of register data to device
@@ -196,6 +201,13 @@ struct RegData {
       delete[] defs_;
     }
   }
+
+  void FreeDevicePointers() {
+    if (useCnt_ > 0)
+      cudaFree(uses_);
+    if (defCnt_ > 0)
+      cudaFree(defs_);
+  }
 };
 
 //data structure for transfer of register file data to device
@@ -222,6 +234,14 @@ struct RegFileData {
       //free up host regs
       delete[] regs_;
     }
+  }
+
+  void FreeDevicePointers() {
+    for (int i = 0; i < regCnt_; i++)
+      regs_[i].FreeDevicePointers();
+
+    if (regs_)
+      cudaFree(regs_);
   }
 };
 
@@ -462,6 +482,7 @@ public:
     return machMdl_->GetPhysRegCnt(regType);
   }
 
+  __host__ __device__
   RegisterFile *getRegFiles() { return RegFiles; }
 
   void CopyPointersToDevice(DataDepGraph *dev_dataDepGraph);
@@ -914,6 +935,8 @@ public:
   void PrintRegPressures() const;
   bool Verify(MachineModel *machMdl, DataDepGraph *dataDepGraph);
   void PrintClassData();
+  //copies schedule from device pointer to this object
+  void CopyPointersToHost(InstSchedule *dev_lstSched);
 };
 /*****************************************************************************/
 

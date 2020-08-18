@@ -86,7 +86,8 @@ void DevListSched(MachineModel *dev_machMdl, SchedRegion *dev_rgn,
 		  InstCount schedUprBound, SchedPriorities prirts, 
 		  bool vrfy, LATENCY_PRECISION ltncyPcsn, 
 		  NodeData *dev_nodeData, RegFileData *dev_regFileData, 
-		  InstCount instCnt, bool cmputTrnstvClsr) {
+		  InstCount instCnt, bool cmputTrnstvClsr,
+		  InstSchedule **dev_lstSchedAddrPtr) {
   //this causes all CUDA API calls to fail, assigning "NULL" instead allows them to complete
   //properly, but then kernel clearly crashes since InstSchedule is passed a NULL ptr
   DataDepGraph *dev_dataDepGraph = new DataDepGraph(dev_machMdl, ltncyPcsn); 
@@ -94,34 +95,35 @@ void DevListSched(MachineModel *dev_machMdl, SchedRegion *dev_rgn,
   //update dev_rgn->dataDepGraph_
   dev_rgn->SetDepGraph(dev_dataDepGraph);
   
-  //debug
-  printf("Dev DDG created, reconstructing\n");
-
-  //TODO:Initialize DDG using dev_nodeData and dev_regData
+  //Initialize DDG using dev_nodeData and dev_regData
   dev_dataDepGraph->ReconstructOnDevice_(instCnt, dev_nodeData, dev_regFileData);
 
   dev_dataDepGraph->SetupForSchdulng(cmputTrnstvClsr);
-  
-  //debug
-  printf("dev_dataDepGraph constructed!\n");  
 
+  ((BBWithSpill *)dev_rgn)->SetRegFiles(dev_dataDepGraph->getRegFiles());
+  
   InstSchedule *dev_lstSched = new InstSchedule(dev_machMdl, dev_dataDepGraph, vrfy);
 
   //debug
-  printf("dev_lstSched created!\n");
+  printf("dev_lstSched = %d\n", dev_lstSched);
+
+  //save pointer for access from host
+  *dev_lstSchedAddrPtr = dev_lstSched;
+
+  //debug
+  printf("*dev_lstSchedAddrPtr = %d\n", *dev_lstSchedAddrPtr);
 
   ConstrainedScheduler *dev_lstSchdulr = new ListScheduler(dev_dataDepGraph, dev_machMdl, 
 		                                           schedUprBound, prirts);
-
-  //debug
-  printf("dev_lstSchdulr created!\n");
 
   FUNC_RESULT rslt = dev_lstSchdulr->FindSchedule(dev_lstSched, dev_rgn);
 
   if (rslt != RES_SUCCESS) {
       printf("Device List scheduling failed!\n");
   }
-
+ 
+  //delete dev_lstSchdulr;
+  //delete dev_dataDepGraph;
   free(dev_dataDepGraph);
 }
 
@@ -240,8 +242,14 @@ FUNC_RESULT SchedRegion::FindOptimalSchedule(
  
     //****Begin Code for ListScheduling on Device****
 
-    //debug: set cuda to use device one
-    
+    //debug: increase heap/stack size
+    if (cudaSuccess != cudaDeviceSetLimit(cudaLimitStackSize, 65536))
+      printf("Error increasing stack size: %s\n",
+             cudaGetErrorString(cudaGetLastError()));
+
+    if (cudaSuccess != cudaDeviceSetLimit(cudaLimitMallocHeapSize , 1028000000))
+      printf("Error increasing heap size: %s\n",
+             cudaGetErrorString(cudaGetLastError()));
 
     //Step 1a) Copy MachineModel to Device
     MachineModel *dev_machMdl = NULL;
@@ -266,12 +274,19 @@ FUNC_RESULT SchedRegion::FindOptimalSchedule(
     NodeData *dev_nodeData = NULL;
 
     //allocate dev mem
-    if (cudaSuccess != cudaMallocManaged((void**)&dev_nodeData, dataDepGraph_->GetInstCnt() * sizeof(NodeData)))
-      printf("Failed to allocate device mem for dev_nodeData: %s\n", cudaGetErrorString(cudaGetLastError()));
+    if (cudaSuccess != cudaMallocManaged((void**)&dev_nodeData, 
+			                 dataDepGraph_->GetInstCnt() 
+					 * sizeof(NodeData)))
+      printf("Failed to allocate device mem for dev_nodeData: %s\n", 
+	     cudaGetErrorString(cudaGetLastError()));
 
     //copy nodeData to device
-    if (cudaSuccess != cudaMemcpy(dev_nodeData, nodeData, dataDepGraph_->GetInstCnt() * sizeof(NodeData), cudaMemcpyHostToDevice))
-      printf("Failed to copy nodeData to device: %s\n", cudaGetErrorString(cudaGetLastError()));
+    if (cudaSuccess != cudaMemcpy(dev_nodeData, nodeData, 
+			          dataDepGraph_->GetInstCnt() 
+				  * sizeof(NodeData), 
+				  cudaMemcpyHostToDevice))
+      printf("Failed to copy nodeData to device: %s\n", 
+	     cudaGetErrorString(cudaGetLastError()));
 
     //copy EdgeData arrays inside NodeData struct to device
     for (int i = 0; i < dataDepGraph_->GetInstCnt(); i++)
@@ -289,12 +304,19 @@ FUNC_RESULT SchedRegion::FindOptimalSchedule(
     RegFileData *dev_regFileData = NULL;
 
     //allocate dev mem
-    if (cudaSuccess != cudaMallocManaged((void**)&dev_regFileData, machMdl_->GetRegTypeCnt() * sizeof(RegFileData)))
-      printf("Failed to allocate device mem for dev_regFileData: %s\n", cudaGetErrorString(cudaGetLastError()));
+    if (cudaSuccess != cudaMallocManaged((void**)&dev_regFileData, 
+			                 machMdl_->GetRegTypeCnt() 
+					 * sizeof(RegFileData)))
+      printf("Failed to allocate device mem for dev_regFileData: %s\n", 
+	     cudaGetErrorString(cudaGetLastError()));
 
     //copy array of regFileData to device
-    if (cudaSuccess != cudaMemcpy(dev_regFileData, regFileData, machMdl_->GetRegTypeCnt() * sizeof(RegFileData), cudaMemcpyHostToDevice))
-      printf("Failed to copy regFileData to device: %s\n", cudaGetErrorString(cudaGetLastError()));
+    if (cudaSuccess != cudaMemcpy(dev_regFileData, regFileData, 
+			          machMdl_->GetRegTypeCnt() 
+				  * sizeof(RegFileData), 
+				  cudaMemcpyHostToDevice))
+      printf("Failed to copy regFileData to device: %s\n", 
+	     cudaGetErrorString(cudaGetLastError()));
 
     for (int i = 0; i < machMdl_->GetRegTypeCnt(); i++)
       regFileData[i].CopyPointersToDevice(&dev_regFileData[i]);
@@ -307,40 +329,73 @@ FUNC_RESULT SchedRegion::FindOptimalSchedule(
 
     //allocate device mem
     if (cudaSuccess != cudaMallocManaged((void**)&dev_rgn, sizeof(BBWithSpill)))
-      printf("Error allocating dev mem for dev_rgn: %s\n", cudaGetErrorString(cudaGetLastError()));
+      printf("Error allocating dev mem for dev_rgn: %s\n", 
+	     cudaGetErrorString(cudaGetLastError()));
 
     //copy this to device
-    if (cudaSuccess != cudaMemcpy(dev_rgn, this, sizeof(BBWithSpill), cudaMemcpyHostToDevice))
-      printf("Error copying this to device: %s\n", cudaGetErrorString(cudaGetLastError()));
+    if (cudaSuccess != cudaMemcpy(dev_rgn, this, sizeof(BBWithSpill), 
+			          cudaMemcpyHostToDevice))
+      printf("Error copying this to device: %s\n", 
+	     cudaGetErrorString(cudaGetLastError()));
 
     //update dev_rgn->machMdl_ to dev_machMdl
-    if (cudaSuccess != cudaMemcpy(&(dev_rgn->machMdl_), &dev_machMdl, sizeof(MachineModel *), cudaMemcpyHostToDevice))
-      printf("Error updating dev_rgn->machMdl_ on device: %s\n", cudaGetErrorString(cudaGetLastError()));
+    if (cudaSuccess != cudaMemcpy(&(dev_rgn->machMdl_), &dev_machMdl, 
+			          sizeof(MachineModel *), 
+				  cudaMemcpyHostToDevice))
+      printf("Error updating dev_rgn->machMdl_ on device: %s\n", 
+             cudaGetErrorString(cudaGetLastError()));
 
     CopyPointersToDevice(dev_rgn);
 
     //step 2) launch device kernel
+    //allocate variable to hold dev_lstSched address
+    InstSchedule **dev_lstSchedAddrPtr = NULL;
+
+    if (cudaSuccess != cudaMalloc((void**)&dev_lstSchedAddrPtr, sizeof(InstSchedule *)))
+      printf("Error allocating dev mem for dev_lstSchedAddrPtr: %s\n",
+             cudaGetErrorString(cudaGetLastError()));
+
     printf("Launching device kernel\n");
-    DevListSched<<<1,1>>>(dev_machMdl, dev_rgn, abslutSchedUprBound_, GetHeuristicPriorities(), vrfySched_, dataDepGraph_->GetLtncyPrcsn(), dev_nodeData, dev_regFileData, dataDepGraph_->GetInstCnt(), needTransitiveClosure);
-    cudaDeviceSynchronize();
+    DevListSched<<<1,1>>>(dev_machMdl, dev_rgn, abslutSchedUprBound_, 
+		          GetHeuristicPriorities(), vrfySched_, 
+			  dataDepGraph_->GetLtncyPrcsn(), dev_nodeData, 
+			  dev_regFileData, dataDepGraph_->GetInstCnt(), 
+			  needTransitiveClosure, dev_lstSchedAddrPtr);
+    
     printf("Post Kernel Error: %s\n", cudaGetErrorString(cudaGetLastError()));
 
-    //step 3) copy ListSchedule to Host
     //free up device memory
     dev_machMdl->FreeDevicePointers();
     cudaFree(dev_machMdl);
-    //dev_rgn->
+    ((BBWithSpill *)dev_rgn)->FreeDevicePointers();
     cudaFree(dev_rgn);
-    //dev_nodeData->FreeDevicePointers();
+    dev_nodeData->FreeDevicePointers();
     cudaFree(dev_nodeData);
-    //dev_regFileData->FreeDevicePointers();
+    dev_regFileData->FreeDevicePointers();
     cudaFree(dev_regFileData);
     
+    //step 3) copy ListSchedule to Host
     //TODO: Implement
-    
+    //get device pointer
+    InstSchedule *dev_lstSched = NULL;
+
+    if (cudaSuccess != cudaMemcpy(&dev_lstSched, dev_lstSchedAddrPtr, sizeof(InstSchedule *), cudaMemcpyDeviceToHost))
+      printf("Error copying lstSched pointer from device: %s\n",
+	      cudaGetErrorString(cudaGetLastError()));
+
+    //debug
+    printf("dev_lstSched = %d\n", dev_lstSched);
+
+    InstSchedule *host_lstSched = new InstSchedule(machMdl_, dataDepGraph_, vrfySched_);
+
+    if (cudaSuccess != cudaMemcpy(host_lstSched, dev_lstSched, sizeof(InstSchedule), cudaMemcpyDeviceToHost))
+     printf("Error copying lstSched to host: %s\n",
+             cudaGetErrorString(cudaGetLastError())); 
+
+    host_lstSched->CopyPointersToHost(dev_lstSched);
     //****End Code for ListScheduling on Device****
 
-
+    //moved to before device ListScheduling starts
     Milliseconds hurstcStart = Utilities::GetProcessorTime();
     lstSched = new InstSchedule(machMdl_, dataDepGraph_, vrfySched_);
 

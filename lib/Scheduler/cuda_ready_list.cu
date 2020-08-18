@@ -130,19 +130,51 @@ ReadyList::ReadyList(DataDepGraph *dataDepGraph, SchedPriorities prirts) {
 
 __host__ __device__
 ReadyList::~ReadyList() {
+
+  //debug
+  //printf("In ~ReadyList\n");
+
   Reset();
+
+  //debug
+  //printf("Done with Reset()\n");
+
   if (prirtyLst_)
     delete prirtyLst_;
+
+  //debug
+  //printf("Deleted prirtyLst_\n");
+
   if (latestSubLst_)
     delete latestSubLst_;
+
+  //debug
+  //printf("Deleted latestSubLst_\n");
+
   if (keyedEntries_)
     delete keyedEntries_;
+
+  //debug
+  //printf("Deleted keyedEntries_\n");
+
+  //debug
+  //printf("Done with ~ReadyList\n");
 }
 
 __host__ __device__
 void ReadyList::Reset() {
+ 
+  //debug
+  //printf("Inside Reset()\n");
   prirtyLst_->Reset();
+
+  //debug
+  //printf("Done with prirtyLst_->Reset()\n");
+
   latestSubLst_->Reset();
+
+  //debug
+  //printf("Done with latesetSubLst_->Reset()\n");
 }
 
 __host__ __device__

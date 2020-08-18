@@ -21,7 +21,13 @@ ListScheduler::ListScheduler(DataDepGraph *dataDepGraph, MachineModel *machMdl,
 }
 
 __host__ __device__
-ListScheduler::~ListScheduler() { delete rdyLst_; }
+ListScheduler::~ListScheduler() { 
+
+  //debug
+  //printf("In ~ListScheduler\n");
+
+  delete rdyLst_; 
+}
 
 __host__ __device__
 SchedInstruction *ListScheduler::PickInst() const {
@@ -43,7 +49,7 @@ FUNC_RESULT ListScheduler::FindSchedule(InstSchedule *sched, SchedRegion *rgn) {
   rgn_ = rgn;
 
   //debug
-  printf("ListScheduler::FindSchedule: Initializing\n");
+  //printf("ListScheduler::FindSchedule: Initializing\n");
 
   Initialize_();
 
@@ -58,15 +64,16 @@ FUNC_RESULT ListScheduler::FindSchedule(InstSchedule *sched, SchedRegion *rgn) {
     avgRdyLstSize += rdyLstSize;
 
     //debug
-    printf("ListScheduler::FindSchedule: Picking inst\n");
+    //printf("ListScheduler::FindSchedule: Picking inst\n");
 
     SchedInstruction *inst = PickInst();
 
-    //debug
+   /* //debug
     if (inst == NULL)
       printf("ListScheduler::FindSchedule: Picked STALL\n");
     else
       printf("ListScheduler::FindSchedule: Picked inst: %d\n", inst->GetNum());
+   */
 
     InstCount instNum;
     // If the ready list is empty.
@@ -77,23 +84,23 @@ FUNC_RESULT ListScheduler::FindSchedule(InstSchedule *sched, SchedRegion *rgn) {
       instNum = inst->GetNum();
 
       //debug
-      printf("ListScheduler::FindSchedule: Calling SchdulInst_\n");
+      //printf("ListScheduler::FindSchedule: Calling SchdulInst_\n");
 
       SchdulInst_(inst, crntCycleNum_);
 
       //debug
-      printf("ListScheduler::FindSchedule: Done with SchdulInst_\n");
+      //printf("ListScheduler::FindSchedule: Done with SchdulInst_\n");
 
       //debug
-      printf("ListScheduler::FindSchedule: Calling inst->Schedule\n");
+      //printf("ListScheduler::FindSchedule: Calling inst->Schedule\n");
 
       inst->Schedule(crntCycleNum_, crntSlotNum_);
 
       //debug
-      printf("ListScheduler::FindSchedule: Done with inst->Schedule\n");
+      //printf("ListScheduler::FindSchedule: Done with inst->Schedule\n");
 
       //debug
-      printf("ListScheduler::FindSchedule: Calling rgn_->SchdulInst()\n");
+      //printf("ListScheduler::FindSchedule: Calling rgn_->SchdulInst()\n");
 
 #ifdef __CUDA_ARCH__
       ((BBWithSpill *)rgn_)->Dev_SchdulInst(inst, crntCycleNum_, crntSlotNum_, false);
@@ -102,7 +109,7 @@ FUNC_RESULT ListScheduler::FindSchedule(InstSchedule *sched, SchedRegion *rgn) {
 #endif
 
       //debug
-      printf("ListScheduler::FindSchedule: Done with rgn_->SchdulInst()\n");
+      //printf("ListScheduler::FindSchedule: Done with rgn_->SchdulInst()\n");
 
       DoRsrvSlots_(inst);
       rdyLst_->RemoveNextPriorityInst();

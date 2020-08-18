@@ -73,9 +73,20 @@ SchedInstruction::SchedInstruction(InstCount num, const char *name,
 
 __host__ __device__
 SchedInstruction::~SchedInstruction() {
+
+  //debug
+  //printf("In ~SchedInstruction\n");
+
   if (memAllocd_)
     DeAllocMem_();
+
+  //debug
+  //printf("Deleting crntRange_\n");
+
   delete crntRange_;
+
+  //debug
+  //printf("Done with ~SchedInstruction\n");
 }
 
 __host__ __device__
@@ -219,9 +230,9 @@ void SchedInstruction::DeAllocMem_() {
   if (ltncyPerPrdcsr_ != NULL)
     delete[] ltncyPerPrdcsr_;
   if (sortedPrdcsrLst_ != NULL)
-    delete sortedPrdcsrLst_;
+    //delete sortedPrdcsrLst_;
   if (sortedScsrLst_ != NULL)
-    delete sortedScsrLst_;
+    //delete sortedScsrLst_;
   if (crtclPathFrmRcrsvScsr_ != NULL)
     delete[] crtclPathFrmRcrsvScsr_;
   if (crtclPathFrmRcrsvPrdcsr_ != NULL)

@@ -874,10 +874,6 @@ InstCount EnumTreeNode::GetPeakSpillCost() { return peakSpillCost_; }
 /*****************************************************************************/
 
 void EnumTreeNode::SetSpillCostSum(InstCount cost) {
-
-  //debug
-  printf("In SetSpillCostSum, cost = %d\n", cost);
-
   assert(cost >= 0);
   spillCostSum_ = cost;
 }

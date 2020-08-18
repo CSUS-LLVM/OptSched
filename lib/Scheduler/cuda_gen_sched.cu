@@ -41,6 +41,10 @@ InstScheduler::InstScheduler(DataDepStruct *dataDepGraph, MachineModel *machMdl,
 
 __host__ __device__
 InstScheduler::~InstScheduler() {
+
+  //debug
+  //printf("In ~InstSchduler\n");
+
   delete[] slotsPerTypePerCycle_;
   delete[] instCntPerIssuType_;
 }
@@ -96,6 +100,10 @@ ConstrainedScheduler::ConstrainedScheduler(DataDepGraph *dataDepGraph,
 
 __host__ __device__
 ConstrainedScheduler::~ConstrainedScheduler() {
+
+  //debug
+  //printf("In ~ConstrainedScheduler\n");
+
   if (crntCycleNum_ < schedUprBound_ &&
       frstRdyLstPerCycle_[crntCycleNum_] != NULL) {
     delete frstRdyLstPerCycle_[crntCycleNum_];
@@ -316,24 +324,14 @@ bool ConstrainedScheduler::IsTriviallyLegal_(
 
 __host__ __device__
 bool ConstrainedScheduler::ChkInstLglty_(SchedInstruction *inst) const {
-
-  //debug
-  printf("Inside ChkInstLglty_\n");	
-
   if (IsTriviallyLegal_(inst))
     return true;
-
-  //debug
-  printf("Reached point 1\n");
 
   //rgn_->ChkInstLglty(inst) is defined to always return true
   //so I am removing this statement for now
   // Do region-specific legality check
   //if (rgn_->ChkInstLglty(inst) == false)
     //return false;
-
-  //debug
-  printf("Reached point 2\n");
 
   // Account for instructions that block the whole cycle.
   if (isCrntCycleBlkd_)

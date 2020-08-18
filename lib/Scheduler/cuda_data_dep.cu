@@ -226,15 +226,37 @@ DataDepGraph::DataDepGraph(MachineModel *machMdl, LATENCY_PRECISION ltncyPrcsn)
 
 __host__ __device__
 DataDepGraph::~DataDepGraph() {
+
+  //debug
+  //printf("In ~DataDepGraph()\n");
+  //printf("Deleting insts_\n");
+  
   if (insts_ != NULL) {
     for (InstCount i = 0; i < instCnt_; i++) {
+      //debug
+      //printf("Checking if insts_[%d] is NULL\n", i);
       if (insts_[i] != NULL) {
+        //debug
+	//printf("insts_[%d] != NULL\n", i);
+
         delete insts_[i];
+
+	//debug
+	//printf("Deleted insts_[%d]\n", i);
       }
     }
+    //debug
+    //printf("Deleting insts_\n");
+
     delete[] insts_;
   }
+  //debug
+  printf("Deleting instCntPerType_\n");
+
   delete[] instCntPerType_;
+
+  //debug
+  //printf("Done with ~DataDepGraph()\n");
 }
 
 __host__ __device__
@@ -1509,7 +1531,7 @@ void DataDepGraph::ReconstructOnDevice_(InstCount instCnt, NodeData *nodeData,
   for (InstCount i = 0; i < instCnt; i++) {
 
     //debug
-    printf("Creating inst node: %d\n", nodeData[i].instNum_);
+    //printf("Creating inst node: %d\n", nodeData[i].instNum_);
 
     inst = CreateNode_(nodeData[i].instNum_, nodeData[i].instName_, 
 		       nodeData[i].instType_, nodeData[i].opCode_, 
@@ -1539,12 +1561,12 @@ void DataDepGraph::ReconstructOnDevice_(InstCount instCnt, NodeData *nodeData,
   //create edges
   for (InstCount i = 0; i < instCnt; i++) {
     //debug
-    printf("Creating nodes for prdcsrs\n");
+    //printf("Creating edges for prdcsrs\n");
 
     for (int j = 0; j < nodeData[i].prdcsrCnt_; j++) {
 
       //debug
-      printf("Creating edge from %d to %d\n", nodeData[i].prdcsrs_[j].toNodeNum_, nodeData[i].instNum_);
+      //printf("Creating edge from %d to %d\n", nodeData[i].prdcsrs_[j].toNodeNum_, nodeData[i].instNum_);
 
       CreateEdge_(nodeData[i].prdcsrs_[j].toNodeNum_, nodeData[i].instNum_,
                   nodeData[i].prdcsrs_[j].ltncy_, 
@@ -1552,12 +1574,12 @@ void DataDepGraph::ReconstructOnDevice_(InstCount instCnt, NodeData *nodeData,
     }
 
     //debug
-    printf("Creating edges to successors\n");
+    //printf("Creating edges to successors\n");
 
     for (int j = 0; j < nodeData[i].scsrCnt_; j++) {
 
       //debug
-      printf("Creating edge from %d to %d\n", nodeData[i].instNum_, nodeData[i].scsrs_[j].toNodeNum_);
+      //printf("Creating edge from %d to %d\n", nodeData[i].instNum_, nodeData[i].scsrs_[j].toNodeNum_);
 
       CreateEdge_(nodeData[i].instNum_, nodeData[i].scsrs_[j].toNodeNum_, 
 		  nodeData[i].scsrs_[j].ltncy_, nodeData[i].scsrs_[j].depType_);
@@ -3371,6 +3393,17 @@ InstCount InstSchedule::GetExecCost() const { return execCost_; }
 void InstSchedule::SetSpillCost(InstCount cost) { spillCost_ = cost; }
 
 InstCount InstSchedule::GetSpillCost() const { return spillCost_; }
+
+void InstSchedule::CopyPointersToHost(InstSchedule *dev_lstSched) {
+  //InstSchedule *dev_lstSched;
+
+  //if (cudaSuccess != cudaGetSymbolAddress((void**)&dev_lstSched, dev_lstSched))
+    //printf("Error copying device schedule pointer to host: %s\n", cudaGetErrorString(cudaGetLastError()));
+  
+
+  if (cudaSuccess != cudaMemcpy(instInSlot_, dev_lstSched->instInSlot_, totSlotCnt_ * sizeof(InstCount), cudaMemcpyDeviceToHost))
+    printf("Error copying instInSlot_ to host: %s\n", cudaGetErrorString(cudaGetLastError()));
+}
 
 /*******************************************************************************
  * Previously inlined functions
