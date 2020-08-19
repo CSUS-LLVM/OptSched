@@ -165,6 +165,9 @@ protected:
   // Static node superiority RP only graph transformation.
   bool StaticNodeSup;
 
+  // ILP Static Node Superiority graph transformation
+  bool ILPStaticNodeSup;
+
   // Run multiple passes of the static node superiority algorithm
   // (StaticNodeSup must be enabled).
   bool MultiPassStaticNodeSup;
