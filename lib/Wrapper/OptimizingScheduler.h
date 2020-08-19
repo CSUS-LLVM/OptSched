@@ -37,6 +37,13 @@ private:
   // Vector of scheduling passes to execute.
   SmallVector<SchedPassStrategy, 4> SchedPasses;
 
+
+protected:
+  // Vector of regions recorded for later rescheduling
+  SmallVector<
+      std::pair<MachineBasicBlock::iterator, MachineBasicBlock::iterator>, 32>
+      Regions;
+
   /// Contains the results of the first ILP pass and second analysis ILP pass.
   /// Used to calculate if we should keep the lower target occupancy schedules
   /// in the second ILP pass. First element is the first ILP pass and second
@@ -44,12 +51,6 @@ private:
   SmallVector<std::pair<int, int>, 32> ILPAnalysis;
   /// TODO: Same as above for cost analysis.
   SmallVector<std::pair<int, int>, 32> CostAnalysis;
-
-protected:
-  // Vector of regions recorded for later rescheduling
-  SmallVector<
-      std::pair<MachineBasicBlock::iterator, MachineBasicBlock::iterator>, 32>
-      Regions;
 
   // Path to opt-sched config options directory.
   SmallString<128> PathCfg;
@@ -71,7 +72,7 @@ protected:
 
   bool IsThirdPass;
 
-  bool isFourthPass;
+  bool IsFourthPass;
 
   // Region number uniquely identifies DAGs.
   size_t RegionIdx;

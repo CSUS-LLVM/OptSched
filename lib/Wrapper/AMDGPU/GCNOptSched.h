@@ -29,6 +29,8 @@ private:
   /// valid range.
   unsigned getMinOcc();
 
+  int getMinILPImprovement();
+
   /// Analyze the possible improvements from lowering the target occupancy
   /// and decide if we should keep the schedules.
   bool shouldCommitLowerOccSched();

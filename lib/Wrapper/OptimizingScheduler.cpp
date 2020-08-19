@@ -380,6 +380,10 @@ void ScheduleDAGOptSched::schedule() {
   // Build LLVM DAG
   SetupLLVMDag();
   OST->initRegion(this, MM.get());
+  /*if (IsSecondPass && !IsThirdPass && !IsFourthPass) {
+    auto GCNOST = static_cast<OptSchedGCNTarget *>(OST.get());
+    GCNOST->setTargetOcc(5);
+  }*/
 
   // Convert graph
   auto DDG =
@@ -489,7 +493,7 @@ void ScheduleDAGOptSched::schedule() {
 
   OST->finalizeRegion(Sched);
 
-  if (IsFirstPass || IsSecondPass)
+  if (!IsThirdPass && !IsFourthPass && (IsFirstPass || IsSecondPass))
     if (!OST->shouldKeepSchedule()) {
       if (IsSecondPass) {
         // We do not keep the schedule so the results of the sequential
@@ -499,7 +503,7 @@ void ScheduleDAGOptSched::schedule() {
       return;
     }
 
-  if (IsSecondPass)
+  if (IsSecondPass && !IsThirdPass && !IsFourthPass)
     ILPAnalysis[RegionIdx].first = BestSchedLngth;
   else if (IsThirdPass) {
     ILPAnalysis[RegionIdx].second = BestSchedLngth;

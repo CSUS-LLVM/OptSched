@@ -53,21 +53,23 @@ ScheduleDAGOptSchedGCN::ScheduleDAGOptSchedGCN(
 unsigned ScheduleDAGOptSchedGCN::getMinOcc() {
   SchedulerOptions &schedIni = SchedulerOptions::getInstance();
   int MinOcc = schedIni.GetInt("MIN_OCCUPANCY_FOR_RESCHEDULE");
-  if (MinOcc <= 10 || MinOcc >= 1)
+  if (MinOcc <= 10 && MinOcc >= 1)
     return MinOcc;
 
-  llvm_unreachable(
-      "Unrecognized option for MIN_OCCUPANCY_FOR_RESCHEDULE setting.")
+  Logger::Fatal(
+      "Unrecognized option for MIN_OCCUPANCY_FOR_RESCHEDULE setting: %d",
+      MinOcc);
 }
 
 int ScheduleDAGOptSchedGCN::getMinILPImprovement() {
   SchedulerOptions &schedIni = SchedulerOptions::getInstance();
   int MinIlpImprovement = schedIni.GetInt("MIN_ILP_IMPROVEMENT");
-  if (MinIlpImprovement <= 100 || MinIlpImprovement >= 1)
+  if (MinIlpImprovement <= 100 && MinIlpImprovement >= 0)
     return MinIlpImprovement;
 
-  llvm_unreachable(
-      "Unrecognized option for MIN_OCCUPANCY_FOR_RESCHEDULE setting.")
+  Logger::Fatal(
+      "Unrecognized option for MIN_OCCUPANCY_FOR_RESCHEDULE setting: %d",
+      MinIlpImprovement);
 }
 
 void ScheduleDAGOptSchedGCN::initSchedulers() {
@@ -114,7 +116,7 @@ void ScheduleDAGOptSchedGCN::finalizeSchedule() {
           unsigned TargetOccupancy = GCNOST->getTargetOcc();
           if (TargetOccupancy <= MinOcc) {
             dbgs() << "Cannot lower occupancy to below minimum occupancy of "
-                   << MinOCc << '\n';
+                   << MinOcc << '\n';
             break;
           }
 
@@ -125,8 +127,14 @@ void ScheduleDAGOptSchedGCN::finalizeSchedule() {
           GCNOST->limitOccupancy(NewTarget);
         }
       } else if (S == OptSchedCommitLowerOcc) {
-        if (!shouldCommitLowerOccSched())
+        dbgs()
+            << "Analyzing if we should commit the lower occupancy schedule\n";
+        if (!shouldCommitLowerOccSched()) {
+          dbgs()
+              << "Lower occupancy schedule did not meet minimum improvement.\n";
           break;
+        }
+        dbgs() << "Lower occupancy met minimum improvement requirement!\n";
       }
 
       for (auto &Region : Regions) {
@@ -233,18 +241,25 @@ void ScheduleDAGOptSchedGCN::scheduleCommitLowerOcc() {
 
 bool ScheduleDAGOptSchedGCN::shouldCommitLowerOccSched() {
   // First analyze ILP improvements
-  int FirstPassILP = 0;
-  int SecondPassILP = 0;
+  int FirstPassLengthSum = 0;
+  int SecondPassLengthSum = 0;
   int MinILPImprovement = getMinILPImprovement();
   for (std::pair<int, int> &RegionLength : ILPAnalysis) {
-    FirstPassILP += RegionLength.first;
-    SecondPassILP += RegionLength.second;
+    dbgs() << "First length -- " << RegionLength.first << ", Second length -- "
+           << RegionLength.second << '\n';
+    FirstPassLengthSum += RegionLength.first;
+    SecondPassLengthSum += RegionLength.second;
   }
-  double ILPImprovement =
-      ((FirstPassILP - SecondPassILP) / (double)FirstPassILP) * 100.0;
+  dbgs() << "First pass length sum: " << FirstPassLengthSum << '\n';
+  dbgs() << "Second pass length sum: " << SecondPassLengthSum << '\n';
+  double FirstPassAverageLength = (double)FirstPassLengthSum / Regions.size();
+  double SecondPassAverageLength = (double)SecondPassLengthSum / Regions.size();
+  double ILPImprovement = ((FirstPassAverageLength - SecondPassAverageLength) /
+                           FirstPassAverageLength) *
+                          100.0;
   dbgs() << "ILPImprovement from second ILP pass is " << ILPImprovement
          << ", min improvement is: " << MinILPImprovement << '\n';
-  if (ILPImprovement >= MinILPImprovement)
+  if (ILPImprovement - MinILPImprovement >= 0)
     return true;
 
   return false;

@@ -411,6 +411,9 @@ FUNC_RESULT SchedRegion::FindOptimalSchedule(
   InitialSchedule = bestSched_;
   InitialScheduleCost = bestCost_;
   InitialScheduleLength = bestSchedLngth_;
+  /*Logger::Info("Printing Initiial schedule");
+  InitialSchedule->Print(Logger::GetLogStream(), "InitialSched", dataDepGraph_);
+  Logger::Info("Finish printing initial schedule");*/
 
   // Step #4: Find the optimal schedule if the heuristc and ACO was not optimal.
   if (BbSchedulerEnabled) {
@@ -647,7 +650,7 @@ FUNC_RESULT SchedRegion::FindOptimalSchedule(
   }
 
   //if (bestSched != NULL)
-    //bestSched->Print(Logger::GetLogStream(), "FinalSched", dataDepGraph_);
+  //  bestSched->Print(Logger::GetLogStream(), "FinalSched", dataDepGraph_);
 
   return rslt;
 }
