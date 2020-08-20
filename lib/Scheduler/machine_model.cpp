@@ -4,8 +4,10 @@
 // for setiosflags(), setprecision().
 #include "opt-sched/Scheduler/buffers.h"
 #include "opt-sched/Scheduler/logger.h"
+#include "llvm/Support/ErrorHandling.h"
 #include <cassert>
 #include <iomanip>
+#include <string>
 
 using namespace llvm::opt_sched;
 
@@ -28,7 +30,7 @@ MachineModel::MachineModel(const string &modelFile) {
     buf.GetNxtVldLine(pieceCnt, strngs, lngths);
 
     if (pieceCnt != 2)
-      Logger::Fatal("Invalid issue type spec");
+      llvm::report_fatal_error("Invalid issue type spec", false);
 
     issueTypes_[j].name = strngs[0];
     issueTypes_[j].slotsCount = atoi(strngs[1]);
@@ -51,7 +53,7 @@ MachineModel::MachineModel(const string &modelFile) {
     buf.GetNxtVldLine(pieceCnt, strngs, lngths);
 
     if (pieceCnt != 2) {
-      Logger::Fatal("Invalid register type spec");
+      llvm::report_fatal_error("Invalid register type spec", false);
     }
 
     registerTypes_[i].name = strngs[0];
@@ -71,8 +73,9 @@ MachineModel::MachineModel(const string &modelFile) {
     IssueType issuType = GetIssueTypeByName(buffer);
 
     if (issuType == INVALID_ISSUE_TYPE) {
-      Logger::Fatal("Invalid issue type %s for inst. type %s", buffer,
-                    it->name.c_str());
+      llvm::report_fatal_error(std::string("Invalid issue type ") + buffer +
+                                   " for inst. type " + it->name,
+                               false);
     }
 
     it->issuType = issuType;

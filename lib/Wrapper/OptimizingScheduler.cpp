@@ -163,15 +163,14 @@ static BLOCKS_TO_KEEP blocksToKeep(const Config &SchedIni) {
 
 static SchedulerType parseListSchedType() {
   auto SchedTypeString =
-      SchedulerOptions::getInstance().GetString("HEUR_SCHED_TYPE", "LIST");
+      SchedulerOptions::getInstance().GetString("HEUR_SCHED_TYPE");
   if (SchedTypeString == "LIST")
     return SCHED_LIST;
   if (SchedTypeString == "SEQ")
     return SCHED_SEQ;
 
-  Logger::Info("Unknown heuristic scheduler type selected defaulting to basic "
-               "list scheduler.");
-  return SCHED_LIST;
+  llvm::report_fatal_error(
+      "Unrecognized option for HEUR_SCHED_TYPE: " + SchedTypeString, false);
 }
 
 static std::unique_ptr<GraphTrans>
@@ -612,8 +611,9 @@ bool ScheduleDAGOptSched::isOptSchedEnabled() const {
     return false;
   }
 
-  Logger::Fatal("Unrecognized option for USE_OPT_SCHED setting: %s",
-                optSchedOption.c_str());
+  llvm::report_fatal_error("Unrecognized option for USE_OPT_SCHED setting: " +
+                               optSchedOption,
+                           false);
 }
 
 bool ScheduleDAGOptSched::isTwoPassEnabled() const {
@@ -625,8 +625,8 @@ bool ScheduleDAGOptSched::isTwoPassEnabled() const {
   else if (twoPassOption == "NO")
     return false;
 
-  Logger::Fatal("Unrecognized option for USE_TWO_PASS setting: %s",
-                twoPassOption.c_str());
+  llvm::report_fatal_error(
+      "Unrecognized option for USE_TWO_PASS setting: " + twoPassOption, false);
 }
 
 LATENCY_PRECISION ScheduleDAGOptSched::fetchLatencyPrecision() const {
@@ -640,8 +640,8 @@ LATENCY_PRECISION ScheduleDAGOptSched::fetchLatencyPrecision() const {
     return LTP_UNITY;
   }
 
-  Logger::Fatal("Unrecognized option for LATENCY_PRECISION setting: %s",
-                lpName.c_str());
+  llvm::report_fatal_error(
+      "Unrecognized option for LATENCY_PRECISION setting: " + lpName, false);
 }
 
 LB_ALG ScheduleDAGOptSched::parseLowerBoundAlgorithm() const {
@@ -652,7 +652,8 @@ LB_ALG ScheduleDAGOptSched::parseLowerBoundAlgorithm() const {
     return LBA_LC;
   }
 
-  Logger::Fatal("Unrecognized option for LB_ALG setting: %s", LBalg.c_str());
+  llvm::report_fatal_error("Unrecognized option for LB_ALG setting: " + LBalg,
+                           false);
 }
 
 // Helper function to find the next substring which is a heuristic name in Str
@@ -671,7 +672,7 @@ static LISTSCHED_HEURISTIC GetNextHeuristicName(const std::string &Str,
       return LSH.HID;
     }
 
-  Logger::Fatal("Unrecognized heuristic used: %s", Str.c_str());
+  llvm::report_fatal_error("Unrecognized heuristic used: " + Str, false);
 }
 
 SchedPriorities ScheduleDAGOptSched::parseHeuristic(const std::string &Str) {
@@ -718,8 +719,8 @@ SPILL_COST_FUNCTION ScheduleDAGOptSched::parseSpillCostFunc() const {
     return SCF_TARGET;
   }
 
-  Logger::Fatal("Unrecognized option for SPILL_COST_FUNCTION setting: %s",
-                name.c_str());
+  llvm::report_fatal_error(
+      "Unrecognized option for SPILL_COST_FUNCTION setting: " + name, false);
 }
 
 bool ScheduleDAGOptSched::shouldPrintSpills() const {
@@ -734,8 +735,9 @@ bool ScheduleDAGOptSched::shouldPrintSpills() const {
     return HotFunctions.GetBool(functionName, false);
   }
 
-  Logger::Fatal("Unrecognized option for PRINT_SPILL_COUNTS setting: %s",
-                printSpills.c_str());
+  llvm::report_fatal_error(
+      "Unrecognized option for PRINT_SPILL_COUNTS setting: " + printSpills,
+      false);
 }
 
 bool ScheduleDAGOptSched::rpMismatch(InstSchedule *sched) {

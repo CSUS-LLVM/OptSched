@@ -19,6 +19,7 @@
 #include "llvm/CodeGen/TargetLowering.h"
 #include "llvm/CodeGen/TargetPassConfig.h"
 #include "llvm/IR/Function.h"
+#include "llvm/Support/ErrorHandling.h"
 #include "llvm/Target/TargetMachine.h"
 #include <cstdio>
 #include <map>
@@ -98,7 +99,7 @@ void OptSchedDDGWrapperBasic::convertSUnits(bool IgnoreRealEdges,
   setupLeaf();
 
   if (Finish_() == RES_ERROR)
-    Logger::Fatal("DAG Finish_() failed.");
+    llvm::report_fatal_error("DAG Finish_() failed.", false);
 }
 
 void OptSchedDDGWrapperBasic::convertRegFiles() {
