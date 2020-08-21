@@ -41,10 +41,6 @@ InstScheduler::InstScheduler(DataDepStruct *dataDepGraph, MachineModel *machMdl,
 
 __host__ __device__
 InstScheduler::~InstScheduler() {
-
-  //debug
-  //printf("In ~InstSchduler\n");
-
   delete[] slotsPerTypePerCycle_;
   delete[] instCntPerIssuType_;
 }
@@ -100,10 +96,6 @@ ConstrainedScheduler::ConstrainedScheduler(DataDepGraph *dataDepGraph,
 
 __host__ __device__
 ConstrainedScheduler::~ConstrainedScheduler() {
-
-  //debug
-  //printf("In ~ConstrainedScheduler\n");
-
   if (crntCycleNum_ < schedUprBound_ &&
       frstRdyLstPerCycle_[crntCycleNum_] != NULL) {
     delete frstRdyLstPerCycle_[crntCycleNum_];
@@ -118,13 +110,8 @@ __host__ __device__
 bool ConstrainedScheduler::Initialize_(InstCount trgtSchedLngth,
                                        LinkedList<SchedInstruction> *fxdLst) {
   for (int i = 0; i < totInstCnt_; i++) {
-    //If compiling device code, use non virtual, device version of 
-    //GetInstByIndx() to avoid cuda copy virtual function error
-#ifdef __CUDA_ARCH__
-    SchedInstruction *inst = dataDepGraph_->Dev_GetInstByIndx(i);
-#else
     SchedInstruction *inst = dataDepGraph_->GetInstByIndx(i);
-#endif
+
     if (!inst->InitForSchdulng(trgtSchedLngth, fxdLst))
       return false;
   }

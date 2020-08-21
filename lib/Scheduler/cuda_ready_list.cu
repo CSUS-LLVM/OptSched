@@ -30,13 +30,7 @@ ReadyList::ReadyList(DataDepGraph *dataDepGraph, SchedPriorities prirts) {
     switch (prirts.vctr[i]) {
     case LSH_CP:
     case LSH_CPR:
-      //if creating readylist on device, use non virtual, device version of
-      //GetRootInst(), Dev_GetRootInst()
-#ifdef __CUDA_ARCH__
-      maxCrtclPath_ = dataDepGraph->Dev_GetRootInst()->GetCrntLwrBound(DIR_BKWRD);
-#else
       maxCrtclPath_ = dataDepGraph->GetRootInst()->GetCrntLwrBound(DIR_BKWRD);
-#endif
       crtclPathBits_ = Utilities::clcltBitsNeededToHoldNum(maxCrtclPath_);
       totKeyBits += crtclPathBits_;
       break;
@@ -130,51 +124,19 @@ ReadyList::ReadyList(DataDepGraph *dataDepGraph, SchedPriorities prirts) {
 
 __host__ __device__
 ReadyList::~ReadyList() {
-
-  //debug
-  //printf("In ~ReadyList\n");
-
   Reset();
-
-  //debug
-  //printf("Done with Reset()\n");
-
   if (prirtyLst_)
     delete prirtyLst_;
-
-  //debug
-  //printf("Deleted prirtyLst_\n");
-
   if (latestSubLst_)
     delete latestSubLst_;
-
-  //debug
-  //printf("Deleted latestSubLst_\n");
-
   if (keyedEntries_)
     delete keyedEntries_;
-
-  //debug
-  //printf("Deleted keyedEntries_\n");
-
-  //debug
-  //printf("Done with ~ReadyList\n");
 }
 
 __host__ __device__
 void ReadyList::Reset() {
- 
-  //debug
-  //printf("Inside Reset()\n");
   prirtyLst_->Reset();
-
-  //debug
-  //printf("Done with prirtyLst_->Reset()\n");
-
   latestSubLst_->Reset();
-
-  //debug
-  //printf("Done with latesetSubLst_->Reset()\n");
 }
 
 __host__ __device__
@@ -270,7 +232,7 @@ void ReadyList::Print(std::ostream &out) {
 }
 
 __device__
-void ReadyList::DevPrint() {
+void ReadyList::Dev_Print() {
   printf("Ready List: ");
   for (const auto *crntInst = prirtyLst_->GetFrstElmnt(); crntInst != NULL;
        crntInst = prirtyLst_->GetNxtElmnt()) {
@@ -408,102 +370,3 @@ void ReadyList::AddPrirtyToKey_(unsigned long &key, int16_t &keySize,
 
 __host__ __device__
 unsigned long ReadyList::MaxPriority() { return maxPriority_; }
-
-
-//Copies objects readylist points at to device
-//dev_ suffix signifies a device pointer
-//dataDepGraph needed for allocation of keyedEntries
-void ReadyList::CopyPointersToDevice(ReadyList *dev_rdyLst, 
-		                     DataDepGraph *dataDepGraph) {
-  //copy prirtyLst_ to device
-  //declare device pointer
-  PriorityList<SchedInstruction> *dev_prirtyLst = NULL;
-
-  //debug
-/*
-  if (prirts_.isDynmc) {
-    printf("ReadyList priorities are Dynamic\n");
-  } else {
-    printf("ReadyList priorities are Static\n");
-  }
-*/
-
-  //allocate device memory
-  if (cudaSuccess != cudaMallocManaged((void**)&dev_prirtyLst, 
-			        sizeof(PriorityList<SchedInstruction>))) {
-    printf("Error allocating device memory for dev_prirtyLst: %s\n", 
-                    cudaGetErrorString(cudaGetLastError()));
-  }
-  //copy prirtyLst_ to device
-  if (cudaSuccess != cudaMemcpy(dev_prirtyLst, prirtyLst_, 
-                                sizeof(PriorityList<SchedInstruction>), 
-				cudaMemcpyHostToDevice)) {
-    printf("Error copying prirtyLst_ to device: %s\n", 
-                    cudaGetErrorString(cudaGetLastError()));
-  }
-  //update dev_rdyLst->prirtyLst_ pointer to dev_priorityList, 
-  //to reference the prioritylist on the device
-  if (cudaSuccess != cudaMemcpy(&(dev_rdyLst->prirtyLst_), &dev_prirtyLst, 
-                                sizeof(PriorityList<SchedInstruction> *), 
-				cudaMemcpyHostToDevice)) {
-    printf("Error updating dev_rdyLst->prirtyLst_: %s\n", 
-                    cudaGetErrorString(cudaGetLastError()));
-  } 
-
-  //Allocate/copy keyedEntries
-  KeyedEntry<SchedInstruction, unsigned long> **dev_keyedEntries = NULL;
-  
-  if (keyedEntries_) {
-    //allocate device memory
-    if (cudaSuccess != cudaMallocManaged((void**)&dev_keyedEntries, 
-			        dataDepGraph->GetInstCnt() * 
-                sizeof(KeyedEntry<SchedInstruction, unsigned long> *))) {
-      printf("Error allocating device memory for dev_keyedEntries: %s\n", 
-                    cudaGetErrorString(cudaGetLastError()));
-    }
-    //copy array to device
-    if (cudaSuccess != cudaMemcpy(dev_keyedEntries, keyedEntries_,
-                                dataDepGraph->GetInstCnt() * 
-                          sizeof(KeyedEntry<SchedInstruction, unsigned long> *),
-                          cudaMemcpyHostToDevice)) {
-      printf("Error copying keyedEntries_ to device: %s\n", 
-                    cudaGetErrorString(cudaGetLastError()));
-    }
-    //update pointer on device
-    if (cudaSuccess != cudaMemcpy(&(dev_rdyLst->keyedEntries_), &dev_keyedEntries,
-                         sizeof(KeyedEntry<SchedInstruction, unsigned long> **),
-                         cudaMemcpyHostToDevice)) {
-      printf("Error updating keyedEntries_ on device: %s\n", 
-  		    cudaGetErrorString(cudaGetLastError()));
-    }
-  }
-
-  //pass dev_keyedEntries in order to update its pointers to device pointers
-  prirtyLst_->CopyPointersToDevice(dev_prirtyLst, dev_keyedEntries);
-
-  //copy latestSubLst_ to device
-  //declare device pointer
-  LinkedList<SchedInstruction> *dev_latestSubLst = NULL;
-  //allocate device memory
-  if (cudaSuccess != cudaMallocManaged((void**)&dev_latestSubLst, 
-			        sizeof(LinkedList<SchedInstruction>))) {
-    printf("Error allocating device memory for dev_latestSubLst: %s\n", 
-                    cudaGetErrorString(cudaGetLastError()));
-  }
-  //copy latestSubLst_ to device
-  if (cudaSuccess != cudaMemcpy(dev_latestSubLst, latestSubLst_,
-                                sizeof(LinkedList<SchedInstruction>), 
-				cudaMemcpyHostToDevice)) {
-    printf("Error copying latestSubLst_ to device: %s\n", 
-                    cudaGetErrorString(cudaGetLastError()));
-  }
-  //update dev_rdyLst->latestSubLst_ to dev_latestSubLst
-  if (cudaSuccess != cudaMemcpy(&(dev_rdyLst->latestSubLst_), &dev_latestSubLst,
-                                sizeof(LinkedList<SchedInstruction> *), 
-				cudaMemcpyHostToDevice)) {
-    printf("Error updating dev_rdyLst->latestSubLst_: %s\n", 
-                    cudaGetErrorString(cudaGetLastError()));
-  }
-
-  latestSubLst_->CopyPointersToDevice(dev_latestSubLst);
-}

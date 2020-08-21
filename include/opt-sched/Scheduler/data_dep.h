@@ -366,9 +366,6 @@ public:
   // Given an instruction number, return a pointer to the instruction object.
   __host__ __device__
   SchedInstruction *GetInstByIndx(InstCount instIndx);
-  //Circumvent polymorphism on device to workaround virtual function copy
-  __device__
-  SchedInstruction *Dev_GetInstByIndx(InstCount instIndx);
 
   SchedInstruction *GetInstByTplgclOrdr(InstCount ordr);
   SchedInstruction *GetInstByRvrsTplgclOrdr(InstCount ordr);
@@ -392,14 +389,8 @@ public:
 
   __host__ __device__
   SchedInstruction *GetRootInst();
-  //Circumvent polymorphism on device to workaround virtual function copy
-  __device__
-  SchedInstruction *Dev_GetRootInst();
   __host__ __device__
   SchedInstruction *GetLeafInst();
-  //Circumvent polymorphism on device to workaround virtual function copy
-  __device__
-  SchedInstruction *Dev_GetLeafInst();
 
   __host__ __device__
   UDT_GLABEL GetMaxLtncySum();
@@ -484,8 +475,6 @@ public:
 
   __host__ __device__
   RegisterFile *getRegFiles() { return RegFiles; }
-
-  void CopyPointersToDevice(DataDepGraph *dev_dataDepGraph);
 
   //creates an array of NodeData which hold the information
   //about the DDG in order to create DDG on device
@@ -884,6 +873,7 @@ public:
   ~InstSchedule();
   bool operator==(InstSchedule &b) const;
 
+  __host__ __device__
   InstCount GetCrntLngth();
   void Reset();
 
@@ -902,10 +892,14 @@ public:
   InstCount GetSchedCycle(InstCount instNum);
   InstCount GetSchedCycle(SchedInstruction *inst);
 
+  __host__ __device__
   void SetCost(InstCount cost);
+  __host__ __device__
   InstCount GetCost() const;
+  __host__ __device__
   void SetExecCost(InstCount cost);
   InstCount GetExecCost() const;
+  __host__ __device__
   void SetSpillCost(InstCount cost);
   InstCount GetSpillCost() const;
 
@@ -913,14 +907,18 @@ public:
   InstCount GetFrstInst(InstCount &cycleNum, InstCount &slotNum);
   InstCount GetNxtInst(InstCount &cycleNum, InstCount &slotNum);
 
+  __host__ __device__
   bool IsComplete();
 
   // Copy schedule src into the current schedule
   void Copy(InstSchedule *src);
 
+  __host__ __device__
   void SetSpillCosts(InstCount *spillCosts);
+  __host__ __device__
   void SetPeakRegPressures(InstCount *regPressures);
   InstCount GetPeakRegPressures(const InstCount *&regPressures) const;
+  __host__ __device__
   InstCount GetSpillCost(InstCount stepNum);
   InstCount GetTotSpillCost();
   int GetConflictCount();

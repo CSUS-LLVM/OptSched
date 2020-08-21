@@ -99,12 +99,9 @@ public:
   // Prints out the ready list, nicely formatted, into an output stream.
   __host__
   void Print(std::ostream &out);
-
+  // Cannot use cout on device, invoke this on device instead
   __device__
-  void DevPrint();
-
-  //Copies all objects rdyLst points at to CUDA device.
-  void CopyPointersToDevice(ReadyList *dev_rdyLst, DataDepGraph *dataDepGraph);
+  void Dev_Print();
 
 private:
   // An ordered vector of priorities

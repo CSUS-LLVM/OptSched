@@ -26,10 +26,6 @@ GraphNode::GraphNode(UDT_GNODES num, UDT_GNODES maxNodeCnt) {
 
 __host__ __device__
 GraphNode::~GraphNode() {
-  
-  //debug
-  //printf("In ~GraphNode\n");
-
   DelScsrLst();
   delete scsrLst_;
   delete prdcsrLst_;
@@ -41,9 +37,6 @@ GraphNode::~GraphNode() {
     delete isRcrsvScsr_;
   if (isRcrsvPrdcsr_ != NULL)
     delete isRcrsvPrdcsr_;
-
-  //debug
-  //printf("Done with ~GraphNode\n");
 }
 
 void GraphNode::DelPrdcsrLst() {
@@ -324,30 +317,6 @@ void GraphNode::LogScsrLst() {
   }
 }
 
-/*
-void GraphNode::CopyPointersToDevice(void *dev_entry){
-  //declare pointer for element->scsrLst_
-  //we only need elmntCnt_ so no need to copy pointers
-  PriorityList<GraphEdge, unsigned long> *dev_scsrLst = NULL;
-  //allocate device memory
-  if (cudaSuccess !=
-      cudaMalloc((void**)&dev_scsrLst, sizeof(PriorityList<GraphEdge>))){
-    printf("Error allocating device memory for dev_scsrLst!\n");
-  }
-  //copy scsrLst_ to device
-  if (cudaSuccess !=
-      cudaMemcpy(dev_scsrLst, scsrLst_, sizeof(PriorityList<GraphEdge>),
-                 cudaMemcpyHostToDevice)){
-    printf("Error copying scsrLst_ to device!\n");
-  }
-  //update dev_entry->element->scsrLst_ pointer
-  if (cudaSuccess !=
-      cudaMemcpy(&(dev_entry->element->scsrLst_), &dev_scsrLst,
-                 sizeof(PriorityList<GraphEdge, unsigned long> *), cudaMemcpyHostToDevice)){
-    printf("Error updating dev_entry->element->scsrLst_ on device!\n");
-  }
-}
-*/
 __host__ __device__
 DirAcycGraph::DirAcycGraph() {
   nodeCnt_ = 0;

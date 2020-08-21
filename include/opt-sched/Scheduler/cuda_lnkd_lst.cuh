@@ -37,25 +37,6 @@ template <class T> struct Entry {
   virtual void SetNext(Entry *e) { next = e; }
   __host__ __device__
   virtual void SetPrev(Entry *e) { prev = e; }
-  
-  //update next/prev pointers on device
-  virtual void UpdateDevicePointers(Entry<T> *cur, Entry<T> *prev, 
-		                                   Entry<T> *next) {
-    //update cur->prev on device
-    if (cudaSuccess !=
-        cudaMemcpy(&(cur->prev), &prev,
-        sizeof(Entry<T> *), cudaMemcpyHostToDevice)){
-      printf("Error updating cur->prev!\n");
-      return;
-    }
-    //update cur->next on device
-    if (cudaSuccess !=
-        cudaMemcpy(&(cur->next), &next,
-        sizeof(Entry<T> *), cudaMemcpyHostToDevice)){
-      printf("Error updating cur->next!\n");
-      return;
-    }
-  }
 
 protected:
   Entry *next;
@@ -160,9 +141,6 @@ public:
   __host__ __device__
   virtual bool FindElmnt(const T *const element, int &hitCnt) const;
 
-  //copies all objects LinkedList points at to device
-  virtual void CopyPointersToDevice(LinkedList<T> *dev_linkedList);
-
 protected:
   int maxSize_;
   Entry<T> *allocEntries_;
@@ -253,10 +231,6 @@ public:
   __host__ __device__
   void CopyList(PriorityList<T, K> const *const otherLst,
                 KeyedEntry<T, unsigned long> **keyedEntries_ = nullptr);
-
-  //copies all objects PriorityList points at to device
-  void CopyPointersToDevice(PriorityList<T,K> *dev_priorityList, 
-		            KeyedEntry<T,K> ** dev_keyedEntries);
 
 protected:
   KeyedEntry<T, K> *allocKeyEntries_;
@@ -467,132 +441,6 @@ bool LinkedList<T>::FindElmnt(const T *const element, int &hitCnt) const {
   return hitCnt > 0 ? true : false;
 }
 
-
-template <class T>
-void LinkedList<T>::CopyPointersToDevice(LinkedList<T> *dev_linkedList){
-  //create a vector of pointers for linking list together later
-  std::vector<Entry<T>*> dev_pointers;
-  //iterate through allocEntries list and allocate/copy to device
-  Entry<T> *cur = topEntry_;
-  //create new device pointer
-  Entry<T> *dev_entry = NULL;
-  //declare a device pointer for Entry->element, should only be SchedInst
-  T *dev_inst = NULL;
-  while (cur){
-    //allocate device memory
-    if (cudaSuccess != cudaMallocManaged((void**)&dev_entry, 
-			                 sizeof(Entry<T>))) {
-      printf("Error allocating device memory for dev_entry!\n");
-    }
-    //copy cur to device
-    if (cudaSuccess != cudaMemcpy(dev_entry, cur, sizeof(Entry<T>), 
-			          cudaMemcpyHostToDevice)) {
-      printf("Error copying an Entry to device!\n");
-    }
-
-    //allocate device memory  for inst
-    if (cudaSuccess != cudaMallocManaged((void**)&dev_inst, sizeof(T))) {
-      printf("Error allocating device memory for dev_inst!\n");
-    }
-    //copy cur->element to device
-    if (cudaSuccess != cudaMemcpy(dev_inst, cur->element, sizeof(T), 
-			          cudaMemcpyHostToDevice)) {
-      printf("Error copying a SchedInstruction to device!\n");
-    }
-    //update dev_entry->element
-    if (cudaSuccess != cudaMemcpy(&(dev_entry->element), &dev_inst, sizeof(T*), 
-			          cudaMemcpyHostToDevice)){
-      printf("Error updating dev_entry->element on device!\n");
-    }
-
-    //copy element's pointers to device and link it to dev_inst
-    cur->element->CopyPointersToDevice(dev_inst);
-
-    //add device pointer to array
-    dev_pointers.push_back(dev_entry);
-    //iterate
-    cur = cur->GetNext();
-  }
-  
-  //Create a NULL pointer to set next/prev to null
-  Entry<T> *null_entry = NULL;
-  //reset cur list iterator
-  cur = topEntry_;
-  //get size of vector
-  const int size = dev_pointers.size();
-  
-  //Set Next/Prev pointers to link the list on device
-  for (int i = 0; i < size; i++) {
-    //only one object in list
-    //set prev/next to NULL
-    if (i == 0 && i == size - 1) {
-      cur->UpdateDevicePointers(dev_pointers[i], null_entry, null_entry);
-    }
-    //first entry
-    //set prev to NULL and next to dev_pointers[i + 1]
-    if (i == 0 && i < size - 1) {
-      cur->UpdateDevicePointers(dev_pointers[i], null_entry, 
-		                dev_pointers[i + 1]);
-    }
-    //last entry
-    //set prev to dev_pointers[i - 1] and next to NULL
-    if (i != 0 && i == size - 1) {
-      cur->UpdateDevicePointers(dev_pointers[i], dev_pointers[i - 1], 
-		                null_entry);
-    }
-    //not edge cases, somewhere in the middle of the list
-    //set prev to i - 1 and next to i + 1
-    if (i != 0 && i != size - 1) {
-      cur->UpdateDevicePointers(dev_pointers[i], dev_pointers[i - 1], 
-		                dev_pointers[i + 1]);
-    }
-    cur = cur->GetNext();
-  }
-
-  //set dev_latestSubList->topEntry_ to point at list head
-  //List is empty, set all pointers to NULL
-  if (size == 0) {
-    //set dev_latestSubLst->allocEntries to NULL
-    if (cudaSuccess !=
-        cudaMemcpy(&(dev_linkedList->allocEntries_), &null_entry,
-                   sizeof(Entry<T> *), cudaMemcpyHostToDevice)) {
-      printf("Error updating dev_latestSubList->allocEntries_!\n");
-    }
-    //set dev_latestSubLst->topEntry_ to NULL
-    if (cudaSuccess !=
-        cudaMemcpy(&(dev_linkedList->topEntry_), &null_entry,
-                   sizeof(Entry<T> *), cudaMemcpyHostToDevice)) {
-      printf("Error updating dev_latestSubList->topEntry_!\n");
-    }
-    //set dev_latestSubLst->bottomEntry_ to NULL
-    if (cudaSuccess !=
-        cudaMemcpy(&(dev_linkedList->bottomEntry_), &null_entry,
-                   sizeof(Entry<T> *), cudaMemcpyHostToDevice)) {
-      printf("Error updating dev_latestSubList->bottomEntry_!\n");
-    }
-    //set dev_latestSubLst->rtrvEntry_ to NULL ?? Should we set to null??
-  } else { //set top to first, and bottom to last entry
-    //set dev_latestSubLst->allocEntries_ to NULL since we are dynamic prirts
-    if (cudaSuccess !=
-        cudaMemcpy(&(dev_linkedList->allocEntries_), &null_entry,
-                   sizeof(Entry<T> *), cudaMemcpyHostToDevice)) {
-      printf("Error updating dev_latestSubList->allocEntries_!\n");
-    }
-    //set dev_latestSubLst->topEntry_ to dev_pointers[0]
-    if (cudaSuccess !=
-        cudaMemcpy(&(dev_linkedList->topEntry_), &dev_pointers[0],
-                   sizeof(Entry<T> *), cudaMemcpyHostToDevice)) {
-      printf("Error updating dev_latestSubList->topEntry_!\n");
-    }
-    //set dev_latestSubLst->bottomEntry_ to dev_pointers[dev_pointers.size()]
-    if (cudaSuccess !=
-        cudaMemcpy(&(dev_linkedList->bottomEntry_), &dev_pointers[size - 1],
-                   sizeof(Entry<T> *), cudaMemcpyHostToDevice)) {
-      printf("Error updating dev_latestSubList->bottomEntry_!\n");
-    }
-  }
-}
-
 template <class T> 
 __host__ __device__
 bool LinkedList<T>::FindElmnt(const T *const element) const {
@@ -661,9 +509,8 @@ template <class T>
 __host__ __device__
 void LinkedList<T>::FreeEntry_(Entry<T> *entry) {
   if (maxSize_ == INVALID_VALUE) {
-#if defined(__CUDA_ARCH__)
-    //free(entry);
-#else  
+  // deconstructors crash the device kernel
+#ifndef __CUDA_ARCH__
     delete entry;
 #endif
   } else {
@@ -758,174 +605,11 @@ inline T *Stack<T>::ExtractElmnt() {
   return trgtElmnt;
 }
 
- //copies all objects PriorityList points at to device
-template <class T, class K>
-void PriorityList<T,K>::CopyPointersToDevice(
-  PriorityList<T,K> *dev_priorityList, KeyedEntry<T,K> ** dev_keyedEntries) {
-  //create a vector of pointers for linking list together later
-  std::vector<KeyedEntry<T,K>*> dev_pointers;
-
-/* debug
-  if(LinkedList<T>::maxSize_ == INVALID_VALUE){ 
-    printf("PriorityList priorities are dynamic\n");
-  } else {
-    printf("PriorityList priorities are static\n");
-  }
-*/
-
-  //iterate through priority list and allocate/copy to device
-  KeyedEntry<T,K> *cur = (KeyedEntry<T,K> *)LinkedList<T>::topEntry_;
-  //create new device pointer for keyedentry
-  KeyedEntry<T,K> *dev_entry = NULL;
-  //store the index where entry will be stored in dev_keyedEntries
-  int dev_index;
-  //declare a device pointer for Entry->element, should only be SchedInst
-  T *dev_inst = NULL;
-  while (cur) {
-    //allocate device memory for entry
-    if (cudaSuccess != cudaMallocManaged((void**)&dev_entry, 
-			                 sizeof(KeyedEntry<T,K>))) {
-      printf("Error allocating device memory for dev_entry!\n");
-      return;
-    }
-    //copy cur to device
-    if (cudaSuccess != cudaMemcpy(dev_entry, cur, sizeof(KeyedEntry<T,K>), 
-			          cudaMemcpyHostToDevice)) {
-      printf("Error copying an Entry to device!\n");
-      return;
-    }
-
-    //allocate device memory  for inst
-    if (cudaSuccess != cudaMallocManaged((void**)&dev_inst, sizeof(T))) {
-      printf("Error allocating device memory for dev_inst!\n");
-      return;
-    }
-    //copy cur->element to device
-    if (cudaSuccess != cudaMemcpy(dev_inst, cur->element, sizeof(T), 
-			          cudaMemcpyHostToDevice)) {
-      printf("Error copying a SchedInstruction to device!\n");
-    }
-    //update dev_entry->element
-    if (cudaSuccess != cudaMemcpy(&(dev_entry->element), &dev_inst, sizeof(T*), 
-			          cudaMemcpyHostToDevice)) {
-      printf("Error updating dev_entry->element on device!\n");
-      return;
-    }
-
-    //copy element's pointers to device and link it to dev_inst
-    dev_index = cur->element->CopyPointersToDevice(dev_inst);
-
-    //if readylist priorities are dynamic
-    if (dev_keyedEntries) {
-      //update pointer in dev_keyedEntries
-      if (cudaSuccess != cudaMemcpy(&dev_keyedEntries[dev_index], &dev_entry,
-                         sizeof(KeyedEntry<T,K>*), cudaMemcpyHostToDevice)) {
-        printf("Error updating dev_keyedEntries[%d] on device: %s\n", dev_index,
-                      cudaGetErrorString(cudaGetLastError()));
-        return;
-      }
-    }
-
-    //add device pointer to array
-    dev_pointers.push_back(dev_entry);
-    //iterate
-    cur = cur->GetNext();
-  }
-
-  //Create a NULL pointer to set next/prev to null
-  KeyedEntry<T,K> *null_entry = NULL;
-  //reset cur list iterator
-  cur = (KeyedEntry<T,K> *)LinkedList<T>::topEntry_;
-  //get size of vector
-  const int size = dev_pointers.size();
-  //Set Next/Prev pointers to link the list on device
-  for (int i = 0; i < size; i++){
-    //only one object in list
-    //set prev/next to NULL
-    if (i == 0 && i == size - 1) {
-      cur->UpdateDevicePointers((Entry<T> *)dev_pointers[i], 
-		                (Entry<T> *)null_entry, 
-				(Entry<T> *)null_entry);
-    }
-    //first entry
-    //set prev to NULL and next to dev_pointers[i + 1]
-    if (i == 0 && i < size - 1) {
-      cur->UpdateDevicePointers((Entry<T> *)dev_pointers[i], 
-                                (Entry<T> *)null_entry, 
-				(Entry<T> *)dev_pointers[i + 1]);
-    }
-    //last entry
-    //set prev to dev_pointers[i - 1] and next to NULL
-    if (i != 0 && i == size - 1) {
-      cur->UpdateDevicePointers((Entry<T> *)dev_pointers[i],
-                                (Entry<T> *)dev_pointers[i - 1], 
-				(Entry<T> *)null_entry);
-    }
-    //not edge cases, somewhere in the middle of the list
-    //set prev to i - 1 and next to i + 1
-    if (i != 0 && i != size - 1) {
-      cur->UpdateDevicePointers((Entry<T> *)dev_pointers[i],
-                                (Entry<T> *)dev_pointers[i - 1], 
-				(Entry<T> *)dev_pointers[i + 1]);
-    }
-    cur = cur->GetNext();
-  }
-
-  //List is empty, set all pointers to NULL
-  if (size == 0){
-    //set dev_priorityList->allocEntries to NULL
-    if (cudaSuccess != cudaMemcpy(&(dev_priorityList->allocEntries_), 
-			          &null_entry, sizeof(KeyedEntry<T,K> *), 
-				  cudaMemcpyHostToDevice)) {
-      printf("Error updating dev_priorityList->allocEntries_!\n");
-    }
-    //set dev_priorityList->topEntry_ to NULL
-    if (cudaSuccess != cudaMemcpy(&(dev_priorityList->topEntry_), &null_entry,
-                                  sizeof(KeyedEntry<T,K> *), 
-				  cudaMemcpyHostToDevice)) {
-      printf("Error updating dev_priorityList->topEntry_!\n");
-    }
-    //set dev_priorityList->bottomEntry_ to NULL
-    if (cudaSuccess != cudaMemcpy(&(dev_priorityList->bottomEntry_), 
-			          &null_entry, sizeof(KeyedEntry<T,K> *), 
-				  cudaMemcpyHostToDevice)) {
-      printf("Error updating dev_priorityList->bottomEntry_!\n");
-    }
-    //set dev_priorityList->rtrvEntry_ to NULL ?? Should we set to null??
-  } else { //set top to first, and bottom to last entry
-    //set dev_priorityList->allocEntries_ to NULL
-    if (cudaSuccess != cudaMemcpy(&(dev_priorityList->allocEntries_), 
-			          &null_entry, sizeof(KeyedEntry<T,K> *), 
-				  cudaMemcpyHostToDevice)) {
-      printf("Error updating dev_priorityList->allocEntries_!\n");
-    }
-    //set dev_priorityList->allocKeyEntries_ to NULL bc prirts = dynamic
-    if (cudaSuccess != cudaMemcpy(&(dev_priorityList->allocKeyEntries_),
-                                  &null_entry, sizeof(KeyedEntry<T,K> *),
-                                  cudaMemcpyHostToDevice)) {
-      printf("Error updating dev_priorityList->allocEntries_!\n");
-    }
-    //set dev_priorityList->topEntry_ to dev_pointers[0]
-    if (cudaSuccess != cudaMemcpy(&(dev_priorityList->topEntry_), 
-			          &dev_pointers[0], sizeof(KeyedEntry<T,K> *), 
-				  cudaMemcpyHostToDevice)) {
-      printf("Error updating dev_priorityList->topEntry_!\n");
-    }
-    //set dev_priorityList->bottomEntry_ to dev_pointers[dev_pointers.size()]
-    if (cudaSuccess != cudaMemcpy(&(dev_priorityList->bottomEntry_), 
-			          &dev_pointers[size - 1], sizeof(KeyedEntry<T,K>*), 
-				  cudaMemcpyHostToDevice)) {
-      printf("Error updating dev_priorityList->bottomEntry_!\n");
-    }
-  }
-}
-
-
 template <class T, class K>
 __host__ __device__
 PriorityList<T, K>::PriorityList(int maxSize) : LinkedList<T>(maxSize) {	
   if (LinkedList<T>::maxSize_ != INVALID_VALUE) {
-    //cannot use delete on device
+    // Cannot use delete on device, crashes kernel
 #ifndef __CUDA_ARCH__
     delete[] LinkedList<T>::allocEntries_;
 #endif

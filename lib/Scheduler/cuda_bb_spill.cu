@@ -405,6 +405,21 @@ InstCount BBWithSpill::CmputNormCost_(InstSchedule *sched,
   sched->SetExecCost(execCost);
   return cost;
 }
+
+__device__
+InstCount BBWithSpill::Dev_CmputNormCost_(InstSchedule *sched, 
+		                          COST_COMP_MODE compMode,
+                                          InstCount &execCost, 
+					  bool trackCnflcts) {
+  InstCount cost = Dev_CmputCost_(sched, compMode, execCost, trackCnflcts);
+
+  cost -= GetCostLwrBound();
+  execCost -= GetCostLwrBound();
+
+  sched->SetCost(cost);
+  sched->SetExecCost(execCost);
+  return cost;
+}
 /*****************************************************************************/
 
 InstCount BBWithSpill::CmputCost_(InstSchedule *sched, COST_COMP_MODE compMode,
@@ -418,6 +433,29 @@ InstCount BBWithSpill::CmputCost_(InstSchedule *sched, COST_COMP_MODE compMode,
     }
   }
 
+  assert(sched->IsComplete());
+  InstCount cost = sched->GetCrntLngth() * schedCostFactor_;
+  execCost = cost;
+  cost += crntSpillCost_ * SCW_;
+  sched->SetSpillCosts(spillCosts_);
+  sched->SetPeakRegPressures(peakRegPressures_);
+  sched->SetSpillCost(crntSpillCost_);
+  return cost;
+}
+
+__device__
+InstCount BBWithSpill::Dev_CmputCost_(InstSchedule *sched, COST_COMP_MODE compMode,
+                                  InstCount &execCost, bool trackCnflcts) {
+/* device is only called with CCM_DYNMC
+  if (compMode == CCM_STTC) {
+    if (GetSpillCostFunc() == SCF_SPILLS) {
+      LocalRegAlloc regAlloc(sched, dataDepGraph_);
+      regAlloc.SetupForRegAlloc();
+      regAlloc.AllocRegs();
+      crntSpillCost_ = regAlloc.GetCost();
+    }
+  }
+*/
   assert(sched->IsComplete());
   InstCount cost = sched->GetCrntLngth() * schedCostFactor_;
   execCost = cost;
@@ -1297,7 +1335,7 @@ void BBWithSpill::CopyPointersToDevice(SchedRegion* dev_rgn) {
     unitCnt = livePhysRegs_[i].GetUnitCnt();
 
     //allocate device mem
-    if (cudaSuccess != cudaMallocManaged((void**)&dev_vctr, unitCnt * sizeof(unsigned int)))
+    if (cudaSuccess != cudaMalloc((void**)&dev_vctr, unitCnt * sizeof(unsigned int)))
       printf("Error allocating dev mem for dev_vctr: %s\n", cudaGetErrorString(cudaGetLastError()));
 
     //copy vctr to device
@@ -1342,7 +1380,7 @@ void BBWithSpill::CopyPointersToDevice(SchedRegion* dev_rgn) {
   if (cudaSuccess != cudaMemcpy(&(((BBWithSpill *)dev_rgn)->regPressures_), &dev_regPressures, sizeof(unsigned *), cudaMemcpyHostToDevice))
     printf("Error updating dev_rgn->regPressures_: %s\n", cudaGetErrorString(cudaGetLastError()));
 
-  printf("Finished copying BBWithSpill!\n");
+  //printf("Finished copying BBWithSpill!\n");
 }
 
 void BBWithSpill::UpdateSpillInfoFromDevice(BBWithSpill *dev_rgn) {

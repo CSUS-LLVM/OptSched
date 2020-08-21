@@ -89,6 +89,11 @@ private:
                            InstCount &execCost, bool trackCnflcts);
   InstCount CmputCost_(InstSchedule *sched, COST_COMP_MODE compMode,
                        InstCount &execCost, bool trackCnflcts);
+  //non virtual versions of function to be invoked on device
+  __device__
+  InstCount Dev_CmputCost_(InstSchedule *sched, COST_COMP_MODE compMode,
+                       InstCount &execCost, bool trackCnflcts);
+
   void CmputSchedUprBound_();
   Enumerator *AllocEnumrtr_(Milliseconds timeout);
   FUNC_RESULT Enumerate_(Milliseconds startTime, Milliseconds rgnDeadline,
@@ -154,6 +159,10 @@ public:
   //updates spill info using the results from device
   //list scheduling
   void UpdateSpillInfoFromDevice(BBWithSpill *dev_rgn);
+  //non virtual versions of function to be invoked on device
+  __device__
+  InstCount Dev_CmputNormCost_(InstSchedule *sched, COST_COMP_MODE compMode,
+                           InstCount &execCost, bool trackCnflcts);
 
 protected:
   // (Chris)

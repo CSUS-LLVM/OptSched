@@ -507,9 +507,6 @@ public:
   __host__ __device__
   InstType GetCrtclPathFrmRoot() { return crtclPathFrmRoot_; }
 
-  //copy relevant pointers to device and link to dev_inst
-  int CopyPointersToDevice(SchedInstruction * dev_inst);
-
   friend class SchedRange;
 
 protected:

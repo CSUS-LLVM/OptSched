@@ -29,27 +29,12 @@ public:
   // Calculates the schedule and returns it in the passed argument.
   __host__ __device__
   FUNC_RESULT FindSchedule(InstSchedule *sched, SchedRegion *rgn);
-  //Copies all objects pointed to by listsched to device
-  void CopyPointersToDevice(ListScheduler **dev_ListSched);
-  //Copies all objects pointer to by dev_listSched to Host
-  void CopyPointersFromDevice(ListScheduler *dev_listSched);
-  //Calls UpdtRdyLst_ when executing on device
-  //needed since the method is private and kernel cannot be a member function
-  __device__
-  void CallUpdtRdyLst_();
 protected:
   bool isDynmcPrirty_;
   // Adds the instructions that have just become ready at this cycle to the
   // ready list.
   __host__ __device__
   void UpdtRdyLst_(InstCount cycleNum, int slotNum);
-  
-  //device version of UpdtRdyLst_ (depreciated)
-  __device__
-  void DevUpdtRdyLst_(InstCount cycleNum, int slotNum);
-  //Copy data and initiate Dev_UpdtRdyLst_ kernel
-  void Call_Kernel();
-
   // Pick next instruction to be scheduled. Returns NULL if no instructions are
   // ready.
   __host__ __device__

@@ -73,20 +73,10 @@ SchedInstruction::SchedInstruction(InstCount num, const char *name,
 
 __host__ __device__
 SchedInstruction::~SchedInstruction() {
-
-  //debug
-  //printf("In ~SchedInstruction\n");
-
   if (memAllocd_)
     DeAllocMem_();
 
-  //debug
-  //printf("Deleting crntRange_\n");
-
   delete crntRange_;
-
-  //debug
-  //printf("Done with ~SchedInstruction\n");
 }
 
 __host__ __device__
@@ -389,157 +379,6 @@ int SchedInstruction::GetMaxLtncy() const { return GetMaxEdgeLabel(); }
 
 __host__ __device__
 int16_t SchedInstruction::GetLastUseCnt() { return lastUseCnt_; }
-
-int SchedInstruction::CopyPointersToDevice(SchedInstruction *dev_inst){
-  Register **dev_uses = NULL; 
-  //allocate space on device
-  if (cudaSuccess !=
-      cudaMallocManaged((void**)&dev_uses, (size_t)(1024 * sizeof(Register *)))) {
-    printf("Error allocating device memory for dev_uses: %s\n",
-                    cudaGetErrorString(cudaGetLastError()));
-  }
-  //copy uses_ to device
-  if (cudaSuccess != cudaMemcpy(dev_uses, uses_, (size_t)(1024 * sizeof(Register *)),
-			        cudaMemcpyHostToDevice)) {
-    printf("Error copying uses_ to device: %s\n",
-                    cudaGetErrorString(cudaGetLastError()));
-  }
-  //update pointer on device
-  if (cudaSuccess != cudaMemcpy(&(dev_inst->uses_), &dev_uses, 
-			        sizeof(Register *), cudaMemcpyHostToDevice)) {
-    printf("Error updating uses_ on device: %s\n",
-                    cudaGetErrorString(cudaGetLastError()));
-  }
-  //loop through uses_ and copy all of the Registers to device,
-  //then update the device pointers in dev_uses
-  Register *dev_reg = NULL;
-
-  for (int i = 0; i < useCnt_; i++) {
-    //allocate space on device
-    if (cudaSuccess != cudaMallocManaged((void**)&dev_reg, sizeof(Register))) {
-      printf("Error allocating device memory for dev_reg: %s\n",
-                    cudaGetErrorString(cudaGetLastError()));
-    }
-    //copy current register to device
-    if (cudaSuccess != cudaMemcpy(dev_reg, uses_[i], sizeof(Register), 
-		                  cudaMemcpyHostToDevice)) {
-      printf("Error copying register uses_[%d] to device: %s\n", i,
-                    cudaGetErrorString(cudaGetLastError()));
-    }
-    //update dev_inst->uses[i] to device pointer to register
-    if(cudaSuccess != cudaMemcpy(&(dev_inst->uses_[i]), &dev_reg, sizeof(Register *),
-		                  cudaMemcpyHostToDevice)) {
-      printf("Error updating dev_uses[%d]: %s\n", i,
-                    cudaGetErrorString(cudaGetLastError()));
-    }
-  }
-
-  //declare pointer for element->scsrLst_
-  PriorityList<GraphEdge> *dev_scsrLst = NULL;
-  //allocate device memory
-  if (cudaSuccess !=
-      cudaMallocManaged((void**)&dev_scsrLst, sizeof(PriorityList<GraphEdge>))) {
-    printf("Error allocating device memory for dev_scsrLst: %s\n",
-                    cudaGetErrorString(cudaGetLastError()));
-  }
-  //copy scsrLst_ to device
-  if (cudaSuccess != 
-      cudaMemcpy(dev_scsrLst, GraphNode::scsrLst_, sizeof(PriorityList<GraphEdge>),
-                 cudaMemcpyHostToDevice)) {
-    printf("Error copying scsrLst_ to device: %s\n",
-                    cudaGetErrorString(cudaGetLastError()));
-  }
-  //update dev_entry->element->scsrLst_ pointer
-  if (cudaSuccess != cudaMemcpy(&(dev_inst->scsrLst_), &dev_scsrLst, 
-	             sizeof(PriorityList<GraphEdge>*),cudaMemcpyHostToDevice)) {
-    printf("Error updating dev_entry->element->scsrLst_ on device: %s\n",
-                    cudaGetErrorString(cudaGetLastError()));
-  }
-
-  //copy scsrLst_ pointers to device
-  GraphNode::scsrLst_->LinkedList<GraphEdge>::CopyPointersToDevice((LinkedList<GraphEdge> *)dev_scsrLst);
-
-  //declare pointer for element->prdcsrLst_
-  PriorityList<GraphEdge> *dev_prdcsrLst = NULL;
-  //allocate device memory
-  if (cudaSuccess !=
-      cudaMallocManaged((void**)&dev_prdcsrLst, sizeof(LinkedList<GraphEdge>))) {
-    printf("Error allocating device memory for dev_prdcsrLst: %s\n",
-                    cudaGetErrorString(cudaGetLastError()));
-  }
-  //copy prdcsrLst_ to device
-  if (cudaSuccess !=
-      cudaMemcpy(dev_prdcsrLst, GraphNode::prdcsrLst_, sizeof(LinkedList<GraphEdge>),
-                 cudaMemcpyHostToDevice)) {
-    printf("Error copying prdcsrLst_ to device: %s\n",
-                    cudaGetErrorString(cudaGetLastError()));
-  }
-  //update dev_entry->element->prdcsrLst_ pointer
-  if (cudaSuccess != cudaMemcpy(&(dev_inst->prdcsrLst_), &dev_prdcsrLst,
-                     sizeof(LinkedList<GraphEdge>*),cudaMemcpyHostToDevice)) {
-    printf("Error updating dev_entry->element->prdcsrLst_ on device: %s\n",
-                    cudaGetErrorString(cudaGetLastError()));
-  }
-
-  //copy prdcsrLst_ pointers to device
-  GraphNode::prdcsrLst_->CopyPointersToDevice(dev_prdcsrLst);
-
-  //copy SchedRange to device, update its inst_ pointer
-  SchedRange *dev_crntRange = NULL;
-
-  //allocate device memory
-  if (cudaSuccess != cudaMalloc((void**)&dev_crntRange, sizeof(SchedRange)))
-    printf("Error allocating memory on device for dev_crntRange: %s\n",
-                    cudaGetErrorString(cudaGetLastError()));
-
-  //copy crntRange_ to device
-  if (cudaSuccess != cudaMemcpy(dev_crntRange, crntRange_, sizeof(SchedRange), cudaMemcpyHostToDevice))
-    printf("Error copying crntRange to device: %s\n",
-                    cudaGetErrorString(cudaGetLastError()));
-
-  //update pointer on device
-  if (cudaSuccess != cudaMemcpy(&(dev_inst->crntRange_), &dev_crntRange, sizeof(SchedRange *), cudaMemcpyHostToDevice))
-    printf("Error updating dev_inst->crntRange_ on device: %s\n",
-                    cudaGetErrorString(cudaGetLastError()));
-
-  //copy rdyCuclePerPrdcsr_ to device, update its inst_ pointer
-  InstCount *dev_rdyCyclePerPrdcsr = NULL;
-
-  //allocate device memory
-  if (cudaSuccess != cudaMalloc((void**)&dev_rdyCyclePerPrdcsr, prdcsrCnt_ * sizeof(InstCount)))
-    printf("Error allocating dev mem for dev_rdyCyclePerPrdcsr: %s\n",
-                    cudaGetErrorString(cudaGetLastError()));
-
-  //copy array to device
-  if (cudaSuccess != cudaMemcpy(dev_rdyCyclePerPrdcsr, rdyCyclePerPrdcsr_, prdcsrCnt_ * sizeof(InstCount), cudaMemcpyHostToDevice))
-    printf("Error copying rdyCyclePerPrdcsr_ to device: %s\n",
-                    cudaGetErrorString(cudaGetLastError()));
-
-  //update device pointer
-  if (cudaSuccess != cudaMemcpy(&(dev_inst->rdyCyclePerPrdcsr_), &dev_rdyCyclePerPrdcsr, sizeof(InstCount *), cudaMemcpyHostToDevice))
-    printf("Error updating dev_inst->rdyCyclePerPrdcsr_ on device: %s\n",
-                    cudaGetErrorString(cudaGetLastError()));
-
-  //copy prevMinRdyCyclePerPrdcsr_ to device
-  InstCount *dev_prevMinRdyCyclePerPrdcsr = NULL;
-
-  //allocate device memory
-  if (cudaSuccess != cudaMalloc((void**)&dev_prevMinRdyCyclePerPrdcsr, prdcsrCnt_ * sizeof(InstCount)))
-    printf("Error allocating dev mem for dev_prevMinRdyCyclePerPrdscsr: %s\n",
-                    cudaGetErrorString(cudaGetLastError()));
-
-  //copy array to device
-  if (cudaSuccess != cudaMemcpy(dev_prevMinRdyCyclePerPrdcsr, prevMinRdyCyclePerPrdcsr_, prdcsrCnt_ * sizeof(InstCount), cudaMemcpyHostToDevice))
-    printf("Error copying prevMinRdyCyclePerPrdcsr_ to device: %s\n",
-                    cudaGetErrorString(cudaGetLastError()));
-
-  //update device pointer
-  if (cudaSuccess != cudaMemcpy(&(dev_inst->prevMinRdyCyclePerPrdcsr_), &dev_prevMinRdyCyclePerPrdcsr, sizeof(InstCount *), cudaMemcpyHostToDevice))
-    printf("Error updating dev_inst->prevMinRdyCyclePerPrdcsr_ on device: %s\n",
-                    cudaGetErrorString(cudaGetLastError()));
-
-  return GraphNode::GetNum();
-}
 
 __host__ __device__
 SchedInstruction *SchedInstruction::GetFrstPrdcsr(InstCount *scsrNum,
