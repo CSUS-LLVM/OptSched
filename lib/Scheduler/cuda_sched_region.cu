@@ -88,11 +88,7 @@ void DevListSched(MachineModel *dev_machMdl, SchedRegion *dev_rgn,
 		  NodeData *dev_nodeData, RegFileData *dev_regFileData, 
 		  InstCount instCnt, bool cmputTrnstvClsr,
 		  InstSchedule *dev_lstSched) {
-<<<<<<< HEAD
 
-=======
-  
->>>>>>> 1e30a0dc459bc8c046260593b6bd374cedd29190
   DataDepGraph *dev_dataDepGraph = new DataDepGraph(dev_machMdl, ltncyPcsn); 
 
   // Update dev_rgn->dataDepGraph_ to device DDG
@@ -361,13 +357,8 @@ FUNC_RESULT SchedRegion::FindOptimalSchedule(
       printf("Error copying lstSched to device: %s\n",
              cudaGetErrorString(cudaGetLastError()));
 
-<<<<<<< HEAD
+
     // Launch device kernel
-    // Allocate variable to hold dev_hurstcExecCost address
-=======
-    //step 2) launch device kernel
-	  
->>>>>>> 1e30a0dc459bc8c046260593b6bd374cedd29190
     printf("Launching device kernel\n");
     DevListSched<<<1,1>>>(dev_machMdl, dev_rgn, abslutSchedUprBound_, 
 		          GetHeuristicPriorities(), vrfySched_, 
@@ -375,29 +366,16 @@ FUNC_RESULT SchedRegion::FindOptimalSchedule(
 			  dev_regFileData, dataDepGraph_->GetInstCnt(), 
 			  needTransitiveClosure, dev_lstSched);
 
-<<<<<<< HEAD
     cudaDeviceSynchronize();
     
     printf("Post Kernel Error: %s\n", cudaGetErrorString(cudaGetLastError()));
  
     // Copy ListSchedule to Host
-=======
-    //free up device memory
-    dev_machMdl->FreeDevicePointers();
-    cudaFree(dev_machMdl);
-    dev_nodeData->FreeDevicePointers();
-    cudaFree(dev_nodeData);
-    dev_regFileData->FreeDevicePointers();
-    cudaFree(dev_regFileData);
-    
-    //step 3) copy ListSchedule to Host
->>>>>>> 1e30a0dc459bc8c046260593b6bd374cedd29190
     if (cudaSuccess != cudaMemcpy(lstSched, dev_lstSched, sizeof(InstSchedule), cudaMemcpyDeviceToHost))
      printf("Error copying lstSched to host: %s\n",
              cudaGetErrorString(cudaGetLastError())); 
 
     lstSched->CopyPointersToHost(machMdl_);
-<<<<<<< HEAD
 
     //TODO: Figure out if sched_rgn needs to be updated with changes from dev_rgn
     //((BBWithSpill *)(this))->UpdateSpillInfoFromDevice((BBWithSpill *)dev_rgn);
@@ -406,24 +384,13 @@ FUNC_RESULT SchedRegion::FindOptimalSchedule(
     // Clear all allocated device memory. 
     // Workaround for deconstructors crashing the kernel
     cudaDeviceReset();
-=======
-    lstSched->Print();
-    
-    //TODO: Implement
-    //((BBWithSpill *)(this))->UpdateSpillInfoFromDevice((BBWithSpill *)dev_rgn);
-	  
->>>>>>> 1e30a0dc459bc8c046260593b6bd374cedd29190
     //****End Code for ListScheduling on Device****
 
     // Moved to before device ListScheduling starts
     //Milliseconds hurstcStart = Utilities::GetProcessorTime();
-<<<<<<< HEAD
 
     //now takes place on device
 /*
-=======
-/*  Now happens on the device
->>>>>>> 1e30a0dc459bc8c046260593b6bd374cedd29190
     lstSched = new InstSchedule(machMdl_, dataDepGraph_, vrfySched_);
 
     lstSchdulr = AllocHeuristicScheduler_();
