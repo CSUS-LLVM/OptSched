@@ -11,7 +11,9 @@
 #include "SIMachineFunctionInfo.h"
 //#include "llvm/CodeGen/OptSequential.h"
 #include "llvm/Support/Debug.h"
+#include "llvm/Support/ErrorHandling.h"
 #include <algorithm>
+#include <string>
 
 #define DEBUG_TYPE "optsched"
 
@@ -56,9 +58,9 @@ unsigned ScheduleDAGOptSchedGCN::getMinOcc() {
   if (MinOcc <= 10 && MinOcc >= 1)
     return MinOcc;
 
-  Logger::Fatal(
+  llvm::report_fatal_error(
       "Unrecognized option for MIN_OCCUPANCY_FOR_RESCHEDULE setting: %d",
-      MinOcc);
+      std::to_string(MinOcc), false);
 }
 
 int ScheduleDAGOptSchedGCN::getMinILPImprovement() {
@@ -67,9 +69,9 @@ int ScheduleDAGOptSchedGCN::getMinILPImprovement() {
   if (MinIlpImprovement <= 100 && MinIlpImprovement >= 0)
     return MinIlpImprovement;
 
-  Logger::Fatal(
+  llvm::report_fatal_error(
       "Unrecognized option for MIN_OCCUPANCY_FOR_RESCHEDULE setting: %d",
-      MinIlpImprovement);
+      std::to_string(MinIlpImprovement), false);
 }
 
 void ScheduleDAGOptSchedGCN::initSchedulers() {
@@ -99,6 +101,7 @@ void ScheduleDAGOptSchedGCN::finalizeSchedule() {
     RescheduleRegions.resize(Regions.size());
     ILPAnalysis.resize(Regions.size());
     CostAnalysis.resize(Regions.size());
+    LowerOccScheds.resize(Regions.size());
     RescheduleRegions.set();
 
     LLVM_DEBUG(dbgs() << "Starting two pass scheduling approach\n");
@@ -107,28 +110,24 @@ void ScheduleDAGOptSchedGCN::finalizeSchedule() {
       MachineBasicBlock *MBB = nullptr;
       // Reset
       RegionIdx = 0;
+
       if (S == OptSchedLowerOccAnalysis) {
-        if (RescheduleRegions.none()) {
-          dbgs() << "No regions to reschedule.\n";
+        if (RescheduleRegions.none())
           break;
-        } else {
+        else {
           auto GCNOST = static_cast<OptSchedGCNTarget *>(OST.get());
           unsigned TargetOccupancy = GCNOST->getTargetOcc();
-          if (TargetOccupancy <= MinOcc) {
-            dbgs() << "Cannot lower occupancy to below minimum occupancy of "
-                   << MinOcc << '\n';
+          if (TargetOccupancy <= MinOcc)
             break;
-          }
 
-          dbgs() << "Beginning rescheduling of regions.\n";
           unsigned NewTarget = TargetOccupancy - 1u;
           dbgs() << "Decreasing current target occupancy " << TargetOccupancy
                  << " to new target " << NewTarget << '\n';
           GCNOST->limitOccupancy(NewTarget);
         }
-      } else if (S == OptSchedCommitLowerOcc) {
-        dbgs()
-            << "Analyzing if we should commit the lower occupancy schedule\n";
+      }
+
+      if (S == OptSchedCommitLowerOcc) {
         if (!shouldCommitLowerOccSched()) {
           dbgs()
               << "Lower occupancy schedule did not meet minimum improvement.\n";
@@ -138,13 +137,6 @@ void ScheduleDAGOptSchedGCN::finalizeSchedule() {
       }
 
       for (auto &Region : Regions) {
-        /*if (S == OptSchedLowerOccAnalysis && !RescheduleRegions[RegionIdx]) {
-          dbgs() << "Region " << RegionIdx << " does not need to be
-        rescheduled.\n";
-          ++RegionIdx;
-          continue;
-        }*/
-
         RegionBegin = Region.first;
         RegionEnd = Region.second;
 
@@ -175,13 +167,6 @@ void ScheduleDAGOptSchedGCN::finalizeSchedule() {
   }
 
   ScheduleDAGMILive::finalizeSchedule();
-
-  LLVM_DEBUG(if (isSimRegAllocEnabled()) {
-    dbgs() << "*************************************\n";
-    dbgs() << "Function: " << MF.getName()
-           << "\nTotal Simulated Spills: " << SimulatedSpills << "\n";
-    dbgs() << "*************************************\n";
-  });
 }
 
 void ScheduleDAGOptSchedGCN::runSchedPass(SchedPassStrategy S) {
@@ -245,13 +230,9 @@ bool ScheduleDAGOptSchedGCN::shouldCommitLowerOccSched() {
   int SecondPassLengthSum = 0;
   int MinILPImprovement = getMinILPImprovement();
   for (std::pair<int, int> &RegionLength : ILPAnalysis) {
-    dbgs() << "First length -- " << RegionLength.first << ", Second length -- "
-           << RegionLength.second << '\n';
     FirstPassLengthSum += RegionLength.first;
     SecondPassLengthSum += RegionLength.second;
   }
-  dbgs() << "First pass length sum: " << FirstPassLengthSum << '\n';
-  dbgs() << "Second pass length sum: " << SecondPassLengthSum << '\n';
   double FirstPassAverageLength = (double)FirstPassLengthSum / Regions.size();
   double SecondPassAverageLength = (double)SecondPassLengthSum / Regions.size();
   double ILPImprovement = ((FirstPassAverageLength - SecondPassAverageLength) /

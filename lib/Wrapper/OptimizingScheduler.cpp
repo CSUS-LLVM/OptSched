@@ -413,8 +413,8 @@ void ScheduleDAGOptSched::schedule() {
                  TotalLoadsInstructionsClusterable,
                  TotalStoreInstructionsClusterable);
 
-    // Get the DDG instance so that we can set and get information that will be
-    // read later on during enumeration.
+    // Get the DDG instance so that we can set and get information that will
+    // be read later on during enumeration.
     auto DataDepGraphInstance = static_cast<DataDepGraph *>(DDG.get());
     // Store total instructions in all clusters in the DDG instance.
     DataDepGraphInstance->setTotalInstructionsInAllClusters(
@@ -469,18 +469,25 @@ void ScheduleDAGOptSched::schedule() {
   // Setup time before scheduling
   Utilities::startTime = std::chrono::high_resolution_clock::now();
   // Schedule region.
-  Rslt = region->FindOptimalSchedule(CurrentRegionTimeout, CurrentLengthTimeout,
-                                     IsEasy, NormBestCost, BestSchedLngth,
-                                     NormHurstcCost, HurstcSchedLngth, Sched,
-                                     FilterByPerp, blocksToKeep(schedIni));
+  if (!IsFourthPass) {
+    Rslt = region->FindOptimalSchedule(
+        CurrentRegionTimeout, CurrentLengthTimeout, IsEasy, NormBestCost,
+        BestSchedLngth, NormHurstcCost, HurstcSchedLngth, Sched, FilterByPerp,
+        blocksToKeep(schedIni));
 
-  if ((!(Rslt == RES_SUCCESS || Rslt == RES_TIMEOUT) || Sched == NULL)) {
-    LLVM_DEBUG(
-        Logger::Info("OptSched run failed: rslt=%d, sched=%p. Falling back.",
-                     Rslt, (void *)Sched));
-    // Scheduling with opt-sched failed.
-    // fallbackScheduler();
-    return;
+    if ((!(Rslt == RES_SUCCESS || Rslt == RES_TIMEOUT) || Sched == NULL)) {
+      LLVM_DEBUG(
+          Logger::Info("OptSched run failed: rslt=%d, sched=%p. Falling back.",
+                       Rslt, (void *)Sched));
+      // Scheduling with opt-sched failed.
+      // fallbackScheduler();
+      return;
+    }
+  } else {
+    dbgs() << "Processing DAG " << RegionName << '\n';
+    dbgs() << "Restoring schedule from second ILP pass: \n";
+    Sched = LowerOccScheds[RegionIdx];
+    dbgs() << "Applying lower occupancy schedule\n";
   }
 
   // BB Enumerator did not find a schedule.
@@ -507,6 +514,7 @@ void ScheduleDAGOptSched::schedule() {
     ILPAnalysis[RegionIdx].first = BestSchedLngth;
   else if (IsThirdPass) {
     ILPAnalysis[RegionIdx].second = BestSchedLngth;
+    LowerOccScheds[RegionIdx] = Sched;
     return;
   }
 

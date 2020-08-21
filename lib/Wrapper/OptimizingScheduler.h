@@ -37,7 +37,6 @@ private:
   // Vector of scheduling passes to execute.
   SmallVector<SchedPassStrategy, 4> SchedPasses;
 
-
 protected:
   // Vector of regions recorded for later rescheduling
   SmallVector<
@@ -51,6 +50,8 @@ protected:
   SmallVector<std::pair<int, int>, 32> ILPAnalysis;
   /// TODO: Same as above for cost analysis.
   SmallVector<std::pair<int, int>, 32> CostAnalysis;
+  /// Store the lower occupancy schedules from the second ILP pass.
+  SmallVector<InstSchedule *, 16> LowerOccScheds;
 
   // Path to opt-sched config options directory.
   SmallString<128> PathCfg;
