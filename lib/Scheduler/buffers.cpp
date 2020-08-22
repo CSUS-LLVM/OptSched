@@ -44,8 +44,8 @@ InputBuffer::~InputBuffer() {
   Unload();
 }
 
-FUNC_RESULT InputBuffer::Load(char const *const fileName,
-                              char const *const path, long maxByts) {
+FUNC_RESULT InputBuffer::Load(const char *const fileName,
+                              const char *const path, long maxByts) {
   char fullPath[MAX_NAMESIZE];
   strcpy(fullPath, path);
   strcat(fullPath, "\\");
@@ -53,7 +53,7 @@ FUNC_RESULT InputBuffer::Load(char const *const fileName,
   return Load(fullPath, maxByts);
 }
 
-FUNC_RESULT InputBuffer::Load(char const *const _fullPath, long maxByts) {
+FUNC_RESULT InputBuffer::Load(const char *const _fullPath, long maxByts) {
   strcpy(fullPath, _fullPath);
 
   if ((fileHndl = open(fullPath, INPFILE_OPENFLAGS)) == FILEOPEN_ERROR) {
@@ -75,8 +75,6 @@ FUNC_RESULT InputBuffer::Load(char const *const _fullPath, long maxByts) {
 
   // Allocate an extra byte for possible null termination.
   buf = new char[totSize + 1];
-  if (buf == NULL)
-    Logger::Fatal("Out of memory.");
   if ((loadedByts = read(fileHndl, buf, totSize)) == 0) {
     Logger::Fatal("Empty input file: %s.", fullPath);
   }
@@ -356,7 +354,7 @@ void InputBuffer::ReportFatalError(char *msg, char *lineStrt, int frstLngth) {
                 crntLineNum, fullPath, frstLngth, lineStrt);
 }
 
-void SpecsBuffer::ReadSpec(char const *const title, char *value) {
+void SpecsBuffer::ReadSpec(const char *const title, char *value) {
   int lngth[INBUF_MAX_PIECES_PERLINE];
   char *strPtr[INBUF_MAX_PIECES_PERLINE];
   int pieceCnt;
@@ -460,7 +458,7 @@ void SpecsBuffer::readLine(char *value, int maxPieceCnt) {
     ofst++;
   }
 
-  // Null terminate the concatinated string.
+  // Null terminate the concatenated string.
   value[ofst] = 0;
 
   if (nxtLineType == NXT_ERR) {
@@ -469,7 +467,7 @@ void SpecsBuffer::readLine(char *value, int maxPieceCnt) {
   }
 }
 
-bool SpecsBuffer::ReadFlagSpec(char const *const title, bool dfltValue) {
+bool SpecsBuffer::ReadFlagSpec(const char *const title, bool dfltValue) {
   char tmpStrng[MAX_NAMESIZE];
 
   ReadSpec(title, tmpStrng);
@@ -485,20 +483,20 @@ bool SpecsBuffer::ReadFlagSpec(char const *const title, bool dfltValue) {
   return dfltValue;
 }
 
-unsigned long SpecsBuffer::ReadUlongSpec(char const *const title) {
+unsigned long SpecsBuffer::ReadUlongSpec(const char *const title) {
   char tmpStrng[MAX_NAMESIZE];
   ReadSpec(title, tmpStrng);
   return strtoul(tmpStrng, NULL, 10);
 }
 
-float SpecsBuffer::ReadFloatSpec(char const *const title) {
+float SpecsBuffer::ReadFloatSpec(const char *const title) {
   char tmpStrng[MAX_NAMESIZE];
 
   ReadSpec(title, tmpStrng);
   return (float)atof(tmpStrng);
 }
 
-uint64_t SpecsBuffer::readUInt64Spec(char const *const title) {
+uint64_t SpecsBuffer::readUInt64Spec(const char *const title) {
   char tmpStrng[MAX_NAMESIZE];
   // Most sig piece and least sig piece.
   unsigned long MSUlong, LSUlong;
@@ -535,13 +533,13 @@ uint64_t SpecsBuffer::readUInt64Spec(char const *const title) {
   return fullNum;
 }
 
-int16_t SpecsBuffer::ReadShortSpec(char const *const title) {
+int16_t SpecsBuffer::ReadShortSpec(const char *const title) {
   char tmpStrng[MAX_NAMESIZE];
   ReadSpec(title, tmpStrng);
   return atoi(tmpStrng);
 }
 
-int SpecsBuffer::ReadIntSpec(char const *const title) {
+int SpecsBuffer::ReadIntSpec(const char *const title) {
   char tmpStrng[MAX_NAMESIZE];
   ReadSpec(title, tmpStrng);
   return (int16_t)atoi(tmpStrng);
@@ -551,7 +549,7 @@ void SpecsBuffer::ErrorHandle(char *value) {
   Logger::Fatal("Invalid parameter or spec (%s) in specs file.", value);
 }
 
-FUNC_RESULT SpecsBuffer::checkTitle(char const *const title) {
+FUNC_RESULT SpecsBuffer::checkTitle(const char *const title) {
   int lngth[INBUF_MAX_PIECES_PERLINE];
   char *strPtr[INBUF_MAX_PIECES_PERLINE];
   int pieceCnt;

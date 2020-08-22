@@ -69,7 +69,7 @@ public:
   bool IsLiveOut() const;
   void SetIsLiveOut(bool liveOut);
 
-  const Register &operator=(Register &rhs);
+  Register &operator=(const Register &rhs);
 
   void SetupConflicts(int regCnt);
   void ResetConflicts();
@@ -118,7 +118,7 @@ private:
 
   // (Chris): The possible live interval set is the set of instructions that
   // may or may not be added to the live interval of this register. This is
-  // computed during the common use lower boudn analysis.
+  // computed during the common use lower bound analysis.
   InstSetType possibleLiveIntervalSet_;
 };
 

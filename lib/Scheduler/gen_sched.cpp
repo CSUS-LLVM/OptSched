@@ -29,9 +29,6 @@ InstScheduler::InstScheduler(DataDepStruct *dataDepGraph, MachineModel *machMdl,
 
   slotsPerTypePerCycle_ = new int[issuTypeCnt_];
   instCntPerIssuType_ = new InstCount[issuTypeCnt_];
-  if (slotsPerTypePerCycle_ == NULL || instCntPerIssuType_ == NULL) {
-    Logger::Fatal("Out of memory.");
-  }
 
   issuTypeCnt_ = machMdl_->GetSlotsPerCycle(slotsPerTypePerCycle_);
 
@@ -47,8 +44,6 @@ InstScheduler::~InstScheduler() {
 
 void ConstrainedScheduler::AllocRsrvSlots_() {
   rsrvSlots_ = new ReserveSlot[issuRate_];
-  if (rsrvSlots_ == NULL)
-    Logger::Fatal("Out of memory.");
   ResetRsrvSlots_();
 }
 
@@ -73,8 +68,6 @@ ConstrainedScheduler::ConstrainedScheduler(DataDepGraph *dataDepGraph,
   // Allocate the array of first-ready lists - one list per cycle.
   assert(schedUprBound_ > 0);
   frstRdyLstPerCycle_ = new LinkedList<SchedInstruction> *[schedUprBound_];
-  if (frstRdyLstPerCycle_ == NULL)
-    Logger::Fatal("Out of memory.");
 
   for (InstCount i = 0; i < schedUprBound_; i++) {
     frstRdyLstPerCycle_[i] = NULL;
@@ -90,8 +83,6 @@ ConstrainedScheduler::ConstrainedScheduler(DataDepGraph *dataDepGraph,
   consecEmptyCycles_ = 0;
 
   avlblSlotsInCrntCycle_ = new int16_t[issuTypeCnt_];
-  if (avlblSlotsInCrntCycle_ == NULL)
-    Logger::Fatal("Out of memory.");
 
   rsrvSlots_ = NULL;
   rsrvSlotCnt_ = 0;
@@ -119,8 +110,6 @@ bool ConstrainedScheduler::Initialize_(InstCount trgtSchedLngth,
   // Allocate the first entry in the array.
   if (frstRdyLstPerCycle_[0] == NULL) {
     frstRdyLstPerCycle_[0] = new LinkedList<SchedInstruction>;
-    if (frstRdyLstPerCycle_[0] == NULL)
-      Logger::Fatal("Out of memory.");
   }
 
   frstRdyLstPerCycle_[0]->InsrtElmnt(rootInst_);
@@ -160,12 +149,9 @@ void ConstrainedScheduler::SchdulInst_(SchedInstruction *inst, InstCount) {
       // If the first-ready list of that cycle has not been created yet.
       if (frstRdyLstPerCycle_[scsrRdyCycle] == NULL) {
         frstRdyLstPerCycle_[scsrRdyCycle] = new LinkedList<SchedInstruction>;
-        if (frstRdyLstPerCycle_[scsrRdyCycle] == NULL) {
-          Logger::Fatal("Out of memory.");
-        }
       }
 
-      // Add this succesor to the first-ready list of the future cycle
+      // Add this successor to the first-ready list of the future cycle
       // in which we now know it will become ready
       frstRdyLstPerCycle_[scsrRdyCycle]->InsrtElmnt(crntScsr);
     }
@@ -184,7 +170,7 @@ void ConstrainedScheduler::UnSchdulInst_(SchedInstruction *inst) {
   assert(inst->IsSchduld());
 
   // Notify each successor of this instruction that it has been unscheduled.
-  // The successors are visted in the reverse order so that each one will be
+  // The successors are visited in the reverse order so that each one will be
   // at the bottom of its first-ready list (if the scheduling of this
   // instruction has caused it to go there).
   for (SchedInstruction *crntScsr = inst->GetLastScsr(&prdcsrNum);

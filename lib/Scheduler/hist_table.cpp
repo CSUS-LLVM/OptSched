@@ -42,8 +42,6 @@ void HistEnumTreeNode::SetRsrvSlots_(EnumTreeNode *node) {
   int issuRate = node->enumrtr_->machMdl_->GetIssueRate();
 
   rsrvSlots_ = new ReserveSlot[issuRate];
-  if (rsrvSlots_ == NULL)
-    Logger::Fatal("Out of memory.");
 
   for (int i = 0; i < issuRate; i++) {
     rsrvSlots_[i].strtCycle = node->rsrvSlots_[i].strtCycle;
@@ -442,7 +440,7 @@ bool CostHistEnumTreeNode::ChkCostDmntn_(EnumTreeNode *node,
 // For the SLIL cost function the improvement in cost when comparing the other
 // prefix to the history prefix must be enough to improve upon the best cost
 // found so far. The required improvement is:
-// "History Total Cost" – "Best Total Cost"
+// "History Total Cost" - "Best Total Cost"
 static bool doesHistorySLILCostDominate(InstCount OtherPrefixCost,
                                         InstCount HistPrefixCost,
                                         InstCount HistTotalCost,
@@ -453,12 +451,20 @@ static bool doesHistorySLILCostDominate(InstCount OtherPrefixCost,
 }
 
 // For peak cost functions (PERP, PRP, Occupancy) the suffix cost does not
-// depend on the prefix cost. We can prune the Other node if the max of the
-// prefix and the history total cost is not better than the best cost schedule.
+// depend on the prefix cost.
 static bool doesHistoryPeakCostDominate(InstCount OtherPrefixCost,
+                                        InstCount HistPrefixCost,
                                         InstCount HistTotalCost,
                                         LengthCostEnumerator *LCE) {
-  return LCE->GetBestCost() <= std::max(OtherPrefixCost, HistTotalCost);
+  // If we cannot improve the prefix, prune the candidate node. Likewise, if
+  // the total cost is determined by the suffix schedule we cannot improve the
+  // cost with a better prefix.
+  if (OtherPrefixCost >= HistPrefixCost || HistTotalCost > HistPrefixCost)
+    return true;
+
+  // Prunes the candidate node if the improved prefix still has higher cost than
+  // the best schedule found so far.
+  return LCE->GetBestCost() <= OtherPrefixCost;
 }
 
 // Should we prune the other node based on RP cost.
@@ -482,8 +488,8 @@ bool CostHistEnumTreeNode::ChkCostDmntnForBBSpill_(EnumTreeNode *Node,
     // pruning conditions that are specific to the current cost function.
     if (SpillCostFunc == SCF_TARGET || SpillCostFunc == SCF_PRP ||
         SpillCostFunc == SCF_PERP)
-      ShouldPrune =
-          doesHistoryPeakCostDominate(Node->GetCostLwrBound(), totalCost_, LCE);
+      ShouldPrune = doesHistoryPeakCostDominate(Node->GetCostLwrBound(),
+                                                partialCost_, totalCost_, LCE);
 
     else if (SpillCostFunc == SCF_SLIL)
       ShouldPrune = doesHistorySLILCostDominate(Node->GetCostLwrBound(),

@@ -1,0 +1,75 @@
+name: Run ClangFormat
+
+on:
+  issue_comment: # GitHub PRs are considered the same type of thing as issues.
+    types: [ created ]
+
+jobs:
+  reformat:
+    name: ClangFormat
+    # If we are a pull_request, we have the trigger comment, and the person
+    # requesting is the one who made the PR, then we run.
+    if: >-
+      github.event.issue.pull_request != ''
+      && github.event.comment.body == 'Do: Reformat'
+      && github.event.comment.user.id == github.event.issue.user.id
+    # We must run on a ubuntu, as we use unix-only commands
+    runs-on: ubuntu-latest
+
+    steps:
+      # Add an emote reaction to acknowledge the request.
+      # For long-running tasks, this is helpful.
+      # For just clang-format, it may not be needed, but it's still nice.
+      - name: Acknowledge
+        uses: peter-evans/create-or-update-comment@v1.4.1
+        with:
+          comment-id: ${{ github.event.comment.id }}
+          reactions: rocket # (Launch)
+
+      - uses: actions/checkout@v2
+        with:
+          # We need the entire history so that we can rebase many commits.
+          fetch-depth: 0
+
+      - name: Checkout PR
+        uses: dawidd6/action-checkout-pr@v1
+        with:
+          pr: ${{ github.event.issue.number }}
+
+      - name: Get clang-format
+        run: sudo apt-get install clang-format-9
+
+      - name: Clang format each commit in place
+        run: |
+          # Git requires user email and name to do commits.
+          # As we are only amending each commit, these shouldn't end up in the
+          # history.
+          # Set user email to the email of the last commit:
+          git config --local user.email "$(git log -n 1 --pretty=format:'%ae')"
+          git config --local user.name 'GitHub Action'
+
+          # Rebases every commit since when this PR branched off of master.
+          # The sed command tells git that we want to edit the code for each commit.
+          GIT_EDITOR="sed -iE 's/^pick/edit/g'" git rebase -i $(git merge-base master HEAD)
+
+          # Abort on error
+          set -e
+          echo '>>> Beginning Rebasing...'
+
+          # While a rebase is ongoing, `git status` contains the text "rebase".
+          while [[ -n $(git status | grep rebase) ]]; do
+            # Run clang-format
+            find . -name '*.hpp' -o -name '*.cpp' | xargs -L1 clang-format-9 -style=file -i --verbose
+
+            # Add all changes and update the commit
+            echo '>>> Rewriting commit...'
+            git add -A
+            git commit --amend --no-edit
+
+            echo '>>> Continuing Rebasing...'
+            git rebase --continue
+          done
+          echo '>>> Finished Rebasing!'
+
+      - name: Push
+        run: git push --force -v

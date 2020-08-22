@@ -147,7 +147,7 @@ For Ubuntu 18.04: [37e6062d969bf337b964fe8119767046fcbdcdfa](https://github.com/
 
 `make && make install`
 
-You may need to install gawk if you are encountering a segmentation fault: 
+You may need to install gawk if you are encountering a segmentation fault:
 
 `sudo apt-get install gawk`
 

@@ -1,0 +1,64 @@
+name: C/C++ CI
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v2
+      - name: Install ninja
+        id: ninja-build
+        run: sudo apt-get install ninja-build
+
+      - name: Install ccache
+        id: ccache
+        run: sudo apt-get install ccache
+
+      - name: ccache cache files
+        uses: actions/cache@v1.1.0
+        with:
+          path: .ccache
+          key: ccache
+
+      - name: make build directory
+        run: mkdir build
+      - name: configure
+        # Release build because Debug builds run out of memory.
+        # ccache greatly improves build speed, especially since we're mostly compiling llvm.
+        run: cmake .. -GNinja
+             -DCMAKE_BUILD_TYPE=Release
+             -DLLVM_PARALLEL_LINK_JOBS=1 ../cmake/superbuild
+             -DCMAKE_CXX_COMPILER_LAUNCHER=ccache -DCMAKE_C_COMPILER_LAUNCHER=ccache
+             -DCMAKE_CXX_COMPILER=g++ -DCMAKE_C_COMPILER=gcc
+             -DOPTSCHEDSUPER_LLVM_EXTRA_CMAKE_ARGS='-DLLVM_ENABLE_ASSERTIONS=ON'
+             -DOPTSCHED_EXTRA_DEFINITIONS='-DIS_DEBUG'
+        working-directory: ./build
+      - name: build
+        run: |
+          ccache -z
+          ninja
+        working-directory: ./build
+        env:
+          CCACHE_BASEDIR: $GITHUB_WORKSPACE
+          CCACHE_DIR: $GITHUB_WORKSPACE/.ccache
+          CCACHE_COMPRESS: true
+          CCACHE_COMPRESSLEVEL: 6
+
+      - name: unit tests
+        run: ninja test
+        working-directory: ./build
+
+      - name: dump ccache statistics
+        run: ccache -s
+        env:
+          CCACHE_BASEDIR: $GITHUB_WORKSPACE
+          CCACHE_DIR: $GITHUB_WORKSPACE/.ccache
+          CCACHE_COMPRESS: true
+          CCACHE_COMPRESSLEVEL: 6

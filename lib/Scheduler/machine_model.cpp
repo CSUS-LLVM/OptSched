@@ -97,7 +97,7 @@ InstType MachineModel::GetInstTypeByName(const string &typeName,
   return INVALID_INST_TYPE;
 }
 
-int16_t MachineModel::GetRegTypeByName(char const *const regTypeName) const {
+int16_t MachineModel::GetRegTypeByName(const char *const regTypeName) const {
   int16_t Type = INVALID_VALUE;
   for (size_t i = 0; i < registerTypes_.size(); i++) {
     if (regTypeName == registerTypes_[i].name) {
@@ -111,7 +111,7 @@ int16_t MachineModel::GetRegTypeByName(char const *const regTypeName) const {
 }
 
 IssueType
-MachineModel::GetIssueTypeByName(char const *const issuTypeName) const {
+MachineModel::GetIssueTypeByName(const char *const issuTypeName) const {
   for (size_t i = 0; i < issueTypes_.size(); i++) {
     if (issuTypeName == issueTypes_[i].name) {
       return (InstType)i;
@@ -170,11 +170,11 @@ int MachineModel::GetSlotsPerCycle(int slotsPerCycle[]) const {
   return issueTypes_.size();
 }
 
-char const *MachineModel::GetInstTypeNameByCode(InstType typeCode) const {
+const char *MachineModel::GetInstTypeNameByCode(InstType typeCode) const {
   return instTypes_[typeCode].name.c_str();
 }
 
-char const *MachineModel::GetIssueTypeNameByCode(IssueType typeCode) const {
+const char *MachineModel::GetIssueTypeNameByCode(IssueType typeCode) const {
   return issueTypes_[typeCode].name.c_str();
 }
 

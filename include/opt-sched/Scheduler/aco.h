@@ -10,11 +10,18 @@ Last Update:  Jan. 2020
 #define OPTSCHED_ACO_H
 
 #include "opt-sched/Scheduler/gen_sched.h"
+#include "llvm/ADT/ArrayRef.h"
+#include "llvm/ADT/SetVector.h"
+#include "llvm/ADT/SmallSet.h"
+#include "llvm/ADT/SmallVector.h"
+#include <map>
+#include <memory>
+#include <utility>
 
 namespace llvm {
 namespace opt_sched {
 
-typedef double pheremone_t;
+typedef double pheromone_t;
 
 struct Choice {
   SchedInstruction *inst;
@@ -29,23 +36,40 @@ public:
   virtual ~ACOScheduler();
   FUNC_RESULT FindSchedule(InstSchedule *schedule, SchedRegion *region);
   inline void UpdtRdyLst_(InstCount cycleNum, int slotNum);
-  // Set the initial schedule for ACO 
+  // Set the initial schedule for ACO
   // Default is NULL if none are set.
   void setInitialSched(InstSchedule *Sched);
-  
+
 private:
-  pheremone_t &Pheremone(SchedInstruction *from, SchedInstruction *to);
-  pheremone_t &Pheremone(InstCount from, InstCount to);
+  pheromone_t &Pheromone(SchedInstruction *from, SchedInstruction *to);
+  pheromone_t &Pheromone(InstCount from, InstCount to);
   double Score(SchedInstruction *from, Choice choice);
 
-  void PrintPheremone();
+  void PrintPheromone();
 
-  SchedInstruction *SelectInstruction(std::vector<Choice> ready,
+  // pheromone Graph Debugging start
+  llvm::SmallSet<std::string, 0> DbgRgns;
+  llvm::SmallSet<std::pair<InstCount, InstCount>, 0> AntEdges;
+  llvm::SmallSet<std::pair<InstCount, InstCount>, 0> CrntAntEdges;
+  llvm::SmallSet<std::pair<InstCount, InstCount>, 0> IterAntEdges;
+  llvm::SmallSet<std::pair<InstCount, InstCount>, 0> BestAntEdges;
+  std::map<std::pair<InstCount, InstCount>, double> LastHeu;
+  bool IsDbg = false;
+  std::string OutPath;
+  std::string graphDisplayAnnotation(int Frm, int To);
+  std::string getHeuIfPossible(int Frm, int To);
+  void writePheromoneGraph(std::string Stage);
+  void writePGraphRecursive(FILE *Out, SchedInstruction *Ins,
+                            llvm::SetVector<SchedInstruction *> &Visited);
+
+  // pheromone Graph Debugging end
+
+  SchedInstruction *SelectInstruction(const llvm::ArrayRef<Choice> &ready,
                                       SchedInstruction *lastInst);
-  void UpdatePheremone(InstSchedule *schedule);
-  InstSchedule *FindOneSchedule();
-  pheremone_t *pheremone_;
-  pheremone_t initialValue_;
+  void UpdatePheromone(InstSchedule *schedule);
+  std::unique_ptr<InstSchedule> FindOneSchedule();
+  llvm::SmallVector<pheromone_t, 0> pheromone_;
+  pheromone_t initialValue_;
   bool use_fixed_bias;
   int count_;
   int heuristicImportance_;
@@ -56,8 +80,7 @@ private:
   double decay_factor;
   int ants_per_iteration;
   bool print_aco_trace;
-  std::vector<double> scores(std::vector<Choice> ready, SchedInstruction *last);
-  InstSchedule* InitialSchedule;
+  std::unique_ptr<InstSchedule> InitialSchedule;
   bool VrfySched_;
 };
 

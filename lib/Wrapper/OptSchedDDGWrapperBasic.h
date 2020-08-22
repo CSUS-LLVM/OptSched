@@ -46,7 +46,8 @@ public:
   /// Dump Optsched register def/use information for the region.
   void dumpOptSchedRegisters() const;
 
-  void convertSUnits() override;
+  void convertSUnits(bool IgnoreRealEdges, bool IgnoreArtificialEdges) override;
+  void addArtificialEdges();
   void convertRegFiles() override;
 
 protected:
@@ -73,8 +74,8 @@ protected:
   std::vector<int> RegIndices;
 
   // Count each definition of a virtual register with the same resNo
-  // as a seperate register in our model. Each resNo is also associated
-  // with multiple pressure sets which are treated as seperate registers
+  // as a separate register in our model. Each resNo is also associated
+  // with multiple pressure sets which are treated as separate registers
   std::map<unsigned, std::vector<Register *>> LastDef;
 
   // Allow the DAG builder to filter our register types that have low peak
@@ -122,7 +123,8 @@ protected:
   void convertSUnit(const llvm::SUnit &SU);
 
   // Create edges between optsched graph nodes using SUnit successors.
-  void convertEdges(const llvm::SUnit &SU);
+  void convertEdges(const llvm::SUnit &SU, bool IgnoreRealEdges,
+                    bool IgnoreArtificialEdges);
 
   // Count number or registers defined by the region boundary.
   void countBoundaryLiveness(std::vector<int> &RegDefCounts,
@@ -142,9 +144,9 @@ protected:
 };
 
 // Exclude certain registers from being visible to the scheduler. Use LLVM's
-// register pressure tracker to find the MAX register pressure for each register
-// type (pressure set). If the MAX pressure is below a certain threshold don't
-// track that register.
+// register pressure tracker to find the MAX register pressure for each
+// register type (pressure set). If the MAX pressure is below a certain
+// threshold don't track that register.
 class LLVMRegTypeFilter {
 private:
   const MachineModel *MM;
@@ -165,13 +167,13 @@ public:
   ~LLVMRegTypeFilter() = default;
 
   // The proportion of the register pressure set limit that a register's Max
-  // pressure must be higher than in order to not be filtered out. (default .7)
-  // The idea is that there is no point in trying to reduce the register
+  // pressure must be higher than in order to not be filtered out. (default
+  // .7) The idea is that there is no point in trying to reduce the register
   // pressure
   // of a register type that is in no danger of causing spilling. If the
   // RegFilterFactor is .7, and a random register type has a pressure limit of
-  // 10, then we filter out the register types if the MAX pressure for that type
-  // is below 7. (10 * .7 = 7)
+  // 10, then we filter out the register types if the MAX pressure for that
+  // type is below 7. (10 * .7 = 7)
   void setRegFilterFactor(float RegFilterFactor);
 
   // Return true if this register type should be filtered out.

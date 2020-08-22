@@ -91,16 +91,8 @@ void EnumTreeNode::Construct(EnumTreeNode *prevNode, SchedInstruction *inst,
 
   if (isCnstrctd_ == false) {
     exmndInsts_ = new LinkedList<ExaminedInst>(instCnt);
-    if (exmndInsts_ == NULL)
-      Logger::Fatal("Out of memory.");
-
     chldrn_ = new LinkedList<HistEnumTreeNode>(instCnt);
-    if (chldrn_ == NULL)
-      Logger::Fatal("Out of memory.");
-
     frwrdLwrBounds_ = new InstCount[instCnt];
-    if (frwrdLwrBounds_ == NULL)
-      Logger::Fatal("Out of memory.");
   }
 
   if (enumrtr_->IsHistDom()) {
@@ -197,8 +189,6 @@ void EnumTreeNode::SetRsrvSlots(int16_t rsrvSlotCnt, ReserveSlot *rsrvSlots) {
   int issuRate = enumrtr_->machMdl_->GetIssueRate();
 
   rsrvSlots_ = new ReserveSlot[issuRate];
-  if (rsrvSlots_ == NULL)
-    Logger::Fatal("Out of memory.");
 
   for (int i = 0; i < issuRate; i++) {
     rsrvSlots_[i].strtCycle = rsrvSlots[i].strtCycle;
@@ -261,8 +251,6 @@ void EnumTreeNode::NewBranchExmnd(SchedInstruction *inst, bool isLegal,
           ExaminedInst *exmndInst;
           exmndInst =
               new ExaminedInst(inst, wasRlxInfsbl, enumrtr_->dirctTightndLst_);
-          if (exmndInst == NULL)
-            Logger::Fatal("Out of memory.");
           exmndInsts_->InsrtElmnt(exmndInst);
         }
       }
@@ -382,7 +370,7 @@ bool EnumTreeNode::WasRsrcDmnntNodeExmnd(SchedInstruction *cnddtInst) {
 /*****************************************************************************/
 
 bool EnumTreeNode::IsBranchDominated(SchedInstruction *cnddtInst) {
-  // Check if the given instruction can be fessibly replaced by a previously
+  // Check if the given instruction can be feasibly replaced by a previously
   // examined instruction, which was found to be infeasible, thus proving by
   // contradiction that the given instruction is infeasible for this slot
   ExaminedInst *exmndInst = exmndInsts_->GetFrstElmnt();
@@ -473,9 +461,6 @@ Enumerator::Enumerator(DataDepGraph *dataDepGraph, MachineModel *machMdl,
                                          schedUprBound_ + SCHED_UB_EXTRA,
                                          DIR_FRWRD, RST_DYNMC, INVALID_VALUE);
 
-  if (rlxdSchdulr_ == NULL)
-    Logger::Fatal("Out of memory.");
-
   for (int16_t i = 0; i < issuTypeCnt_; i++) {
     neededSlots_[i] = instCntPerIssuType_[i];
 #ifdef IS_DEBUG_ISSUE_TYPES
@@ -505,8 +490,6 @@ Enumerator::Enumerator(DataDepGraph *dataDepGraph, MachineModel *machMdl,
   if (IsHistDom()) {
     exmndSubProbs_ =
         new BinHashTable<HistEnumTreeNode>(sigSize, sigHashSize, true);
-    if (exmndSubProbs_ == NULL)
-      Logger::Fatal("Out of memory.");
   }
 
   histTableInitTime = Utilities::GetProcessorTime() - histTableInitTime;
@@ -518,24 +501,10 @@ Enumerator::Enumerator(DataDepGraph *dataDepGraph, MachineModel *machMdl,
   fxdLst_ = NULL;
 
   tightndLst_ = new LinkedList<SchedInstruction>(totInstCnt_);
-  if (tightndLst_ == NULL)
-    Logger::Fatal("Out of memory.");
-
   fxdLst_ = new LinkedList<SchedInstruction>(totInstCnt_);
-  if (fxdLst_ == NULL)
-    Logger::Fatal("Out of memory.");
-
   dirctTightndLst_ = new LinkedList<SchedInstruction>(totInstCnt_);
-  if (dirctTightndLst_ == NULL)
-    Logger::Fatal("Out of memory.");
-
   bkwrdTightndLst_ = new LinkedList<SchedInstruction>(totInstCnt_);
-  if (bkwrdTightndLst_ == NULL)
-    Logger::Fatal("Out of memory.");
-
   tmpLwrBounds_ = new InstCount[totInstCnt_];
-  if (tmpLwrBounds_ == NULL)
-    Logger::Fatal("Out of memory.");
 
   SetInstSigs_();
   iterNum_ = 0;
@@ -573,31 +542,15 @@ void Enumerator::SetupAllocators_() {
 
   nodeAlctr_ = new EnumTreeNodeAlloc(maxNodeCnt);
 
-  if (nodeAlctr_ == NULL)
-    Logger::Fatal("Out of memory.");
-
   if (IsHistDom()) {
     hashTblEntryAlctr_ =
         new MemAlloc<BinHashTblEntry<HistEnumTreeNode>>(memAllocBlkSize);
-    if (hashTblEntryAlctr_ == NULL)
-      Logger::Fatal("Out of memory.");
 
     bitVctr1_ = new BitVector(totInstCnt_);
     bitVctr2_ = new BitVector(totInstCnt_);
 
-    if (bitVctr1_ == NULL || bitVctr2_ == NULL) {
-      Logger::Fatal("Out of memory.");
-    }
-
     lastInsts_ = new SchedInstruction *[lastInstsEntryCnt];
-
-    if (lastInsts_ == NULL)
-      Logger::Fatal("Out of memory.");
-
     othrLastInsts_ = new SchedInstruction *[totInstCnt_];
-
-    if (othrLastInsts_ == NULL)
-      Logger::Fatal("Out of memory.");
   }
 }
 /****************************************************************************/
@@ -1014,9 +967,8 @@ bool Enumerator::FindNxtFsblBrnch_(EnumTreeNode *&newNode) {
 
 #if defined(IS_DEBUG) || defined(IS_DEBUG_READY_LIST)
   InstCount rdyInstCnt = rdyLst_->GetInstCnt();
-#endif
   assert(crntNode_->IsLeaf() || (brnchCnt != rdyInstCnt) ? 1 : rdyInstCnt);
-  // brnchCnt == rdyInstCnt == 0 ? 1 : rdyInstCnt);
+#endif
 
 #ifdef IS_DEBUG_READY_LIST
   Logger::Info("Ready List Size is %d", rdyInstCnt);
@@ -1350,7 +1302,7 @@ void Enumerator::InitNewNode_(EnumTreeNode *newNode) {
 namespace {
 void SetTotalCostsAndSuffixes(EnumTreeNode *const currentNode,
                               EnumTreeNode *const parentNode,
-                              InstCount const targetLength,
+                              const InstCount targetLength,
                               const bool suffixConcatenationEnabled) {
   // (Chris): Before archiving, set the total cost info of this node. If it's a
   // leaf node, then the total cost is the current cost. If it's an inner node,
@@ -1820,9 +1772,6 @@ bool Enumerator::RlxdSchdul_(EnumTreeNode *newNode) {
   assert(newNode != NULL);
   LinkedList<SchedInstruction> *rsrcFxdLst = new LinkedList<SchedInstruction>;
 
-  if (rsrcFxdLst == NULL)
-    Logger::Fatal("Out of memory.");
-
   bool fsbl =
       rlxdSchdulr_->SchdulAndChkFsblty(crntCycleNum_, trgtSchedLngth_ - 1);
 
@@ -1910,9 +1859,6 @@ LengthEnumerator::LengthEnumerator(
                  preFxdInstCnt, preFxdInsts) {
   SetupAllocators_();
   tmpHstryNode_ = new HistEnumTreeNode;
-
-  if (tmpHstryNode_ == NULL)
-    Logger::Fatal("Out of memory.");
 }
 /*****************************************************************************/
 
@@ -1929,8 +1875,6 @@ void LengthEnumerator::SetupAllocators_() {
 
   if (IsHistDom()) {
     histNodeAlctr_ = new MemAlloc<HistEnumTreeNode>(memAllocBlkSize);
-    if (histNodeAlctr_ == NULL)
-      Logger::Fatal("Out of memory.");
   }
 }
 /****************************************************************************/
@@ -2009,8 +1953,6 @@ LengthCostEnumerator::LengthCostEnumerator(
   costLwrBound_ = 0;
   spillCostFunc_ = spillCostFunc;
   tmpHstryNode_ = new CostHistEnumTreeNode;
-  if (tmpHstryNode_ == NULL)
-    Logger::Fatal("Out of memory.");
 }
 /*****************************************************************************/
 
@@ -2027,8 +1969,6 @@ void LengthCostEnumerator::SetupAllocators_() {
 
   if (IsHistDom()) {
     histNodeAlctr_ = new MemAlloc<CostHistEnumTreeNode>(memAllocBlkSize);
-    if (histNodeAlctr_ == NULL)
-      Logger::Fatal("Out of memory.");
   }
 }
 /****************************************************************************/

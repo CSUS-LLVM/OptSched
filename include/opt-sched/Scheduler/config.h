@@ -55,8 +55,8 @@ public:
 
   // Make sure there is no way for a second config object to be accidentally
   // created.
-  SchedulerOptions(SchedulerOptions const &) = delete;
-  void operator=(SchedulerOptions const &) = delete;
+  SchedulerOptions(const SchedulerOptions &) = delete;
+  void operator=(const SchedulerOptions &) = delete;
 
 private:
   SchedulerOptions() {}

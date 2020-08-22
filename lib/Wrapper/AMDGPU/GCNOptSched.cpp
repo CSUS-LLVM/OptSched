@@ -21,8 +21,11 @@ static cl::opt<bool>
                          cl::init(false), cl::Hidden);
 
 static ScheduleDAGInstrs *createOptSchedGCN(MachineSchedContext *C) {
-  return new ScheduleDAGOptSchedGCN(
+  ScheduleDAGMILive *DAG = new ScheduleDAGOptSchedGCN(
       C, std::make_unique<GCNMaxOccupancySchedStrategy>(C));
+  DAG->addMutation(createLoadClusterDAGMutation(DAG->TII, DAG->TRI));
+  DAG->addMutation(createStoreClusterDAGMutation(DAG->TII, DAG->TRI));
+  return DAG;
 }
 
 // Register the machine scheduler.
@@ -46,12 +49,6 @@ ScheduleDAGOptSchedGCN::ScheduleDAGOptSchedGCN(
     : ScheduleDAGOptSched(C, std::move(S)) {}
 
 void ScheduleDAGOptSchedGCN::initSchedulers() {
-  // Add DAG mutations that apply to both GCN and OptSched DAG's
-
-  addMutation(createLoadClusterDAGMutation(TII, TRI));
-  addMutation(createStoreClusterDAGMutation(TII, TRI));
-  // addMutation(createAMDGPUMacroFusionDAGMutation());
-
   // Add passes
 
   // SchedPasses.push_back(GCNMaxOcc);
@@ -60,7 +57,7 @@ void ScheduleDAGOptSchedGCN::initSchedulers() {
   SchedPasses.push_back(OptSchedMaxOcc);
   // Second
   SchedPasses.push_back(OptSchedBalanced);
-}   
+}
 
 // Execute scheduling passes.
 // Partially copied GCNScheduleDAGMILive::finalizeSchedule
@@ -93,7 +90,8 @@ void ScheduleDAGOptSchedGCN::finalizeSchedule() {
           exitRegion();
           continue;
         }
-        LLVM_DEBUG(getRealRegionPressure(RegionBegin, RegionEnd, LIS, "Before"));
+        LLVM_DEBUG(
+            getRealRegionPressure(RegionBegin, RegionEnd, LIS, "Before"));
         runSchedPass(S);
         LLVM_DEBUG(getRealRegionPressure(RegionBegin, RegionEnd, LIS, "After"));
         Region = std::make_pair(RegionBegin, RegionEnd);

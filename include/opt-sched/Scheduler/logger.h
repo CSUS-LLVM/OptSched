@@ -48,7 +48,7 @@ void RegisterPeriodicLogger(Milliseconds period, void (*callback)());
 void PeriodicLog();
 
 // Shortcuts for each logging level.
-void Fatal(const char *format_string, ...);
+[[noreturn]] void Fatal(const char *format_string, ...);
 void Error(const char *format_string, ...);
 void Info(const char *format_string, ...);
 void Summary(const char *format_string, ...);

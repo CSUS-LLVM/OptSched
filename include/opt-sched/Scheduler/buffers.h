@@ -1,6 +1,6 @@
 /*******************************************************************************
 Description:  Defines input buffering classes that can be used for opening,
-              loading, bufering and parsing input files using system-level I/O,
+              loading, buffering and parsing input files using system-level I/O,
               which relies on the programmer to do his own buffering, unlike the
               standard I/O which handles the buffering and hides it from the
               programmer.
@@ -45,10 +45,10 @@ public:
   void Clean();
   void Unload();
   char *GetBuf() { return buf; }
-  char const *GetFullPath() const { return fullPath; }
-  FUNC_RESULT Load(char const *const fileName, char const *const path,
+  const char *GetFullPath() const { return fullPath; }
+  FUNC_RESULT Load(const char *const fileName, const char *const path,
                    long maxByts = DFLT_INPBUF_SIZE);
-  FUNC_RESULT Load(char const *const fullPath, long maxByts = DFLT_INPBUF_SIZE);
+  FUNC_RESULT Load(const char *const fullPath, long maxByts = DFLT_INPBUF_SIZE);
   FUNC_RESULT SetBuf(char *buf, long size);
 
   // This function skips all comments and white spaces (tabs are not taken
@@ -90,23 +90,23 @@ protected:
 };
 
 // A specs buffer is an input buffer for parsing a typical input specification
-// or configurartion file whose format is line based, i.e., includes one spec
+// or configuration file whose format is line based, i.e., includes one spec
 // or setting per line. This class includes one method for parsing one type
 // of specs
 class SpecsBuffer : public InputBuffer {
 public:
   SpecsBuffer();
-  void ReadSpec(char const *const title, char *value);
+  void ReadSpec(const char *const title, char *value);
   void readLine(char *value, int maxPieceCnt);
   void readLstElmnt(char *value);
   int readIntLstElmnt();
-  bool ReadFlagSpec(char const *const title, bool dfltValue);
-  unsigned long ReadUlongSpec(char const *const title);
-  float ReadFloatSpec(char const *const title);
-  uint64_t readUInt64Spec(char const *const title);
-  int ReadIntSpec(char const *const title);
-  int16_t ReadShortSpec(char const *const title);
-  FUNC_RESULT checkTitle(char const *const title);
+  bool ReadFlagSpec(const char *const title, bool dfltValue);
+  unsigned long ReadUlongSpec(const char *const title);
+  float ReadFloatSpec(const char *const title);
+  uint64_t readUInt64Spec(const char *const title);
+  int ReadIntSpec(const char *const title);
+  int16_t ReadShortSpec(const char *const title);
+  FUNC_RESULT checkTitle(const char *const title);
   void ErrorHandle(char *value);
 
 protected:

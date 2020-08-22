@@ -71,7 +71,8 @@ OptSchedDDGWrapperBasic::OptSchedDDGWrapperBasic(
                                        DAG->getRegPressure().MaxSetPressure);
 }
 
-void OptSchedDDGWrapperBasic::convertSUnits() {
+void OptSchedDDGWrapperBasic::convertSUnits(bool IgnoreRealEdges,
+                                            bool IgnoreArtificialEdges) {
   LLVM_DEBUG(dbgs() << "Building opt_sched DAG\n");
   // The extra 2 are for the artifical root and leaf nodes.
   instCnt_ = nodeCnt_ = DAG->SUnits.size() + 2;
@@ -87,7 +88,7 @@ void OptSchedDDGWrapperBasic::convertSUnits() {
 
   // Create edges.
   for (const auto &SU : DAG->SUnits) {
-    convertEdges(SU);
+    convertEdges(SU, IgnoreRealEdges, IgnoreArtificialEdges);
   }
 
   // Add artificial root and leaf nodes and edges.
@@ -194,7 +195,7 @@ void OptSchedDDGWrapperBasic::addDefsAndUses() {
 
   // Check for any registers that are not used but are also not in LLVM's
   // live-out set.
-  // Optionally, add these registers as uses in the aritificial leaf node.
+  // Optionally, add these registers as uses in the artificial leaf node.
   for (int16_t i = 0; i < MM->GetRegTypeCnt(); i++)
     for (int j = 0; j < RegFiles[i].GetRegCnt(); j++) {
       Register *Reg = RegFiles[i].GetReg(j);
@@ -405,11 +406,25 @@ inline void OptSchedDDGWrapperBasic::setupLeaf() {
       CreateEdge_(i, LeafNum, 0, DEP_OTHER);
 }
 
-void OptSchedDDGWrapperBasic::convertEdges(const SUnit &SU) {
+void OptSchedDDGWrapperBasic::addArtificialEdges() {
+  for (const auto &SU : DAG->SUnits) {
+    convertEdges(SU, true, false);
+  }
+}
+
+void OptSchedDDGWrapperBasic::convertEdges(const SUnit &SU,
+                                           bool IgnoreRealEdges,
+                                           bool IgnoreArtificialEdges) {
   const MachineInstr *instr = SU.getInstr();
   SUnit::const_succ_iterator I, E;
   for (I = SU.Succs.begin(), E = SU.Succs.end(); I != E; ++I) {
     if (I->getSUnit()->isBoundaryNode())
+      continue;
+
+    bool IsArtificial = I->isArtificial() || I->isCluster();
+    if (IgnoreArtificialEdges && IsArtificial)
+      continue;
+    else if (IgnoreRealEdges && !IsArtificial)
       continue;
 
     DependenceType DepType;
@@ -438,7 +453,8 @@ void OptSchedDDGWrapperBasic::convertEdges(const SUnit &SU) {
     else
       Latency = 1; // unit latency = ignore ilp
 
-    CreateEdge_(SU.NodeNum, I->getSUnit()->NodeNum, Latency, DepType);
+    CreateEdge_(SU.NodeNum, I->getSUnit()->NodeNum, Latency, DepType,
+                IsArtificial);
   }
 }
 

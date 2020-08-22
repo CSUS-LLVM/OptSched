@@ -2,7 +2,7 @@
 Description:  Defines an enumerator class.
 Author:       Ghassan Shobaki
 Created:      Jun. 2002
-Last Update:  Jun. 2017
+Last Update:  Apr. 2020
 *******************************************************************************/
 
 #ifndef OPTSCHED_ENUM_ENUMERATOR_H
@@ -215,7 +215,7 @@ public:
   inline bool FoundInstWithUse();
   inline void SetFoundInstWithUse(bool foundInstWithUse);
 
-  // Get the siganture of the parial schedule up to this node
+  // Get the signature of the partial schedule up to this node
   inline InstSignature GetSig();
 
   // Get the time of this node in the schedule (total number of slots
@@ -331,11 +331,11 @@ protected:
   // A pointer to a relaxed scheduler
   RJ_RelaxedScheduler *rlxdSchdulr_;
 
-  // Array hloding the number of issue slots available for each issue type
+  // Array holding the number of issue slots available for each issue type
   // based on the target schedule length and the slots that have been taken
   InstCount avlblSlots_[MAX_ISSUTYPE_CNT];
 
-  // Array hloding the number of insructions that have not been scheduled
+  // Array holding the number of insructions that have not been scheduled
   // for each issue type
   InstCount neededSlots_[MAX_ISSUTYPE_CNT];
 
@@ -620,7 +620,7 @@ public:
 /*****************************************************************************/
 
 /******************************************************************************
-In line Functions
+Inline Functions
 ******************************************************************************/
 
 void EnumTreeNode::ChildInfsbl() {
@@ -917,6 +917,9 @@ inline void Enumerator::UpdtRdyLst_(InstCount cycleNum, int slotNum) {
   LinkedList<SchedInstruction> *lst1 = NULL;
   LinkedList<SchedInstruction> *lst2 = frstRdyLstPerCycle_[cycleNum];
 
+  if (prirts_.isDynmc)
+    rdyLst_->UpdatePriorities();
+
   if (slotNum == 0 && prevCycleNum >= 0) {
     // If at the begining of a new cycle other than the very first cycle, then
     // we also have to include the instructions that might have become ready in
@@ -965,8 +968,6 @@ inline void Enumerator::CreateNewRdyLst_() {
   ReadyList *oldLst = rdyLst_;
 
   rdyLst_ = new ReadyList(dataDepGraph_, prirts_);
-  if (rdyLst_ == NULL)
-    Logger::Fatal("Out of memory.");
 
   if (oldLst != NULL) {
     rdyLst_->CopyList(oldLst);

@@ -6,6 +6,9 @@
 import sys
 import re
 
+RE_REGION_DELIMITER = re.compile(r'INFO: \*{4,}? Opt Scheduling \*{4,}?')
+
+RE_REGION_COST_LOWER_BOUND = re.compile(r'INFO: Lower bound of cost before scheduling: (\d+)')
 RE_REGION_COST_BEST = re.compile(r"INFO: Best schedule for DAG (.*) has cost (\d+) and length (\d+). The schedule is (.*) \(Time")
 RE_REGION_COST_HEURISTIC = re.compile(r"INFO: The list schedule is of length (\d+) and spill cost (\d+). Tot cost = (\d+) \(Time")
 RE_REGION_SPILLS_BEST = re.compile(r"INFO: OPT_SCHED LOCAL RA: DAG Name: (\S+) Number of spills: (\d+) \(Time")
@@ -21,14 +24,14 @@ foundRegion = False
 
 with open(str(sys.argv[1])) as logfile:
     log1 = logfile.read()
-    blocks = log1.split("INFO: ********** Opt Scheduling **********")
+    blocks = [block for block in RE_REGION_DELIMITER.split(log1) if RE_REGION_COST_BEST.search(block)]
     for block in blocks:
-        # Assume that if this matches the block is valid.
-        if (len(RE_REGION_COST_BEST.findall(block)) == 0):
-            continue;
+        if not RE_REGION_COST_LOWER_BOUND.search(block):
+            print("WARNING: Block does not have a logged lower bound.", out=sys.stderr)
 
-        totalBlocks+=1
+        totalBlocks += 1
 
+        lowerBound = int(RE_REGION_COST_LOWER_BOUND.search(block).group(1))
         regionCostMatchB = RE_REGION_COST_BEST.findall(block)
         regionName = regionCostMatchB[0][0]
         regionCostBest = int(regionCostMatchB[0][1])
@@ -50,6 +53,7 @@ with open(str(sys.argv[1])) as logfile:
             totalMismatches+=1
             print("Found Region: "  + regionName + " With Length: " + str(regionLengthBest))
             print("Best Cost: " + str(regionCostBest) + " Heuristic Cost: " + str(regionCostHeuristic))
+            print("Best Cost (Absolute): " + (lowerBound + regionCostBest))
             print("Best Spills: " + str(regionSpillsBest) + " Heurisitc Spills: " + str(regionSpillsHeuristic))
             if (regionLengthBest < lowestLength):
                 foundRegion = True

@@ -1,0 +1,22 @@
+name: Reject Trailing Whitespace
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v2
+      with:
+        fetch-depth: 0
+
+    - name: Check Trailing Whitespace
+      # git diff --check checks the diff for any whitespace violations.
+      # By diffing HEAD against an empty tree, we are checking every file.
+      # However, we exclude .patch files, as those correctly have trailing whitespace.
+      run: git diff --check $(git hash-object -t tree /dev/null) HEAD -- ':(exclude)*.patch'

@@ -39,8 +39,6 @@ DataDepStruct::DataDepStruct(MachineModel *machMdl) {
   machMdl_ = machMdl;
   issuTypeCnt_ = (int16_t)machMdl->GetIssueTypeCnt();
   instCntPerIssuType_ = new InstCount[issuTypeCnt_];
-  if (instCntPerIssuType_ == NULL)
-    Logger::Fatal("Out of memory.");
 
   for (int16_t i = 0; i < issuTypeCnt_; i++) {
     instCntPerIssuType_[i] = 0;
@@ -100,8 +98,6 @@ InstCount DataDepStruct::CmputRsrcLwrBound_() {
 
   int *slotsPerIssuType;
   slotsPerIssuType = new int[issuTypeCnt_];
-  if (slotsPerIssuType == NULL)
-    Logger::Fatal("Out of memory.");
 
   machMdl_->GetSlotsPerCycle(slotsPerIssuType);
 
@@ -185,8 +181,6 @@ DataDepGraph::DataDepGraph(MachineModel *machMdl, LATENCY_PRECISION ltncyPrcsn)
 
   instTypeCnt_ = (int16_t)machMdl->GetInstTypeCnt();
   instCntPerType_ = new InstCount[instTypeCnt_];
-  if (instCntPerType_ == NULL)
-    Logger::Fatal("Out of memory.");
 
   for (i = 0; i < instTypeCnt_; i++) {
     instCntPerType_[i] = 0;
@@ -236,8 +230,8 @@ FUNC_RESULT DataDepGraph::SetupForSchdulng(bool cmputTrnstvClsr) {
     inst->SetMustBeInBBEntry(false);
     inst->SetMustBeInBBExit(false);
 
-    if (inst->GetUseCnt() > maxUseCnt_)
-      maxUseCnt_ = inst->GetUseCnt();
+    if (inst->NumUses() > maxUseCnt_)
+      maxUseCnt_ = inst->NumUses();
   }
 
   //  Logger::Info("Max use count = %d", maxUseCnt_);
@@ -249,10 +243,6 @@ FUNC_RESULT DataDepGraph::SetupForSchdulng(bool cmputTrnstvClsr) {
 
   frwrdLwrBounds_ = new InstCount[instCnt_];
   bkwrdLwrBounds_ = new InstCount[instCnt_];
-
-  if (frwrdLwrBounds_ == NULL || bkwrdLwrBounds_ == NULL) {
-    Logger::Fatal("Out of memory.");
-  }
 
   CmputCrtclPaths_();
 
@@ -504,8 +494,6 @@ void DataDepGraph::AllocArrays_(InstCount instCnt) {
   instCnt_ = instCnt;
   nodeCnt_ = instCnt;
   insts_ = new SchedInstruction *[instCnt_];
-  if (insts_ == NULL)
-    Logger::Fatal("Out of memory.");
   nodes_ = (GraphNode **)insts_;
 
   for (i = 0; i < instCnt_; i++) {
@@ -835,16 +823,14 @@ FUNC_RESULT DataDepGraph::SkipGraph(SpecsBuffer *buf, bool &endOfFileReached) {
 }
 
 SchedInstruction *DataDepGraph::CreateNode_(
-    InstCount instNum, char const *const instName, InstType instType,
-    char const *const opCode, int nodeID, InstCount fileSchedOrder,
+    InstCount instNum, const char *const instName, InstType instType,
+    const char *const opCode, int nodeID, InstCount fileSchedOrder,
     InstCount fileSchedCycle, InstCount fileLB, InstCount fileUB, int blkNum) {
 
   SchedInstruction *newInstPtr;
   newInstPtr = new SchedInstruction(instNum, instName, instType, opCode,
                                     2 * instCnt_, nodeID, fileSchedOrder,
                                     fileSchedCycle, fileLB, fileUB, machMdl_);
-  if (newInstPtr == NULL)
-    Logger::Fatal("Out of memory.");
   if (instNum < 0 || instNum >= instCnt_)
     Logger::Fatal("Invalid instruction number");
   //  Logger::Info("Instruction order = %d, instCnt_ = %d", fileSchedOrder,
@@ -863,7 +849,6 @@ void DataDepGraph::CreateEdge(SchedInstruction *frmNode,
 #if defined(IS_DEBUG) || defined(IS_DEBUG_DAG)
   InstCount frmNodeNum = frmNode->GetNum();
   InstCount toNodeNum = toNode->GetNum();
-#endif
 
 #ifdef IS_DEBUG_DAG
   Logger::Info("Creating extra edge from %d to %d of type %d and latency %d",
@@ -875,6 +860,7 @@ void DataDepGraph::CreateEdge(SchedInstruction *frmNode,
 
   assert(toNodeNum < instCnt_);
   assert(nodes_[toNodeNum] != NULL);
+#endif
 
 #ifdef IS_DEBUG_LATENCIES
   stats::dependenceTypeLatencies.Add(GetDependenceTypeName(depType), ltncy);
@@ -903,8 +889,6 @@ void DataDepGraph::CreateEdge(SchedInstruction *frmNode,
   }
 
   GraphEdge *newEdg = new GraphEdge(frmNode, toNode, ltncy, depType);
-  if (newEdg == NULL)
-    Logger::Fatal("Out of memory.");
 
   frmNode->AddScsr(newEdg);
   toNode->AddPrdcsr(newEdg);
@@ -915,7 +899,8 @@ void DataDepGraph::CreateEdge(SchedInstruction *frmNode,
 }
 
 void DataDepGraph::CreateEdge_(InstCount frmNodeNum, InstCount toNodeNum,
-                               int ltncy, DependenceType depType) {
+                               int ltncy, DependenceType depType,
+                               bool IsArtificial) {
   GraphEdge *edge;
 
   assert(frmNodeNum < instCnt_);
@@ -944,9 +929,7 @@ void DataDepGraph::CreateEdge_(InstCount frmNodeNum, InstCount toNodeNum,
     Logger::Info("Creating edge from %d to %d of type %d and latency %d",
                  frmNodeNum, toNodeNum, depType, ltncy);
 #endif
-    edge = new GraphEdge(frmNode, toNode, ltncy, depType);
-    if (edge == NULL)
-      Logger::Fatal("Out of memory.");
+    edge = new GraphEdge(frmNode, toNode, ltncy, depType, IsArtificial);
 
     frmNode->AddScsr(edge);
     toNode->AddPrdcsr(edge);
@@ -1116,7 +1099,7 @@ void DataDepGraph::WriteDepInfoToF2File_(FILE *file) {
     DependenceType depType;
     for (SchedInstruction *scsr = inst->GetFrstScsr(NULL, &ltncy, &depType);
          scsr != NULL; scsr = inst->GetNxtScsr(NULL, &ltncy, &depType)) {
-      char const *bareDepTypeName = GetDependenceTypeName(depType);
+      const char *bareDepTypeName = GetDependenceTypeName(depType);
       int bareDepTypeLngth = strlen(bareDepTypeName);
       char depTypeName[MAX_NAMESIZE];
       addDblQuotes(bareDepTypeName, bareDepTypeLngth, depTypeName);
@@ -1200,7 +1183,7 @@ void DataDepGraph::CmputCrtclPathsFrmRcrsvScsr_(SchedInstruction *ref) {
 }
 
 void DataDepGraph::PrintLwrBounds(DIRECTION dir, std::ostream &out,
-                                  char const *const title) {
+                                  const char *const title) {
   out << '\n' << title;
   for (InstCount i = 0; i < instCnt_; i++) {
     out << "\nLB(" << i << ")= " << insts_[i]->GetLwrBound(dir);
@@ -1334,8 +1317,6 @@ DataDepSubGraph::DataDepSubGraph(DataDepGraph *fullGraph, InstCount maxInstCnt,
   subType_ = SGT_DISC;
 
   insts_ = new SchedInstruction *[maxInstCnt_];
-  if (insts_ == NULL)
-    Logger::Fatal("Out of memory.");
 
   for (i = 0; i < maxInstCnt; i++) {
     insts_[i] = NULL;
@@ -1363,19 +1344,12 @@ DataDepSubGraph::DataDepSubGraph(DataDepGraph *fullGraph, InstCount maxInstCnt,
 
   rootVctr_ = new BitVector(fullGraph_->GetInstCnt());
   leafVctr_ = new BitVector(fullGraph_->GetInstCnt());
-  if (rootVctr_ == NULL || leafVctr_ == NULL) {
-    Logger::Fatal("Out of memory.");
-  }
 
   numToIndx_ = new InstCount[fullGraph_->GetInstCnt()];
-  if (numToIndx_ == NULL)
-    Logger::Fatal("Out of memory.");
 
   fxdLst_ = NULL;
 
   lostInsts_ = new Stack<LostInst>;
-  if (lostInsts_ == NULL)
-    Logger::Fatal("Out of memory.");
 
   for (i = 0; i < fullGraph_->GetInstCnt(); i++) {
     numToIndx_[i] = INVALID_VALUE;
@@ -1437,8 +1411,6 @@ void DataDepSubGraph::SetupForDynmcLwrBounds(InstCount schedUprBound) {
 
   dynmcRlxdSchdulr_ = new RJ_RelaxedScheduler(
       this, machMdl_, subGraphUprBound, DIR_FRWRD, RST_SUBDYNMC, maxInstCnt_);
-  if (dynmcRlxdSchdulr_ == NULL)
-    Logger::Fatal("Out of memory.");
 
   AllocDynmcData_();
 }
@@ -1447,25 +1419,13 @@ void DataDepSubGraph::AllocSttcData_() {
   frwrdCrtclPaths_ = new InstCount[maxInstCnt_];
   bkwrdCrtclPaths_ = new InstCount[maxInstCnt_];
 
-  if (frwrdCrtclPaths_ == NULL || bkwrdCrtclPaths_ == NULL) {
-    Logger::Fatal("Out of memory.");
-  }
-
   frwrdLwrBounds_ = new InstCount[maxInstCnt_];
   bkwrdLwrBounds_ = new InstCount[maxInstCnt_];
-
-  if (frwrdLwrBounds_ == NULL || bkwrdLwrBounds_ == NULL) {
-    Logger::Fatal("Out of memory.");
-  }
 }
 
 void DataDepSubGraph::AllocDynmcData_() {
   dynmcFrwrdLwrBounds_ = new InstCount[maxInstCnt_];
   dynmcBkwrdLwrBounds_ = new InstCount[maxInstCnt_];
-
-  if (dynmcFrwrdLwrBounds_ == NULL || dynmcBkwrdLwrBounds_ == NULL) {
-    Logger::Fatal("Out of memory.");
-  }
 }
 
 // Called before lower bound computation after all instructions have been added
@@ -1563,16 +1523,12 @@ void DataDepSubGraph::CreateRootAndLeafInsts_() {
   rootInst_ =
       new SchedInstruction(INVALID_VALUE, "root", instType, " ", maxInstCnt_, 0,
                            INVALID_VALUE, INVALID_VALUE, 0, 0, machMdl_);
-  if (rootInst_ == NULL)
-    Logger::Fatal("Out of memory.");
 
   rootInst_->SetIssueType(issuType);
 
   leafInst_ =
       new SchedInstruction(INVALID_VALUE, "leaf", instType, " ", maxInstCnt_, 0,
                            INVALID_VALUE, INVALID_VALUE, 0, 0, machMdl_);
-  if (leafInst_ == NULL)
-    Logger::Fatal("Out of memory.");
 
   leafInst_->SetIssueType(issuType);
 
@@ -1724,8 +1680,6 @@ void DataDepSubGraph::InstLost(SchedInstruction *inst) {
   InstCount instIndx = numToIndx_[instNum];
   assert(instIndx != INVALID_VALUE);
   LostInst *lostInst = new LostInst;
-  if (lostInst == NULL)
-    Logger::Fatal("Out of memory.");
 
   lostInst->inst = inst;
   lostInst->indx = instIndx;
@@ -1875,8 +1829,6 @@ void DataDepSubGraph::CreateEdge_(SchedInstruction *frmInst,
 
   //  assert(frmInst==rootInst_ || toInst==leafInst_);
   GraphEdge *newEdg = new GraphEdge(frmNode, toNode, 1);
-  if (newEdg == NULL)
-    Logger::Fatal("Out of memory.");
 
   if (toInst != leafInst_) {
     frmNode->ApndScsr(newEdg);
@@ -2034,10 +1986,6 @@ void DataDepSubGraph::AllocRlxdSchdulr_(LB_ALG lbAlg,
         new LC_RelaxedScheduler(this, machMdl_, schedUprBound_, DIR_BKWRD);
     rlxdSchdulr = LCRlxdSchdulr_;
     rvrsRlxdSchdulr = LCRvrsRlxdSchdulr_;
-  }
-
-  if (rlxdSchdulr == NULL || rvrsRlxdSchdulr == NULL) {
-    Logger::Fatal("Out of memory.");
   }
 }
 
@@ -2659,11 +2607,6 @@ InstSchedule::InstSchedule(MachineModel *machMdl, DataDepGraph *dataDepGraph,
   spillCosts_ = new InstCount[totInstCnt_];
   peakRegPressures_ = new InstCount[machMdl->GetRegTypeCnt()];
 
-  if (instInSlot_ == NULL || slotForInst_ == NULL || spillCosts_ == NULL ||
-      peakRegPressures_ == NULL) {
-    Logger::Fatal("Out of memory.");
-  }
-
   InstCount i;
 
   for (i = 0; i < totInstCnt_; i++) {
@@ -2855,7 +2798,7 @@ void InstSchedule::SetSpillCandidateCount(int spillCnddtCnt) {
 }
 
 // TODO(austin) move logger print of schedule to different function
-void InstSchedule::Print(std::ostream &out, char const *const label) {
+void InstSchedule::Print(std::ostream &out, const char *const label) {
   InstCount slotInCycle = 0;
   InstCount cycleNum = 0;
   InstCount i;
@@ -3030,8 +2973,15 @@ bool InstSchedule::VerifyDataDeps_(DataDepGraph *dataDepGraph) {
 
     UDT_GLABEL ltncy;
     DependenceType depType;
-    for (SchedInstruction *scsr = inst->GetFrstScsr(NULL, &ltncy, &depType);
-         scsr != NULL; scsr = inst->GetNxtScsr(NULL, &ltncy, &depType)) {
+    bool IsArtificial;
+    for (SchedInstruction *scsr =
+             inst->GetFrstScsr(NULL, &ltncy, &depType, &IsArtificial);
+         scsr != NULL;
+         scsr = inst->GetNxtScsr(NULL, &ltncy, &depType, &IsArtificial)) {
+      // Artificial edges are not required for the schedule to be correct
+      if (IsArtificial)
+        continue;
+
       InstCount scsrCycle = GetSchedCycle(scsr);
       if (scsrCycle < (instCycle + ltncy)) {
         Logger::Error("Invalid schedule: Latency from %d to %d not satisfied",
@@ -3131,12 +3081,6 @@ SchedInstruction *DataDepGraph::GetRootInst() {
 
 SchedInstruction *DataDepGraph::GetLeafInst() {
   return (SchedInstruction *)leaf_;
-}
-
-void DataDepGraph::AddNode_(SchedInstruction *instPtr, InstCount instNum) {
-  assert(instNum < instCnt_);
-  insts_[instNum] = instPtr;
-  instPtr->SetNum(instNum);
 }
 
 void DataDepGraph::CmputCrtclPathsFrmRoot_() {
@@ -3256,20 +3200,19 @@ bool DataDepGraph::DoesFeedUser(SchedInstruction *inst) {
   for (GraphNode *succ = rcrsvSuccs->GetFrstElmnt(); succ != NULL;
        succ = rcrsvSuccs->GetNxtElmnt()) {
     SchedInstruction *succInst = static_cast<SchedInstruction *>(succ);
-    
+
     int curInstAdjUseCnt = succInst->GetAdjustedUseCnt();
     // Ignore successor instructions that does not close live intervals
     if (curInstAdjUseCnt == 0)
       continue;
     // Ignore instructions that open more live intervals than
     // it closes because it will increase register pressure instead.
-    else if (curInstAdjUseCnt < succInst->GetDefCnt())
+    else if (curInstAdjUseCnt < succInst->NumDefs())
       continue;
 
     // If there is a successor instruction that decreases live intervals
     // or one that does not increase live intervals, then return true.
     return true;
-
   }
 // Return false if there is no recursive successor of inst
 // that uses a live register.

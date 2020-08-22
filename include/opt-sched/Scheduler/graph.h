@@ -49,11 +49,15 @@ struct GraphEdge {
   UDT_GEDGES predOrder;
   // The second node's order in the first node's successor list.
   UDT_GEDGES succOrder;
+  // Whether or not the edge is an artificial dependency meaning it isn't
+  // required to be correct
+  bool IsArtificial;
 
   // Creates an edge between two nodes with labels label and label2.
   GraphEdge(GraphNode *from, GraphNode *to, UDT_GLABEL label,
-            UDT_GLABEL label2 = 0)
-      : from(from), to(to), label(label), label2(label2) {}
+            UDT_GLABEL label2 = 0, bool IsArtificial = false)
+      : from(from), to(to), label(label), label2(label2),
+        IsArtificial(IsArtificial) {}
 
   // Returns the node on the other side of the edge from the provided node.
   // Assumes that the argument is one of the nodes on the sides of the edge.
@@ -155,11 +159,11 @@ public:
   bool IsScsrDmntd(GraphNode *cnddtDmnnt);
 
   // Returns the sum of the labels of edges from this node to its successors.
-  // This value is not synamically calculated and is adjusted only through
+  // This value is not dynamically calculated and is adjusted only through
   // AddScsr().
   UDT_GLABEL GetScsrLblSum() const;
   // Returns the sum of the labels of edges from this node to its
-  // predecessors. This value is not synamically calculated and is adjusted
+  // predecessors. This value is not dynamically calculated and is adjusted
   // only through AddPrdcsr().
   UDT_GLABEL GetPrdcsrLblSum() const;
   // Returns the topological order of this node which was calculated by
@@ -172,8 +176,6 @@ public:
   void SetColor(GNODE_COLOR color);
   // Returns the color of this node.
   GNODE_COLOR GetColor() const;
-  // Sets the number (label) of the node.
-  void SetNum(UDT_GNODES num);
   // Returns the number (label) of the node.
   UDT_GNODES GetNum() const;
 
@@ -212,7 +214,14 @@ public:
   // info log.
   void LogScsrLst();
 
-protected:
+  // Returns the number of predecessors in this instruction's transitive
+  // closure (i.e. total number of ancestors).
+  UDT_GEDGES GetRcrsvPrdcsrCnt() const;
+  // Returns the number of successors in this instruction's transitive
+  // closure (i.e. total number of descendants).
+  UDT_GEDGES GetRcrsvScsrCnt() const;
+
+private:
   // The node number. Should be unique within a single graph.
   UDT_GNODES num_;
   // A list of the immediate successors of this node.
@@ -242,10 +251,34 @@ protected:
   // The color of this node, to be used during traversal.
   GNODE_COLOR color_;
 
+protected:
   // TODO(max): Document what this is.
   bool FindScsr_(GraphNode *&crntScsr, UDT_GNODES trgtNum, UDT_GLABEL trgtLbl);
   // Actually implements the functionality of FindRcrsvNghbrs().
   void FindRcrsvNghbrs_(GraphNode *root, DIRECTION dir, DirAcycGraph *graph);
+
+  // Returns the node's predecessor or successor list, depending on
+  // the specified direction.
+  LinkedList<GraphEdge> *GetNghbrLst(DIRECTION dir);
+
+  // Returns a pointer to the edge for the first successor of the node. Sets the
+  // successor iterator.
+  GraphEdge *GetFrstScsrEdge();
+  // Returns a pointer to the edge for the next successor of the node. Must be
+  // called after GetFrstScsr() or GetFrstScsrEdge(), which starts the successor
+  // iterator.
+  GraphEdge *GetNxtScsrEdge();
+  GraphEdge *GetLastScsrEdge();
+  GraphEdge *GetPrevScsrEdge();
+  // Returns a pointer to the edge for the first predecessor of the node. Sets
+  // the predecessor iterator.
+  GraphEdge *GetFrstPrdcsrEdge();
+  // Returns a pointer to the edge for the next predecessor of the node. Must be
+  // called after GetFrstPrdcsr() or GetFrstPrdcsrEdge(), which starts the
+  // predecessor iterator.
+  GraphEdge *GetNxtPrdcsrEdge();
+  GraphEdge *GetLastPrdcsrEdge();
+  GraphEdge *GetPrevPrdcsrEdge();
 };
 
 // TODO(max): Make this class actually useful by providing a way to add nodes
@@ -394,8 +427,6 @@ inline GNODE_COLOR GraphNode::GetColor() const { return color_; }
 
 inline UDT_GNODES GraphNode::GetNum() const { return num_; }
 
-inline void GraphNode::SetNum(UDT_GNODES num) { num_ = num; }
-
 inline GraphNode *GraphNode::GetFrstScsr(UDT_GLABEL &label) {
   GraphEdge *edge = scsrLst_->GetFrstElmnt();
   if (edge == NULL)
@@ -474,6 +505,50 @@ inline bool GraphNode::IsRcrsvNghbr(DIRECTION dir, GraphNode *node) const {
   } else {
     return IsRcrsvPrdcsr(node);
   }
+}
+
+inline UDT_GEDGES GraphNode::GetRcrsvPrdcsrCnt() const {
+  return rcrsvPrdcsrLst_->GetElmntCnt();
+}
+
+inline UDT_GEDGES GraphNode::GetRcrsvScsrCnt() const {
+  return rcrsvScsrLst_->GetElmntCnt();
+}
+
+inline LinkedList<GraphEdge> *GraphNode::GetNghbrLst(DIRECTION dir) {
+  return dir == DIR_FRWRD ? prdcsrLst_ : scsrLst_;
+}
+
+inline GraphEdge *GraphNode::GetFrstScsrEdge() {
+  return scsrLst_->GetFrstElmnt();
+}
+
+inline GraphEdge *GraphNode::GetNxtScsrEdge() {
+  return scsrLst_->GetNxtElmnt();
+}
+
+inline GraphEdge *GraphNode::GetLastScsrEdge() {
+  return scsrLst_->GetLastElmnt();
+}
+
+inline GraphEdge *GraphNode::GetPrevScsrEdge() {
+  return scsrLst_->GetPrevElmnt();
+}
+
+inline GraphEdge *GraphNode::GetFrstPrdcsrEdge() {
+  return prdcsrLst_->GetFrstElmnt();
+}
+
+inline GraphEdge *GraphNode::GetNxtPrdcsrEdge() {
+  return prdcsrLst_->GetNxtElmnt();
+}
+
+inline GraphEdge *GraphNode::GetLastPrdcsrEdge() {
+  return prdcsrLst_->GetLastElmnt();
+}
+
+inline GraphEdge *GraphNode::GetPrevPrdcsrEdge() {
+  return prdcsrLst_->GetPrevElmnt();
 }
 
 inline DIRECTION DirAcycGraph::ReverseDirection(DIRECTION dir) {

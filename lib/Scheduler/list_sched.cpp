@@ -14,8 +14,6 @@ ListScheduler::ListScheduler(DataDepGraph *dataDepGraph, MachineModel *machMdl,
 
   prirts_ = prirts;
   rdyLst_ = new ReadyList(dataDepGraph_, prirts);
-  if (rdyLst_ == NULL)
-    Logger::Fatal("Out of memory.");
 }
 
 ListScheduler::~ListScheduler() { delete rdyLst_; }

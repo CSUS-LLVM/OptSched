@@ -169,12 +169,12 @@ logFile = {}
 
 #Add all log files
 logFile['ALL'] = [
-	'adpcm',
-	'epic',
-	'g721',
-	'gsm',
-	'jpeg',
-	'pegwit'
+        'adpcm',
+        'epic',
+        'g721',
+        'gsm',
+        'jpeg',
+        'pegwit'
 ]
 
 #Add log files individually
@@ -197,9 +197,9 @@ SPILLS_REGEX = re.compile(r'Function: (.*?)\nGREEDY RA: Number of spilled live r
 SPILLS_WEIGHTED_REGEX = re.compile(r'SC in Function (.*?) (-?\d+)')
 TIMES_REGEX = re.compile(r'(\d+) total seconds elapsed')
 BLOCK_NAME_AND_SIZE_REGEX = re.compile(r'Processing DAG (.*) with (\d+) insts')
-BLOCK_NOT_ENUMERATED_REGEX = re.compile(r'The list schedule .* is optimal')
-BLOCK_ZERO_TIME_LIMIT = re.compile(r'Bypassing optimal scheduling due to zero time limit')
 BLOCK_ENUMERATED_OPTIMAL_REGEX = re.compile(r'DAG solved optimally')
+BLOCK_ENUMERATED_REGEX = re.compile(r'Enumerating at target length (\d+)')
+BLOCK_COST_LOWER_BOUND_REGEX = re.compile(r'Lower bound of cost before scheduling: (\d+)')
 BLOCK_COST_REGEX = re.compile(r'list schedule is of length \d+ and spill cost \d+. Tot cost = (\d+)')
 BLOCK_IMPROVEMENT_REGEX = re.compile(r'cost imp=(\d+)')
 BLOCK_START_TIME_REGEX = re.compile(r'-{20} \(Time = (\d+) ms\)')
@@ -244,19 +244,19 @@ def writeStats(stats, spills, weighted, times, blocks, regp, trackOptSchedSpills
     # Write the weighted spill stats
     if weighted:
         with open(weighted, 'w') as weighted_file:
-	    totalWeightedSpills = 0
+            totalWeightedSpills = 0
             for benchName in stats:
-		totalWeightedSpillsPerBenchmark = 0
+                totalWeightedSpillsPerBenchmark = 0
                 weighted_file.write('%s:\n' % benchName)
-		weightedSpills = stats[benchName]['spills']['weightedSpills']
+                weightedSpills = stats[benchName]['spills']['weightedSpills']
                 for functionName in weightedSpills:
-		    weightedSpillCount = weightedSpills[functionName]
-		    totalWeightedSpillsPerBenchmark += weightedSpillCount
+                    weightedSpillCount = weightedSpills[functionName]
+                    totalWeightedSpillsPerBenchmark += weightedSpillCount
                     weighted_file.write('      %5d %s\n' %
                                       (weightedSpillCount, functionName))
                 weighted_file.write('  ---------\n')
                 weighted_file.write('  Sum:%5d\n\n' % totalWeightedSpillsPerBenchmark)
-		totalWeightedSpills += totalWeightedSpillsPerBenchmark
+                totalWeightedSpills += totalWeightedSpillsPerBenchmark
             weighted_file.write('------------\n')
             weighted_file.write('Total:%5d\n' % totalWeightedSpills)
 
@@ -626,11 +626,11 @@ def calculateBlockStats(output, trackOptSchedSpills):
                 else:
                     optSchedSpills = 0
 
-                listCost = int(BLOCK_COST_REGEX.findall(block)[0])
+                costLwrBound = int(BLOCK_COST_LOWER_BOUND_REGEX.search(block).group(1))
+                listCost = costLwrBound + int(BLOCK_COST_REGEX.findall(block)[0])
                 # The block is not enumerated if the list schedule is optimal or there is a zero
                 # time limit for enumeration.
-                isEnumerated = (BLOCK_NOT_ENUMERATED_REGEX.findall(block) == []) and (
-                    BLOCK_ZERO_TIME_LIMIT.findall(block) == [])
+                isEnumerated = (BLOCK_ENUMERATED_REGEX.findall(block) != [])
                 if isEnumerated:
                     isOptimal = bool(
                         BLOCK_ENUMERATED_OPTIMAL_REGEX.findall(block))
@@ -668,8 +668,8 @@ def calculateBlockStats(output, trackOptSchedSpills):
             for line in blocks[index].split('\n')[1:-1][:10]:
                 print '   ', line
 
-				
-				
+
+
     return stats
 
 
@@ -697,16 +697,16 @@ def calculateSpills(output):
     # Get and record the number of spills using a regular expression
     for functionName, spillCountString in SPILLS_REGEX.findall(output):
         numOfSpills[functionName] = int(spillCountString)
-		
+
     # Get and record the number of weighted spills using a regular expression
     for functionName, weightedSpillCount in SPILLS_WEIGHTED_REGEX.findall(output):
-	weightedSpills[functionName] = int(weightedSpillCount)
+        weightedSpills[functionName] = int(weightedSpillCount)
 
     # Insert the spills and weighted spills into the spills dictionary variable
     spills['spills'] = numOfSpills
     spills['weightedSpills'] = weightedSpills
-    
-	
+
+
     return spills
 
 
@@ -775,36 +775,36 @@ def main(args):
     # Parse a log file or multiple log files instead of running benchmark
     results = {}
     if args.logfile is not None:
-	logArgs = args.logfile.split(',')
-	logfiles = []
-	for logArg in logArgs:
-		if logArg not in logFile:
-			print 'Fatal: Unknown log file specified: "%s".' % logArg
-			if logArg == 'all':
-				print 'Did you mean ALL?'
-			sys.exit(1)
+        logArgs = args.logfile.split(',')
+        logfiles = []
+        for logArg in logArgs:
+            if logArg not in logFile:
+                print 'Fatal: Unknown log file specified: "%s".' % logArg
+                if logArg == 'all':
+                    print 'Did you mean ALL?'
+                sys.exit(1)
 
-		logfiles = list(set(logfiles + logFile[logArg]))
+            logfiles = list(set(logfiles + logFile[logArg]))
 
         for log in logfiles:
-		with open('./' + log + '/' + log + '.log') as log_file:
-			output = log_file.read()
-			results[log] = getBenchmarkResult(output, args.trackOptSchedSpills)
+            with open('./' + log + '/' + log + '.log') as log_file:
+                output = log_file.read()
+                results[log] = getBenchmarkResult(output, args.trackOptSchedSpills)
 
-		spills = os.path.join(args.outdir, args.spills)
-		weighted = os.path.join(args.outdir, args.weighted)
-	        times = os.path.join(args.outdir, args.times)
-        	blocks = os.path.join(args.outdir, args.blocks)
+            spills = os.path.join(args.outdir, args.spills)
+            weighted = os.path.join(args.outdir, args.weighted)
+            times = os.path.join(args.outdir, args.times)
+            blocks = os.path.join(args.outdir, args.blocks)
 
-		if args.regp:
-	            	regp = os.path.join(testOutDir, args.regp)
-        	else:
-            		regp = None
+            if args.regp:
+                regp = os.path.join(testOutDir, args.regp)
+            else:
+                regp = None
 
-        	# Write out the results from the logfile.
-        	writeStats(results, spills, weighted, times, blocks, regp, args.trackOptSchedSpills)
+            # Write out the results from the logfile.
+            writeStats(results, spills, weighted, times, blocks, regp, args.trackOptSchedSpills)
 
-	# Run the benchmarks and collect results.
+        # Run the benchmarks and collect results.
     else:
         # Create a directory for the test results.
         if not os.path.exists(args.outdir):
@@ -919,5 +919,3 @@ if __name__ == '__main__':
                       help='Should the simulated number of spills per-block be tracked (%default).')
 
     main(parser.parse_args()[0])
-
-

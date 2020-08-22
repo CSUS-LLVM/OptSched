@@ -80,7 +80,7 @@ collectVirtualRegUses(const MachineInstr &MI, const LiveIntervals &LIS,
     if (!MO.isUse() || !MO.readsReg())
       continue;
 
-    auto const UsedMask = getUsedRegMask(MO, MRI, LIS);
+    const auto UsedMask = getUsedRegMask(MO, MRI, LIS);
 
     auto Reg = MO.getReg();
     auto I =
@@ -104,7 +104,7 @@ collectVirtualRegDefs(const MachineInstr &MI, const LiveIntervals &LIS,
         MO.isDead())
       continue;
 
-    auto const DefMask = getDefRegMask(MO, MRI);
+    const auto DefMask = getDefRegMask(MO, MRI);
 
     auto Reg = MO.getReg();
     auto I =

@@ -2,8 +2,12 @@
 #include "opt-sched/Scheduler/bit_vector.h"
 #include "opt-sched/Scheduler/logger.h"
 #include "opt-sched/Scheduler/register.h"
+#include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/STLExtras.h"
+#include "llvm/ADT/SmallVector.h"
+#include <algorithm>
 #include <list>
+#include <vector>
 
 using namespace llvm::opt_sched;
 
@@ -167,13 +171,13 @@ bool StaticNodeSupTrans::NodeIsSuperior_(SchedInstruction *nodeA,
 
   // For every virtual register that belongs to the Use set of B but does not
   // belong to the Use set of A
-  // there must be at least one instruction C that is distint from A nad B and
+  // there must be at least one instruction C that is distinct from A and B and
   // belongs to the
-  // recurisve sucessor lits of both A and B.
+  // recursive successor lits of both A and B.
   //
-  // For every vitrual register that would have its live range lengthened by
+  // For every virtual register that would have its live range lengthened by
   // scheduling B after A,
-  // there must be a register of the same time that would have its live range
+  // there must be a register of the same type that would have its live range
   // shortened by scheduling
   // A before B.
 
@@ -181,124 +185,93 @@ bool StaticNodeSupTrans::NodeIsSuperior_(SchedInstruction *nodeA,
   // of A.
   // TODO (austin) modify wrapper code so it is easier to identify physical
   // registers.
-  Register **usesA;
-  Register **usesB;
-  // Register **usesC;
-  int useCntA = nodeA->GetUses(usesA);
-  int useCntB = nodeB->GetUses(usesB);
-  // Register used by B but not by A.
-  std::list<Register *> usesOnlyB;
-  // A list of registers that will have their live range lengthened
-  // by scheduling B after A.
-  std::list<Register *> lengthenedLiveRegisters;
-  // The number of registers that will be lengthened by
-  // scheduling B after A. Indexed by register type.
-  std::vector<InstCount> lengthenedByB(graph->GetRegTypeCnt());
-  std::fill(lengthenedByB.begin(), lengthenedByB.end(), 0);
-  // The total number of live ranges that could be lengthened by
-  // scheduling B after A.
-  // InstCount totalLengthenedByB = 0;
+  const int regTypes = graph->GetRegTypeCnt();
 
-  for (int i = 0; i < useCntB; i++) {
-    Register *useB = usesB[i];
-    // Flag for determining whether useB is used by node A.
-    bool usedByA = false;
-    for (int j = 0; j < useCntA; j++) {
-      Register *useA = usesA[j];
-      if (useA == useB) {
-        usedByA = true;
-        break;
-      }
-    }
-    if (!usedByA) {
-#ifdef IS_DEBUG_GRAPH_TRANS
-      Logger::Info("Found reg used by nodeB but not nodeA");
-#endif
+  const llvm::ArrayRef<const Register *> usesA = nodeA->GetUses();
+  const llvm::ArrayRef<const Register *> usesB = nodeB->GetUses();
 
-      // For this register did we find a user C that is a successor of
-      // A and B.
-      bool foundC = false;
-      for (const SchedInstruction *user : useB->GetUseList()) {
-        if (user != nodeB &&
-            nodeB->IsRcrsvScsr(const_cast<SchedInstruction *>(user))) {
-          foundC = true;
-          break;
-        }
-      }
-      if (!foundC) {
-#ifdef IS_DEBUG_GRAPH_TRANS
-        Logger::Info("Found register that has its live range lengthend by "
-                     "scheduling B after A");
-#endif
-        return false;
-        // lengthenedByB[useB->GetType()]++;
-        // totalLengthenedByB++;
-      }
-    }
-  }
-  /*
-    for (int j = 0; j < useCntA && totalLengthenedByB > 0; j++) {
-      Register *useA = usesA[j];
+  const llvm::ArrayRef<const Register *> defsA = nodeA->GetDefs();
+  const llvm::ArrayRef<const Register *> defsB = nodeB->GetDefs();
 
-      if (lengthenedByB[useA->GetType()] < 1)
-        continue;
+  // (# lengthened registers) - (# shortened registers)
+  // from scheduling B after A. Indexed by register type.
+  llvm::SmallVector<int, 10> amountLengthenedBySwap(regTypes);
 
-      // Try to find an instruction that must be scheduled after A
-      // that uses register "useA".
-      bool foundLaterUse = false;
-      for (const SchedInstruction *user : useA->GetUseList()) {
-        // If "nodeA" is not a recursive predecessor of "user" nodeA is not the
-        // last
-        // user of this register.
-        if (user != nodeA &&
-            !nodeA->IsRcrsvPrdcsr(const_cast<SchedInstruction *>(user))) {
-          foundLaterUse = true;
-          break;
-        }
-      }
+  // With B after A, some Use registers' live ranges might be lengthened. If it
+  // could be lengthened, we must assume that it will be lengthened.
+  auto bUsesLengthened =
+      llvm::make_filter_range(usesB, [&](const Register *useB) {
+        // Is this register also used by A?
+        // If so, reordering A and B would have no effect on this register's
+        // live range.
+        const bool usedByA = llvm::find(usesA, useB) != usesA.end();
+        // If this register isn't used by A, is it at least used
+        // by some successor? If so, reordering A and B would have no effect on
+        // this register's live range, as it must live until C.
+        const auto usedByC = [&] {
+          return llvm::any_of(
+              useB->GetUseList(), [&](const SchedInstruction *user) {
+                // Given: [... B ... A ...]
+                // We need to prove that the register `useB` won't be used by an
+                // instruction before A but after B. In the hypothetical
+                // schedule we are considering, A currently appears after B.
+                // Thus, it is sufficient to show that this register has a user
+                // C that is a successor of A.
+                //
+                // This is more relaxed than showing that C is a successor of B,
+                // as RcrsvScsr(B) is a subset of RcrsvScsr(A).
+                return user != nodeB &&
+                       nodeA->IsRcrsvScsr(const_cast<SchedInstruction *>(user));
+              });
+        };
 
-      if (!foundLaterUse) {
-        lengthenedByB[useA->GetType()]--;
-        totalLengthenedByB--;
-      }
-    }
+        return !usedByA && !usedByC();
+      });
 
-    if (totalLengthenedByB > 0) {
-  #ifdef IS_DEBUG_GRAPH_TRANS
-      Logger::Info("Live range condition 1 failed");
-  #endif
-      return false;
-    }
-  */
-
-  // For each register type, the number of registers defined by A is less than
-  // or equal to the number of registers defined by B.
-  Register **defsA;
-  Register **defsB;
-  int defCntA = nodeA->GetDefs(defsA);
-  int defCntB = nodeB->GetDefs(defsB);
-  int regTypes = graph->GetRegTypeCnt();
-  vector<InstCount> regTypeDefsA(regTypes);
-  vector<InstCount> regTypeDefsB(regTypes);
-
-  for (int i = 0; i < defCntA; i++)
-    regTypeDefsA[defsA[i]->GetType()]++;
-
-  for (int i = 0; i < defCntB; i++)
-    regTypeDefsB[defsB[i]->GetType()]++;
-
-  for (int i = 0; i < regTypes; i++) {
-    // Logger::Info("Def count A for Type %d is %d and B is %d", i,
-    // regTypeDefsA[i], regTypeDefsB[i]);
-    if (regTypeDefsA[i] > regTypeDefsB[i]) {
-#ifdef IS_DEBUG_GRAPH_TRANS
-      Logger::Info("Live range condition 2 failed");
-#endif
-      return false;
-    }
+  for (const Register *bLastUse : bUsesLengthened) {
+    ++amountLengthenedBySwap[bLastUse->GetType()];
   }
 
-  return true;
+  // For A's uses, we need to find registers whose live ranges are definitely
+  // shortened. Possibly shortened isn't enough.
+  auto aUsesShortened =
+      llvm::make_filter_range(usesA, [&](const Register *reg) {
+        // A given register definitely has its live range shortened if its last
+        // use is A.
+        // A must be the last use of R if every user of R is a recursive
+        // predecessor of A or A itself.
+        // However, we can relax this to recursive predecessor of B, since B
+        // appears before A's final destination after the swap.
+        // This is a strict relaxation, as RecPred(A) is a subset of RecPred(B).
+        const auto &regUses = reg->GetUseList();
+
+        return llvm::all_of(regUses, [&](const SchedInstruction *user) {
+          // If this register is used both by A and by B, then its live range
+          // will not be shortened.
+          if (user == nodeB) {
+            return false;
+          }
+
+          return user == nodeA ||
+                 nodeB->IsRcrsvPrdcsr(const_cast<SchedInstruction *>(user));
+        });
+      });
+  for (const Register *aLastUse : aUsesShortened) {
+    --amountLengthenedBySwap[aLastUse->GetType()];
+  }
+
+  // Every register defined by A is moved earlier, lengthening their live ranges
+  for (const Register *reg : defsA) {
+    ++amountLengthenedBySwap[reg->GetType()];
+  }
+
+  // Every register defined by B is moved later, shortening their live ranges
+  for (const Register *reg : defsB) {
+    --amountLengthenedBySwap[reg->GetType()];
+  }
+
+  return llvm::all_of(amountLengthenedBySwap,
+                      [](int netLengthened) { return netLengthened <= 0; });
 }
 
 void StaticNodeSupTrans::nodeMultiPass_(

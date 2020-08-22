@@ -167,7 +167,7 @@ protected:
 };
 
 // TODO(max): Find out what this really is.
-// The Data Dependence Graph is a sepcial case of a DAG and a special case of
+// The Data Dependence Graph is a special case of a DAG and a special case of
 // a Data Dependence Structure as well
 class DataDepGraph : public llvm::opt_sched::OptSchedDDGWrapperBase,
                      public DirAcycGraph,
@@ -245,12 +245,12 @@ public:
 
   bool UseFileBounds();
   void PrintLwrBounds(DIRECTION dir, std::ostream &out,
-                      char const *const title);
+                      const char *const title);
   void RestoreAbsoluteBounds();
 
   void PrintInstTypeInfo(FILE *file);
 
-  // Count dependences and cross-dependences
+  // Count dependencies and cross-dependencies
   void CountDeps(InstCount &totDepCnt, InstCount &crossDepCnt);
 
   int GetBscBlkCnt();
@@ -309,7 +309,7 @@ protected:
   // The maximum latency in the graph
   UDT_GLABEL maxLtncy_;
 
-  // The maximum sum of latencies from a sinlge instruction
+  // The maximum sum of latencies from a single instruction
   UDT_GLABEL maxLtncySum_;
 
   // Upper and lower bounds read from the input file
@@ -384,15 +384,14 @@ protected:
                             InstCount &nodeNum, InstType &instType,
                             NXTLINE_TYPE &nxtLine);
 
-  SchedInstruction *CreateNode_(InstCount instNum, char const *const instName,
-                                InstType instType, char const *const opCode,
+  SchedInstruction *CreateNode_(InstCount instNum, const char *const instName,
+                                InstType instType, const char *const opCode,
                                 int nodeID, InstCount fileSchedOrder,
                                 InstCount fileSchedCycle, InstCount fileLB,
                                 InstCount fileUB, int blkNum);
-  void AddNode_(SchedInstruction *instPtr, InstCount instNum);
   FUNC_RESULT FinishNode_(InstCount nodeNum, InstCount edgeCnt = -1);
   void CreateEdge_(InstCount frmInstNum, InstCount toInstNum, int ltncy,
-                   DependenceType depType);
+                   DependenceType depType, bool IsArtificial = false);
 
   FUNC_RESULT Finish_();
 
@@ -697,7 +696,7 @@ public:
   int GetSpillCandidateCount();
   void SetSpillCandidateCount(int cnflctCnt);
 
-  void Print(std::ostream &out, char const *const title);
+  void Print(std::ostream &out, const char *const title);
   void PrintInstList(FILE *file, DataDepGraph *dataDepGraph,
                      const char *title) const;
   void PrintRegPressures() const;

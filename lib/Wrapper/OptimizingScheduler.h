@@ -37,7 +37,6 @@ private:
   SmallVector<SchedPassStrategy, 4> SchedPasses;
 
 protected:
-
   // Vector of regions recorded for later rescheduling
   SmallVector<
       std::pair<MachineBasicBlock::iterator, MachineBasicBlock::iterator>, 32>
@@ -158,7 +157,8 @@ protected:
   // The heuristic used for the enumerator.
   SchedPriorities EnumPriorities;
 
-  // The heuristic used for the second pass enumerator in the two-pass scheduling approach.
+  // The heuristic used for the second pass enumerator in the two-pass
+  // scheduling approach.
   SchedPriorities SecondPassEnumPriorities;
 
   // Static node superiority RP only graph transformation.

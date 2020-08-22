@@ -24,9 +24,9 @@ OptSched reads from configuration files at runtime to initialize the scheduler. 
 ## Usage Examples
 
 `clang++ -O3 -fplugin=<path/to/OptSched.so> -mllvm -misched=optsched -mllvm -optsched-cfg=<path/to/optsched-cfg>  <example.cpp>`
-  
+
 `llc -load <path/to/OptSched.so> -misched=optsched -optsched-cfg=<path/to/optsched-cfg> <example.ll>`
-  
+
 ## Command-Line Options
 
 When using Clang, pass options to LLVM with `-mllvm`.

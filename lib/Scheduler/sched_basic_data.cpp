@@ -1,6 +1,7 @@
 #include "opt-sched/Scheduler/sched_basic_data.h"
 #include "opt-sched/Scheduler/register.h"
 #include "opt-sched/Scheduler/stats.h"
+#include "llvm/ADT/STLExtras.h"
 
 using namespace llvm::opt_sched;
 
@@ -40,8 +41,6 @@ SchedInstruction::SchedInstruction(InstCount num, const string &name,
   unschduldScsrCnt_ = 0;
 
   crntRange_ = new SchedRange(this);
-  if (crntRange_ == NULL)
-    Logger::Fatal("Out of memory.");
 
   crntSchedCycle_ = SCHD_UNSCHDULD;
   crntRlxdCycle_ = SCHD_UNSCHDULD;
@@ -158,21 +157,16 @@ bool SchedInstruction::InitForSchdulng(InstCount schedLngth,
 
 void SchedInstruction::AllocMem_(InstCount instCnt, bool isCP_FromScsr,
                                  bool isCP_FromPrdcsr) {
-  scsrCnt_ = scsrLst_->GetElmntCnt();
-  prdcsrCnt_ = prdcsrLst_->GetElmntCnt();
+  scsrCnt_ = GetScsrCnt();
+  prdcsrCnt_ = GetPrdcsrCnt();
   rdyCyclePerPrdcsr_ = new InstCount[prdcsrCnt_];
   ltncyPerPrdcsr_ = new InstCount[prdcsrCnt_];
   prevMinRdyCyclePerPrdcsr_ = new InstCount[prdcsrCnt_];
   sortedPrdcsrLst_ = new PriorityList<SchedInstruction>;
 
-  if (rdyCyclePerPrdcsr_ == NULL || ltncyPerPrdcsr_ == NULL ||
-      prevMinRdyCyclePerPrdcsr_ == NULL || sortedPrdcsrLst_ == NULL) {
-    Logger::Fatal("Out of memory.");
-  }
-
   InstCount predecessorIndex = 0;
-  for (GraphEdge *edge = prdcsrLst_->GetFrstElmnt(); edge != NULL;
-       edge = prdcsrLst_->GetNxtElmnt()) {
+  for (GraphEdge *edge = GetFrstPrdcsrEdge(); edge != NULL;
+       edge = GetNxtPrdcsrEdge()) {
     ltncyPerPrdcsr_[predecessorIndex++] = edge->label;
     sortedPrdcsrLst_->InsrtElmnt((SchedInstruction *)edge->GetOtherNode(this),
                                  edge->label, true);
@@ -180,8 +174,6 @@ void SchedInstruction::AllocMem_(InstCount instCnt, bool isCP_FromScsr,
 
   if (isCP_FromScsr) {
     crtclPathFrmRcrsvScsr_ = new InstCount[instCnt];
-    if (crtclPathFrmRcrsvScsr_ == NULL)
-      Logger::Fatal("Out of memory.");
 
     for (InstCount i = 0; i < instCnt; i++) {
       crtclPathFrmRcrsvScsr_[i] = INVALID_VALUE;
@@ -192,8 +184,6 @@ void SchedInstruction::AllocMem_(InstCount instCnt, bool isCP_FromScsr,
 
   if (isCP_FromPrdcsr) {
     crtclPathFrmRcrsvPrdcsr_ = new InstCount[instCnt];
-    if (crtclPathFrmRcrsvPrdcsr_ == NULL)
-      Logger::Fatal("Out of memory.");
 
     for (InstCount i = 0; i < instCnt; i++) {
       crtclPathFrmRcrsvPrdcsr_[i] = INVALID_VALUE;
@@ -233,7 +223,7 @@ InstCount SchedInstruction::CmputCrtclPath_(DIRECTION dir,
   // predecessor (successor) and then taking the maximum value among all these
   // paths.
   InstCount crtclPath = 0;
-  LinkedList<GraphEdge> *nghbrLst = (dir == DIR_FRWRD) ? prdcsrLst_ : scsrLst_;
+  LinkedList<GraphEdge> *nghbrLst = GetNghbrLst(dir);
 
   for (GraphEdge *edg = nghbrLst->GetFrstElmnt(); edg != NULL;
        edg = nghbrLst->GetNxtElmnt()) {
@@ -291,35 +281,11 @@ void SchedInstruction::AddUse(Register *reg) {
 }
 
 bool SchedInstruction::FindDef(Register *reg) const {
-  assert(reg != NULL);
-
-  for (int i = 0; i < defCnt_; i++) {
-    if (defs_[i] == reg)
-      return true;
-  }
-
-  return false;
+  return llvm::any_of(GetDefs(), [reg](const Register *r) { return reg == r; });
 }
 
 bool SchedInstruction::FindUse(Register *reg) const {
-  assert(reg != NULL);
-
-  for (int i = 0; i < useCnt_; i++) {
-    if (uses_[i] == reg)
-      return true;
-  }
-
-  return false;
-}
-
-int16_t SchedInstruction::GetDefs(Register **&defs) {
-  defs = defs_;
-  return defCnt_;
-}
-
-int16_t SchedInstruction::GetUses(Register **&uses) {
-  uses = uses_;
-  return useCnt_;
+  return llvm::any_of(GetUses(), [reg](const Register *r) { return reg == r; });
 }
 
 bool SchedInstruction::BlocksCycle() const { return blksCycle_; }
@@ -352,30 +318,10 @@ int SchedInstruction::GetLtncySum() const { return GetScsrLblSum(); }
 
 int SchedInstruction::GetMaxLtncy() const { return GetMaxEdgeLabel(); }
 
-InstCount SchedInstruction::GetPrdcsrCnt() const {
-  return prdcsrLst_->GetElmntCnt();
-}
-
-InstCount SchedInstruction::GetScsrCnt() const {
-  return scsrLst_->GetElmntCnt();
-}
-
-InstCount SchedInstruction::GetRcrsvPrdcsrCnt() const {
-  assert(rcrsvPrdcsrLst_ != NULL);
-  assert(rcrsvPrdcsrLst_->GetElmntCnt() >= prdcsrCnt_);
-  return rcrsvPrdcsrLst_->GetElmntCnt();
-}
-
-InstCount SchedInstruction::GetRcrsvScsrCnt() const {
-  assert(rcrsvScsrLst_ != NULL);
-  assert(rcrsvScsrLst_->GetElmntCnt() >= scsrCnt_);
-  return rcrsvScsrLst_->GetElmntCnt();
-}
-
 SchedInstruction *SchedInstruction::GetFrstPrdcsr(InstCount *scsrNum,
                                                   UDT_GLABEL *ltncy,
                                                   DependenceType *depType) {
-  GraphEdge *edge = prdcsrLst_->GetFrstElmnt();
+  GraphEdge *edge = GetFrstPrdcsrEdge();
   if (!edge)
     return NULL;
   if (scsrNum)
@@ -390,7 +336,7 @@ SchedInstruction *SchedInstruction::GetFrstPrdcsr(InstCount *scsrNum,
 SchedInstruction *SchedInstruction::GetNxtPrdcsr(InstCount *scsrNum,
                                                  UDT_GLABEL *ltncy,
                                                  DependenceType *depType) {
-  GraphEdge *edge = prdcsrLst_->GetNxtElmnt();
+  GraphEdge *edge = GetNxtPrdcsrEdge();
   if (!edge)
     return NULL;
   if (scsrNum)
@@ -404,8 +350,9 @@ SchedInstruction *SchedInstruction::GetNxtPrdcsr(InstCount *scsrNum,
 
 SchedInstruction *SchedInstruction::GetFrstScsr(InstCount *prdcsrNum,
                                                 UDT_GLABEL *ltncy,
-                                                DependenceType *depType) {
-  GraphEdge *edge = scsrLst_->GetFrstElmnt();
+                                                DependenceType *depType,
+                                                bool *IsArtificial) {
+  GraphEdge *edge = GetFrstScsrEdge();
   if (!edge)
     return NULL;
   if (prdcsrNum)
@@ -414,13 +361,16 @@ SchedInstruction *SchedInstruction::GetFrstScsr(InstCount *prdcsrNum,
     *ltncy = edge->label;
   if (depType)
     *depType = (DependenceType)edge->label2;
+  if (IsArtificial)
+    *IsArtificial = edge->IsArtificial;
   return (SchedInstruction *)(edge->to);
 }
 
 SchedInstruction *SchedInstruction::GetNxtScsr(InstCount *prdcsrNum,
                                                UDT_GLABEL *ltncy,
-                                               DependenceType *depType) {
-  GraphEdge *edge = scsrLst_->GetNxtElmnt();
+                                               DependenceType *depType,
+                                               bool *IsArtificial) {
+  GraphEdge *edge = GetNxtScsrEdge();
   if (!edge)
     return NULL;
   if (prdcsrNum)
@@ -429,11 +379,13 @@ SchedInstruction *SchedInstruction::GetNxtScsr(InstCount *prdcsrNum,
     *ltncy = edge->label;
   if (depType)
     *depType = (DependenceType)edge->label2;
+  if (IsArtificial)
+    *IsArtificial = edge->IsArtificial;
   return (SchedInstruction *)(edge->to);
 }
 
 SchedInstruction *SchedInstruction::GetLastScsr(InstCount *prdcsrNum) {
-  GraphEdge *edge = scsrLst_->GetLastElmnt();
+  GraphEdge *edge = GetLastScsrEdge();
   if (!edge)
     return NULL;
   if (prdcsrNum)
@@ -442,7 +394,7 @@ SchedInstruction *SchedInstruction::GetLastScsr(InstCount *prdcsrNum) {
 }
 
 SchedInstruction *SchedInstruction::GetPrevScsr(InstCount *prdcsrNum) {
-  GraphEdge *edge = scsrLst_->GetPrevElmnt();
+  GraphEdge *edge = GetPrevScsrEdge();
   if (!edge)
     return NULL;
   if (prdcsrNum)
@@ -452,7 +404,7 @@ SchedInstruction *SchedInstruction::GetPrevScsr(InstCount *prdcsrNum) {
 
 SchedInstruction *SchedInstruction::GetFrstNghbr(DIRECTION dir,
                                                  UDT_GLABEL *ltncy) {
-  GraphEdge *edge = (dir == DIR_FRWRD ? scsrLst_ : prdcsrLst_)->GetFrstElmnt();
+  GraphEdge *edge = dir == DIR_FRWRD ? GetFrstScsrEdge() : GetFrstPrdcsrEdge();
   if (edge == NULL)
     return NULL;
   if (ltncy)
@@ -462,7 +414,7 @@ SchedInstruction *SchedInstruction::GetFrstNghbr(DIRECTION dir,
 
 SchedInstruction *SchedInstruction::GetNxtNghbr(DIRECTION dir,
                                                 UDT_GLABEL *ltncy) {
-  GraphEdge *edge = (dir == DIR_FRWRD ? scsrLst_ : prdcsrLst_)->GetNxtElmnt();
+  GraphEdge *edge = dir == DIR_FRWRD ? GetNxtScsrEdge() : GetNxtPrdcsrEdge();
   if (edge == NULL)
     return NULL;
   if (ltncy)
@@ -679,9 +631,8 @@ bool SchedInstruction::ProbeScsrsCrntLwrBounds(InstCount cycle) {
   if (cycle <= crntRange_->GetLwrBound(DIR_FRWRD))
     return false;
 
-  LinkedList<GraphEdge> *nghbrLst = scsrLst_;
-  for (GraphEdge *edg = nghbrLst->GetFrstElmnt(); edg != NULL;
-       edg = nghbrLst->GetNxtElmnt()) {
+  for (GraphEdge *edg = GetFrstScsrEdge(); edg != NULL;
+       edg = GetNxtScsrEdge()) {
     UDT_GLABEL edgLbl = edg->label;
     SchedInstruction *nghbr = (SchedInstruction *)(edg->GetOtherNode(this));
     InstCount nghbrNewLwrBound = cycle + edgLbl;
@@ -696,14 +647,10 @@ bool SchedInstruction::ProbeScsrsCrntLwrBounds(InstCount cycle) {
 }
 
 void SchedInstruction::ComputeAdjustedUseCnt_() {
-  Register **uses;
-  int useCnt = GetUses(uses);
-  adjustedUseCnt_ = useCnt;
-
-  for (int i = 0; i < useCnt; i++) {
-    if (uses[i]->IsLiveOut())
-      adjustedUseCnt_--;
-  }
+  adjustedUseCnt_ =
+      NumUses() - llvm::count_if(GetUses(), [](const Register *use) {
+        return use->IsLiveOut();
+      });
 }
 
 InstCount SchedInstruction::GetFileSchedOrder() const {
@@ -717,8 +664,8 @@ InstCount SchedInstruction::GetFileSchedCycle() const {
 void SchedInstruction::SetScsrNums_() {
   InstCount scsrNum = 0;
 
-  for (GraphEdge *edge = scsrLst_->GetFrstElmnt(); edge != NULL;
-       edge = scsrLst_->GetNxtElmnt()) {
+  for (GraphEdge *edge = GetFrstScsrEdge(); edge != NULL;
+       edge = GetNxtScsrEdge()) {
     edge->succOrder = scsrNum++;
   }
 
@@ -728,8 +675,8 @@ void SchedInstruction::SetScsrNums_() {
 void SchedInstruction::SetPrdcsrNums_() {
   InstCount prdcsrNum = 0;
 
-  for (GraphEdge *edge = prdcsrLst_->GetFrstElmnt(); edge != NULL;
-       edge = prdcsrLst_->GetNxtElmnt()) {
+  for (GraphEdge *edge = GetFrstPrdcsrEdge(); edge != NULL;
+       edge = GetNxtPrdcsrEdge()) {
     edge->predOrder = prdcsrNum++;
   }
 
@@ -816,8 +763,11 @@ bool SchedRange::TightnLwrBoundRcrsvly(DIRECTION dir, InstCount newBound,
                                        LinkedList<SchedInstruction> *tightndLst,
                                        LinkedList<SchedInstruction> *fxdLst,
                                        bool enforce) {
-  LinkedList<GraphEdge> *nghbrLst =
-      (dir == DIR_FRWRD) ? inst_->scsrLst_ : inst_->prdcsrLst_;
+  auto getNextNeighbor =
+      dir == DIR_FRWRD
+          ? +[](SchedRange &range) { return range.inst_->GetNxtScsrEdge(); }
+          : +[](SchedRange &range) { return range.inst_->GetNxtPrdcsrEdge(); };
+
   InstCount crntBound = (dir == DIR_FRWRD) ? frwrdLwrBound_ : bkwrdLwrBound_;
   bool fsbl = IsFsbl_();
 
@@ -830,8 +780,9 @@ bool SchedRange::TightnLwrBoundRcrsvly(DIRECTION dir, InstCount newBound,
     if (!fsbl && !enforce)
       return false;
 
-    for (GraphEdge *edg = nghbrLst->GetFrstElmnt(); edg != NULL;
-         edg = nghbrLst->GetNxtElmnt()) {
+    for (GraphEdge *edg = dir == DIR_FRWRD ? inst_->GetFrstScsrEdge()
+                                           : inst_->GetFrstPrdcsrEdge();
+         edg != NULL; edg = getNextNeighbor(*this)) {
       UDT_GLABEL edgLbl = edg->label;
       SchedInstruction *nghbr = (SchedInstruction *)(edg->GetOtherNode(inst_));
       InstCount nghbrNewBound = newBound + edgLbl;

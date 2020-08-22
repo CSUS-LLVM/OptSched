@@ -4,7 +4,7 @@
 Description:    Validation script for OptSched with the plaidbench benchmarking
                 suite. This script is meant to be used together with the
                 run-plaidbench.sh script.
-Modified by:    Vang Thao  
+Modified by:    Vang Thao
 Last Update:    December 17, 2019
 **********************************************************************************
 
@@ -48,6 +48,7 @@ benchmarks = [
 ]
 
 # Parse for DAG stats
+RE_DAG_COST_LOWER_BOUND = re.compile(r'Lower bound of cost before scheduling: (\d+)')
 RE_DAG_COST = re.compile(r'INFO: Best schedule for DAG (.*) has cost (\d+) and length (\d+). The schedule is (.*) \(Time')
 # Parse for passthrough number
 RE_PASS_NUM = re.compile(r'End of (.*) pass through')
@@ -89,7 +90,7 @@ def compareDags(displayMismatches, displayNumLargest, displayNumSmallest, passNu
     numSmlBlkPrt = displayNumSmallest
     # Dictionary with the sizes of the mismatches for each mismatched block and the size of the block.
     mismatches = {}
-    
+
     for bench in benchmarks:
         for dagName in dags[0][bench][passNum]:
             if dagName not in dags[1][bench][passNum]:
@@ -185,7 +186,7 @@ def main(args):
             benchStats[bench] = {}
             benchStats[bench]['first'] = {}
             benchStats[bench]['second'] = {}
-            
+
             # Open log file
             currentPath = os.path.join(directories[i], bench)
             currentLogFile = os.path.join(currentPath, bench + '.log')
@@ -197,17 +198,18 @@ def main(args):
                     # Get pass num
                     getPass = RE_PASS_NUM.search(block)
                     passNum = getPass.group(1)
-                    
+
                     # Get DAG stats
+                    dagLwrBound = RE_DAG_COST_LOWER_BOUND.search(block)
                     dagStats = RE_DAG_COST.search(block)
                     dag = {}
                     dagName = dagStats.group(1)
                     dag['dagName'] = dagName
-                    dag['cost'] = int(dagStats.group(2))
+                    dag['cost'] = int(dagStats.group(2)) + int(dagLwrBound.group(1))
                     dag['length'] = dagStats.group(3)
                     dag['isOptimal'] = (dagStats.group(4) == 'optimal')
-                    
-                    # Add this DAG's stats to temp stats container 
+
+                    # Add this DAG's stats to temp stats container
                     benchStats[bench][passNum][dagName] = dag
                     # Record number of DAGs
                     tempNumDags[passNum] += 1
@@ -215,7 +217,7 @@ def main(args):
         # Move temp stats to global vars
         dags.append(benchStats)
         numDags.append(tempNumDags)
-        
+
     # Compare DAGs from first passthrough
     compareDags(args.displayMismatches, args.displayNumLargest, args.displayNumSmallest, 'first')
 
@@ -226,7 +228,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Validation script for OptSched on plaidbench', \
                                       formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 
-    # Run 1 directory for plaidbench    
+    # Run 1 directory for plaidbench
     parser.add_argument('directory1',
                         help='Directory containing a plaidbench run')
     # Run 2 directory for plaidbench
@@ -252,4 +254,3 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     main(args)
-

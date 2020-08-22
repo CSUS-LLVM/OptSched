@@ -1,0 +1,31 @@
+name: Check Clang Format
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v2
+
+      # https://github.com/DoozyX/clang-format-lint-action
+    - uses: DoozyX/clang-format-lint-action@v0.5
+      with:
+        source: '.'
+        clangFormatVersion: 9
+
+    - name: Report failure
+      if: ${{ failure() }}
+      run: |
+        cat << EOF
+        ::error::Something is not properly formatted by clang-format.
+
+        ::error::If you add a comment to your PR with exactly the text 'Do: Reformat' \
+        (without the quotes), each commit of your PR will be reformatted for you.
+        EOF
+        exit 1

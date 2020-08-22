@@ -74,7 +74,7 @@ void Register::IncrmntCrntLngth() { crntLngth_++; }
 
 void Register::DcrmntCrntLngth() { crntLngth_--; }
 
-const Register &Register::operator=(Register &rhs) {
+Register &Register::operator=(const Register &rhs) {
   if (this != &rhs) {
     num_ = rhs.num_;
     type_ = rhs.type_;
