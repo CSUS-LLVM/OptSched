@@ -21,7 +21,9 @@ if(${PACKAGE_VERSION} VERSION_LESS "7.0")
 endif()
 
 # If asserts are enabled opt-sched must be built with "IS_DEBUG".
-set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -DIS_DEBUG")
+if(LLVM_ENABLE_ASSERTIONS)
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DIS_DEBUG")
+endif()
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
