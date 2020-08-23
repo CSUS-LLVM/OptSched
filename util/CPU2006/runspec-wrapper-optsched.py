@@ -495,7 +495,7 @@ def calculateBlockStats(output, trackOptSchedSpills):
     blocks = split_blocks(output)
     stats = []
     for index, block in enumerate(blocks):
-        events = parse_as_singular_events(parse_events(block))
+        events = keep_only_first_event(parse_events(block))
 
         try:
             process_dag = events['ProcessDag']

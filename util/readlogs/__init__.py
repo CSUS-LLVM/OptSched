@@ -42,6 +42,16 @@ def keep_only_singular_events(logs):
         if len(v) == 1: result[k] = v[0]
     return result
 
+def keep_only_first_event(logs):
+    '''
+    Converts a the event `dict[event_id --> list[event-json]]` to
+    `dict[event_id --> event-json]` keeping only the first of any event for a given event_id.
+    '''
+    result = dict()
+    for k, v in logs.items():
+        result[k] = v[0]
+    return result
+
 def parse_as_singular_events(logs):
     '''
     Converts a the event `dict[event_id --> list[event-json]]` to
