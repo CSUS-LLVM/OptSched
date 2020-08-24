@@ -59,7 +59,7 @@ unsigned ScheduleDAGOptSchedGCN::getMinOcc() {
     return MinOcc;
 
   llvm::report_fatal_error(
-      "Unrecognized option for MIN_OCCUPANCY_FOR_RESCHEDULE setting: %d",
+      "Unrecognized option for MIN_OCCUPANCY_FOR_RESCHEDULE setting: %d" +
       std::to_string(MinOcc), false);
 }
 
@@ -70,7 +70,7 @@ int ScheduleDAGOptSchedGCN::getMinILPImprovement() {
     return MinIlpImprovement;
 
   llvm::report_fatal_error(
-      "Unrecognized option for MIN_OCCUPANCY_FOR_RESCHEDULE setting: %d",
+      "Unrecognized option for MIN_OCCUPANCY_FOR_RESCHEDULE setting: %d" +
       std::to_string(MinIlpImprovement), false);
 }
 
