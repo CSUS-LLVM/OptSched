@@ -1380,6 +1380,8 @@ void DataDepGraph::CreateNodeData(NodeData *nodeData) {
 
 void DataDepGraph::CreateRegData(RegFileData *regFileData) {
   Register *reg = NULL;
+  int x;
+
   for (int i = 0; i < machMdl_->GetRegTypeCnt(); i++) {
     regFileData[i].regType_ = RegFiles[i].GetRegType();
     regFileData[i].regCnt_ = RegFiles[i].GetRegCnt();
@@ -1390,25 +1392,39 @@ void DataDepGraph::CreateRegData(RegFileData *regFileData) {
       regFileData[i].regs_[j].wght_ = reg->GetWght();
       regFileData[i].regs_[j].isLiveIn_ = reg->IsLiveIn();
       regFileData[i].regs_[j].isLiveOut_ = reg->IsLiveOut();
-      regFileData[i].regs_[j].useCnt_ = reg->GetUseCnt();
+      regFileData[i].regs_[j].useCnt_ = 0;
       
-      int x = 0;
-      if (regFileData[i].regs_[j].useCnt_ > 0) {
-        regFileData[i].regs_[j].uses_ = new InstCount[reg->GetUseCnt()];
+      if (reg->GetSizeOfUseList() > 0) {
+        regFileData[i].regs_[j].uses_ = new InstCount[reg->GetSizeOfUseList()];
 
-        for (const auto &inst : reg->GetUseList())
-	  regFileData[i].regs_[j].uses_[x++] = inst->GetNum();
+	x = 0;
+        for (const auto &inst : reg->GetUseList()) {
+	  regFileData[i].regs_[j].uses_[x++] = (InstCount)inst->GetNum();
+	  regFileData[i].regs_[j].useCnt_++;
+        }
+
+	//debug
+	if (regFileData[i].regs_[j].useCnt_ != (InstCount)reg->GetSizeOfUseList())
+          printf("regFileData[%d].regs_[%d].useCnt_ != (InstCount)reg->GetSizeOfUseList()\n", i, j);
+
       } else
         regFileData[i].regs_[j].uses_ = NULL;
 
-      regFileData[i].regs_[j].defCnt_ = reg->GetDefCnt();
+      regFileData[i].regs_[j].defCnt_ = 0;
 
-      if (regFileData[i].regs_[j].defCnt_ > 0) {
-        regFileData[i].regs_[j].defs_ = new InstCount[reg->GetDefCnt()];
+      if (reg->GetSizeOfDefList() > 0) {
+        regFileData[i].regs_[j].defs_ = new InstCount[reg->GetSizeOfDefList()];
 
 	x = 0;
-        for (const auto &inst : reg->GetDefList())
-          regFileData[i].regs_[j].defs_[x++] = inst->GetNum();
+        for (const auto &inst : reg->GetDefList()) {
+          regFileData[i].regs_[j].defs_[x++] = (InstCount)inst->GetNum();
+	  regFileData[i].regs_[j].defCnt_++;
+	}
+
+	//debug
+	if (regFileData[i].regs_[j].defCnt_ != (InstCount)reg->GetSizeOfDefList())
+          printf("regFileData[%d].regs_[%d].defCnt_ != (InstCount)reg->GetSizeOfDefList()\n", i, j);
+
       } else
         regFileData[i].regs_[j].defs_ = NULL;
     }
@@ -1417,7 +1433,7 @@ void DataDepGraph::CreateRegData(RegFileData *regFileData) {
 
 //reconstruct the DDG on device using nodeData
 __device__
-void DataDepGraph::ReconstructOnDevice_(InstCount instCnt, NodeData *nodeData,
+void DataDepGraph::ReconstructOnDevice(InstCount instCnt, NodeData *nodeData,
 	                        	RegFileData *regFileData) {
   AllocArrays_(instCnt);
 
@@ -1481,7 +1497,7 @@ void DataDepGraph::ReconstructOnDevice_(InstCount instCnt, NodeData *nodeData,
 	inst->AddUse(reg);
 	reg->AddUse(inst);
       }
-
+ 
       //add defs
       for (int x = 0; x < regFileData[i].regs_[j].defCnt_; x++) {
         inst = insts_[regFileData[i].regs_[j].defs_[x]];

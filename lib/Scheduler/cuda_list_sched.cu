@@ -22,10 +22,6 @@ ListScheduler::ListScheduler(DataDepGraph *dataDepGraph, MachineModel *machMdl,
 
 __host__ __device__
 ListScheduler::~ListScheduler() { 
-
-  //debug
-  //printf("In ~ListScheduler\n");
-
   delete rdyLst_; 
 }
 

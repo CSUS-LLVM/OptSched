@@ -95,7 +95,7 @@ void DevListSched(MachineModel *dev_machMdl, SchedRegion *dev_rgn,
   dev_rgn->SetDepGraph(dev_dataDepGraph);
   
   // Initialize DDG using dev_nodeData and dev_regData
-  dev_dataDepGraph->ReconstructOnDevice_(instCnt, dev_nodeData, dev_regFileData);
+  dev_dataDepGraph->ReconstructOnDevice(instCnt, dev_nodeData, dev_regFileData);
 
   dev_dataDepGraph->SetupForSchdulng(cmputTrnstvClsr);
 
@@ -113,6 +113,9 @@ void DevListSched(MachineModel *dev_machMdl, SchedRegion *dev_rgn,
   // Compute schedule costs
   InstCount hurstcExecCost;
   ((BBWithSpill *)(dev_rgn))->Dev_CmputNormCost_(dev_lstSched, CCM_DYNMC, hurstcExecCost, true);
+
+  //debug
+  printf("Device schedule cost: %d\n", dev_lstSched->GetCost());
 }
 
 FUNC_RESULT SchedRegion::FindOptimalSchedule(
@@ -230,7 +233,7 @@ FUNC_RESULT SchedRegion::FindOptimalSchedule(
  
     //****Begin Code for ListScheduling on Device****
     Milliseconds hurstcStart = Utilities::GetProcessorTime();
-
+    cudaProfilerStart();
 
     // Increase heap/stack size to allow large DDGs to be allocated
     if (cudaSuccess != cudaDeviceSetLimit(cudaLimitStackSize, 65536))
@@ -366,8 +369,7 @@ FUNC_RESULT SchedRegion::FindOptimalSchedule(
 			  dev_regFileData, dataDepGraph_->GetInstCnt(), 
 			  needTransitiveClosure, dev_lstSched);
 
-    cudaDeviceSynchronize();
-    
+    cudaDeviceSynchronize(); 
     printf("Post Kernel Error: %s\n", cudaGetErrorString(cudaGetLastError()));
  
     // Copy ListSchedule to Host
@@ -390,12 +392,15 @@ FUNC_RESULT SchedRegion::FindOptimalSchedule(
     //Milliseconds hurstcStart = Utilities::GetProcessorTime();
 
     //now takes place on device
-/*
-    lstSched = new InstSchedule(machMdl_, dataDepGraph_, vrfySched_);
+
+    //debug
+    printf("Running host list scheduling to check for correctness\n");
+
+    InstSchedule *host_lstSched = new InstSchedule(machMdl_, dataDepGraph_, vrfySched_);
 
     lstSchdulr = AllocHeuristicScheduler_();
 
-    rslt = lstSchdulr->FindSchedule(lstSched, this);
+    rslt = lstSchdulr->FindSchedule(host_lstSched, this);
 
     if (rslt != RES_SUCCESS) {
       Logger::Fatal("List scheduling failed");
@@ -403,7 +408,7 @@ FUNC_RESULT SchedRegion::FindOptimalSchedule(
       delete lstSched;
       return rslt;
     }
-*/
+
     hurstcTime = Utilities::GetProcessorTime() - hurstcStart;
     stats::heuristicTime.Record(hurstcTime);
     if (hurstcTime > 0)
@@ -414,9 +419,24 @@ FUNC_RESULT SchedRegion::FindOptimalSchedule(
     // Compute cost for Heuristic list scheduler, this must be called before
     // calling GetCost() on the InstSchedule instance.
     //Computing sched cost now happens on device
-    //CmputNormCost_(lstSched, CCM_DYNMC, hurstcExecCost, true);
+    CmputNormCost_(host_lstSched, CCM_DYNMC, hurstcExecCost, true);
     
     hurstcCost_ = lstSched->GetCost();
+
+    bool match = true;
+
+    for (InstCount i = 0; i < dataDepGraph_->GetInstCnt(); i++) {
+      if (host_lstSched->GetSchedCycle(i) != lstSched->GetSchedCycle(i))
+        match = false;
+    }
+
+    if (match)
+      Logger::Info("Host and device schedules match!");
+    else {
+      Logger::Fatal("******** Host and Device Schedule mismatch ********");
+    }
+
+    cudaProfilerStop();
 
     // This schedule is optimal so ACO will not be run
     // so set bestSched here.

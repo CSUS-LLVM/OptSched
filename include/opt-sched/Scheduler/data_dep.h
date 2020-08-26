@@ -486,7 +486,7 @@ public:
 
   //used to setup DDG on device
   __device__
-  void ReconstructOnDevice_(InstCount instCnt, NodeData *nodeData, RegFileData *regFileData);
+  void ReconstructOnDevice(InstCount instCnt, NodeData *nodeData, RegFileData *regFileData);
 
 protected:
   // TODO(max): Get rid of this.

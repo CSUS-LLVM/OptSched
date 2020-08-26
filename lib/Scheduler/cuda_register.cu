@@ -46,6 +46,11 @@ __host__ __device__
 void Register::ResetCrntUseCnt() { crntUseCnt_ = 0; }
 
 void Register::AddUse(const SchedInstruction *inst) {
+  //debug
+#ifndef __CUDA_ARCH__
+  if (liveIntervalSet_.count(inst) != 0)
+    printf("Duplicate instruction entered. InstNum: %d\n", inst->GetNum());
+#endif
   uses_.insert(inst);
   useCnt_++;
 }
