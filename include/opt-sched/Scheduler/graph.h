@@ -193,9 +193,9 @@ public:
   // Returns whether this node is a leaf (i.e. has no successor).
   bool IsLeaf() const;
   // Returns whether the given node is a recursive predecessor of this node.
-  bool IsRcrsvPrdcsr(GraphNode *node) const;
+  bool IsRcrsvPrdcsr(const GraphNode *node) const;
   // Returns whether the given node is a recursive successor of this node.
-  bool IsRcrsvScsr(GraphNode *node) const;
+  bool IsRcrsvScsr(const GraphNode *node) const;
   // Returns whether the given node is a recursive neighbor (predecessor or
   // successor) of this node, depending on the specified direction.
   bool IsRcrsvNghbr(DIRECTION dir, GraphNode *node) const;
@@ -548,14 +548,14 @@ inline BitVector *GraphNode::GetRecursivePredecessorsBitVector() {
   return isRcrsvPrdcsr_;
 }
 
-inline bool GraphNode::IsRcrsvPrdcsr(GraphNode *node) const {
+inline bool GraphNode::IsRcrsvPrdcsr(const GraphNode *node) const {
   assert(node != NULL);
   if (node == this)
     return true;
   return isRcrsvPrdcsr_->GetBit(node->GetNum());
 }
 
-inline bool GraphNode::IsRcrsvScsr(GraphNode *node) const {
+inline bool GraphNode::IsRcrsvScsr(const GraphNode *node) const {
   assert(node != NULL);
   if (node == this)
     return true;
