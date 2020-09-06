@@ -115,6 +115,25 @@ double ACOScheduler::Score(SchedInstruction *from, Choice choice) {
          pow(choice.heuristic, heuristicImportance_);
 }
 
+bool ACOScheduler::shouldReplaceSchedule(InstSchedule* OldSched, InstSchedule* NewSched)
+{
+  // return true if the old schedule is null (eg:there is no old schedule)
+  // return false if the new schedule is is NULL
+  // if it is the 1st pass return the cost comparison
+  // if it is the 2nd pass return true if the RP cost and ILP cost is less
+  if (!OldSched)
+    return true;
+  else if (!NewSched)
+    return false;
+  else if (!rgn_->IsSecondPass())
+    return NewSched->GetCost() < OldSched->GetCost();
+  else
+    return (NewSched->GetSpillCost() <= OldSched->GetSpillCost()) &&
+           (NewSched->GetCost() <  OldSched->GetCost());
+//           (NewSched->GetCrntLngth() <  OldSched->GetCrntLngth());
+}
+
+
 Choice ACOScheduler::SelectInstruction(const llvm::ArrayRef<Choice> &ready,
                                        SchedInstruction *lastInst) {
 #if TWO_STEP
@@ -345,12 +364,12 @@ FUNC_RESULT ACOScheduler::FindSchedule(InstSchedule *schedule_out,
     pheromone_[i] = initialValue_;
   std::cerr << "initialValue_" << initialValue_ << std::endl;
 
-  writePheromoneGraph("initial");
-
   std::unique_ptr<InstSchedule> bestSchedule = std::move(InitialSchedule);
   if (bestSchedule) {
     UpdatePheromone(bestSchedule.get());
   }
+  writePheromoneGraph("initial");
+
   Config &schedIni = SchedulerOptions::getInstance();
   int noImprovementMax = schedIni.GetInt("ACO_STOP_ITERATIONS");
   int noImprovement = 0; // how many iterations with no improvement
@@ -362,8 +381,7 @@ FUNC_RESULT ACOScheduler::FindSchedule(InstSchedule *schedule_out,
       std::unique_ptr<InstSchedule> schedule = FindOneSchedule();
       if (print_aco_trace)
         PrintSchedule(schedule.get());
-      if (iterationBest == nullptr ||
-          schedule->GetCost() < iterationBest->GetCost()) {
+      if (shouldReplaceSchedule(iterationBest.get(), schedule.get())) {
         iterationBest = std::move(schedule);
         if (IsDbg)
           IterAntEdges = CrntAntEdges;
@@ -373,8 +391,7 @@ FUNC_RESULT ACOScheduler::FindSchedule(InstSchedule *schedule_out,
     /* PrintSchedule(iterationBest); */
     /* std::cout << iterationBest->GetCost() << std::endl; */
     // TODO DRY
-    if (bestSchedule == nullptr ||
-        iterationBest->GetCost() < bestSchedule->GetCost()) {
+    if (shouldReplaceSchedule(bestSchedule.get(), iterationBest.get())) {
       bestSchedule = std::move(iterationBest);
       Logger::Info("ACO found schedule with spill cost %d",
                    bestSchedule->GetCost());

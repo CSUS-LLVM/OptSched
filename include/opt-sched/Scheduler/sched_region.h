@@ -106,6 +106,8 @@ public:
   void UpdateScheduleCost(InstSchedule *sched);
   SPILL_COST_FUNCTION GetSpillCostFunc();
 
+  bool IsSecondPass() const { return isSecondPass_; }
+
   // Initialize variables for the second pass of the two-pass-optsched
   void InitSecondPass();
 
@@ -177,8 +179,6 @@ protected:
 
   // protected accessors:
   SchedulerType GetHeuristicSchedulerType() const { return HeurSchedType_; }
-
-  bool IsSecondPass() const { return isSecondPass_; }
 
   void SetBestCost(InstCount bestCost) { bestCost_ = bestCost; }
 

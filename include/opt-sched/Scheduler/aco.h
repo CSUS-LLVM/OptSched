@@ -45,6 +45,7 @@ private:
   pheromone_t &Pheromone(SchedInstruction *from, SchedInstruction *to);
   pheromone_t &Pheromone(InstCount from, InstCount to);
   double Score(SchedInstruction *from, Choice choice);
+  bool shouldReplaceSchedule(InstSchedule* OldSched, InstSchedule* NewSched);
 
   void PrintPheromone();
 
