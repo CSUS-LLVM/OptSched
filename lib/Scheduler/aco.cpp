@@ -404,6 +404,8 @@ FUNC_RESULT ACOScheduler::FindSchedule(InstSchedule *schedule_out,
         BestAntEdges = IterAntEdges;
 
       noImprovement = 0;
+      if(bestSchedule->GetCost()==0)
+        break;
     } else {
       noImprovement++;
       /* if (*iterationBest == *bestSchedule) */
