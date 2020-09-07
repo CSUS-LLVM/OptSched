@@ -343,7 +343,7 @@ FUNC_RESULT ACOScheduler::FindSchedule(InstSchedule *schedule_out,
 
   //get settings
   Config &schedIni = SchedulerOptions::getInstance();
-  bool IsFirst = rgn_->IsSecondPass();
+  bool IsFirst = !rgn_->IsSecondPass();
   heuristicImportance_ = schedIni.GetInt(IsFirst ? "ACO_HEURISTIC_IMPORTANCE" : "ACO2P_HEURISTIC_IMPORTANCE");
   fixed_bias = schedIni.GetInt(IsFirst ? "ACO_FIXED_BIAS" : "ACO2P_FIXED_BIAS");
   noImprovementMax = schedIni.GetInt(IsFirst ? "ACO_STOP_ITERATIONS" : "ACO2P_STOP_ITERATIONS");
