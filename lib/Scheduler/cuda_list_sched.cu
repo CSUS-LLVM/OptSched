@@ -118,8 +118,9 @@ bool SequentialListScheduler::ChkInstLglty_(SchedInstruction *inst) const {
     return false;
 
   // Do region-specific legality check
-  if (rgn_->ChkInstLglty(inst) == false)
-    return false;
+  // currently always returns true
+  //if (rgn_->ChkInstLglty(inst) == false)
+    //return false;
 
   // Account for instructions that block the whole cycle.
   if (isCrntCycleBlkd_)

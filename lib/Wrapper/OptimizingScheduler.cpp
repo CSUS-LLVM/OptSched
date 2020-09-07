@@ -213,10 +213,44 @@ ScheduleDAGOptSched::ScheduleDAGOptSched(
     TargetFactory =
         OptSchedTargetRegistry::Registry.getFactoryWithName("generic");
 
+  maxRegionSize = 0;
+
   OST = TargetFactory();
   MM = OST->createMachineModel(PathCfgMM.c_str());
   MM->convertMachineModel(static_cast<ScheduleDAGInstrs &>(*this),
                           RegClassInfo);
+/*
+  // Increase heap/stack size to allow large DDGs to be allocated
+  if (cudaSuccess != cudaDeviceSetLimit(cudaLimitStackSize, 65536))
+    printf("Error increasing stack size: %s\n",
+           cudaGetErrorString(cudaGetLastError()));
+
+  if (cudaSuccess != cudaDeviceSetLimit(cudaLimitMallocHeapSize, 2048000000))
+    printf("Error increasing heap size: %s\n",
+           cudaGetErrorString(cudaGetLastError()));
+
+  // Copy MachineModel to device for use during DevListSched.
+  // Allocate device memory
+  if (cudaSuccess != cudaMallocManaged((void**)&dev_MM,
+                                       sizeof(MachineModel)))
+    printf("Error allocating device space for dev_machMdl: %s\n",
+           cudaGetErrorString(cudaGetLastError()));
+  // Copy machMdl_ to device
+  if (cudaSuccess != cudaMemcpy(dev_MM, MM.get(),
+                                sizeof(MachineModel),
+                                cudaMemcpyHostToDevice))
+    printf("Error copying machMdl_ to device: %s\n",
+           cudaGetErrorString(cudaGetLastError()));
+  // Copy over all pointers to device
+  MM.get()->CopyPointersToDevice(dev_MM);
+
+  //Allocate device memory for dev_maxDDG pointer storage
+  if (cudaSuccess != cudaMallocManaged((void**)&dev_maxDDG,
+                                       sizeof(DataDepGraph)))
+    printf("Error allocating device space for dev_maxDDG: %s\n",
+           cudaGetErrorString(cudaGetLastError()));
+*/
+  dev_MM = NULL;
 }
 
 void ScheduleDAGOptSched::SetupLLVMDag() {
@@ -252,6 +286,16 @@ void ScheduleDAGOptSched::initSchedulers() {
   SchedPasses.push_back(OptSchedBalanced);
 }
 
+__global__
+void AllocateMaxDDG(MachineModel *dev_machMdl, LATENCY_PRECISION ltncyPcsn,
+		    InstCount maxRegionSize, DataDepGraph **dev_maxDDG) {
+  // Create new DDG and save its pointer for later kernels
+  *dev_maxDDG = new DataDepGraph(dev_machMdl, ltncyPcsn);
+  // Allocate DDG with maxRegionSize num of nodes and 
+  // n-1 edges for each node
+  (*dev_maxDDG)->AllocateMaxDDG(maxRegionSize);
+}
+
 // schedule called for each basic block
 void ScheduleDAGOptSched::schedule() {
   ShouldTrackPressure = true;
@@ -266,6 +310,10 @@ void ScheduleDAGOptSched::schedule() {
   // If two pass scheduling is enabled then
   // first just record the scheduling region.
   if (OptSchedEnabled && TwoPassEnabled && !TwoPassSchedulingStarted) {
+    //Keep track of largest region
+    if (maxRegionSize < (InstCount)RegionBegin->getParent()->size())
+      maxRegionSize = RegionBegin->getParent()->size();
+
     Regions.push_back(std::make_pair(RegionBegin, RegionEnd));
     LLVM_DEBUG(
         dbgs() << "Recording scheduling region before scheduling with two pass "
@@ -383,11 +431,52 @@ void ScheduleDAGOptSched::schedule() {
   auto *BDDG = static_cast<OptSchedDDGWrapperBasic *>(DDG.get());
   addGraphTransformations(BDDG);
 
+  if (dev_MM == NULL) {
+    // Increase heap/stack size to allow large DDGs to be allocated
+    if (cudaSuccess != cudaDeviceSetLimit(cudaLimitStackSize, 65536))
+      printf("Error increasing stack size: %s\n",
+             cudaGetErrorString(cudaGetLastError()));
+
+    if (cudaSuccess != cudaDeviceSetLimit(cudaLimitMallocHeapSize, 2048000000))
+      printf("Error increasing heap size: %s\n",
+             cudaGetErrorString(cudaGetLastError()));
+
+    // Copy MachineModel to device for use during DevListSched.
+    // Allocate device memory
+    if (cudaSuccess != cudaMallocManaged((void**)&dev_MM,
+                                         sizeof(MachineModel)))
+      printf("Error allocating device space for dev_machMdl: %s\n",
+             cudaGetErrorString(cudaGetLastError()));
+    // Copy machMdl_ to device
+    if (cudaSuccess != cudaMemcpy(dev_MM, MM.get(),
+                                  sizeof(MachineModel),
+                                  cudaMemcpyHostToDevice))
+      printf("Error copying machMdl_ to device: %s\n",
+             cudaGetErrorString(cudaGetLastError()));
+    // Copy over all pointers to device
+    MM.get()->CopyPointersToDevice(dev_MM);
+
+    //Allocate device memory for dev_maxDDG pointer storage
+    if (cudaSuccess != cudaMallocManaged((void**)&dev_maxDDG,
+                                         sizeof(DataDepGraph)))
+      printf("Error allocating device space for dev_maxDDG: %s\n",
+             cudaGetErrorString(cudaGetLastError()));
+    //debug
+    Logger::Info("Launching AllocateMaxDDG kernel with size %d", maxRegionSize + 1);
+
+    AllocateMaxDDG<<<1,1>>>(dev_MM, LatencyPrecision, maxRegionSize + 1, 
+		            dev_maxDDG);
+
+    cudaDeviceSynchronize();
+    Logger::Info("Post Kernel Error: %s", cudaGetErrorString(cudaGetLastError()));
+  }
+  
   // create region
   auto region = llvm::make_unique<BBWithSpill>(
-      OST.get(), static_cast<DataDepGraph *>(DDG.get()), 0, HistTableHashBits,
+      OST.get(), static_cast<DataDepGraph *>(DDG.get()), RegionNumber, HistTableHashBits,
       LowerBoundAlgorithm, HeuristicPriorities, EnumPriorities, VerifySchedule,
-      PruningStrategy, SchedForRPOnly, EnumStalls, SCW, SCF, HeurSchedType);
+      PruningStrategy, SchedForRPOnly, EnumStalls, SCW, SCF, HeurSchedType,
+      dev_MM, dev_maxDDG);
 
   bool IsEasy = false;
   InstCount NormBestCost = 0;
@@ -418,6 +507,15 @@ void ScheduleDAGOptSched::schedule() {
                                      IsEasy, NormBestCost, BestSchedLngth,
                                      NormHurstcCost, HurstcSchedLngth, Sched,
                                      FilterByPerp, blocksToKeep(schedIni));
+
+  // Deallocate all device memory after completing second pass
+  // on the last scheduling region
+  //if (RegionNumber == Regions.size() - 1) {
+    Logger::Info("Calling cudaDeviceReset()");
+    cudaDeviceReset();
+    dev_MM = NULL;
+    dev_maxDDG = NULL;
+  //}
 
   if ((!(Rslt == RES_SUCCESS || Rslt == RES_TIMEOUT) || Sched == NULL)) {
     LLVM_DEBUG(

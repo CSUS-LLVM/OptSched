@@ -42,6 +42,12 @@ protected:
       std::pair<MachineBasicBlock::iterator, MachineBasicBlock::iterator>, 32>
       Regions;
 
+  // Holds size of largest region. Used for device DDG allocation
+  InstCount maxRegionSize;
+
+  // Holds device pointer to device max DDG pointer
+  DataDepGraph **dev_maxDDG;
+
   // Path to opt-sched config options directory.
   SmallString<128> PathCfg;
 
@@ -68,6 +74,9 @@ protected:
 
   // into the OptSched machine model
   std::unique_ptr<OptSchedMachineModel> MM;
+
+  // OptSched MachineModel on device
+  MachineModel *dev_MM;
 
   // A list of functions that are indicated as candidates for the
   // OptScheduler

@@ -861,7 +861,7 @@ SchedInstruction *DataDepGraph::CreateNode_(
   newInstPtr = new SchedInstruction(instNum, instName, instType, opCode,
                                     2 * instCnt_, nodeID, fileSchedOrder,
                                     fileSchedCycle, fileLB, fileUB, machMdl_);
-  if (instNum < 0 || instNum >= instCnt_)
+  if ((instNum < 0 || instNum >= instCnt_) && instNum != UNINITIATED_NUM)
     printf("Invalid instruction number\n");
   //  Logger::Fatal("Invalid instruction number");
   //  Logger::Info("Instruction order = %d, instCnt_ = %d", fileSchedOrder,
@@ -1431,14 +1431,14 @@ void DataDepGraph::CreateRegData(RegFileData *regFileData) {
   }
 }
 
-//reconstruct the DDG on device using nodeData
+// Reconstruct the DDG on device using nodeData
 __device__
 void DataDepGraph::ReconstructOnDevice(InstCount instCnt, NodeData *nodeData,
 	                        	RegFileData *regFileData) {
   AllocArrays_(instCnt);
 
   SchedInstruction *inst = NULL;
-  //create nodes
+  // Create nodes
   for (InstCount i = 0; i < instCnt; i++) {
     inst = CreateNode_(nodeData[i].instNum_, nodeData[i].instName_, 
 		       nodeData[i].instType_, nodeData[i].opCode_, 
@@ -1456,16 +1456,16 @@ void DataDepGraph::ReconstructOnDevice(InstCount instCnt, NodeData *nodeData,
 	     nodeData[i].fileLB_, nodeData[i].fileUB_);
     }
 
-    //set root_
+    // Set root_
     if (nodeData[i].prdcsrCnt_ == 0)
       root_ = (GraphNode *)inst;
 
-    //set leaf_
+    // Set leaf_
     if (nodeData[i].scsrCnt_ == 0)
       leaf_ = (GraphNode *)inst;
   }
 
-  //create edges
+  // Create edges
   for (InstCount i = 0; i < instCnt; i++) {
     for (int j = 0; j < nodeData[i].prdcsrCnt_; j++) {
       CreateEdge_(nodeData[i].prdcsrs_[j].toNodeNum_, nodeData[i].instNum_,
@@ -1480,7 +1480,7 @@ void DataDepGraph::ReconstructOnDevice(InstCount instCnt, NodeData *nodeData,
   }
   
   Register *reg = NULL;
-  //recreate RegFiles
+  // Recreate RegFiles
   for (int i = 0; i < machMdl_->GetRegTypeCnt(); i++) {
     RegFiles[i].SetRegType(regFileData[i].regType_);
     RegFiles[i].SetRegCnt(regFileData[i].regCnt_);
@@ -1506,6 +1506,74 @@ void DataDepGraph::ReconstructOnDevice(InstCount instCnt, NodeData *nodeData,
       }
     }
   }
+}
+
+__device__
+void DataDepGraph::InstantiateOnDevice(InstCount instCnt, NodeData *nodeData,
+                                        RegFileData *regFileData) {
+  //debug
+  printf("In DataDepGraph::InstantiateOnDevice\n");
+
+  // Instantiate nodes
+  for (InstCount i = 0; i < instCnt; i++) {
+    //debug
+    printf("Instantiating node %d with name %s\n", i, nodeData[i].instName_);
+    printf("insts_[%d]->GetNum : %d\n", i, insts_[i]->GetNum()); 
+
+    if (insts_[i]->GetNum() != nodeData[i].instNum_)
+      printf("NODE NUM MISMATCH!\n");
+
+    insts_[i]->InstantiateNode_(nodeData[i].instNum_, nodeData[i].instName_,
+                               nodeData[i].instType_, nodeData[i].opCode_,
+                               nodeData[i].nodeID_, nodeData[i].fileSchedOrder_,
+                               nodeData[i].fileSchedCycle_, nodeData[i].fileLB_,
+                               nodeData[i].fileUB_, 0, machMdl_);
+ 
+    //set root_
+    if (nodeData[i].prdcsrCnt_ == 0)
+      root_ = (GraphNode *)insts_[i];
+
+    //set leaf_
+    if (nodeData[i].scsrCnt_ == 0)
+      leaf_ = (GraphNode *)insts_[i];
+  }
+
+  //debug
+  printf("Done with DataDepGraph::InstantiateOnDevice\n");
+}
+
+
+__device__
+void DataDepGraph::AllocateMaxDDG(InstCount maxRgnSize) {
+  AllocArrays_(maxRgnSize);
+
+  SchedInstruction *inst;
+  for (InstCount i = 0; i < maxRgnSize; i++) {
+    // Allocate blank nodes for later 
+    inst = CreateNode_( i, "UNINITIATED",
+                       UNINITIATED_TYPE, "UNINITIATED",
+                       UNINITIATED_NUM, UNINITIATED_NUM,
+                       UNINITIATED_NUM, UNINITIATED_NUM,
+                       UNINITIATED_NUM, UNINITIATED_NUM);
+
+    //debug
+    if (!inst) {
+      printf("Node Creation failed for node num %d\n", i);
+    }
+  }
+
+  // Allocate n * n-1 blank edges
+  // Hold all pointers in edges for later initilization
+  edges_ = new GraphEdge *[instCnt_ * (instCnt_ - 1)];
+
+  for (InstCount i = 0; i < (instCnt_ * (instCnt_ - 1)); i++)
+    edges_[i] = new GraphEdge(NULL, NULL, UNINITIATED_NUM);
+}
+
+__device__
+void DataDepGraph::Reset() {
+ // for (InstCount i = 0; i < instCnt_; i++)
+    
 }
 
 InstCount DataDepGraph::GetRltvCrtclPath(SchedInstruction *ref,

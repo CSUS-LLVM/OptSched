@@ -19,13 +19,15 @@ extern bool OPTSCHED_gPrintSpills;
 
 using namespace llvm::opt_sched;
 
-SchedRegion::SchedRegion(MachineModel *machMdl, DataDepGraph *dataDepGraph,
-                         long rgnNum, int16_t sigHashSize, LB_ALG lbAlg,
+SchedRegion::SchedRegion(MachineModel *machMdl, MachineModel *dev_machMdl, 
+		         DataDepGraph *dataDepGraph, DataDepGraph **dev_MaxDDG, 
+			 long rgnNum, int16_t sigHashSize, LB_ALG lbAlg,
                          SchedPriorities hurstcPrirts,
                          SchedPriorities enumPrirts, bool vrfySched,
                          Pruning PruningStrategy, SchedulerType HeurSchedType,
                          SPILL_COST_FUNCTION spillCostFunc) {
   machMdl_ = machMdl;
+  dev_machMdl_ = dev_machMdl;
   dataDepGraph_ = dataDepGraph;
   rgnNum_ = rgnNum;
   sigHashSize_ = sigHashSize;
@@ -47,6 +49,8 @@ SchedRegion::SchedRegion(MachineModel *machMdl, DataDepGraph *dataDepGraph,
   schedUprBound_ = INVALID_VALUE;
 
   spillCostFunc_ = spillCostFunc;
+
+  dev_maxDDG = dev_MaxDDG;
 }
 
 void SchedRegion::UseFileBounds_() {
@@ -83,11 +87,20 @@ static bool isBbEnabled(Config &schedIni, Milliseconds rgnTimeout) {
 
 __global__
 void DevListSched(MachineModel *dev_machMdl, SchedRegion *dev_rgn, 
-		  InstCount schedUprBound, SchedPriorities prirts, 
-		  bool vrfy, LATENCY_PRECISION ltncyPcsn, 
-		  NodeData *dev_nodeData, RegFileData *dev_regFileData, 
+		  DataDepGraph **dev_maxDDG, InstCount schedUprBound, 
+		  SchedPriorities prirts, bool vrfy,
+		  LATENCY_PRECISION ltncyPcsn,
+		  NodeData *dev_nodeData, RegFileData *dev_regFileData,
 		  InstCount instCnt, bool cmputTrnstvClsr,
-		  InstSchedule *dev_lstSched) {
+		  InstSchedule *dev_lstSched, SchedulerType SCHED_TYPE) {
+
+  //debug
+  printf("Instantiating max_DDG on device\n");
+
+  (*dev_maxDDG)->InstantiateOnDevice(instCnt, dev_nodeData, dev_regFileData);
+
+  //debug
+  printf("Done instantiating max_DDG on device\n");
 
   DataDepGraph *dev_dataDepGraph = new DataDepGraph(dev_machMdl, ltncyPcsn); 
 
@@ -101,8 +114,15 @@ void DevListSched(MachineModel *dev_machMdl, SchedRegion *dev_rgn,
 
   ((BBWithSpill *)dev_rgn)->SetRegFiles(dev_dataDepGraph->getRegFiles());
 
-  ConstrainedScheduler *dev_lstSchdulr = new ListScheduler(dev_dataDepGraph, dev_machMdl, 
-		                                           schedUprBound, prirts);
+  ConstrainedScheduler *dev_lstSchdulr;
+ 
+  if (SCHED_TYPE == SCHED_LIST)
+    dev_lstSchdulr = new ListScheduler(dev_dataDepGraph, dev_machMdl, 
+		                       schedUprBound, prirts);
+  else
+    dev_lstSchdulr = new SequentialListScheduler(dev_dataDepGraph, 
+		                                 dev_machMdl, schedUprBound, 
+						 prirts);
 
   FUNC_RESULT rslt = dev_lstSchdulr->FindSchedule(dev_lstSched, dev_rgn);
 
@@ -233,33 +253,21 @@ FUNC_RESULT SchedRegion::FindOptimalSchedule(
  
     //****Begin Code for ListScheduling on Device****
     Milliseconds hurstcStart = Utilities::GetProcessorTime();
-    cudaProfilerStart();
+/*    
+// moved to ScheduleDAGOptsched constructor    
+    // If we are on first pass of block 0, set heap/stack size and copy
+    // machMdl to device once for the whole function
+    //if (rgnNum_ == 0) {
+      // Increase heap/stack size to allow large DDGs to be allocated
+      if (cudaSuccess != cudaDeviceSetLimit(cudaLimitStackSize, 65536))
+        printf("Error increasing stack size: %s\n",
+               cudaGetErrorString(cudaGetLastError()));
 
-    // Increase heap/stack size to allow large DDGs to be allocated
-    if (cudaSuccess != cudaDeviceSetLimit(cudaLimitStackSize, 65536))
-      printf("Error increasing stack size: %s\n",
-             cudaGetErrorString(cudaGetLastError()));
-
-    if (cudaSuccess != cudaDeviceSetLimit(cudaLimitMallocHeapSize , 1024000000))
-      printf("Error increasing heap size: %s\n",
-             cudaGetErrorString(cudaGetLastError()));
-
-    // Copy MachineModel to Device
-    MachineModel *dev_machMdl = NULL;
-    // Allocate space on device
-    if (cudaSuccess != cudaMallocManaged((void**)&dev_machMdl, 
-			                 sizeof(MachineModel)))
-      printf("Error allocating device space for dev_machMdl: %s\n",
-             cudaGetErrorString(cudaGetLastError()));
-    // Copy machMdl_ to device
-    if (cudaSuccess != cudaMemcpy(dev_machMdl, machMdl_, 
-			          sizeof(MachineModel), 
-			          cudaMemcpyHostToDevice))
-      printf("Error copying machMdl_ to device: %s\n",
-	     cudaGetErrorString(cudaGetLastError()));
-    // Copy over all pointers to device
-    machMdl_->CopyPointersToDevice(dev_machMdl);
-
+      if (cudaSuccess != cudaDeviceSetLimit(cudaLimitMallocHeapSize, 1024000000))
+        printf("Error increasing heap size: %s\n",
+               cudaGetErrorString(cudaGetLastError()));
+    //}
+*/
     // Create and copy NodeData and RegData arrays to device for dev DDG
     // holds data about nodes and edges
     NodeData *nodeData = new NodeData[dataDepGraph_->GetInstCnt()];
@@ -334,7 +342,7 @@ FUNC_RESULT SchedRegion::FindOptimalSchedule(
 	     cudaGetErrorString(cudaGetLastError()));
 
     // Update dev_rgn->machMdl_ to dev_machMdl
-    if (cudaSuccess != cudaMemcpy(&(dev_rgn->machMdl_), &dev_machMdl, 
+    if (cudaSuccess != cudaMemcpy(&(dev_rgn->machMdl_), &dev_machMdl_, 
 			          sizeof(MachineModel *), 
 				  cudaMemcpyHostToDevice))
       printf("Error updating dev_rgn->machMdl_ on device: %s\n", 
@@ -348,7 +356,7 @@ FUNC_RESULT SchedRegion::FindOptimalSchedule(
     InstSchedule *dev_lstSched = NULL;
 
     // Move lstSched arrays to device
-    lstSched->CopyPointersToDevice(dev_machMdl);
+    lstSched->CopyPointersToDevice(dev_machMdl_);
 
     // Allocate dev mem for dev_lstSched
     if (cudaSuccess != cudaMalloc((void**)&dev_lstSched, sizeof(InstSchedule)))
@@ -363,11 +371,13 @@ FUNC_RESULT SchedRegion::FindOptimalSchedule(
 
     // Launch device kernel
     printf("Launching device kernel\n");
-    DevListSched<<<1,1>>>(dev_machMdl, dev_rgn, abslutSchedUprBound_, 
-		          GetHeuristicPriorities(), vrfySched_, 
-			  dataDepGraph_->GetLtncyPrcsn(), dev_nodeData, 
-			  dev_regFileData, dataDepGraph_->GetInstCnt(), 
-			  needTransitiveClosure, dev_lstSched);
+    DevListSched<<<1,1>>>(dev_machMdl_, dev_rgn, dev_maxDDG, 
+		          abslutSchedUprBound_, GetHeuristicPriorities(), 
+			  vrfySched_, dataDepGraph_->GetLtncyPrcsn(), 
+			  dev_nodeData, dev_regFileData, 
+			  dataDepGraph_->GetInstCnt(),
+			  needTransitiveClosure, dev_lstSched,
+			  GetHeuristicSchedulerType());
 
     cudaDeviceSynchronize(); 
     printf("Post Kernel Error: %s\n", cudaGetErrorString(cudaGetLastError()));
@@ -378,14 +388,6 @@ FUNC_RESULT SchedRegion::FindOptimalSchedule(
              cudaGetErrorString(cudaGetLastError())); 
 
     lstSched->CopyPointersToHost(machMdl_);
-
-    //TODO: Figure out if sched_rgn needs to be updated with changes from dev_rgn
-    //((BBWithSpill *)(this))->UpdateSpillInfoFromDevice((BBWithSpill *)dev_rgn);
-
-    cudaDeviceSynchronize();
-    // Clear all allocated device memory. 
-    // Workaround for deconstructors crashing the kernel
-    cudaDeviceReset();
     //****End Code for ListScheduling on Device****
 
     // Moved to before device ListScheduling starts
@@ -436,7 +438,7 @@ FUNC_RESULT SchedRegion::FindOptimalSchedule(
       Logger::Fatal("******** Host and Device Schedule mismatch ********");
     }
 
-    cudaProfilerStop();
+    //cudaProfilerStop();
 
     // This schedule is optimal so ACO will not be run
     // so set bestSched here.

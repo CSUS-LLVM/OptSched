@@ -832,6 +832,84 @@ int16_t SchedInstruction::CmputLastUseCnt() {
   return lastUseCnt_;
 }
 
+__device__
+void SchedInstruction::InstantiateNode_(InstCount instNum, 
+		         const char *const instName,
+                         InstType instType, const char *const opCode,
+                         int nodeID, InstCount fileSchedOrder,
+                         InstCount fileSchedCycle, InstCount fileLB,
+                         InstCount fileUB, int blkNum, MachineModel *model) {
+  //debug
+  printf("In SchedInstruction::InstantiateNode_\n");
+  printf("Instantiating name %s\n", instName);
+  
+  int i = 0;
+  do {
+    name_[i] = instName[i];}
+  while (instName[i++] != 0);
+
+  //debug
+  printf("Instantiating opCode %s\n", opCode);
+
+  i = 0;
+  do {
+    opCode_[i] = opCode[i];}
+  while (opCode[i++] != 0);
+
+  //debug
+  printf("Done instantiaing name+opcode\n");
+
+  instType_ = instType;
+
+  frwrdLwrBound_ = INVALID_VALUE;
+  bkwrdLwrBound_ = INVALID_VALUE;
+  abslutFrwrdLwrBound_ = INVALID_VALUE;
+  abslutBkwrdLwrBound_ = INVALID_VALUE;
+  crtclPathFrmRoot_ = INVALID_VALUE;
+  crtclPathFrmLeaf_ = INVALID_VALUE;
+
+  ltncyPerPrdcsr_ = NULL;
+  memAllocd_ = false;
+  sortedPrdcsrLst_ = NULL;
+  sortedScsrLst_ = NULL;
+
+  crtclPathFrmRcrsvScsr_ = NULL;
+  crtclPathFrmRcrsvPrdcsr_ = NULL;
+
+  // Dynamic data that changes during scheduling.
+  ready_ = false;
+  rdyCyclePerPrdcsr_ = NULL;
+  minRdyCycle_ = INVALID_VALUE;
+  prevMinRdyCyclePerPrdcsr_ = NULL;
+  unschduldPrdcsrCnt_ = 0;
+  unschduldScsrCnt_ = 0;
+
+  crntSchedCycle_ = SCHD_UNSCHDULD;
+  crntRlxdCycle_ = SCHD_UNSCHDULD;
+  sig_ = 0;
+  preFxdCycle_ = INVALID_VALUE;
+
+  blksCycle_ = model->BlocksCycle(instType);
+  pipelined_ = model->IsPipelined(instType);
+
+  defCnt_ = 0;
+  useCnt_ = 0;
+
+  nodeID_ = nodeID;
+  fileSchedOrder_ = fileSchedOrder;
+  fileSchedCycle_ = fileSchedCycle;
+  fileLwrBound_ = fileLB;
+  fileUprBound_ = fileUB;
+
+  mustBeInBBEntry_ = false;
+  mustBeInBBExit_ = false;
+
+  GraphNode::SetNum(instNum);
+
+  //debug
+  printf("Done with SchedInstruction::InstantiateNode_\n");
+}
+
 /******************************************************************************
  * SchedRange                                                                 *
  ******************************************************************************/

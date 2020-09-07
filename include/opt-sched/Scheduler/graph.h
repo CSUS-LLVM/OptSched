@@ -336,6 +336,9 @@ protected:
   GraphEdge *GetLastPrdcsrEdge();
   __host__ __device__
   GraphEdge *GetPrevPrdcsrEdge();
+  // Sets num when instantiating on device
+  __device__
+  void SetNum(UDT_GNODES num) { num_ = num; }
 };
 
 // TODO(max): Make this class actually useful by providing a way to add nodes

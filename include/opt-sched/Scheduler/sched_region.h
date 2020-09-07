@@ -45,11 +45,13 @@ class ListScheduler;
 class SchedRegion {
 public:
   // TODO(max): Document.
-  SchedRegion(MachineModel *machMdl, DataDepGraph *dataDepGraph, long rgnNum,
-              int16_t sigHashSize, LB_ALG lbAlg, SchedPriorities hurstcPrirts,
-              SchedPriorities enumPrirts, bool vrfySched,
-              Pruning PruningStrategy, SchedulerType HeurSchedType,
-              SPILL_COST_FUNCTION spillCostFunc = SCF_PERP);
+  SchedRegion(MachineModel *machMdl, MachineModel *dev_machMdl, 
+	      DataDepGraph *dataDepGraph, DataDepGraph **dev_maxDDG, 
+	      long rgnNum, int16_t sigHashSize, LB_ALG lbAlg, 
+	      SchedPriorities hurstcPrirts, SchedPriorities enumPrirts, 
+	      bool vrfySched, Pruning PruningStrategy, 
+	      SchedulerType HeurSchedType, 
+	      SPILL_COST_FUNCTION spillCostFunc = SCF_PERP);
   // Destroys the region. Must be overriden by child classes.
   virtual ~SchedRegion() {}
 
@@ -122,6 +124,8 @@ private:
   LB_ALG lbAlg_;
   // The number of this region.
   long rgnNum_;
+  // Is this region the last region of the function
+  bool isLastRgn_;
   // Whether to verify the schedule after calculating it.
   bool vrfySched_;
 
@@ -161,8 +165,12 @@ private:
 protected:
   // The dependence graph of this region.
   DataDepGraph *dataDepGraph_;
+  // Pointer to device maxDDG
+  DataDepGraph **dev_maxDDG;
   // The machine model used by this region.
   MachineModel *machMdl_;
+  // Pointer to machMdl_ on the device
+  MachineModel *dev_machMdl_;
 
   // The schedule currently used by the enumerator
   InstSchedule *enumCrntSched_;

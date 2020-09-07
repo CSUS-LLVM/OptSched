@@ -94,6 +94,11 @@ const int MAX_LATENCY_VALUE = 10;
 // The total number of possible graph transformations.
 const int NUM_GRAPH_TRANS = 1;
 
+// Values for Uninitiated nodes
+const InstCount UNINITIATED_NUM = -1;
+const InstType UNINITIATED_TYPE = -1;
+//const char[12] UNINITIATED_NAME = "UNINITIATED";
+
 //struct for transfer of prdcsr/scrsr data to device
 struct EdgeData {
   InstCount toNodeNum_;
@@ -308,6 +313,9 @@ protected:
   // An array of pointers to instructions.
   // TODO(max): Elaborate.
   SchedInstruction **insts_;
+  // An array of pointers to allocated edges
+  // used by maxDDG to reset and initialize edges without reallocating
+  GraphEdge **edges_;
 
   // The number of issue types of the machine which this graph uses.
   int16_t issuTypeCnt_;
@@ -476,17 +484,28 @@ public:
   __host__ __device__
   RegisterFile *getRegFiles() { return RegFiles; }
 
-  //creates an array of NodeData which hold the information
-  //about the DDG in order to create DDG on device
+  // Creates an array of NodeData which hold the information
+  // about the DDG in order to create DDG on device
   void CreateNodeData(NodeData *nodeData);
-  //Creates and array of reg file data with holds the information
-  //about the RegFiles and its Regs in order to recreate
-  //regFiles on device
+  // Creates and array of reg file data with holds the information
+  // about the RegFiles and its Regs in order to recreate
+  // egFiles on device
   void CreateRegData(RegFileData *regFileData);
 
-  //used to setup DDG on device
+  // Used to setup DDG on device
   __device__
-  void ReconstructOnDevice(InstCount instCnt, NodeData *nodeData, RegFileData *regFileData);
+  void ReconstructOnDevice(InstCount instCnt, NodeData *nodeData, 
+		           RegFileData *regFileData);
+  // Initalized allocated SchedInsts and Edges
+  __device__
+  void InstantiateOnDevice(InstCount instCnt, NodeData *nodeData,
+                           RegFileData *regFileData);
+  // Allocates a full DDG with nodes = maxRgnSize and n-1 edges per node
+  __device__
+  void AllocateMaxDDG(InstCount maxRgnSize);
+  // Resets DDG for later reinitilization
+  __device__
+  void Reset();
 
 protected:
   // TODO(max): Get rid of this.
