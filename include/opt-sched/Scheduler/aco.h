@@ -81,6 +81,7 @@ private:
   double local_decay;
   double decay_factor;
   int ants_per_iteration;
+  int noImprovementMax;
   bool print_aco_trace;
   std::unique_ptr<InstSchedule> InitialSchedule;
   bool VrfySched_;

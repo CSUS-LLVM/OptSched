@@ -51,9 +51,7 @@ ACOScheduler::ACOScheduler(DataDepGraph *dataDepGraph,
   Config &schedIni = SchedulerOptions::getInstance();
 
   use_fixed_bias = schedIni.GetBool("ACO_USE_FIXED_BIAS");
-  heuristicImportance_ = schedIni.GetInt("ACO_HEURISTIC_IMPORTANCE");
   use_tournament = schedIni.GetBool("ACO_TOURNAMENT");
-  fixed_bias = schedIni.GetInt("ACO_FIXED_BIAS");
   bias_ratio = schedIni.GetFloat("ACO_BIAS_RATIO");
   local_decay = schedIni.GetFloat("ACO_LOCAL_DECAY");
   decay_factor = schedIni.GetFloat("ACO_DECAY_FACTOR");
@@ -87,6 +85,7 @@ ACOScheduler::ACOScheduler(DataDepGraph *dataDepGraph,
   int pheromone_size = (count_ + 1) * count_;
   pheromone_.resize(pheromone_size);
   InitialSchedule = nullptr;
+  //Logger::Info("Fincons");
 }
 
 ACOScheduler::~ACOScheduler() { delete rdyLst_; }
@@ -342,6 +341,13 @@ FUNC_RESULT ACOScheduler::FindSchedule(InstSchedule *schedule_out,
                                        SchedRegion *region) {
   rgn_ = region;
 
+  //get settings
+  Config &schedIni = SchedulerOptions::getInstance();
+  bool IsFirst = rgn_->IsSecondPass();
+  heuristicImportance_ = schedIni.GetInt(IsFirst ? "ACO_HEURISTIC_IMPORTANCE" : "ACO2P_HEURISTIC_IMPORTANCE");
+  fixed_bias = schedIni.GetInt(IsFirst ? "ACO_FIXED_BIAS" : "ACO2P_FIXED_BIAS");
+  noImprovementMax = schedIni.GetInt(IsFirst ? "ACO_STOP_ITERATIONS" : "ACO2P_STOP_ITERATIONS");
+
   // compute the relative maximum score inverse
   ScRelMax = rgn_->GetHeuristicCost();
 
@@ -370,8 +376,7 @@ FUNC_RESULT ACOScheduler::FindSchedule(InstSchedule *schedule_out,
   }
   writePheromoneGraph("initial");
 
-  Config &schedIni = SchedulerOptions::getInstance();
-  int noImprovementMax = schedIni.GetInt("ACO_STOP_ITERATIONS");
+  //int noImprovementMax = schedIni.GetInt("ACO_STOP_ITERATIONS");
   int noImprovement = 0; // how many iterations with no improvement
   int iterations = 0;
   while (true) {
@@ -404,7 +409,7 @@ FUNC_RESULT ACOScheduler::FindSchedule(InstSchedule *schedule_out,
         BestAntEdges = IterAntEdges;
 
       noImprovement = 0;
-      if(bestSchedule->GetCost()==0)
+      if(bestSchedule && bestSchedule->GetCost()==0)
         break;
     } else {
       noImprovement++;
