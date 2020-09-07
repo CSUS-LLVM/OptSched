@@ -13,6 +13,7 @@
 #include "opt-sched/Scheduler/data_dep.h"
 #include "opt-sched/Scheduler/graph_trans.h"
 #include "opt-sched/Scheduler/graph_trans_ilp.h"
+#include "opt-sched/Scheduler/graph_trans_ilp_occupancy_preserving.h"
 #include "opt-sched/Scheduler/random.h"
 #include "opt-sched/Scheduler/register.h"
 #include "opt-sched/Scheduler/sched_region.h"
@@ -197,6 +198,11 @@ void ScheduleDAGOptSched::addGraphTransformations(
   if (ILPStaticNodeSup) {
     GraphTransformations->push_back(
         llvm::make_unique<StaticNodeSupILPTrans>(BDDG));
+  }
+
+  if (OccupancyPreservingILPStaticNodeSup) {
+    GraphTransformations->push_back(
+        llvm::make_unique<StaticNodeSupOccupancyPreservingILPTrans>(BDDG));
   }
 }
 
@@ -604,6 +610,8 @@ void ScheduleDAGOptSched::loadOptSchedConfig() {
   MultiPassStaticNodeSup =
       schedIni.GetBool("MULTI_PASS_NODE_SUPERIORITY", false);
   ILPStaticNodeSup = schedIni.GetBool("STATIC_NODE_SUPERIORITY_ILP", false);
+  OccupancyPreservingILPStaticNodeSup =
+      schedIni.GetBool("STATIC_NODE_SUPERIORITY_ILP_PRESERVE_OCCUPANCY", false);
   // setup pruning
   PruningStrategy.rlxd = schedIni.GetBool("APPLY_RELAXED_PRUNING");
   PruningStrategy.nodeSup = schedIni.GetBool("DYNAMIC_NODE_SUPERIORITY");

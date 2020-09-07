@@ -21,6 +21,10 @@ using namespace llvm::opt_sched;
 using ILP = StaticNodeSupILPTrans;
 using RP = StaticNodeSupTrans;
 
+StaticNodeSupOccupancyPreservingILPTrans::
+    StaticNodeSupOccupancyPreservingILPTrans(DataDepGraph *DDG)
+    : GraphTrans(DDG) {}
+
 FUNC_RESULT StaticNodeSupOccupancyPreservingILPTrans::ApplyTrans() {
   Logger::Info("Performing occupancy-preserving ILP graph transformations");
 
