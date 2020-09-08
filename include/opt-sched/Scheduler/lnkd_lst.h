@@ -161,6 +161,7 @@ protected:
   Entry<T> *allocEntries_;
   int crntAllocIndx_;
   Entry<T> *topEntry_, *bottomEntry_, *rtrvEntry_;
+  Entry<T> *freeList_;
   int elmntCnt_;
   bool itrtrReset_;
   bool wasTopRmvd_;
@@ -461,7 +462,6 @@ template <class T> void LinkedList<T>::AppendEntry_(Entry<T> *newEntry) {
 }
 
 template <class T> void LinkedList<T>::RmvEntry_(Entry<T> *entry, bool free) {
-  assert(maxSize_ == INVALID_VALUE);
   assert(LinkedList<T>::elmntCnt_ > 0);
 
   Entry<T> *nextEntry = entry->GetNext();
@@ -492,14 +492,19 @@ template <class T> void LinkedList<T>::RmvEntry_(Entry<T> *entry, bool free) {
 template <class T> void LinkedList<T>::FreeEntry_(Entry<T> *entry) {
   if (maxSize_ == INVALID_VALUE) {
     delete entry;
-  } else {
+  } else if (entry - allocEntries_ == crntAllocIndx_ - 1) {
     assert(crntAllocIndx_ >= 1);
     crntAllocIndx_--;
+  } else {
+    entry->SetPrev(nullptr);
+    entry->SetNext(freeList_);
+    freeList_ = entry;
   }
 }
 
 template <class T> inline void LinkedList<T>::Init_() {
   topEntry_ = bottomEntry_ = rtrvEntry_ = NULL;
+  freeList_ = nullptr;
   elmntCnt_ = 0;
   itrtrReset_ = true;
   wasTopRmvd_ = false;
@@ -512,10 +517,13 @@ template <class T> Entry<T> *LinkedList<T>::AllocEntry_(T *element) {
 
   if (maxSize_ == INVALID_VALUE) {
     entry = new Entry<T>();
-  } else {
-    assert(crntAllocIndx_ < maxSize_);
+  } else if (crntAllocIndx_ < maxSize_) {
     entry = allocEntries_ + crntAllocIndx_;
     crntAllocIndx_++;
+  } else {
+    assert(freeList_);
+    entry = freeList_;
+    freeList_ = freeList_->GetNext();
   }
 
   entry->element = element;
