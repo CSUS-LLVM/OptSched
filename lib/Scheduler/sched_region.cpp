@@ -15,6 +15,7 @@
 #include "opt-sched/Scheduler/sched_region.h"
 #include "opt-sched/Scheduler/stats.h"
 #include "opt-sched/Scheduler/utilities.h"
+#include "llvm/Support/ErrorHandling.h"
 
 extern bool OPTSCHED_gPrintSpills;
 
@@ -134,8 +135,9 @@ FUNC_RESULT SchedRegion::FindOptimalSchedule(
 
   if (!HeuristicSchedulerEnabled && !AcoBeforeEnum) {
     // Abort if ACO and heuristic algorithms are disabled.
-    Logger::Fatal(
-        "Heuristic list scheduler or ACO must be enabled before enumerator.");
+    llvm::report_fatal_error(
+        "Heuristic list scheduler or ACO must be enabled before enumerator.",
+        false);
     return RES_ERROR;
   }
 
@@ -190,7 +192,7 @@ FUNC_RESULT SchedRegion::FindOptimalSchedule(
     rslt = lstSchdulr->FindSchedule(lstSched, this);
 
     if (rslt != RES_SUCCESS) {
-      Logger::Fatal("List scheduling failed");
+      llvm::report_fatal_error("List scheduling failed", false);
       delete lstSchdulr;
       delete lstSched;
       return rslt;
@@ -269,7 +271,7 @@ FUNC_RESULT SchedRegion::FindOptimalSchedule(
 
     rslt = runACO(AcoSchedule, lstSched);
     if (rslt != RES_SUCCESS) {
-      Logger::Fatal("ACO scheduling failed");
+      llvm::report_fatal_error("ACO scheduling failed", false);
       if (lstSchdulr)
         delete lstSchdulr;
       if (lstSched)

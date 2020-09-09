@@ -13,6 +13,7 @@ Last Update:  May  2020
 #include "opt-sched/Scheduler/defines.h"
 #include "opt-sched/Scheduler/logger.h"
 #include "llvm/ADT/ArrayRef.h"
+#include "llvm/Support/ErrorHandling.h"
 #include <cstring>
 
 namespace llvm {
@@ -169,7 +170,7 @@ public:
   // element with the same key exists.
   KeyedEntry<T, K> *InsrtElmnt(T *elmnt, K key, bool allowDplct);
   // Disable the version from LinkedList.
-  void InsrtElmnt(T *) { Logger::Fatal("Unimplemented."); }
+  void InsrtElmnt(T *) { llvm::report_fatal_error("Unimplemented.", false); }
   // Updates an entry's key and moves it to its correct place.
   void BoostEntry(KeyedEntry<T, K> *entry, K newKey);
   // Gets the next element in the list, based on the "current" element.
@@ -191,7 +192,7 @@ protected:
   KeyedEntry<T, K> *AllocEntry_(T *elmnt, K key);
   // Disable the version from LinkedList.
   Entry<T> *AllocEntry_(T *) {
-    Logger::Fatal("Unimplemented.");
+    llvm::report_fatal_error("Unimplemented.", false);
     return NULL;
   }
   // Allocates all the keyed entries in a fixed-size list.
@@ -271,7 +272,7 @@ template <class T> void LinkedList<T>::RmvElmnt(const T *const elmnt) {
     }
   }
 
-  Logger::Fatal("Invalid linked list removal.");
+  llvm::report_fatal_error("Invalid linked list removal.", false);
 }
 
 template <class T> void LinkedList<T>::RmvLastElmnt() {

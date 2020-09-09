@@ -2,6 +2,8 @@
 #include "opt-sched/Scheduler/register.h"
 #include "opt-sched/Scheduler/stats.h"
 #include "llvm/ADT/STLExtras.h"
+#include "llvm/Support/ErrorHandling.h"
+#include <string>
 
 using namespace llvm::opt_sched;
 
@@ -257,8 +259,9 @@ bool SchedInstruction::ApplyPreFxng(LinkedList<SchedInstruction> *tightndLst,
 
 void SchedInstruction::AddDef(Register *reg) {
   if (defCnt_ >= MAX_DEFS_PER_INSTR) {
-    Logger::Fatal("An instruction can't have more than %d defs",
-                  MAX_DEFS_PER_INSTR);
+    llvm::report_fatal_error("An instruction can't have more than " +
+                                 std::to_string(MAX_DEFS_PER_INSTR) + " defs",
+                             false);
   }
   // Logger::Info("Inst %d defines reg %d of type %d and physNum %d and useCnt
   // %d",
@@ -270,8 +273,9 @@ void SchedInstruction::AddDef(Register *reg) {
 
 void SchedInstruction::AddUse(Register *reg) {
   if (useCnt_ >= MAX_USES_PER_INSTR) {
-    Logger::Fatal("An instruction can't have more than %d uses",
-                  MAX_USES_PER_INSTR);
+    llvm::report_fatal_error("An instruction can't have more than " +
+                                 std::to_string(MAX_USES_PER_INSTR) + " uses",
+                             false);
   }
   // Logger::Info("Inst %d uses reg %d of type %d and physNum %d and useCnt %d",
   // num_, reg->GetNum(), reg->GetType(), reg->GetPhysicalNumber(),

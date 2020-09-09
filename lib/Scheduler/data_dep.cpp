@@ -12,6 +12,7 @@
 #include "opt-sched/Scheduler/stats.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/Debug.h"
+#include "llvm/Support/ErrorHandling.h"
 
 // only print pressure if enabled by sched.ini
 extern bool OPTSCHED_gPrintSpills;
@@ -832,7 +833,7 @@ SchedInstruction *DataDepGraph::CreateNode_(
                                     2 * instCnt_, nodeID, fileSchedOrder,
                                     fileSchedCycle, fileLB, fileUB, machMdl_);
   if (instNum < 0 || instNum >= instCnt_)
-    Logger::Fatal("Invalid instruction number");
+    llvm::report_fatal_error("Invalid instruction number", false);
   //  Logger::Info("Instruction order = %d, instCnt_ = %d", fileSchedOrder,
   //  instCnt_);
   if (fileSchedOrder > maxFileSchedOrder_)

@@ -12,6 +12,7 @@
 #include "opt-sched/Scheduler/stats.h"
 #include "opt-sched/Scheduler/utilities.h"
 #include "llvm/ADT/STLExtras.h"
+#include "llvm/Support/ErrorHandling.h"
 #include <algorithm>
 #include <cstdio>
 #include <iostream>
@@ -20,6 +21,7 @@
 #include <numeric>
 #include <set>
 #include <sstream>
+#include <string>
 #include <utility>
 
 extern bool OPTSCHED_gPrintSpills;
@@ -437,8 +439,10 @@ void BBWithSpill::UpdateSpillInfoForSchdul_(SchedInstruction *inst,
     physRegNum = use->GetPhysicalNumber();
 
     if (use->IsLive() == false)
-      Logger::Fatal("Reg %d of type %d is used without being defined", regNum,
-                    regType);
+      llvm::report_fatal_error("Reg " + std::to_string(regNum) + " of type " +
+                                   std::to_string(regType) +
+                                   " is used without being defined",
+                               false);
 
 #ifdef IS_DEBUG_REG_PRESSURE
     Logger::Info("Inst %d uses reg %d of type %d and %d uses", inst->GetNum(),
