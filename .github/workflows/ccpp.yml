@@ -52,7 +52,7 @@ jobs:
           CCACHE_COMPRESSLEVEL: 6
 
       - name: unit tests
-        run: ninja test
+        run: ctest -VV
         working-directory: ./build
 
       - name: dump ccache statistics
