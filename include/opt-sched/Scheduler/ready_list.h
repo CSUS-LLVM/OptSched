@@ -83,6 +83,9 @@ public:
   // Prints out the ready list, nicely formatted, into an output stream.
   void Print(std::ostream &out);
 
+  // Constructs the priority-list key based on the schemes listed in prirts_.
+  unsigned long CmputKey_(SchedInstruction *inst, bool isUpdate, bool &changed);
+
 private:
   // An ordered vector of priorities
   SchedPriorities prirts_;
@@ -117,9 +120,6 @@ private:
   int16_t ltncySumBits_;
   int16_t nodeID_Bits_;
   int16_t inptSchedOrderBits_;
-
-  // Constructs the priority-list key based on the schemes listed in prirts_.
-  unsigned long CmputKey_(SchedInstruction *inst, bool isUpdate, bool &changed);
 
   // Adds instructions at the bottom of a given list which have not been added
   // to the ready list already.
