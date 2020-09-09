@@ -43,7 +43,11 @@ jobs:
       - name: build
         run: |
           ccache -z
-          ninja
+          ninja || true
+          (ninja | grep -E -v '^-- Up-to-date: ') || true
+          (ninja | grep -E -v '^-- Up-to-date: ') || true
+          (ninja | grep -E -v '^-- Up-to-date: ') || true
+          (ninja | grep -E -v '^-- Up-to-date: ')
         working-directory: ./build
         env:
           CCACHE_BASEDIR: $GITHUB_WORKSPACE
