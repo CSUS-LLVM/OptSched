@@ -833,31 +833,22 @@ int16_t SchedInstruction::CmputLastUseCnt() {
 }
 
 __device__
-void SchedInstruction::InstantiateNode_(InstCount instNum, 
+void SchedInstruction::InitializeNode_(InstCount instNum, 
 		         const char *const instName,
                          InstType instType, const char *const opCode,
                          int nodeID, InstCount fileSchedOrder,
                          InstCount fileSchedCycle, InstCount fileLB,
                          InstCount fileUB, int blkNum, MachineModel *model) {
-  //debug
-  printf("In SchedInstruction::InstantiateNode_\n");
-  printf("Instantiating name %s\n", instName);
-  
+
   int i = 0;
   do {
     name_[i] = instName[i];}
   while (instName[i++] != 0);
 
-  //debug
-  printf("Instantiating opCode %s\n", opCode);
-
   i = 0;
   do {
     opCode_[i] = opCode[i];}
   while (opCode[i++] != 0);
-
-  //debug
-  printf("Done instantiaing name+opcode\n");
 
   instType_ = instType;
 
@@ -906,8 +897,8 @@ void SchedInstruction::InstantiateNode_(InstCount instNum,
 
   GraphNode::SetNum(instNum);
 
-  //debug
-  printf("Done with SchedInstruction::InstantiateNode_\n");
+  // Reset private values to default and reset LinkedLists
+  //GraphNode::Reset();
 }
 
 /******************************************************************************

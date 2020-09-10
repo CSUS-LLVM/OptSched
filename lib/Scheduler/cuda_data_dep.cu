@@ -984,6 +984,65 @@ void DataDepGraph::CreateEdge_(InstCount frmNodeNum, InstCount toNodeNum,
   }
 }
 
+__device__
+void DataDepGraph::InitializeEdge_(InstCount frmNodeNum, InstCount toNodeNum,
+                                   int ltncy, DependenceType depType) {
+  GraphEdge *edge;
+
+  assert(frmNodeNum < instCnt_);
+  assert(nodes_[frmNodeNum] != NULL);
+
+  assert(toNodeNum < instCnt_);
+
+  assert(nodes_[toNodeNum] != NULL);
+
+  GraphNode *frmNode = nodes_[frmNodeNum];
+  GraphNode *toNode = nodes_[toNodeNum];
+
+#ifdef IS_DEBUG_LATENCIES
+  stats::dependenceTypeLatencies.Add(GetDependenceTypeName(depType), ltncy);
+  if (depType == DEP_DATA) {
+    InstType inst = ((SchedInstruction *)frmNode)->GetInstType();
+    stats::instructionTypeLatencies.Add(machMdl_->GetInstTypeNameByCode(inst),
+                                        ltncy);
+  }
+#endif
+
+  edge = frmNode->FindScsr(toNode);
+
+  if (edge == NULL) {
+#ifdef IS_DEBUG_DAG
+    Logger::Info("Creating edge from %d to %d of type %d and latency %d",
+                 frmNodeNum, toNodeNum, depType, ltncy);
+#endif
+    edge = edges_[initializedEdges_++];
+    edge->from = frmNode;
+    edge->to = toNode;
+    edge->label = ltncy;
+    edge->label2 = depType;
+
+    frmNode->AddScsr(edge);
+    toNode->AddPrdcsr(edge);
+  } else {
+    if (ltncy > edge->label) {
+#ifdef IS_DEBUG_DAG
+      Logger::Info("Setting latency of the edge from %d to %d to %d",
+                   frmNodeNum, toNodeNum, ltncy);
+#endif
+      edge->label = ltncy;
+      edge->from->UpdtMaxEdgLbl(ltncy);
+    }
+  }
+
+  if (ltncy > maxLtncy_) {
+    maxLtncy_ = ltncy;
+  }
+
+  if (ltncy <= MAX_LATENCY_VALUE) {
+    edgeCntPerLtncy_[ltncy]++;
+  }
+}
+
 FUNC_RESULT DataDepGraph::FinishNode_(InstCount nodeNum, InstCount edgeCnt) {
   if (edgeCnt != -1) {
     assert(edgeCnt == nodes_[nodeNum]->GetScsrCnt());
@@ -1509,21 +1568,23 @@ void DataDepGraph::ReconstructOnDevice(InstCount instCnt, NodeData *nodeData,
 }
 
 __device__
-void DataDepGraph::InstantiateOnDevice(InstCount instCnt, NodeData *nodeData,
+void DataDepGraph::InitializeOnDevice(InstCount instCnt, NodeData *nodeData,
                                         RegFileData *regFileData) {
   //debug
-  printf("In DataDepGraph::InstantiateOnDevice\n");
+  printf("In DataDepGraph::InitializeOnDevice with instCnt %d\n", instCnt);
+
+  instCnt_ = instCnt;
+  DirAcycGraph::nodeCnt_ = instCnt;
 
   // Instantiate nodes
   for (InstCount i = 0; i < instCnt; i++) {
     //debug
-    printf("Instantiating node %d with name %s\n", i, nodeData[i].instName_);
-    printf("insts_[%d]->GetNum : %d\n", i, insts_[i]->GetNum()); 
+    //printf("Initializing node %d with name %s\n", i, nodeData[i].instName_);
 
     if (insts_[i]->GetNum() != nodeData[i].instNum_)
       printf("NODE NUM MISMATCH!\n");
 
-    insts_[i]->InstantiateNode_(nodeData[i].instNum_, nodeData[i].instName_,
+    insts_[i]->InitializeNode_(nodeData[i].instNum_, nodeData[i].instName_,
                                nodeData[i].instType_, nodeData[i].opCode_,
                                nodeData[i].nodeID_, nodeData[i].fileSchedOrder_,
                                nodeData[i].fileSchedCycle_, nodeData[i].fileLB_,
@@ -1538,14 +1599,59 @@ void DataDepGraph::InstantiateOnDevice(InstCount instCnt, NodeData *nodeData,
       leaf_ = (GraphNode *)insts_[i];
   }
 
+  // Create edges
+  for (InstCount i = 0; i < instCnt; i++) {
+    for (int j = 0; j < nodeData[i].prdcsrCnt_; j++) {
+      InitializeEdge_(nodeData[i].prdcsrs_[j].toNodeNum_, nodeData[i].instNum_,
+                  nodeData[i].prdcsrs_[j].ltncy_,
+                  nodeData[i].prdcsrs_[j].depType_);
+    }
+
+    for (int j = 0; j < nodeData[i].scsrCnt_; j++) {
+      InitializeEdge_(nodeData[i].instNum_, nodeData[i].scsrs_[j].toNodeNum_,
+                  nodeData[i].scsrs_[j].ltncy_, nodeData[i].scsrs_[j].depType_);
+    }
+  }
+
+  SchedInstruction *inst = NULL;
+  Register *reg = NULL;
+  // Recreate RegFiles
+  for (int i = 0; i < machMdl_->GetRegTypeCnt(); i++) {
+    RegFiles[i].SetRegType(regFileData[i].regType_);
+    RegFiles[i].SetRegCnt(regFileData[i].regCnt_);
+
+    for (int j = 0; j < regFileData[i].regCnt_; j++) {
+      reg = RegFiles[i].GetReg(j);
+      reg->SetWght(regFileData[i].regs_[j].wght_);
+      reg->SetIsLiveIn(regFileData[i].regs_[j].isLiveIn_);
+      reg->SetIsLiveOut(regFileData[i].regs_[j].isLiveOut_);
+
+      //add uses
+      for (int x = 0; x < regFileData[i].regs_[j].useCnt_; x++) {
+        inst = insts_[regFileData[i].regs_[j].uses_[x]];
+        inst->AddUse(reg);
+        reg->AddUse(inst);
+      }    
+ 
+      //add defs
+      for (int x = 0; x < regFileData[i].regs_[j].defCnt_; x++) {
+        inst = insts_[regFileData[i].regs_[j].defs_[x]];
+        inst->AddDef(reg);
+        reg->AddDef(inst);
+      }    
+    }    
+  }
+
   //debug
-  printf("Done with DataDepGraph::InstantiateOnDevice\n");
+  printf("Done with DataDepGraph::InitializeOnDevice\n");
 }
 
 
 __device__
 void DataDepGraph::AllocateMaxDDG(InstCount maxRgnSize) {
   AllocArrays_(maxRgnSize);
+
+  DirAcycGraph::tplgclOrdr_ = new GraphNode *[maxRgnSize];
 
   SchedInstruction *inst;
   for (InstCount i = 0; i < maxRgnSize; i++) {
@@ -1566,14 +1672,29 @@ void DataDepGraph::AllocateMaxDDG(InstCount maxRgnSize) {
   // Hold all pointers in edges for later initilization
   edges_ = new GraphEdge *[instCnt_ * (instCnt_ - 1)];
 
-  for (InstCount i = 0; i < (instCnt_ * (instCnt_ - 1)); i++)
+  for (InstCount i = 0; i < (instCnt_ * (instCnt_ - 1)); i++) {
     edges_[i] = new GraphEdge(NULL, NULL, UNINITIATED_NUM);
+
+    if (!edges_[i])
+      printf("Node creationg failed for edge num %d\n", i);
+  }
+
+  // Reset unused edge pool counter
+  initializedEdges_ = 0;
 }
 
 __device__
 void DataDepGraph::Reset() {
- // for (InstCount i = 0; i < instCnt_; i++)
-    
+  // Reset unused edge pool counter
+  initializedEdges_ = 0;
+  // Reset all insts that were initialized
+  for (InstCount i = 0; i < instCnt_; i++)
+    ((GraphNode *)insts_[i])->Reset();
+
+  RegFiles = new RegisterFile[machMdl_->GetRegTypeCnt()];
+
+  wasSetupForSchduling_ = false;
+  dpthFrstSrchDone_ = false; 
 }
 
 InstCount DataDepGraph::GetRltvCrtclPath(SchedInstruction *ref,
@@ -2942,6 +3063,9 @@ bool InstSchedule::operator==(InstSchedule &b) const {
 
 __host__ __device__
 bool InstSchedule::AppendInst(InstCount instNum) {
+  //debug
+  //printf("crntSlotNum: %d, totSlotCnt_: %d\n", crntSlotNum_, totSlotCnt_);
+
   assert(crntSlotNum_ < totSlotCnt_);
   instInSlot_[crntSlotNum_] = instNum;
 

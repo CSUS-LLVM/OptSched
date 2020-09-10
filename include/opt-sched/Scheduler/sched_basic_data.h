@@ -510,11 +510,15 @@ public:
   // Sets values of nodes/edges in dev_maxDDG to correct values
   // for current region
   __device__
-  void InstantiateNode_(InstCount instNum, const char *const instName, 
+  void InitializeNode_(InstCount instNum, const char *const instName, 
 		        InstType instType, const char *const opCode, 
 		        int nodeID, InstCount fileSchedOrder,
                         InstCount fileSchedCycle, InstCount fileLB, 
 			InstCount fileUB, int blkNum, MachineModel *model);
+
+  // Resets prdcsr/scsr lists so new inst can be initialized
+  __device__
+  void Reset();
 
   friend class SchedRange;
 

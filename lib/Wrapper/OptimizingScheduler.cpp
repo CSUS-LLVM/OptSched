@@ -510,12 +510,12 @@ void ScheduleDAGOptSched::schedule() {
 
   // Deallocate all device memory after completing second pass
   // on the last scheduling region
-  //if (RegionNumber == Regions.size() - 1) {
+  if (RegionNumber == Regions.size() - 1 && SecondPass) {
     Logger::Info("Calling cudaDeviceReset()");
     cudaDeviceReset();
     dev_MM = NULL;
     dev_maxDDG = NULL;
-  //}
+  }
 
   if ((!(Rslt == RES_SUCCESS || Rslt == RES_TIMEOUT) || Sched == NULL)) {
     LLVM_DEBUG(

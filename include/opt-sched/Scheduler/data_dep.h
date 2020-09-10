@@ -316,6 +316,8 @@ protected:
   // An array of pointers to allocated edges
   // used by maxDDG to reset and initialize edges without reallocating
   GraphEdge **edges_;
+  // Keep track of how many edges are currently in use per region
+  int initializedEdges_;
 
   // The number of issue types of the machine which this graph uses.
   int16_t issuTypeCnt_;
@@ -498,12 +500,17 @@ public:
 		           RegFileData *regFileData);
   // Initalized allocated SchedInsts and Edges
   __device__
-  void InstantiateOnDevice(InstCount instCnt, NodeData *nodeData,
+  void InitializeOnDevice(InstCount instCnt, NodeData *nodeData,
                            RegFileData *regFileData);
+  // Initializes a blank edge to given values. Same behavior as create
+  // edge except edges are taken from a pre allocated pool and not created
+  __device__
+  void InitializeEdge_(InstCount frmNodeNum, InstCount toNodeNum, int ltncy, 
+		       DependenceType depType);
   // Allocates a full DDG with nodes = maxRgnSize and n-1 edges per node
   __device__
   void AllocateMaxDDG(InstCount maxRgnSize);
-  // Resets DDG for later reinitilization
+  // Resets DDG to blank state for later reinitilization
   __device__
   void Reset();
 

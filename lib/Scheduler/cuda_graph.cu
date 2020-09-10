@@ -57,6 +57,29 @@ void GraphNode::DelScsrLst() {
   scsrLst_->Reset();
 }
 
+__device__
+void GraphNode::Reset() {
+  scsrLblSum_ = 0;
+  prdcsrLblSum_ = 0;
+  maxEdgLbl_ = 0;
+  color_ = COL_WHITE;
+
+  rcrsvScsrLst_ = NULL;
+  rcrsvPrdcsrLst_ = NULL;
+  isRcrsvScsr_ = NULL;
+  isRcrsvPrdcsr_ = NULL;
+
+  scsrLst_->Reset();
+  prdcsrLst_->Reset();
+
+  if (rcrsvScsrLst_)
+    rcrsvScsrLst_->Reset();
+
+  if (rcrsvPrdcsrLst_)
+    rcrsvPrdcsrLst_->Reset();
+
+}
+
 void GraphNode::DepthFirstVisit(GraphNode *tplgclOrdr[],
                                 UDT_GNODES &tplgclIndx) {
   color_ = COL_GRAY;

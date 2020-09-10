@@ -266,6 +266,10 @@ public:
   __host__ __device__
   UDT_GEDGES GetRcrsvScsrCnt() const;
 
+  // Resets node to default state, used for dev_maxDDG
+  __device__
+  void Reset();
+
 private:
   // The node number. Should be unique within a single graph.
   UDT_GNODES num_;

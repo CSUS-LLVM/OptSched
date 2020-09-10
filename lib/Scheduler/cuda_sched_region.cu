@@ -95,32 +95,32 @@ void DevListSched(MachineModel *dev_machMdl, SchedRegion *dev_rgn,
 		  InstSchedule *dev_lstSched, SchedulerType SCHED_TYPE) {
 
   //debug
-  printf("Instantiating max_DDG on device\n");
+  printf("Initializing max_DDG on device\n");
 
-  (*dev_maxDDG)->InstantiateOnDevice(instCnt, dev_nodeData, dev_regFileData);
+  (*dev_maxDDG)->InitializeOnDevice(instCnt, dev_nodeData, dev_regFileData);
 
   //debug
-  printf("Done instantiating max_DDG on device\n");
+  printf("Done initializing max_DDG on device\n");
 
-  DataDepGraph *dev_dataDepGraph = new DataDepGraph(dev_machMdl, ltncyPcsn); 
+  //DataDepGraph *dev_dataDepGraph = new DataDepGraph(dev_machMdl, ltncyPcsn); 
 
   // Update dev_rgn->dataDepGraph_ to device DDG
-  dev_rgn->SetDepGraph(dev_dataDepGraph);
+  dev_rgn->SetDepGraph(*dev_maxDDG);
   
   // Initialize DDG using dev_nodeData and dev_regData
-  dev_dataDepGraph->ReconstructOnDevice(instCnt, dev_nodeData, dev_regFileData);
+  //dev_dataDepGraph->ReconstructOnDevice(instCnt, dev_nodeData, dev_regFileData);
+  
+  (*dev_maxDDG)->SetupForSchdulng(cmputTrnstvClsr);
 
-  dev_dataDepGraph->SetupForSchdulng(cmputTrnstvClsr);
-
-  ((BBWithSpill *)dev_rgn)->SetRegFiles(dev_dataDepGraph->getRegFiles());
+  ((BBWithSpill *)dev_rgn)->SetRegFiles((*dev_maxDDG)->getRegFiles());
 
   ConstrainedScheduler *dev_lstSchdulr;
  
   if (SCHED_TYPE == SCHED_LIST)
-    dev_lstSchdulr = new ListScheduler(dev_dataDepGraph, dev_machMdl, 
+    dev_lstSchdulr = new ListScheduler(*dev_maxDDG, dev_machMdl, 
 		                       schedUprBound, prirts);
   else
-    dev_lstSchdulr = new SequentialListScheduler(dev_dataDepGraph, 
+    dev_lstSchdulr = new SequentialListScheduler(*dev_maxDDG, 
 		                                 dev_machMdl, schedUprBound, 
 						 prirts);
 
@@ -136,6 +136,9 @@ void DevListSched(MachineModel *dev_machMdl, SchedRegion *dev_rgn,
 
   //debug
   printf("Device schedule cost: %d\n", dev_lstSched->GetCost());
+
+  // Reset state of maxDDG so that next region can be initialized
+  (*dev_maxDDG)->Reset();
 }
 
 FUNC_RESULT SchedRegion::FindOptimalSchedule(
