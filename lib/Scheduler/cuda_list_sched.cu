@@ -95,9 +95,9 @@ FUNC_RESULT ListScheduler::FindSchedule(InstSchedule *sched, SchedRegion *rgn) {
     }
   }
 
-//#ifdef IS_DEBUG_SCHED
+#ifdef IS_DEBUG_SCHED
   crntSched_->Print();
-//#endif
+#endif
 
   return RES_SUCCESS;
 }

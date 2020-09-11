@@ -273,6 +273,7 @@ FUNC_RESULT SchedRegion::FindOptimalSchedule(
 */
     // Create and copy NodeData and RegData arrays to device for dev DDG
     // holds data about nodes and edges
+/*
     NodeData *nodeData = new NodeData[dataDepGraph_->GetInstCnt()];
 
     dataDepGraph_->CreateNodeData(nodeData);
@@ -400,12 +401,12 @@ FUNC_RESULT SchedRegion::FindOptimalSchedule(
 
     //debug
     printf("Running host list scheduling to check for correctness\n");
-
-    InstSchedule *host_lstSched = new InstSchedule(machMdl_, dataDepGraph_, vrfySched_);
+*/
+    InstSchedule *lstSched = new InstSchedule(machMdl_, dataDepGraph_, vrfySched_);
 
     lstSchdulr = AllocHeuristicScheduler_();
 
-    rslt = lstSchdulr->FindSchedule(host_lstSched, this);
+    rslt = lstSchdulr->FindSchedule(lstSched, this);
 
     if (rslt != RES_SUCCESS) {
       Logger::Fatal("List scheduling failed");
@@ -424,12 +425,12 @@ FUNC_RESULT SchedRegion::FindOptimalSchedule(
     // Compute cost for Heuristic list scheduler, this must be called before
     // calling GetCost() on the InstSchedule instance.
     //Computing sched cost now happens on device
-    CmputNormCost_(host_lstSched, CCM_DYNMC, hurstcExecCost, true);
+    CmputNormCost_(lstSched, CCM_DYNMC, hurstcExecCost, true);
     
     hurstcCost_ = lstSched->GetCost();
 
     bool match = true;
-
+/*
     for (InstCount i = 0; i < dataDepGraph_->GetInstCnt(); i++) {
       if (host_lstSched->GetSchedCycle(i) != lstSched->GetSchedCycle(i))
         match = false;
@@ -440,17 +441,17 @@ FUNC_RESULT SchedRegion::FindOptimalSchedule(
     else {
       Logger::Fatal("******** Host and Device Schedule mismatch ********");
     }
-
+*/
     //cudaProfilerStop();
 
     // This schedule is optimal so ACO will not be run
     // so set bestSched here.
-    if (hurstcCost_ == 0) {
+    //if (hurstcCost_ == 0) {
       isLstOptml = true;
       bestSched = bestSched_ = lstSched;
       bestSchedLngth_ = heuristicScheduleLength;
       bestCost_ = hurstcCost_;
-    }
+    //}
 
     FinishHurstc_();
 

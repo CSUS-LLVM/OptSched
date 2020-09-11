@@ -430,7 +430,7 @@ void ScheduleDAGOptSched::schedule() {
 
   auto *BDDG = static_cast<OptSchedDDGWrapperBasic *>(DDG.get());
   addGraphTransformations(BDDG);
-
+/*
   if (dev_MM == NULL) {
     // Increase heap/stack size to allow large DDGs to be allocated
     if (cudaSuccess != cudaDeviceSetLimit(cudaLimitStackSize, 65536))
@@ -470,7 +470,7 @@ void ScheduleDAGOptSched::schedule() {
     cudaDeviceSynchronize();
     Logger::Info("Post Kernel Error: %s", cudaGetErrorString(cudaGetLastError()));
   }
-  
+*/  
   // create region
   auto region = llvm::make_unique<BBWithSpill>(
       OST.get(), static_cast<DataDepGraph *>(DDG.get()), RegionNumber, HistTableHashBits,
@@ -510,13 +510,13 @@ void ScheduleDAGOptSched::schedule() {
 
   // Deallocate all device memory after completing second pass
   // on the last scheduling region
-  if (RegionNumber == Regions.size() - 1 && SecondPass) {
+/*  if (RegionNumber == Regions.size() - 1 && SecondPass) {
     Logger::Info("Calling cudaDeviceReset()");
     cudaDeviceReset();
     dev_MM = NULL;
     dev_maxDDG = NULL;
   }
-
+*/
   if ((!(Rslt == RES_SUCCESS || Rslt == RES_TIMEOUT) || Sched == NULL)) {
     LLVM_DEBUG(
         Logger::Info("OptSched run failed: rslt=%d, sched=%p. Falling back.",
