@@ -863,9 +863,20 @@ InstCount BBWithSpill::UpdtOptmlSched(InstSchedule *crntSched,
   //  crntSched->Print(Logger::GetLogStream(), "New Feasible Schedule");
   //#endif
 
-  if (crntCost < GetBestCost()) {
 
-    if (crntSched->GetCrntLngth() > schedLwrBound_)
+  // update optimial solution if:
+  // first pass & found better RP
+  // second pass & found target & shorter length @ given RP
+  //    only schedules meeting trgt length will make it this far,
+  //    thus we don't need to check that condition
+  // non two-pass & found better weighted cost 
+  if (
+      (IsSecondPass() && crntSpillCost_ <= GetFirstPassSpillCost() && 
+        crntSched->GetCrntLngth() < GetBestSchedLength()) 
+      || (!IsSecondPass() && IsTwoPassEnabled() && crntSpillCost_ < optmlSpillCost_) 
+      || (!IsTwoPassEnabled() && crntCost < GetBestCost()))    
+  {
+    if (!IsTwoPassEnabled() && crntSched->GetCrntLngth() > schedLwrBound_)
       Logger::Info("$$$ GOOD_HIT: Better spill cost for a longer schedule");
 
     SetBestCost(crntCost);
@@ -874,7 +885,7 @@ InstCount BBWithSpill::UpdtOptmlSched(InstSchedule *crntSched,
     enumBestSched_->Copy(crntSched);
     bestSched_ = enumBestSched_;
   }
-
+   
   return GetBestCost();
 }
 /*****************************************************************************/
@@ -902,25 +913,39 @@ void BBWithSpill::SetupForSchdulng_() {
 
 bool BBWithSpill::ChkCostFsblty(InstCount trgtLngth, EnumTreeNode *node) {
   bool fsbl = true;
-  InstCount crntCost, dynmcCostLwrBound;
+  InstCount crntCost;
   if (GetSpillCostFunc() == SCF_SLIL) {
     crntCost = dynamicSlilLowerBound_ * SCW_ + trgtLngth * schedCostFactor_;
+    
+    //If second pass -- check that our RP is held at first pass RP
+    //If first pass -- minimize RP
+    if (IsSecondPass())
+      fsbl = (dynamicSlilLowerBound_ <= GetFirstPassSpillCost());
+    else if (IsTwoPassEnabled() && !IsSecondPass())
+      fsbl = dynamicSlilLowerBound_ <= optmlSpillCost_;
+
   } else {
     crntCost = crntSpillCost_ * SCW_ + trgtLngth * schedCostFactor_;
+    
+    if (IsSecondPass())
+      fsbl = (crntSpillCost_ <= GetFirstPassSpillCost());
+    else if (IsTwoPassEnabled() && !IsSecondPass())
+      fsbl = crntSpillCost_ <= optmlSpillCost_;
   }
+
   crntCost -= GetCostLwrBound();
-  dynmcCostLwrBound = crntCost;
 
   // assert(cost >= 0);
-  assert(dynmcCostLwrBound >= 0);
+  assert(crntCost >= 0);
 
-  fsbl = dynmcCostLwrBound < GetBestCost();
+  if (!IsTwoPassEnabled())
+    fsbl = crntCost < GetBestCost();
 
   // FIXME: RP tracking should be limited to the current SCF. We need RP
   // tracking interface.
   if (fsbl) {
     node->SetCost(crntCost);
-    node->SetCostLwrBound(dynmcCostLwrBound);
+    node->SetCostLwrBound(crntCost);
     node->SetPeakSpillCost(peakSpillCost_);
     node->SetSpillCostSum(totSpillCost_);
   }

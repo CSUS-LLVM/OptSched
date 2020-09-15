@@ -65,6 +65,9 @@ public:
   // Get the number of simulated spills code added for this block.
   inline int GetSimSpills() { return totalSimSpills_; }
 
+  // Get schedLength for best-so-far sched
+  inline InstCount GetBestSchedLength() { return bestSchedLngth_; }
+
   // TODO(max): Document.
   virtual FUNC_RESULT
   FindOptimalSchedule(Milliseconds rgnTimeout, Milliseconds lngthTimeout,
@@ -109,6 +112,9 @@ public:
   // Initialize variables for the second pass of the two-pass-optsched
   void InitSecondPass();
 
+  // Initiliaze variables to reflect that we are using two-pass version of algorithm
+  void InitTwoPassAlg();
+
 private:
   // The algorithm to use for calculated lower bounds.
   LB_ALG lbAlg_;
@@ -119,6 +125,10 @@ private:
 
   // The normal heuristic scheduling results.
   InstCount hurstcCost_;
+    
+  // Spill cost for heuristic schedule
+  InstCount hurstcSpillCost_;
+
 
   // total simulated spills.
   int totalSimSpills_;
@@ -150,6 +160,9 @@ private:
   // The pruning technique to use for this region.
   Pruning prune_;
 
+  // Whether or not we are using two-pass version of algorithm
+  bool twoPassEnabled_;
+
 protected:
   // The dependence graph of this region.
   DataDepGraph *dataDepGraph_;
@@ -179,6 +192,10 @@ protected:
   SchedulerType GetHeuristicSchedulerType() const { return HeurSchedType_; }
 
   bool IsSecondPass() const { return isSecondPass_; }
+
+  bool IsTwoPassEnabled() const { return twoPassEnabled_; }
+
+  InstCount GetFirstPassSpillCost() const { return hurstcSpillCost_; }
 
   void SetBestCost(InstCount bestCost) { bestCost_ = bestCost; }
 
