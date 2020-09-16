@@ -875,7 +875,6 @@ InstCount BBWithSpill::UpdtOptmlSched(InstSchedule *crntSched,
         crntSched->GetCrntLngth() < getBestSchedLength()) 
       || (!IsSecondPass() && isTwoPassEnabled() && crntSpillCost_ < optmlSpillCost_) 
       || (!isTwoPassEnabled() && crntCost < GetBestCost()))    
-  //if (crntCost < GetBestCost())
   {
     if (!isTwoPassEnabled() && crntSched->GetCrntLngth() > schedLwrBound_)
       Logger::Info("$$$ GOOD_HIT: Better spill cost for a longer schedule");
