@@ -234,7 +234,7 @@ FUNC_RESULT SchedRegion::FindOptimalSchedule(
     hurstcCost_ = lstSched->GetCost();
 
     // Get unweighted spill cost for Heurstic list scheduler
-    hurstcSpillCost_ = lstSched->GetSpillCost();
+    HurstcSpillCost_ = lstSched->GetSpillCost();
 
     // This schedule is optimal so ACO will not be run
     // so set bestSched here.
@@ -832,7 +832,7 @@ void SchedRegion::RegAlloc_(InstSchedule *&bestSched, InstSchedule *&lstSched) {
 
 void SchedRegion::InitSecondPass() { isSecondPass_ = true; }
 
-void SchedRegion::InitTwoPassAlg() { twoPassEnabled_ = true; }
+void SchedRegion::initTwoPassAlg() { TwoPassEnabled_ = true; }
 
 FUNC_RESULT SchedRegion::runACO(InstSchedule *ReturnSched,
                                 InstSchedule *InitSched) {

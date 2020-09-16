@@ -66,7 +66,7 @@ public:
   inline int GetSimSpills() { return totalSimSpills_; }
 
   // Get schedLength for best-so-far sched
-  inline InstCount GetBestSchedLength() { return bestSchedLngth_; }
+  inline InstCount getBestSchedLength() { return bestSchedLngth_; }
 
   // TODO(max): Document.
   virtual FUNC_RESULT
@@ -113,7 +113,7 @@ public:
   void InitSecondPass();
 
   // Initiliaze variables to reflect that we are using two-pass version of algorithm
-  void InitTwoPassAlg();
+  void initTwoPassAlg();
 
 private:
   // The algorithm to use for calculated lower bounds.
@@ -127,8 +127,7 @@ private:
   InstCount hurstcCost_;
     
   // Spill cost for heuristic schedule
-  InstCount hurstcSpillCost_;
-
+  InstCount HurstcSpillCost_;
 
   // total simulated spills.
   int totalSimSpills_;
@@ -161,7 +160,7 @@ private:
   Pruning prune_;
 
   // Whether or not we are using two-pass version of algorithm
-  bool twoPassEnabled_;
+  bool TwoPassEnabled_;
 
 protected:
   // The dependence graph of this region.
@@ -193,9 +192,9 @@ protected:
 
   bool IsSecondPass() const { return isSecondPass_; }
 
-  bool IsTwoPassEnabled() const { return twoPassEnabled_; }
+  bool isTwoPassEnabled() const { return TwoPassEnabled_; }
 
-  InstCount GetFirstPassSpillCost() const { return hurstcSpillCost_; }
+  InstCount getFirstPassSpillCost() const { return HurstcSpillCost_; }
 
   void SetBestCost(InstCount bestCost) { bestCost_ = bestCost; }
 
