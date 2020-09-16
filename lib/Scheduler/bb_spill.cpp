@@ -870,11 +870,12 @@ InstCount BBWithSpill::UpdtOptmlSched(InstSchedule *crntSched,
   //    only schedules meeting trgt length will make it this far,
   //    thus we don't need to check that condition
   // non two-pass & found better weighted cost 
-  if (
+  /*if (
       (IsSecondPass() && crntSpillCost_ <= GetFirstPassSpillCost() && 
         crntSched->GetCrntLngth() < GetBestSchedLength()) 
       || (!IsSecondPass() && IsTwoPassEnabled() && crntSpillCost_ < optmlSpillCost_) 
-      || (!IsTwoPassEnabled() && crntCost < GetBestCost()))    
+      || (!IsTwoPassEnabled() && crntCost < GetBestCost()))    */
+  if (crntCost < GetBestCost())
   {
     if (!IsTwoPassEnabled() && crntSched->GetCrntLngth() > schedLwrBound_)
       Logger::Info("$$$ GOOD_HIT: Better spill cost for a longer schedule");
@@ -919,18 +920,18 @@ bool BBWithSpill::ChkCostFsblty(InstCount trgtLngth, EnumTreeNode *node) {
     
     //If second pass -- check that our RP is held at first pass RP
     //If first pass -- minimize RP
-    if (IsSecondPass())
-      fsbl = (dynamicSlilLowerBound_ <= GetFirstPassSpillCost());
-    else if (IsTwoPassEnabled() && !IsSecondPass())
-      fsbl = dynamicSlilLowerBound_ <= optmlSpillCost_;
+    //if (IsSecondPass())
+    //  fsbl = (dynamicSlilLowerBound_ <= GetFirstPassSpillCost());
+    //else if (IsTwoPassEnabled() && !IsSecondPass())
+    //  fsbl = dynamicSlilLowerBound_ <= optmlSpillCost_;
 
   } else {
     crntCost = crntSpillCost_ * SCW_ + trgtLngth * schedCostFactor_;
     
-    if (IsSecondPass())
-      fsbl = (crntSpillCost_ <= GetFirstPassSpillCost());
-    else if (IsTwoPassEnabled() && !IsSecondPass())
-      fsbl = crntSpillCost_ <= optmlSpillCost_;
+    //if (IsSecondPass())
+    //  fsbl = (crntSpillCost_ <= GetFirstPassSpillCost());
+    //else if (IsTwoPassEnabled() && !IsSecondPass())
+    //  fsbl = crntSpillCost_ <= optmlSpillCost_;
   }
 
   crntCost -= GetCostLwrBound();
@@ -938,7 +939,7 @@ bool BBWithSpill::ChkCostFsblty(InstCount trgtLngth, EnumTreeNode *node) {
   // assert(cost >= 0);
   assert(crntCost >= 0);
 
-  if (!IsTwoPassEnabled())
+  //if (!IsTwoPassEnabled())
     fsbl = crntCost < GetBestCost();
 
   // FIXME: RP tracking should be limited to the current SCF. We need RP
