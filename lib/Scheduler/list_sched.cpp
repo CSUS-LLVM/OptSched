@@ -121,6 +121,11 @@ bool SequentialListScheduler::ChkInstLglty_(SchedInstruction *inst) const {
 
 bool SequentialListScheduler::IsSequentialInstruction(
     const SchedInstruction *Inst) const {
+  // Instr with number 0 is always sequential and legal to schedule
+  // since its predecessor is OptSched artificial root which is always
+  // trivially legal
+  if (Inst->GetNum() == 0)
+    return true;
   // Instr with number N-1 must already be scheduled.
   return crntSched_->GetSchedCycle(Inst->GetNum() - 1) != SCHD_UNSCHDULD;
 }
