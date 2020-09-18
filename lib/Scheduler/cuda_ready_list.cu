@@ -231,7 +231,7 @@ void ReadyList::Print(std::ostream &out) {
   prirtyLst_->ResetIterator();
 }
 
-__device__
+__host__ __device__
 void ReadyList::Dev_Print() {
   printf("Ready List: ");
   for (const auto *crntInst = prirtyLst_->GetFrstElmnt(); crntInst != NULL;

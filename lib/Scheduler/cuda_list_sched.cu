@@ -50,6 +50,9 @@ FUNC_RESULT ListScheduler::FindSchedule(InstSchedule *sched, SchedRegion *rgn) {
     UpdtRdyLst_(crntCycleNum_, crntSlotNum_);
     rdyLst_->ResetIterator();
 
+    //debug
+    //rdyLst_->Dev_Print();
+
     iterCnt++;
     rdyLstSize = rdyLst_->GetInstCnt();
     if (rdyLstSize > maxRdyLstSize)
@@ -125,10 +128,8 @@ bool SequentialListScheduler::ChkInstLglty_(SchedInstruction *inst) const {
   // Account for instructions that block the whole cycle.
   if (isCrntCycleBlkd_)
     return false;
-
   if (inst->BlocksCycle() && crntSlotNum_ != 0)
     return false;
-
   if (includesUnpipelined_ && rsrvSlots_ &&
       rsrvSlots_[crntSlotNum_].strtCycle != INVALID_VALUE &&
       crntCycleNum_ <= rsrvSlots_[crntSlotNum_].endCycle) {
@@ -145,6 +146,12 @@ __host__ __device__
 bool SequentialListScheduler::IsSequentialInstruction(
     const SchedInstruction *Inst) const {
   // Instr with number N-1 must already be scheduled.
+
+  // In the case of Inst num 0, its predecessor (OptSched root) is always
+  // scheduled	
+  if (Inst->GetNum() == 0)
+    return true;
+
   return crntSched_->GetSchedCycle(Inst->GetNum() - 1) != SCHD_UNSCHDULD;
 }
 

@@ -100,7 +100,7 @@ public:
   __host__
   void Print(std::ostream &out);
   // Cannot use cout on device, invoke this on device instead
-  __device__
+  __host__ __device__
   void Dev_Print();
 
 private:

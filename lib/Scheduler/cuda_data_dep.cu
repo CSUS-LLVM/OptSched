@@ -1589,6 +1589,9 @@ void DataDepGraph::InitializeOnDevice(InstCount instCnt, NodeData *nodeData,
                                nodeData[i].nodeID_, nodeData[i].fileSchedOrder_,
                                nodeData[i].fileSchedCycle_, nodeData[i].fileLB_,
                                nodeData[i].fileUB_, 0, machMdl_);
+
+    if (!insts_[i])
+      printf("Node creation failed for node num %d\n", i);
  
     //set root_
     if (nodeData[i].prdcsrCnt_ == 0)
@@ -1598,6 +1601,9 @@ void DataDepGraph::InitializeOnDevice(InstCount instCnt, NodeData *nodeData,
     if (nodeData[i].scsrCnt_ == 0)
       leaf_ = (GraphNode *)insts_[i];
   }
+
+  //debug
+  //printf("Initializing Edges\n");
 
   // Create edges
   for (InstCount i = 0; i < instCnt; i++) {
@@ -1612,6 +1618,9 @@ void DataDepGraph::InitializeOnDevice(InstCount instCnt, NodeData *nodeData,
                   nodeData[i].scsrs_[j].ltncy_, nodeData[i].scsrs_[j].depType_);
     }
   }
+
+  //debug
+  //printf("Done initializing edges\n");
 
   SchedInstruction *inst = NULL;
   Register *reg = NULL;
@@ -3432,6 +3441,7 @@ __host__ __device__
 InstCount InstSchedule::GetSchedCycle(InstCount instNum) {
   assert(instNum < totInstCnt_);
   InstCount slotNum = slotForInst_[instNum];
+  
   InstCount cycleNum;
 
   if (slotNum == SCHD_UNSCHDULD) {
