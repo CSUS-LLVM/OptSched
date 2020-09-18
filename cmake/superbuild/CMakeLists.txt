@@ -51,6 +51,8 @@ set(cache_default_args)
 add_cache_variables(cache_default_args
   CMAKE_CXX_COMPILER_LAUNCHER
   CMAKE_C_COMPILER_LAUNCHER
+  OPTSCHED_EXTRA_DEFINITIONS
+  OPTSCHED_EXTRA_LINK_LIBRARIES
 )
 
 set(ROOT_DIR ${PROJECT_SOURCE_DIR}/../..)

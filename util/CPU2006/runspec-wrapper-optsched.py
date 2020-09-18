@@ -12,6 +12,9 @@ import os
 import shutil
 import pdb
 
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from readlogs import *
+
 ## Configuration
 
 # Dictionary for benchmark selection. Maps benchmark names and categories
@@ -196,21 +199,8 @@ SPILLS_REGEX = re.compile(r'Function: (.*?)\nGREEDY RA: Number of spilled live r
 #SPILLS_REGEX = re.compile(r'Function: (.*?)\nTotal Simulated Spills: (\d+)')
 SPILLS_WEIGHTED_REGEX = re.compile(r'SC in Function (.*?) (-?\d+)')
 TIMES_REGEX = re.compile(r'(\d+) total seconds elapsed')
-BLOCK_NAME_AND_SIZE_REGEX = re.compile(r'Processing DAG (.*) with (\d+) insts')
-BLOCK_ENUMERATED_OPTIMAL_REGEX = re.compile(r'DAG solved optimally')
-BLOCK_ENUMERATED_REGEX = re.compile(r'Enumerating at target length (\d+)')
-BLOCK_COST_LOWER_BOUND_REGEX = re.compile(r'Lower bound of cost before scheduling: (\d+)')
-BLOCK_COST_REGEX = re.compile(r'list schedule is of length \d+ and spill cost \d+. Tot cost = (\d+)')
-BLOCK_IMPROVEMENT_REGEX = re.compile(r'cost imp=(\d+)')
-BLOCK_START_TIME_REGEX = re.compile(r'-{20} \(Time = (\d+) ms\)')
-BLOCK_END_TIME_REGEX = re.compile(r'verified successfully \(Time = (\d+) ms\)')
-BLOCK_LIST_FAILED_REGEX = re.compile(r'List scheduling failed')
-BLOCK_RP_MISMATCH = re.compile(r'RP-mismatch falling back!')
-BLOCK_PEAK_REG_PRESSURE_REGEX = re.compile(r'PeakRegPresAfter Index (\d+) Name (.*) Peak (\d+) Limit (\d+)')
-BLOCK_PEAK_REG_BLOCK_NAME = re.compile(r'LLVM max pressure after scheduling for BB (\S+)')
-REGION_OPTSCHED_SPILLS_REGEX = re.compile(r"OPT_SCHED LOCAL RA: DAG Name: (\S+) Number of spills: (\d+) \(Time")
 
-def writeStats(stats, spills, weighted, times, blocks, regp, trackOptSchedSpills):
+def writeStats(stats, spills, weighted, times, blocks, trackOptSchedSpills):
     # Write times.
     if times:
         with open(times, 'w') as times_file:
@@ -500,140 +490,41 @@ def writeStats(stats, spills, weighted, times, blocks, regp, trackOptSchedSpills
             blocks_file.write('  Average optimal solution time: %d ms\n' %
                               ((sum(optimalTimesList) / len(optimalTimesList)) if optimalTimesList else 0))
 
-        # Write peak pressure stats
-        if regp:
-            with open(regp, 'w') as regp_file:
-                for benchName in stats:
-                    regp_file.write('Benchmark %s:\n' % benchName)
-                    regpressure = stats[benchName]['regpressure']
-                    numberOfFunctionsWithPeakExcess = 0
-                    numberOfBlocksWithPeakExcess = 0
-                    numberOfBlocks = 0
-                    peakPressureSetSumsPerBenchmark = {}
-                    for functionName in regpressure:
-                        peakPressureSetSums = {}
-                        regp_file.write('  Function %s:\n' % functionName)
-                        listOfBlocks = regpressure[functionName]
-                        if len(listOfBlocks) == 0:
-                            continue
-                        for blockName, listOfExcessPressureTuples in listOfBlocks:
-                            numberOfBlocks += 1
-                            if len(listOfExcessPressureTuples) == 0:
-                                continue
-                            # regp_file.write('    Block %s:\n' % blockName)
-                            for setName, peakExcessPressure in listOfExcessPressureTuples:
-                                # If we ever enter this loop, that means there exists a peak excess pressure
-                                # regp_file.write('      %5d %s\n' % (peakExcessPressure, setName))
-                                if not setName in peakPressureSetSums:
-                                    peakPressureSetSums[setName] = peakExcessPressure
-                                else:
-                                    peakPressureSetSums[setName] += peakExcessPressure
-                        regp_file.write(
-                            '  Pressure Set Sums for Function %s:\n' % functionName)
-                        for setName in peakPressureSetSums:
-                            regp_file.write('    %5d %s\n' %
-                                            (peakPressureSetSums[setName], setName))
-                            if not setName in peakPressureSetSumsPerBenchmark:
-                                peakPressureSetSumsPerBenchmark[setName] = peakPressureSetSums[setName]
-                            else:
-                                peakPressureSetSumsPerBenchmark[setName] += peakPressureSetSums[setName]
-                    regp_file.write(
-                        'Pressure Set Sums for Benchmark %s:\n' % benchName)
-                    for setName in peakPressureSetSumsPerBenchmark:
-                        regp_file.write('%5d %s\n' % (
-                            peakPressureSetSumsPerBenchmark[setName], setName))
-                    # regp_file.write('Number of blocks with peak excess:    %d\n' % numberOfBlocksWithPeakExcess)
-                    # regp_file.write('Number of blocks total:               %d\n' % numberOfBlocks)
-                    # regp_file.write('Number of functions with peak excess: %d\n' % numberOfFunctionsWithPeakExcess)
-                    # regp_file.write('Number of functions total:            %d\n' % len(regpressure))
-                    regp_file.write('------------\n')
-
-
-def calculatePeakPressureStats(output):
-    """
-    Output should look like:
-    Benchmark:
-      Function1:
-        Block1:
-          PERP1 RegName1
-          PERP2 RegName2
-          ...
-      Function1 Peak: PERPMax RegNameMax
-    Number of blocks with peak excess register pressure: M
-    Number of blocks total: N
-    Number of functions with excess register pressure: F
-    Number of functions total: G
-
-    Then the data structure will look like:
-    {
-      function1: [
-        (block1, [(SetName1, PERP1), ...]),
-        ...
-        ],
-      function2: ...
-    }
-    """
-    blocks = output.split('Scheduling **********')[1:]
-    functions = {}
-    for block in blocks:
-        if len(BLOCK_PEAK_REG_BLOCK_NAME.findall(block)) == 0:
-            continue
-        dagName = BLOCK_PEAK_REG_BLOCK_NAME.findall(block)[0]
-        functionName = dagName.split(':')[0]
-        blockName = dagName.split(':')[1]
-        pressureMatches = BLOCK_PEAK_REG_PRESSURE_REGEX.findall(block)
-        peakExcessPressures = []
-        for indexString, name, peakString, limitString in pressureMatches:
-            peak = int(peakString)
-            limit = int(limitString)
-            excessPressure = peak - limit
-            if excessPressure < 0:
-                excessPressure = 0
-            element = tuple((name, excessPressure))
-            peakExcessPressures.append(element)
-        if len(peakExcessPressures) > 0:
-            blockStats = (blockName, peakExcessPressures)
-            if not functionName in functions:
-                functions[functionName] = []
-            functions[functionName].append(blockStats)
-    return functions
-
 
 def calculateBlockStats(output, trackOptSchedSpills):
-    blocks = output.split('Opt Scheduling **********')[1:]
+    blocks = split_blocks(output)
     stats = []
     for index, block in enumerate(blocks):
-        lines = [line[6:]
-                 for line in block.split('\n') if line.startswith('INFO:')]
-        block = '\n'.join(lines)
+        events = keep_only_first_event(parse_events(block))
 
         try:
-            name, size = BLOCK_NAME_AND_SIZE_REGEX.findall(block)[0]
+            process_dag = events['ProcessDag']
+            name = process_dag['name']
+            size = process_dag['num_instructions']
 
-            failed = BLOCK_LIST_FAILED_REGEX.findall(
-                block) != [] or BLOCK_RP_MISMATCH.findall(block) != []
+            heuristic_failed = 'HeuristicSchedulerFailed' in events
+            failed = heuristic_failed
 
             if failed:
                 timeTaken = 0
                 isEnumerated = isOptimal = False
                 listCost = improvement = 0
             else:
-                start_time = int(BLOCK_START_TIME_REGEX.findall(block)[0])
-                end_time = int(BLOCK_END_TIME_REGEX.findall(block)[0])
+                start_time = process_dag['time']
+                end_time = events['ScheduleVerifiedSuccessfully']['time']
                 timeTaken = end_time - start_time
-                if REGION_OPTSCHED_SPILLS_REGEX.findall(block) and trackOptSchedSpills:
-                    optSchedSpills = int(REGION_OPTSCHED_SPILLS_REGEX.findall(block)[0][1])
+                if 'LocalRegAllocSimulationChoice' in events and trackOptSchedSpills:
+                    optSchedSpills = events['LocalRegAllocSimulationChoice']['num_spills']
                 else:
                     optSchedSpills = 0
 
-                costLwrBound = int(BLOCK_COST_LOWER_BOUND_REGEX.search(block).group(1))
-                listCost = costLwrBound + int(BLOCK_COST_REGEX.findall(block)[0])
+                costLowerBound = events['CostLowerBound']['cost']
+                listCost = costLowerBound + events['HeuristicResult']['cost']
                 # The block is not enumerated if the list schedule is optimal or there is a zero
                 # time limit for enumeration.
-                isEnumerated = (BLOCK_ENUMERATED_REGEX.findall(block) != [])
+                isEnumerated = 'Enumerating' in events
                 if isEnumerated:
-                    isOptimal = bool(
-                        BLOCK_ENUMERATED_OPTIMAL_REGEX.findall(block))
+                    isOptimal = 'DagSolvedOptimally' in events
                     """
                     Sometimes the OptScheduler doesn't print out cost improvement.
                     This happens when the scheduler determines that the list schedule is
@@ -642,11 +533,7 @@ def calculateBlockStats(output, trackOptSchedSpills):
                     The rest of this if-block ensures that this tool doesn't crash.
                     If the improvement is not found, it is assumed to be 0.
                     """
-                    matches = BLOCK_IMPROVEMENT_REGEX.findall(block)
-                    if matches == []:
-                        improvement = 0
-                    else:
-                        improvement = int(matches[0])
+                    improvement = events['DagSolvedOptimally']['cost_improvement'] if isOptimal else 0
                 else:
                     isOptimal = False
                     improvement = 0
@@ -722,7 +609,6 @@ def getBenchmarkResult(output, trackOptSchedSpills):
         'time': time,
         'spills': calculateSpills(output),
         'blocks': calculateBlockStats(output, trackOptSchedSpills),
-        'regpressure': calculatePeakPressureStats(output)
     }
 
 
@@ -796,13 +682,8 @@ def main(args):
             times = os.path.join(args.outdir, args.times)
             blocks = os.path.join(args.outdir, args.blocks)
 
-            if args.regp:
-                regp = os.path.join(testOutDir, args.regp)
-            else:
-                regp = None
-
             # Write out the results from the logfile.
-            writeStats(results, spills, weighted, times, blocks, regp, args.trackOptSchedSpills)
+            writeStats(results, spills, weighted, times, blocks, args.trackOptSchedSpills)
 
         # Run the benchmarks and collect results.
     else:
@@ -849,13 +730,9 @@ def main(args):
             weighted = os.path.join(testOutDir, args.weighted)
             times = os.path.join(testOutDir, args.times)
             blocks = os.path.join(testOutDir, args.blocks)
-            if args.regp:
-                regp = os.path.join(testOutDir, args.regp)
-            else:
-                regp = None
 
             # Write out the results for this test.
-            writeStats(results, spills, weighted, times, blocks, regp, args.trackOptSchedSpills)
+            writeStats(results, spills, weighted, times, blocks, args.trackOptSchedSpills)
 
 
 if __name__ == '__main__':
@@ -877,9 +754,6 @@ if __name__ == '__main__':
                       metavar='filepath',
                       default='blocks.dat',
                       help='Where to write the run block stats (%default).')
-    parser.add_option('-r', '--regp',
-                      metavar='filepath',
-                      help='Where to write the reg pressure stats (%default).')
     parser.add_option('-c', '--config',
                       metavar='filepath',
                       default='default.cfg',

@@ -2,6 +2,7 @@ import re
 import mmap
 import optparse
 import os
+import json
 
 parser = optparse.OptionParser(
     description='Wrapper around runspec for collecting spill counts.')
@@ -24,8 +25,6 @@ if not os.path.isfile(bruteForceFile):
 if not os.path.isfile(bbFile):
     raise Error("Please specify a valid dynamic log file.")
 
-regex = re.compile(r'DAG (.*?) spillCostLB (\d+) scFactor \d+ lengthLB \d+ lenFactor \d+ staticLB \d+')
-
 results = {}
 
 errorCount = 0
@@ -36,19 +35,20 @@ improvementCount = 0
 with open(bruteForceFile) as bff:
     bffm = mmap.mmap(bff.fileno(), 0, access=mmap.ACCESS_READ)
     dagResults = {}
-    for match in regex.finditer(bffm):
-        dagResults[match.group(1)] = int(match.group(2))
+    for match in re.finditer(r'EVENT: ({"event_id": "StaticLowerBoundDebugInfo".*)', bffm):
+        info = json.loads(match.group(1))
+        dagResults[info['name']] = int(info['spill_cost_lb'])
     bffm.close()
     results['bf'] = dagResults
 
 with open(bbFile) as bbf:
     bbfm = mmap.mmap(bbf.fileno(), 0, access=mmap.ACCESS_READ)
     dagResults = {}
-    for match in regex.finditer(bbfm):
-        dagResults[match.group(1)] = int(match.group(2))
+    for match in re.finditer(r'EVENT: ({"event_id": "StaticLowerBoundDebugInfo".*)', bffm):
+        info = json.loads(match.group(1))
+        dagResults[info['name']] = int(info['spill_cost_lb'])
     bbfm.close()
     results['bb'] = dagResults
-
 
 #analyze results
 #

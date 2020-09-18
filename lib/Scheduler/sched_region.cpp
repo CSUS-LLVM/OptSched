@@ -2,6 +2,7 @@
 #include <memory>
 #include <utility>
 
+#include "Wrapper/OptSchedDDGWrapperBasic.h"
 #include "opt-sched/Scheduler/aco.h"
 #include "opt-sched/Scheduler/bb_spill.h"
 #include "opt-sched/Scheduler/config.h"
@@ -14,6 +15,7 @@
 #include "opt-sched/Scheduler/sched_region.h"
 #include "opt-sched/Scheduler/stats.h"
 #include "opt-sched/Scheduler/utilities.h"
+#include "llvm/Support/ErrorHandling.h"
 
 extern bool OPTSCHED_gPrintSpills;
 
@@ -74,7 +76,7 @@ static bool isBbEnabled(Config &schedIni, Milliseconds rgnTimeout) {
     return false;
 
   if (rgnTimeout <= 0) {
-    Logger::Info("Disabling enumerator becuase region timeout is set to zero.");
+    Logger::Info("Disabling enumerator because region timeout is set to zero.");
     return false;
   }
 
@@ -133,13 +135,20 @@ FUNC_RESULT SchedRegion::FindOptimalSchedule(
 
   if (!HeuristicSchedulerEnabled && !AcoBeforeEnum) {
     // Abort if ACO and heuristic algorithms are disabled.
-    Logger::Fatal(
-        "Heuristic list scheduler or ACO must be enabled before enumerator.");
+    llvm::report_fatal_error(
+        "Heuristic list scheduler or ACO must be enabled before enumerator.",
+        false);
     return RES_ERROR;
   }
 
   Logger::Info("---------------------------------------------------------------"
                "------------");
+  Logger::Event("ProcessDag", "name", dataDepGraph_->GetDagID(),
+                "num_instructions", dataDepGraph_->GetInstCnt(), //
+                "max_latency", dataDepGraph_->GetMaxLtncy());
+  // TODO(justin): Remove once relevant scripts have been updated:
+  // func-stats.py, rp-compare.py, get-benchmark-stats.py,
+  // get-optsched-stats.py, get-sched-length.py, runspec-wrapper-SLIL.py
   Logger::Info("Processing DAG %s with %d insts and max latency %d.",
                dataDepGraph_->GetDagID(), dataDepGraph_->GetInstCnt(),
                dataDepGraph_->GetMaxLtncy());
@@ -176,17 +185,6 @@ FUNC_RESULT SchedRegion::FindOptimalSchedule(
   CmputAbslutUprBound_();
   schedLwrBound_ = dataDepGraph_->GetSchedLwrBound();
 
-  // We can calculate lower bounds here since it is only dependent
-  // on schedLwrBound_
-  if (!BbSchedulerEnabled)
-    costLwrBound_ = CmputCostLwrBound();
-  else
-    CmputLwrBounds_(false);
-
-  // Log the lower bound on the cost, allowing tools reading the log to compare
-  // absolute rather than relative costs.
-  Logger::Info("Lower bound of cost before scheduling: %d", costLwrBound_);
-
   // Step #1: Find the heuristic schedule if enabled.
   // Note: Heuristic scheduler is required for the two-pass scheduler
   // to use the sequential list scheduler which inserts stalls into
@@ -200,7 +198,7 @@ FUNC_RESULT SchedRegion::FindOptimalSchedule(
     rslt = lstSchdulr->FindSchedule(lstSched, this);
 
     if (rslt != RES_SUCCESS) {
-      Logger::Fatal("List scheduling failed");
+      llvm::report_fatal_error("List scheduling failed", false);
       delete lstSchdulr;
       delete lstSched;
       return rslt;
@@ -210,7 +208,30 @@ FUNC_RESULT SchedRegion::FindOptimalSchedule(
     stats::heuristicTime.Record(hurstcTime);
     if (hurstcTime > 0)
       Logger::Info("Heuristic_Time %d", hurstcTime);
+  }
 
+  // After the sequential scheduler in the second pass, add the artificial edges
+  // to the DDG. Some mutations were adding artificial edges which caused a
+  // conflict with the sequential scheduler. Therefore, wait until the
+  // sequential scheduler is done before adding artificial edges.
+  if (IsSecondPass()) {
+    static_cast<OptSchedDDGWrapperBasic *>(dataDepGraph_)->addArtificialEdges();
+    rslt = dataDepGraph_->UpdateSetupForSchdulng(needTransitiveClosure);
+    if (rslt != RES_SUCCESS) {
+      Logger::Info("Invalid DAG after adding artificial cluster edges");
+      return rslt;
+    }
+  }
+
+  // This must be done after SetupForSchdulng() or UpdateSetupForSchdulng() to
+  // avoid resetting lower bound values.
+  if (!BbSchedulerEnabled)
+    costLwrBound_ = CmputCostLwrBound();
+  else
+    CmputLwrBounds_(false);
+
+  // Cost calculation must be below lower bounds calculation
+  if (HeuristicSchedulerEnabled || IsSecondPass()) {
     heuristicScheduleLength = lstSched->GetCrntLngth();
     InstCount hurstcExecCost;
     // Compute cost for Heuristic list scheduler, this must be called before
@@ -229,11 +250,13 @@ FUNC_RESULT SchedRegion::FindOptimalSchedule(
 
     FinishHurstc_();
 
-    //  #ifdef IS_DEBUG_SOLN_DETAILS_1
+    Logger::Event("HeuristicResult", "length", heuristicScheduleLength, //
+                  "spill_cost", lstSched->GetSpillCost(), "cost", hurstcCost_);
+    // TODO(justin): Remove once relevant scripts have been updated:
+    // get-sched-length.py, runspec-wrapper-SLIL.py
     Logger::Info(
         "The list schedule is of length %d and spill cost %d. Tot cost = %d",
         heuristicScheduleLength, lstSched->GetSpillCost(), hurstcCost_);
-    //  #endif
 
 #ifdef IS_DEBUG_PRINT_SCHEDS
     lstSched->Print(Logger::GetLogStream(), "Heuristic");
@@ -244,6 +267,13 @@ FUNC_RESULT SchedRegion::FindOptimalSchedule(
 #endif
   }
 
+  // Log the lower bound on the cost, allowing tools reading the log to compare
+  // absolute rather than relative costs.
+  Logger::Event("CostLowerBound", "cost", costLwrBound_);
+  // TODO(justin): Remove once relevant scripts have been updated:
+  // plaidbench-validation-test.py, runspec-wrapper-SLIL.py
+  Logger::Info("Lower bound of cost before scheduling: %d", costLwrBound_);
+
   // Step #2: Use ACO to find a schedule if enabled and no optimal schedule is
   // yet to be found.
   if (AcoBeforeEnum && !isLstOptml) {
@@ -252,7 +282,7 @@ FUNC_RESULT SchedRegion::FindOptimalSchedule(
 
     rslt = runACO(AcoSchedule, lstSched);
     if (rslt != RES_SUCCESS) {
-      Logger::Fatal("ACO scheduling failed");
+      llvm::report_fatal_error("ACO scheduling failed", false);
       if (lstSchdulr)
         delete lstSchdulr;
       if (lstSched)
@@ -377,7 +407,8 @@ FUNC_RESULT SchedRegion::FindOptimalSchedule(
   InitialScheduleCost = bestCost_;
   InitialScheduleLength = bestSchedLngth_;
 
-  // Step #4: Find the optimal schedule if the heuristc and ACO was not optimal.
+  // Step #4: Find the optimal schedule if the heuristic and ACO was not
+  // optimal.
   if (BbSchedulerEnabled) {
     Milliseconds enumStart = Utilities::GetProcessorTime();
     if (!isLstOptml) {
@@ -399,16 +430,24 @@ FUNC_RESULT SchedRegion::FindOptimalSchedule(
 #endif
       }
     } else if (rgnTimeout == 0) {
+      Logger::Event("BypassZeroTimeLimit", "cost", bestCost_);
+      // TODO(justin): Remove once relevant scripts have been updated:
+      // runspec-wrapper-SLIL.py
       Logger::Info(
           "Bypassing optimal scheduling due to zero time limit with cost %d",
           bestCost_);
     } else {
-      Logger::Info("The initial schedule of length %d and cost %d is optimal.",
-                   bestSchedLngth_, bestCost_);
+      Logger::Event("HeuristicScheduleOptimal", "length", bestSchedLngth_,
+                    "cost", bestCost_);
     }
 
     if (rgnTimeout != 0) {
       bool optimalSchedule = isLstOptml || (rslt == RES_SUCCESS);
+      Logger::Event("BestResult", "name", dataDepGraph_->GetDagID(), //
+                    "cost", bestCost_, "length", bestSchedLngth_,    //
+                    "optimal", optimalSchedule);
+      // TODO(justin): Remove once relevant scripts have been updated:
+      // get-sched-length.py, plaidbench-validation-test.py
       Logger::Info("Best schedule for DAG %s has cost %d and length %d. The "
                    "schedule is %s",
                    dataDepGraph_->GetDagID(), bestCost_, bestSchedLngth_,
@@ -583,6 +622,12 @@ FUNC_RESULT SchedRegion::FindOptimalSchedule(
         return (bestPerp > heuristicPerp) ? "True" : "False";
       }();
 
+      Logger::Event("SlilStats", "name", dataDepGraph_->GetDagID(), //
+                    "static_lb", costLwrBound_, "gap_size", bestCost_,
+                    "is_enumerated", isEnumerated, "is_optimal", isOptimal,
+                    "is_perp_higher", isPerpHigherThanHeuristic);
+      // TODO(justin): Remove once relevant scripts have been updated:
+      // gather-SLIL-stats.py
       Logger::Info("SLIL stats: DAG %s static LB %d gap size %d enumerated %s "
                    "optimal %s PERP higher %s",
                    dataDepGraph_->GetDagID(), costLwrBound_, bestCost_,
@@ -622,28 +667,32 @@ FUNC_RESULT SchedRegion::Optimize_(Milliseconds startTime,
   enumrtr = AllocEnumrtr_(lngthTimeout);
   rslt = Enumerate_(startTime, rgnTimeout, lngthTimeout);
 
-  Milliseconds solnTime = Utilities::GetProcessorTime() - startTime;
+  Milliseconds solutionTime = Utilities::GetProcessorTime() - startTime;
 
-#ifdef IS_DEBUG_NODES
-  Logger::Info("Examined %lld nodes.", enumrtr->GetNodeCnt());
-#endif
+  Logger::Event("NodeExamineCount", "num_nodes", enumrtr->GetNodeCnt());
+
   stats::nodeCount.Record(enumrtr->GetNodeCnt());
-  stats::solutionTime.Record(solnTime);
+  stats::solutionTime.Record(solutionTime);
 
-  InstCount imprvmnt = initCost - bestCost_;
+  const InstCount improvement = initCost - bestCost_;
   if (rslt == RES_SUCCESS) {
+    Logger::Event("DagSolvedOptimally", "solution_time", solutionTime, //
+                  "length", bestSchedLngth_,                           //
+                  "spill_cost", bestSched_->GetSpillCost(),            //
+                  "total_cost", bestCost_, "cost_improvement", improvement);
+    // TODO(justin): Remove once relevant scripts have been updated:
+    // runspec-wrapper-SLIL.py
     Logger::Info("DAG solved optimally in %lld ms with "
                  "length=%d, spill cost = %d, tot cost = %d, cost imp=%d.",
-                 solnTime, bestSchedLngth_, bestSched_->GetSpillCost(),
-                 bestCost_, imprvmnt);
+                 solutionTime, bestSchedLngth_, bestSched_->GetSpillCost(),
+                 bestCost_, improvement);
     stats::solvedProblemSize.Record(dataDepGraph_->GetInstCnt());
-    stats::solutionTimeForSolvedProblems.Record(solnTime);
+    stats::solutionTimeForSolvedProblems.Record(solutionTime);
   } else {
     if (rslt == RES_TIMEOUT) {
-      Logger::Info("DAG timed out with "
-                   "length=%d, spill cost = %d, tot cost = %d, cost imp=%d.",
-                   bestSchedLngth_, bestSched_->GetSpillCost(), bestCost_,
-                   imprvmnt);
+      Logger::Event("DagTimedOut", "length", bestSchedLngth_, //
+                    "spill_cost", bestSched_->GetSpillCost(), //
+                    "total_cost", bestCost_, "cost_improvement", improvement);
     }
     stats::unsolvedProblemSize.Record(dataDepGraph_->GetInstCnt());
   }
@@ -759,6 +808,7 @@ void SchedRegion::HandlEnumrtrRslt_(FUNC_RESULT rslt, InstCount trgtLngth) {
 void SchedRegion::RegAlloc_(InstSchedule *&bestSched, InstSchedule *&lstSched) {
   std::unique_ptr<LocalRegAlloc> u_regAllocBest = nullptr;
   std::unique_ptr<LocalRegAlloc> u_regAllocList = nullptr;
+  const LocalRegAlloc *regAllocChoice = nullptr;
 
   if (SchedulerOptions::getInstance().GetString(
           "SIMULATE_REGISTER_ALLOCATION") == "HEURISTIC" ||
@@ -769,15 +819,16 @@ void SchedRegion::RegAlloc_(InstSchedule *&bestSched, InstSchedule *&lstSched) {
     // Simulate register allocation using the heuristic schedule.
     u_regAllocList = std::unique_ptr<LocalRegAlloc>(
         new LocalRegAlloc(lstSched, dataDepGraph_));
+    regAllocChoice = u_regAllocList.get();
 
     u_regAllocList->SetupForRegAlloc();
     u_regAllocList->AllocRegs();
 
-    std::string id(dataDepGraph_->GetDagID());
-    std::string heur_ident(" ***heuristic_schedule***");
-    std::string ident(id + heur_ident);
-
-    u_regAllocList->PrintSpillInfo(ident.c_str());
+    Logger::Event("HeuristicLocalRegAllocSimulation",           //
+                  "dag_name", dataDepGraph_->GetDagID(),        //
+                  "num_spills", u_regAllocList->GetCost(),      //
+                  "num_stores", u_regAllocList->GetNumStores(), //
+                  "num_loads", u_regAllocList->GetNumLoads());
   }
   if (SchedulerOptions::getInstance().GetString(
           "SIMULATE_REGISTER_ALLOCATION") == "BEST" ||
@@ -788,23 +839,39 @@ void SchedRegion::RegAlloc_(InstSchedule *&bestSched, InstSchedule *&lstSched) {
     // Simulate register allocation using the best schedule.
     u_regAllocBest = std::unique_ptr<LocalRegAlloc>(
         new LocalRegAlloc(bestSched, dataDepGraph_));
+    regAllocChoice = u_regAllocBest.get();
 
     u_regAllocBest->SetupForRegAlloc();
     u_regAllocBest->AllocRegs();
 
-    u_regAllocBest->PrintSpillInfo(dataDepGraph_->GetDagID());
     totalSimSpills_ = u_regAllocBest->GetCost();
+
+    Logger::Event("BestLocalRegAllocSimulation",                //
+                  "dag_name", dataDepGraph_->GetDagID(),        //
+                  "num_spills", u_regAllocBest->GetCost(),      //
+                  "num_stores", u_regAllocBest->GetNumStores(), //
+                  "num_loads", u_regAllocBest->GetNumLoads());
   }
 
   if (SchedulerOptions::getInstance().GetString(
-          "SIMULATE_REGISTER_ALLOCATION") == "TAKE_SCHED_WITH_LEAST_SPILLS")
+          "SIMULATE_REGISTER_ALLOCATION") == "TAKE_SCHED_WITH_LEAST_SPILLS") {
     if (u_regAllocList->GetCost() < u_regAllocBest->GetCost()) {
       bestSched = lstSched;
+      regAllocChoice = u_regAllocList.get();
 #ifdef IS_DEBUG
       Logger::Info(
-          "Taking list schedule becuase of less spilling with simulated RA.");
+          "Taking list schedule because of less spilling with simulated RA.");
 #endif
+    } else {
+      regAllocChoice = u_regAllocBest.get();
     }
+  }
+
+  Logger::Event("LocalRegAllocSimulationChoice",              //
+                "dag_name", dataDepGraph_->GetDagID(),        //
+                "num_spills", regAllocChoice->GetCost(),      //
+                "num_stores", regAllocChoice->GetNumStores(), //
+                "num_loads", regAllocChoice->GetNumLoads());
 }
 
 void SchedRegion::InitSecondPass() { isSecondPass_ = true; }

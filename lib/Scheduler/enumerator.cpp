@@ -370,7 +370,7 @@ bool EnumTreeNode::WasRsrcDmnntNodeExmnd(SchedInstruction *cnddtInst) {
 /*****************************************************************************/
 
 bool EnumTreeNode::IsBranchDominated(SchedInstruction *cnddtInst) {
-  // Check if the given instruction can be fessibly replaced by a previously
+  // Check if the given instruction can be feasibly replaced by a previously
   // examined instruction, which was found to be infeasible, thus proving by
   // contradiction that the given instruction is infeasible for this slot
   ExaminedInst *exmndInst = exmndInsts_->GetFrstElmnt();
@@ -967,9 +967,8 @@ bool Enumerator::FindNxtFsblBrnch_(EnumTreeNode *&newNode) {
 
 #if defined(IS_DEBUG) || defined(IS_DEBUG_READY_LIST)
   InstCount rdyInstCnt = rdyLst_->GetInstCnt();
-#endif
   assert(crntNode_->IsLeaf() || (brnchCnt != rdyInstCnt) ? 1 : rdyInstCnt);
-  // brnchCnt == rdyInstCnt == 0 ? 1 : rdyInstCnt);
+#endif
 
 #ifdef IS_DEBUG_READY_LIST
   Logger::Info("Ready List Size is %d", rdyInstCnt);

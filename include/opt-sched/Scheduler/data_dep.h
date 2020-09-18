@@ -167,7 +167,7 @@ protected:
 };
 
 // TODO(max): Find out what this really is.
-// The Data Dependence Graph is a sepcial case of a DAG and a special case of
+// The Data Dependence Graph is a special case of a DAG and a special case of
 // a Data Dependence Structure as well
 class DataDepGraph : public llvm::opt_sched::OptSchedDDGWrapperBase,
                      public DirAcycGraph,
@@ -250,7 +250,7 @@ public:
 
   void PrintInstTypeInfo(FILE *file);
 
-  // Count dependences and cross-dependences
+  // Count dependencies and cross-dependencies
   void CountDeps(InstCount &totDepCnt, InstCount &crossDepCnt);
 
   int GetBscBlkCnt();
@@ -309,7 +309,7 @@ protected:
   // The maximum latency in the graph
   UDT_GLABEL maxLtncy_;
 
-  // The maximum sum of latencies from a sinlge instruction
+  // The maximum sum of latencies from a single instruction
   UDT_GLABEL maxLtncySum_;
 
   // Upper and lower bounds read from the input file
@@ -391,7 +391,7 @@ protected:
                                 InstCount fileUB, int blkNum);
   FUNC_RESULT FinishNode_(InstCount nodeNum, InstCount edgeCnt = -1);
   void CreateEdge_(InstCount frmInstNum, InstCount toInstNum, int ltncy,
-                   DependenceType depType);
+                   DependenceType depType, bool IsArtificial = false);
 
   FUNC_RESULT Finish_();
 

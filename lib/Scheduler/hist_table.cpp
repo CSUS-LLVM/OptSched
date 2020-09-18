@@ -440,7 +440,7 @@ bool CostHistEnumTreeNode::ChkCostDmntn_(EnumTreeNode *node,
 // For the SLIL cost function the improvement in cost when comparing the other
 // prefix to the history prefix must be enough to improve upon the best cost
 // found so far. The required improvement is:
-// "History Total Cost" – "Best Total Cost"
+// "History Total Cost" - "Best Total Cost"
 static bool doesHistorySLILCostDominate(InstCount OtherPrefixCost,
                                         InstCount HistPrefixCost,
                                         InstCount HistTotalCost,

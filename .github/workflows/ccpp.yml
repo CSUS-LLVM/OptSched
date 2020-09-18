@@ -37,11 +37,17 @@ jobs:
              -DLLVM_PARALLEL_LINK_JOBS=1 ../cmake/superbuild
              -DCMAKE_CXX_COMPILER_LAUNCHER=ccache -DCMAKE_C_COMPILER_LAUNCHER=ccache
              -DCMAKE_CXX_COMPILER=g++ -DCMAKE_C_COMPILER=gcc
+             -DOPTSCHEDSUPER_LLVM_EXTRA_CMAKE_ARGS='-DLLVM_ENABLE_ASSERTIONS=ON'
+             -DOPTSCHED_EXTRA_DEFINITIONS='-DIS_DEBUG'
         working-directory: ./build
       - name: build
         run: |
           ccache -z
-          ninja
+          ninja || true
+          (ninja | grep -E -v '^-- Up-to-date: ') || true
+          (ninja | grep -E -v '^-- Up-to-date: ') || true
+          (ninja | grep -E -v '^-- Up-to-date: ') || true
+          (ninja | grep -E -v '^-- Up-to-date: ')
         working-directory: ./build
         env:
           CCACHE_BASEDIR: $GITHUB_WORKSPACE
@@ -50,7 +56,7 @@ jobs:
           CCACHE_COMPRESSLEVEL: 6
 
       - name: unit tests
-        run: ninja test
+        run: ctest -VV
         working-directory: ./build
 
       - name: dump ccache statistics

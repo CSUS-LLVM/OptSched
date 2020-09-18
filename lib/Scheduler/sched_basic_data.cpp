@@ -1,6 +1,9 @@
 #include "opt-sched/Scheduler/sched_basic_data.h"
 #include "opt-sched/Scheduler/register.h"
 #include "opt-sched/Scheduler/stats.h"
+#include "llvm/ADT/STLExtras.h"
+#include "llvm/Support/ErrorHandling.h"
+#include <string>
 
 using namespace llvm::opt_sched;
 
@@ -256,8 +259,9 @@ bool SchedInstruction::ApplyPreFxng(LinkedList<SchedInstruction> *tightndLst,
 
 void SchedInstruction::AddDef(Register *reg) {
   if (defCnt_ >= MAX_DEFS_PER_INSTR) {
-    Logger::Fatal("An instruction can't have more than %d defs",
-                  MAX_DEFS_PER_INSTR);
+    llvm::report_fatal_error("An instruction can't have more than " +
+                                 std::to_string(MAX_DEFS_PER_INSTR) + " defs",
+                             false);
   }
   // Logger::Info("Inst %d defines reg %d of type %d and physNum %d and useCnt
   // %d",
@@ -269,8 +273,9 @@ void SchedInstruction::AddDef(Register *reg) {
 
 void SchedInstruction::AddUse(Register *reg) {
   if (useCnt_ >= MAX_USES_PER_INSTR) {
-    Logger::Fatal("An instruction can't have more than %d uses",
-                  MAX_USES_PER_INSTR);
+    llvm::report_fatal_error("An instruction can't have more than " +
+                                 std::to_string(MAX_USES_PER_INSTR) + " uses",
+                             false);
   }
   // Logger::Info("Inst %d uses reg %d of type %d and physNum %d and useCnt %d",
   // num_, reg->GetNum(), reg->GetType(), reg->GetPhysicalNumber(),
@@ -280,35 +285,11 @@ void SchedInstruction::AddUse(Register *reg) {
 }
 
 bool SchedInstruction::FindDef(Register *reg) const {
-  assert(reg != NULL);
-
-  for (int i = 0; i < defCnt_; i++) {
-    if (defs_[i] == reg)
-      return true;
-  }
-
-  return false;
+  return llvm::any_of(GetDefs(), [reg](const Register *r) { return reg == r; });
 }
 
 bool SchedInstruction::FindUse(Register *reg) const {
-  assert(reg != NULL);
-
-  for (int i = 0; i < useCnt_; i++) {
-    if (uses_[i] == reg)
-      return true;
-  }
-
-  return false;
-}
-
-int16_t SchedInstruction::GetDefs(Register **&defs) {
-  defs = defs_;
-  return defCnt_;
-}
-
-int16_t SchedInstruction::GetUses(Register **&uses) {
-  uses = uses_;
-  return useCnt_;
+  return llvm::any_of(GetUses(), [reg](const Register *r) { return reg == r; });
 }
 
 bool SchedInstruction::BlocksCycle() const { return blksCycle_; }
@@ -373,7 +354,8 @@ SchedInstruction *SchedInstruction::GetNxtPrdcsr(InstCount *scsrNum,
 
 SchedInstruction *SchedInstruction::GetFrstScsr(InstCount *prdcsrNum,
                                                 UDT_GLABEL *ltncy,
-                                                DependenceType *depType) {
+                                                DependenceType *depType,
+                                                bool *IsArtificial) {
   GraphEdge *edge = GetFrstScsrEdge();
   if (!edge)
     return NULL;
@@ -383,12 +365,15 @@ SchedInstruction *SchedInstruction::GetFrstScsr(InstCount *prdcsrNum,
     *ltncy = edge->label;
   if (depType)
     *depType = (DependenceType)edge->label2;
+  if (IsArtificial)
+    *IsArtificial = edge->IsArtificial;
   return (SchedInstruction *)(edge->to);
 }
 
 SchedInstruction *SchedInstruction::GetNxtScsr(InstCount *prdcsrNum,
                                                UDT_GLABEL *ltncy,
-                                               DependenceType *depType) {
+                                               DependenceType *depType,
+                                               bool *IsArtificial) {
   GraphEdge *edge = GetNxtScsrEdge();
   if (!edge)
     return NULL;
@@ -398,6 +383,8 @@ SchedInstruction *SchedInstruction::GetNxtScsr(InstCount *prdcsrNum,
     *ltncy = edge->label;
   if (depType)
     *depType = (DependenceType)edge->label2;
+  if (IsArtificial)
+    *IsArtificial = edge->IsArtificial;
   return (SchedInstruction *)(edge->to);
 }
 
@@ -664,14 +651,10 @@ bool SchedInstruction::ProbeScsrsCrntLwrBounds(InstCount cycle) {
 }
 
 void SchedInstruction::ComputeAdjustedUseCnt_() {
-  Register **uses;
-  int useCnt = GetUses(uses);
-  adjustedUseCnt_ = useCnt;
-
-  for (int i = 0; i < useCnt; i++) {
-    if (uses[i]->IsLiveOut())
-      adjustedUseCnt_--;
-  }
+  adjustedUseCnt_ =
+      NumUses() - llvm::count_if(GetUses(), [](const Register *use) {
+        return use->IsLiveOut();
+      });
 }
 
 InstCount SchedInstruction::GetFileSchedOrder() const {

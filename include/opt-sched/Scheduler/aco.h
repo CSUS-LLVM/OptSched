@@ -11,17 +11,22 @@ Last Update:  Jan. 2020
 
 #include "opt-sched/Scheduler/gen_sched.h"
 #include "llvm/ADT/ArrayRef.h"
+#include "llvm/ADT/SetVector.h"
+#include "llvm/ADT/SmallSet.h"
 #include "llvm/ADT/SmallVector.h"
+#include <map>
 #include <memory>
+#include <utility>
 
 namespace llvm {
 namespace opt_sched {
 
-typedef double pheremone_t;
+typedef double pheromone_t;
 
 struct Choice {
   SchedInstruction *inst;
-  double heuristic; // range 0 to 1
+  double heuristic;  // range 1 to 2
+  InstCount readyOn; // number of cycles until this instruction becomes ready
 };
 
 class ACOScheduler : public ConstrainedScheduler {
@@ -37,18 +42,35 @@ public:
   void setInitialSched(InstSchedule *Sched);
 
 private:
-  pheremone_t &Pheremone(SchedInstruction *from, SchedInstruction *to);
-  pheremone_t &Pheremone(InstCount from, InstCount to);
+  pheromone_t &Pheromone(SchedInstruction *from, SchedInstruction *to);
+  pheromone_t &Pheromone(InstCount from, InstCount to);
   double Score(SchedInstruction *from, Choice choice);
 
-  void PrintPheremone();
+  void PrintPheromone();
 
-  SchedInstruction *SelectInstruction(const llvm::ArrayRef<Choice> &ready,
-                                      SchedInstruction *lastInst);
-  void UpdatePheremone(InstSchedule *schedule);
+  // pheromone Graph Debugging start
+  llvm::SmallSet<std::string, 0> DbgRgns;
+  llvm::SmallSet<std::pair<InstCount, InstCount>, 0> AntEdges;
+  llvm::SmallSet<std::pair<InstCount, InstCount>, 0> CrntAntEdges;
+  llvm::SmallSet<std::pair<InstCount, InstCount>, 0> IterAntEdges;
+  llvm::SmallSet<std::pair<InstCount, InstCount>, 0> BestAntEdges;
+  std::map<std::pair<InstCount, InstCount>, double> LastHeu;
+  bool IsDbg = false;
+  std::string OutPath;
+  std::string graphDisplayAnnotation(int Frm, int To);
+  std::string getHeuIfPossible(int Frm, int To);
+  void writePheromoneGraph(std::string Stage);
+  void writePGraphRecursive(FILE *Out, SchedInstruction *Ins,
+                            llvm::SetVector<SchedInstruction *> &Visited);
+
+  // pheromone Graph Debugging end
+
+  Choice SelectInstruction(const llvm::ArrayRef<Choice> &ready,
+                           SchedInstruction *lastInst);
+  void UpdatePheromone(InstSchedule *schedule);
   std::unique_ptr<InstSchedule> FindOneSchedule();
-  llvm::SmallVector<pheremone_t, 0> pheremone_;
-  pheremone_t initialValue_;
+  llvm::SmallVector<pheromone_t, 0> pheromone_;
+  pheromone_t initialValue_;
   bool use_fixed_bias;
   int count_;
   int heuristicImportance_;
@@ -61,6 +83,7 @@ private:
   bool print_aco_trace;
   std::unique_ptr<InstSchedule> InitialSchedule;
   bool VrfySched_;
+  pheromone_t ScRelMax;
 };
 
 } // namespace opt_sched

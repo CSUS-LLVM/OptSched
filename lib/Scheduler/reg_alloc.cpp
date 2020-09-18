@@ -42,14 +42,8 @@ void LocalRegAlloc::AllocRegs() {
     Logger::Info("REG_ALLOC: Processing instruction %d.", instNum);
 #endif
 
-    Register **uses;
-    Register **defs;
-    int useCnt = inst->GetUses(uses);
-    int defCnt = inst->GetDefs(defs);
-
     // Find registers for this instruction's VReg uses.
-    for (int u = 0; u < useCnt; u++) {
-      Register *use = uses[u];
+    for (Register *use : inst->GetUses()) {
       int16_t regType = use->GetType();
       int virtRegNum = use->GetNum();
       RegMap &map = regMaps_[regType][virtRegNum];
@@ -69,8 +63,7 @@ void LocalRegAlloc::AllocRegs() {
     }
 
     // Kill registers if this is the last use for them.
-    for (int u = 0; u < useCnt; u++) {
-      Register *use = uses[u];
+    for (Register *use : inst->GetUses()) {
       int16_t regType = use->GetType();
       int virtRegNum = use->GetNum();
       RegMap &map = regMaps_[regType][virtRegNum];
@@ -90,8 +83,7 @@ void LocalRegAlloc::AllocRegs() {
     }
 
     // Process definitions.
-    for (int d = 0; d < defCnt; d++) {
-      Register *def = defs[d];
+    for (Register *def : inst->GetDefs()) {
       int16_t regType = def->GetType();
       int virtRegNum = def->GetNum();
 #ifdef IS_DEBUG_REG_ALLOC
@@ -210,14 +202,11 @@ void LocalRegAlloc::ScanUses_() {
       continue;
 
     int instNum = i;
-    Register **uses;
-    int useCnt = inst->GetUses(uses);
 #ifdef IS_DEBUG_REG_ALLOC
     Logger::Info("REG_ALLOC: Scanning for uses for instruction %d.", instNum);
 #endif
 
-    for (int j = 0; j < useCnt; j++) {
-      Register *use = uses[j];
+    for (Register *use : inst->GetUses()) {
       int virtRegNum = use->GetNum();
       int16_t regType = use->GetType();
       if (regMaps_[regType].find(virtRegNum) == regMaps_[regType].end()) {
@@ -245,11 +234,7 @@ void LocalRegAlloc::ScanUses_() {
 
 void LocalRegAlloc::AddLiveIn_(SchedInstruction *artificialEntry) {
   // Process live-in regs.
-  Register **defs;
-  int defCnt = artificialEntry->GetDefs(defs);
-
-  for (int d = 0; d < defCnt; d++) {
-    Register *def = defs[d];
+  for (Register *def : artificialEntry->GetDefs()) {
     int16_t regType = def->GetType();
     int virtRegNum = def->GetNum();
 #ifdef IS_DEBUG_REG_ALLOC
@@ -293,4 +278,4 @@ void LocalRegAlloc::PrintSpillInfo(const char *dagName) {
   Logger::Info("Number of loads %d", numLoads_);
 }
 
-int LocalRegAlloc::GetCost() { return numLoads_ + numStores_; }
+int LocalRegAlloc::GetCost() const { return numLoads_ + numStores_; }

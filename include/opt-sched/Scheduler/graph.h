@@ -49,11 +49,15 @@ struct GraphEdge {
   UDT_GEDGES predOrder;
   // The second node's order in the first node's successor list.
   UDT_GEDGES succOrder;
+  // Whether or not the edge is an artificial dependency meaning it isn't
+  // required to be correct
+  bool IsArtificial;
 
   // Creates an edge between two nodes with labels label and label2.
   GraphEdge(GraphNode *from, GraphNode *to, UDT_GLABEL label,
-            UDT_GLABEL label2 = 0)
-      : from(from), to(to), label(label), label2(label2) {}
+            UDT_GLABEL label2 = 0, bool IsArtificial = false)
+      : from(from), to(to), label(label), label2(label2),
+        IsArtificial(IsArtificial) {}
 
   // Returns the node on the other side of the edge from the provided node.
   // Assumes that the argument is one of the nodes on the sides of the edge.
@@ -155,11 +159,11 @@ public:
   bool IsScsrDmntd(GraphNode *cnddtDmnnt);
 
   // Returns the sum of the labels of edges from this node to its successors.
-  // This value is not synamically calculated and is adjusted only through
+  // This value is not dynamically calculated and is adjusted only through
   // AddScsr().
   UDT_GLABEL GetScsrLblSum() const;
   // Returns the sum of the labels of edges from this node to its
-  // predecessors. This value is not synamically calculated and is adjusted
+  // predecessors. This value is not dynamically calculated and is adjusted
   // only through AddPrdcsr().
   UDT_GLABEL GetPrdcsrLblSum() const;
   // Returns the topological order of this node which was calculated by

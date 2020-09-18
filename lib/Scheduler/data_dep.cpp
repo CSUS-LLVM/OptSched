@@ -12,6 +12,7 @@
 #include "opt-sched/Scheduler/stats.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/Debug.h"
+#include "llvm/Support/ErrorHandling.h"
 
 // only print pressure if enabled by sched.ini
 extern bool OPTSCHED_gPrintSpills;
@@ -230,8 +231,8 @@ FUNC_RESULT DataDepGraph::SetupForSchdulng(bool cmputTrnstvClsr) {
     inst->SetMustBeInBBEntry(false);
     inst->SetMustBeInBBExit(false);
 
-    if (inst->GetUseCnt() > maxUseCnt_)
-      maxUseCnt_ = inst->GetUseCnt();
+    if (inst->NumUses() > maxUseCnt_)
+      maxUseCnt_ = inst->NumUses();
   }
 
   //  Logger::Info("Max use count = %d", maxUseCnt_);
@@ -832,7 +833,7 @@ SchedInstruction *DataDepGraph::CreateNode_(
                                     2 * instCnt_, nodeID, fileSchedOrder,
                                     fileSchedCycle, fileLB, fileUB, machMdl_);
   if (instNum < 0 || instNum >= instCnt_)
-    Logger::Fatal("Invalid instruction number");
+    llvm::report_fatal_error("Invalid instruction number", false);
   //  Logger::Info("Instruction order = %d, instCnt_ = %d", fileSchedOrder,
   //  instCnt_);
   if (fileSchedOrder > maxFileSchedOrder_)
@@ -849,7 +850,6 @@ void DataDepGraph::CreateEdge(SchedInstruction *frmNode,
 #if defined(IS_DEBUG) || defined(IS_DEBUG_DAG)
   InstCount frmNodeNum = frmNode->GetNum();
   InstCount toNodeNum = toNode->GetNum();
-#endif
 
 #ifdef IS_DEBUG_DAG
   Logger::Info("Creating extra edge from %d to %d of type %d and latency %d",
@@ -861,6 +861,7 @@ void DataDepGraph::CreateEdge(SchedInstruction *frmNode,
 
   assert(toNodeNum < instCnt_);
   assert(nodes_[toNodeNum] != NULL);
+#endif
 
 #ifdef IS_DEBUG_LATENCIES
   stats::dependenceTypeLatencies.Add(GetDependenceTypeName(depType), ltncy);
@@ -899,7 +900,8 @@ void DataDepGraph::CreateEdge(SchedInstruction *frmNode,
 }
 
 void DataDepGraph::CreateEdge_(InstCount frmNodeNum, InstCount toNodeNum,
-                               int ltncy, DependenceType depType) {
+                               int ltncy, DependenceType depType,
+                               bool IsArtificial) {
   GraphEdge *edge;
 
   assert(frmNodeNum < instCnt_);
@@ -928,7 +930,7 @@ void DataDepGraph::CreateEdge_(InstCount frmNodeNum, InstCount toNodeNum,
     Logger::Info("Creating edge from %d to %d of type %d and latency %d",
                  frmNodeNum, toNodeNum, depType, ltncy);
 #endif
-    edge = new GraphEdge(frmNode, toNode, ltncy, depType);
+    edge = new GraphEdge(frmNode, toNode, ltncy, depType, IsArtificial);
 
     frmNode->AddScsr(edge);
     toNode->AddPrdcsr(edge);
@@ -2891,6 +2893,9 @@ bool InstSchedule::Verify(MachineModel *machMdl, DataDepGraph *dataDepGraph) {
   Print(std::cout, "debug");
 #endif
 
+  Logger::Event("ScheduleVerifiedSuccessfully");
+  // TODO(justin): Remove once relevant scripts have been updated:
+  // runspec-wrapper-SLIL.py
   Logger::Info("Schedule verified successfully");
 
   return true;
@@ -2972,8 +2977,15 @@ bool InstSchedule::VerifyDataDeps_(DataDepGraph *dataDepGraph) {
 
     UDT_GLABEL ltncy;
     DependenceType depType;
-    for (SchedInstruction *scsr = inst->GetFrstScsr(NULL, &ltncy, &depType);
-         scsr != NULL; scsr = inst->GetNxtScsr(NULL, &ltncy, &depType)) {
+    bool IsArtificial;
+    for (SchedInstruction *scsr =
+             inst->GetFrstScsr(NULL, &ltncy, &depType, &IsArtificial);
+         scsr != NULL;
+         scsr = inst->GetNxtScsr(NULL, &ltncy, &depType, &IsArtificial)) {
+      // Artificial edges are not required for the schedule to be correct
+      if (IsArtificial)
+        continue;
+
       InstCount scsrCycle = GetSchedCycle(scsr);
       if (scsrCycle < (instCycle + ltncy)) {
         Logger::Error("Invalid schedule: Latency from %d to %d not satisfied",
@@ -3199,7 +3211,7 @@ bool DataDepGraph::DoesFeedUser(SchedInstruction *inst) {
       continue;
     // Ignore instructions that open more live intervals than
     // it closes because it will increase register pressure instead.
-    else if (curInstAdjUseCnt < succInst->GetDefCnt())
+    else if (curInstAdjUseCnt < succInst->NumDefs())
       continue;
 
     // If there is a successor instruction that decreases live intervals

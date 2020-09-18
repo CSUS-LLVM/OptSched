@@ -22,7 +22,7 @@ using namespace llvm::opt_sched;
 
 // This is necessary because we cannot perfectly predict the number of registers
 // of each type that will be allocated.
-static const unsigned GPRErrorMargin = 3;
+static const unsigned GPRErrorMargin = 0;
 
 #ifndef NDEBUG
 static unsigned getOccupancyWeight(unsigned Occupancy) {
@@ -192,7 +192,7 @@ void OptSchedGCNTarget::finalizeRegion(const InstSchedule *Schedule) {
 
 InstCount
 OptSchedGCNTarget::getCost(const llvm::SmallVectorImpl<unsigned> &PRP) const {
-  // FIXME: It's bad to asssume that the reg types for SGPR32/VGPR32 are
+  // FIXME: It's bad to assume that the reg types for SGPR32/VGPR32 are
   // fixed, but we avoid doing an expensive string compare here with
   // GetRegTypeByName since updating the cost happens so often. We should
   // replace OptSched register types completely with PSets to fix both issues.

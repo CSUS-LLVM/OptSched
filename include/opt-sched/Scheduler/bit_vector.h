@@ -160,7 +160,7 @@ BitVector::And(BitVector *otherBitVector) const {
 
     // TODO(austin) This may not be portable enough.
     // This is a built in gcc function for counting the number of 1 bits
-    // in a number. When using x86 it should be inplemented as a single
+    // in a number. When using x86 it should be implemented as a single
     // instruction ie "popcnt %rdi, %rax"
     andedVector->oneCnt_ += __builtin_popcountll(andedVector->vctr_[i]);
   }
@@ -194,7 +194,7 @@ inline BitVector::Unit BitVector::GetMask_(int bitNum, bool bitVal) {
 
   if (!bitVal) {
     // The mask for setting a bit to 0 is the inverse of the mask for setting a
-    // bit to 1. E.g. ORing with the mask 0x0008 sets the fourth bit to 1 while
+    // bit to 1. E.g. OR-ing with the mask 0x0008 sets the fourth bit to 1 while
     // ANDing with the mask 0xfff7 sets the fourth bit to 0.
     mask = ~mask;
   }
