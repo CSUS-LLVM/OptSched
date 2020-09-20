@@ -242,7 +242,7 @@ protected:
   // (Chris) Get the SLIL for each set
   virtual const std::vector<int> &GetSLIL_() const = 0;
 
-  FUNC_RESULT runACO(InstSchedule *ReturnSched, InstSchedule *InitSched);
+  FUNC_RESULT runACO(InstSchedule *ReturnSched, InstSchedule *InitSched, bool IsPostBB);
 };
 
 } // namespace opt_sched

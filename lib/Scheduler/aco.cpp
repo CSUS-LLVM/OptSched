@@ -42,9 +42,11 @@ double RandDouble(double min, double max) {
 
 ACOScheduler::ACOScheduler(DataDepGraph *dataDepGraph,
                            MachineModel *machineModel, InstCount upperBound,
-                           SchedPriorities priorities, bool vrfySched)
+                           SchedPriorities priorities, bool vrfySched,
+                           bool IsPostBB)
     : ConstrainedScheduler(dataDepGraph, machineModel, upperBound) {
   VrfySched_ = vrfySched;
+  this->IsPostBB = IsPostBB;
   prirts_ = priorities;
   rdyLst_ = new ReadyList(dataDepGraph_, priorities);
   count_ = dataDepGraph->GetInstCnt();
@@ -85,7 +87,6 @@ ACOScheduler::ACOScheduler(DataDepGraph *dataDepGraph,
   int pheromone_size = (count_ + 1) * count_;
   pheromone_.resize(pheromone_size);
   InitialSchedule = nullptr;
-  //Logger::Info("Fincons");
 }
 
 ACOScheduler::~ACOScheduler() { delete rdyLst_; }
@@ -360,6 +361,7 @@ FUNC_RESULT ACOScheduler::FindSchedule(InstSchedule *schedule_out,
   std::unique_ptr<InstSchedule> heuristicSched = FindOneSchedule();
   InstCount heuristicCost =
       heuristicSched->GetCost() + 1; // prevent divide by zero
+  InstCount InitialCost = InitialSchedule ? InitialSchedule->GetCost() : 0;
 
 #if USE_ACS
   initialValue_ = 2.0 / ((double)count_ * heuristicCost);
@@ -422,6 +424,11 @@ FUNC_RESULT ACOScheduler::FindSchedule(InstSchedule *schedule_out,
     writePheromoneGraph("iteration" + std::to_string(iterations));
     iterations++;
   }
+
+  Logger::Event(IsPostBB ? "ACOpost_sched_complete" : "ACO_sched_complete",
+                "cost", bestSchedule->GetCost(),
+                "iterations", iterations,
+                "improvement", InitialCost-bestSchedule->GetCost());
   PrintSchedule(bestSchedule.get());
   schedule_out->Copy(bestSchedule.release());
 
@@ -560,9 +567,9 @@ void ACOScheduler::writePheromoneGraph(std::string Stage) {
       OutPath + "/" + dataDepGraph_->GetDagID() + "@" + Stage + ".dot";
   FILE *Out = fopen(FullOutPath.c_str(), "w");
   if (!Out) {
-    Logger::Info("Could now open file to write pheromone display at %s."
-                 " Skipping.",
-                 FullOutPath.c_str());
+    Logger::Error("Could now open file to write pheromone display at %s."
+                  " Skipping.",
+                  FullOutPath.c_str());
     return;
   }
 

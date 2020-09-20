@@ -33,7 +33,7 @@ class ACOScheduler : public ConstrainedScheduler {
 public:
   ACOScheduler(DataDepGraph *dataDepGraph, MachineModel *machineModel,
                InstCount upperBound, SchedPriorities priorities,
-               bool vrfySched);
+               bool vrfySched, bool IsPostBB);
   virtual ~ACOScheduler();
   FUNC_RESULT FindSchedule(InstSchedule *schedule, SchedRegion *region);
   inline void UpdtRdyLst_(InstCount cycleNum, int slotNum);
@@ -85,6 +85,7 @@ private:
   bool print_aco_trace;
   std::unique_ptr<InstSchedule> InitialSchedule;
   bool VrfySched_;
+  bool IsPostBB;
   pheromone_t ScRelMax;
 };
 
