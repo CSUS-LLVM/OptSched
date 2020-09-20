@@ -533,7 +533,12 @@ def calculateBlockStats(output, trackOptSchedSpills):
                     The rest of this if-block ensures that this tool doesn't crash.
                     If the improvement is not found, it is assumed to be 0.
                     """
-                    improvement = events['DagSolvedOptimally']['cost_improvement'] if isOptimal else 0
+                    if isOptimal:
+                        improvement = events['DagSolvedOptimally']['cost_improvement']
+                    elif 'DagTimedOut' in events:
+                        improvement = events['DagTimedOut']['cost_improvement']
+                    else:
+                        improvement = 0
                 else:
                     isOptimal = False
                     improvement = 0
