@@ -56,7 +56,7 @@ TR_TABLE = {
         INFO: Number of stores {num_stores} (Time = {time} ms)
         INFO: Number of loads {num_loads} (Time = {time} ms)''')),
     'LocalRegAllocSimulationChoice': discard,
-    'PassFinished': discard, # lambda log: ('INFO: End of first pass through\n (Time = {time} ms)', 'INFO: End of second pass through (Time = {time} ms)')[log['num']].format(time=log['time']),
+    'PassFinished': discard, # lambda log: ('INFO: End of first pass through\n (Time = {time} ms)', 'INFO: End of second pass through (Time = {time} ms)')[log['num'] - 1].format(time=log['time']),
 }
 
 
