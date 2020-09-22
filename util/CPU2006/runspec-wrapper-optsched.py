@@ -855,11 +855,11 @@ def calculateBlockStats(output, trackOptSchedSpills, normalized):
                     improvement = 0
 
             if 'ACO_sched_complete' in events:
-                acoImprovement = events['ACO_sched_complete']['improvement']
+                acoImprovement = events['AcoSchedComplete']['improvement']
             else:
                 acoImprovement = 0
             if 'ACOpost_sched_complete' in events:
-                acoPostImprovement = events['ACOpost_sched_complete']['improvement']
+                acoPostImprovement = events['AcoPostSchedComplete']['improvement']
             else:
                 acoPostImprovement = 0
 

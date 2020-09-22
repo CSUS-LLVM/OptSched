@@ -130,7 +130,6 @@ bool ACOScheduler::shouldReplaceSchedule(InstSchedule *OldSched,
   else
     return (NewSched->GetSpillCost() <= OldSched->GetSpillCost()) &&
            (NewSched->GetCost() < OldSched->GetCost());
-  //           (NewSched->GetCrntLngth() <  OldSched->GetCrntLngth());
 }
 
 Choice ACOScheduler::SelectInstruction(const llvm::ArrayRef<Choice> &ready,
@@ -379,7 +378,6 @@ FUNC_RESULT ACOScheduler::FindSchedule(InstSchedule *schedule_out,
   }
   writePheromoneGraph("initial");
 
-  // int noImprovementMax = schedIni.GetInt("ACO_STOP_ITERATIONS");
   int noImprovement = 0; // how many iterations with no improvement
   int iterations = 0;
   while (true) {
@@ -426,8 +424,8 @@ FUNC_RESULT ACOScheduler::FindSchedule(InstSchedule *schedule_out,
     iterations++;
   }
 
-  Logger::Event(IsPostBB ? "ACOpost_sched_complete" : "ACO_sched_complete",
-                "cost", bestSchedule->GetCost(), "iterations", iterations,
+  Logger::Event(IsPostBB ? "AcoPostSchedComplete" : "ACOSchedComplete", "cost",
+                bestSchedule->GetCost(), "iterations", iterations,
                 "improvement", InitialCost - bestSchedule->GetCost());
   PrintSchedule(bestSchedule.get());
   schedule_out->Copy(bestSchedule.release());
