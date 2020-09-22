@@ -19,177 +19,469 @@ from readlogs import *
 
 # Dictionary for benchmark selection. Maps benchmark names and categories
 # to lists of specific benchmarks.
-benchDict = {}
-# Add all benchmarks individually.
-benchDict['perlbench'] = ['perlbench']
-benchDict['bzip2'] = ['bzip2']
-benchDict['gcc'] = ['gcc']
-benchDict['mcf'] = ['mcf']
-benchDict['gobmk'] = ['gobmk']
-benchDict['hmmer'] = ['hmmer']
-benchDict['sjeng'] = ['sjeng']
-benchDict['libquantum'] = ['libquantum']
-benchDict['h264ref'] = ['h264ref']
-benchDict['omnetpp'] = ['omnetpp']
-benchDict['astar'] = ['astar']
-benchDict['xalancbmk'] = ['xalancbmk']
-benchDict['bwaves'] = ['bwaves']
-benchDict['gamess'] = ['gamess']
-benchDict['milc'] = ['milc']
-benchDict['zeusmp'] = ['zeusmp']
-benchDict['gromacs'] = ['gromacs']
-benchDict['cactus'] = ['cactus']
-benchDict['leslie'] = ['leslie']
-benchDict['namd'] = ['namd']
-benchDict['dealII'] = ['dealII']
-benchDict['soplex'] = ['soplex']
-benchDict['povray'] = ['povray']
-benchDict['calculix'] = ['calculix']
-benchDict['Gems'] = ['Gems']
-benchDict['tonto'] = ['tonto']
-benchDict['lbm'] = ['lbm']
-benchDict['wrf'] = ['wrf']
-benchDict['sphinx'] = ['sphinx']
+specVersions = {
+    'CPU2006' : {
+        'BUILD_COMMAND' : 'runspec --loose -size=ref -iterations=1 -config=%s --tune=base -r 1 -I -a build %s',
+        'SCRUB_COMMAND' : 'runspec --loose -size=ref -iterations=1 -config=%s --tune=base -r 1 -I -a scrub %s',
+        'benchDict' : {
+            # Add all benchmarks individually.
+            'perlbench': ['perlbench'],
+            'bzip2' : ['bzip2'],
+            'gcc' : ['gcc'],
+            'mcf' : ['mcf'],
+            'gobmk' : ['gobmk'],
+            'hmmer' : ['hmmer'],
+            'sjeng' : ['sjeng'],
+            'libquantum' : ['libquantum'],
+            'h264ref' : ['h264ref'],
+            'omnetpp' : ['omnetpp'],
+            'astar' : ['astar'],
+            'xalancbmk' : ['xalancbmk'],
+            'bwaves' : ['bwaves'],
+            'gamess' : ['gamess'],
+            'milc' : ['milc'],
+            'zeusmp' : ['zeusmp'],
+            'gromacs' : ['gromacs'],
+            'cactus' : ['cactus'],
+            'leslie' : ['leslie'],
+            'namd' : ['namd'],
+            'dealII' : ['dealII'],
+            'soplex' : ['soplex'],
+            'povray' : ['povray'],
+            'calculix' : ['calculix'],
+            'Gems' : ['Gems'],
+            'tonto' : ['tonto'],
+            'lbm' : ['lbm'],
+            'wrf' : ['wrf'],
 
-# Add ALL benchmark group.
-benchDict['ALL'] = [
-    'perlbench',
-    'bzip2',
-    'gcc',
-    'mcf',
-    'gobmk',
-    'hmmer',
-    'sjeng',
-    'libquantum',
-    'h264ref',
-    'omnetpp',
-    'astar',
-    'xalancbmk',
-    'bwaves',
-    'gamess',
-    'milc',
-    'zeusmp',
-    'gromacs',
-    'cactus',
-    'leslie', 'namd',
-    'dealII',
-    'soplex',
-    'povray',
-    'calculix',
-    'Gems',
-    'tonto',
-    'lbm',
-    'wrf',
-    'sphinx'
-]
+            # Add ALL benchmark group.
+            'ALL' : [
+                'perlbench',
+                'bzip2',
+                'gcc',
+                'mcf',
+                'gobmk',
+                'hmmer',
+                'sjeng',
+                'libquantum',
+                'h264ref',
+                'omnetpp',
+                'astar',
+                'xalancbmk',
+                'bwaves',
+                'gamess',
+                'milc',
+                'zeusmp',
+                'gromacs',
+                'cactus',
+                'leslie',
+                'namd',
+                'dealII',
+                'soplex',
+                'povray',
+                'calculix',
+                'Gems',
+                'tonto',
+                'lbm',
+                'wrf',
+                'sphinx'
+            ],
 
-# Add INT benchmark group.
-benchDict['INT'] = [
-    'perlbench',
-    'bzip2',
-    'gcc',
-    'mcf',
-    'gobmk',
-    'hmmer',
-    'sjeng',
-    'libquantum',
-    'h264ref',
-    'omnetpp',
-    'astar',
-    'xalancbmk'
-]
+            # Add INT benchmark group.
+            'INT' : [
+                'perlbench',
+                'bzip2',
+                'gcc',
+                'mcf',
+                'gobmk',
+                'hmmer',
+                'sjeng',
+                'libquantum',
+                'h264ref',
+                'omnetpp',
+                'astar',
+                'xalancbmk'
+            ],
 
-# Add FP benchmark group.
-benchDict['FP'] = [
-    'bwaves',
-    'gamess',
-    'milc',
-    'zeusmp',
-    'gromacs',
-    'cactus',
-    'leslie',
-    'namd',
-    'dealII',
-    'soplex',
-    'povray',
-    'calculix',
-    'Gems',
-    'tonto',
-    'lbm',
-    'wrf',
-    'sphinx'
-]
+            # Add FP benchmark group.
+            'FP' : [
+                'bwaves',
+                'gamess',
+                'milc',
+                'zeusmp',
+                'gromacs',
+                'cactus',
+                'leslie',
+                'namd',
+                'dealII',
+                'soplex',
+                'povray',
+                'calculix',
+                'Gems',
+                'tonto',
+                'lbm',
+                'wrf',
+                'sphinx'
+            ],
 
-# Add C benchmark group.
-benchDict['C'] = [
-    'perlbench',
-    'bzip2',
-    'gcc',
-    'mcf',
-    'milc',
-    'gobmk',
-    'hmmer',
-    'sjeng',
-    'libquantum',
-    'h264ref',
-    'lbm',
-    'sphinx'
-]
+            # Add C benchmark group.
+            'C' : [
+                'perlbench',
+                'bzip2',
+                'gcc',
+                'mcf',
+                'milc',
+                'gobmk',
+                'hmmer',
+                'sjeng',
+                'libquantum',
+                'h264ref',
+                'lbm',
+                'sphinx'
+            ],
 
-# Add C++ benchmark group.
-benchDict['C++'] = [
-    'namd',
-    'dealII',
-    'soplex',
-    'povray',
-    'omnetpp',
-    'astar',
-    'xalancbmk'
-]
+            # Add C++ benchmark group.
+            'C++' : [
+                'namd',
+                'dealII',
+                'soplex',
+                'povray',
+                'omnetpp',
+                'astar',
+                'xalancbmk'
+            ],
 
-# Add the FORTRAN benchmark group.
-benchDict['FORTRAN'] = [
-    'bwaves',
-    'gamess',
-    'zeusmp',
-    'leslie',
-    'Gems',
-    'tonto'
-]
+            # Add the FORTRAN benchmark group.
+            'FORTRAN' : [
+                'bwaves',
+                'gamess',
+                'zeusmp',
+                'leslie',
+                'Gems',
+                'tonto'
+            ],
 
-# Add the MIXED language benchmark group.
-benchDict['MIXED'] = [
-    'gromacs',
-    'cactus',
-    'calculix',
-    'wrf'
-]
+            # Add the MIXED language benchmark group.
+            'MIXED' : [
+                'gromacs',
+                'cactus',
+                'calculix',
+                'wrf'
+            ],
 
-# The FP benchmarks without FORTRAN. (ie no dragonegg)
-benchDict['FP_NO_F'] = list(set(benchDict['FP']) - set(benchDict['FORTRAN'] + benchDict['MIXED']))
-#List of log files
-logFile = {}
+            # The FP benchmarks without FORTRAN. (ie no dragonegg/flang)
+            'FP_NO_F' : [
+                'milc',
+                'namd',
+                'dealII',
+                'soplex',
+                'povray',
+                'lbm',
+                'sphinx'
+            ]
+        }
+    },
 
-#Add all log files
-logFile['ALL'] = [
-        'adpcm',
-        'epic',
-        'g721',
-        'gsm',
-        'jpeg',
-        'pegwit'
-]
+    'CPU2017' : {
+        'BUILD_COMMAND' : 'runcpu --tune=base --config=%s -a build %s',
+        'SCRUB_COMMAND' : 'runcpu --tune=base --config=%s -a scrub %s',
+        'benchDict' : {
+            # Add all benchmarks individually.
+            '500.perlbench_r' : ['500.perlbench_r'],
+            '502.gcc_r' : ['502.gcc_r'],
+            '503.bwaves_r' : ['503.bwaves_r'],
+            '505.mcf_r' : ['505.mcf_r'],
+            '507.cactuBSSN_r' : ['507.cactuBSSN_r'],
+            '508.namd_r' : ['508.namd_r'],
+            '510.parest_r' : ['510.parest_r'],
+            '511.povray_r' : ['511.povray_r'],
+            '519.lbm_r' : ['519.lbm_r'],
+            '520.omnetpp_r' : ['520.omnetpp_r'],
+            '523.xalancbmk_r' : ['523.xalancbmk_r'],
+            '525.x264_r' : ['525.x264_r'],
+            '531.deepsjeng_r' : ['531.deepsjeng_r'],
+            '541.leela_r' : ['541.leela_r'],
+            '548.exchange2_r' : ['548.exchange2_r'],
+            '557.xz_r' : ['557.xz_r'],
+            '600.perlbench_s' : ['600.perlbench_s'],
+            '602.gcc_s' : ['602.gcc_s'],
+            '603.bwaves_s' : ['603.bwaves_s'],
+            '605.mcf_s' : ['605.mcf_s'],
+            '607.cactuBSSN_s' : ['607.cactuBSSN_s'],
+            '619.lbm_s' : ['619.lbm_s'],
+            '620.omnetpp_s' : ['620.omnetpp_s'],
+            '621.wrf_s' : ['621.wrf_s'],
+            '623.xalancbmk_s' : ['623.xalancbmk_s'],
+            '627.cam4_s' : ['627.cam4_s'],
+            '625.x264_s' : ['625.x264_s'],
+            '628.pop2_s' : ['628.pop2_s'],
+            '631.deepsjeng_s' : ['631.deepsjeng_s'],
+            '638.imagick_s' : ['638.imagick_s'],
+            '641.leela_s' : ['641.leela_s'],
+            '644.nab_s' : ['644.nab_s'],
+            '648.exchange2_s' : ['648.exchange2_s'],
+            '649.fotonik3d_s' : ['649.fotonik3d_s'],
+            '654.roms_s' : ['654.roms_s'],
+            '657.xz_s' : ['657.xz_s'],
 
-#Add log files individually
-logFile['adpcm'] = ['adpcm']
-logFile['epic'] = ['epic']
-logFile['g721'] = ['g721']
-logFile['gsm'] = ['gsm']
-logFile['jpeg'] = ['jpeg']
-logFile['pegwit'] = ['pegwit']
+            # Add TEST benchmark group.
+            'TEST' : [
+                '603.bwaves_s',
+                '619.lbm_s',
+                '607.cactuBSSN_s'
+            ],
 
-BUILD_COMMAND = "runspec --loose -size=ref -iterations=1 -config=%s --tune=base -r 1 -I -a build %s"
-SCRUB_COMMAND = "runspec --loose -size=ref -iterations=1 -config=%s --tune=base -r 1 -I -a scrub %s"
+            # Add ALL benchmark group.
+            'ALL' : [
+                '500.perlbench_r',
+                '600.perlbench_s',
+                '502.gcc_r',
+                '602.gcc_s',
+                '505.mcf_r',
+                '605.mcf_s',
+                '520.omnetpp_r',
+                '620.omnetpp_s',
+                '523.xalancbmk_r',
+                '623.xalancbmk_s',
+                '525.x264_r',
+                '625.x264_s',
+                '531.deepsjeng_r',
+                '631.deepsjeng_s',
+                '541.leela_r',
+                '641.leela_s',
+                '548.exchange2_r',
+                '648.exchange2_s',
+                '557.xz_r',
+                '657.xz_s',
+                '503.bwaves_r',
+                '603.bwaves_s',
+                '507.cactuBSSN_r',
+                '607.cactuBSSN_s',
+                '508.namd_r',
+                '510.parest_r',
+                '511.povray_r',
+                '519.lbm_r',
+                '619.lbm_s',
+                '521.wrf_r',
+                '621.wrf_s',
+                '526.blender_r',
+                '527.cam4_r',
+                '627.cam4_s',
+                '628.pop2_s',
+                '538.imagick_r',
+                '638.imagick_s',
+                '544.nab_r',
+                '644.nab_s',
+                '549.fotonik3d_r',
+                '649.fotonik3d_s',
+                '554.roms_r',
+                '654.roms_s'
+            ],
+
+            # Add INT benchmark group.
+            'INT' : [
+                '500.perlbench_r',
+                '600.perlbench_s',
+                '502.gcc_r',
+                '602.gcc_s',
+                '505.mcf_r',
+                '605.mcf_s',
+                '520.omnetpp_r',
+                '620.omnetpp_s',
+                '523.xalancbmk_r',
+                '623.xalancbmk_s',
+                '525.x264_r',
+                '625.x264_s',
+                '531.deepsjeng_r',
+                '631.deepsjeng_s',
+                '541.leela_r',
+                '641.leela_s',
+                '548.exchange2_r',
+                '648.exchange2_s',
+                '557.xz_r',
+                '657.xz_s',
+            ],
+
+            #Add INT SPECrate
+            'INT_RATE' : [
+                '500.perlbench_r',
+                '502.gcc_r',
+                '505.mcf_r',
+                '520.omnetpp_r',
+                '523.xalancbmk_r',
+                '525.x264_r',
+                '531.deepsjeng_r',
+                '541.leela_r',
+                '548.exchange2_r',
+                '557.xz_r',
+            ],
+
+            #Add INT SPECspeed
+            'INT_SPEED' : [
+                '600.perlbench_s',
+                '602.gcc_s',
+                '605.mcf_s',
+                '620.omnetpp_s',
+                '623.xalancbmk_s',
+                '625.x264_s',
+                '631.deepsjeng_s',
+                '641.leela_s',
+                '648.exchange2_s',
+                '657.xz_s',
+            ],
+
+            # Add FP benchmark group.
+            'FP' : [
+                '503.bwaves_r',
+                '603.bwaves_s',
+                '507.cactuBSSN_r',
+                '607.cactuBSSN_s',
+                '508.namd_r',
+                '510.parest_r',
+                '511.povray_r',
+                '519.lbm_r',
+                '619.lbm_s',
+                '521.wrf_r',
+                '621.wrf_s',
+                '526.blender_r',
+                '527.cam4_r',
+                '627.cam4_s',
+                '628.pop2_s',
+                '538.imagick_r',
+                '638.imagick_s',
+                '544.nab_r',
+                '644.nab_s',
+                '549.fotonik3d_r',
+                '649.fotonik3d_s',
+                '554.roms_r',
+                '654.roms_s'
+            ],
+
+            # Add FP SPECrate
+            'FP_RATE' : [
+                '503.bwaves_r',
+                '507.cactuBSSN_r',
+                '508.namd_r',
+                '510.parest_r',
+                '511.povray_r',
+                '519.lbm_r',
+                '521.wrf_r',
+                '526.blender_r',
+                '527.cam4_r',
+                '538.imagick_r',
+                '544.nab_r',
+                '549.fotonik3d_r',
+                '554.roms_r',
+            ],
+
+            # Add FP SPECrate w/o the non-working wrf
+            'FP_RATE_NWRF' : [
+                '503.bwaves_r',
+                '507.cactuBSSN_r',
+                '508.namd_r',
+                '510.parest_r',
+                '511.povray_r',
+                '519.lbm_r',
+                '526.blender_r',
+                '527.cam4_r',
+                '538.imagick_r',
+                '544.nab_r',
+                '549.fotonik3d_r',
+                '554.roms_r',
+            ],
+
+            # Add FP SPECspeed
+            'FP_SPEED' : [
+                '603.bwaves_s',
+                '607.cactuBSSN_s',
+                '619.lbm_s',
+                '621.wrf_s',
+                '627.cam4_s',
+                '628.pop2_s',
+                '638.imagick_s',
+                '644.nab_s',
+                '649.fotonik3d_s',
+                '654.roms_s'
+            ],
+
+            # Add C benchmark group.
+            'C' : [
+                '500.perlbench_r',
+                '600.perlbench_s',
+                '502.gcc_r',
+                '602.gcc_s',
+                '505.mcf_r',
+                '605.mcf_s',
+                '525.x264_r',
+                '625.x264_s',
+                '557.xz_r',
+                '657.xz_s',
+                '519.lbm_r',
+                '619.lbm_s',
+                '538.imagick_r',
+                '638.imagick_s',
+                '544.nab_r',
+                '644.nab_s',
+            ],
+
+            # Add C++ benchmark group.
+            'C++' : [
+                '520.omnetpp_r',
+                '620.omnetpp_s',
+                '523.xalancbmk_r',
+                '623.xalancbmk_s',
+                '531.deepsjeng_r',
+                '631.deepsjeng_s',
+                '541.leela_r',
+                '641.leela_s',
+                '508.namd_r',
+                '510.parest_r',
+            ],
+
+            # Add the FORTRAN benchmark group.
+            'FORTRAN' : [
+                '548.exchange2_r',
+                '648.exchange2_s',
+                '503.bwaves_r',
+                '603.bwaves_s',
+                '549.fotonik3d_r',
+                '649.fotonik3d_s',
+                '554.roms_r',
+                '654.roms_s'
+            ],
+
+            # Add the MIXED language benchmark group.
+            'MIXED' : [
+                '507.cactuBSSN_r',
+                '607.cactuBSSN_s',
+                '511.povray_r',
+                '521.wrf_r',
+                '621.wrf_s',
+                '526.blender_r',
+                '527.cam4_r',
+                '627.cam4_s',
+                '628.pop2_s'
+            ],
+
+            # The FP benchmarks without FORTRAN. (ie no dragonegg/flang)
+            'FP_NO_F' : [
+                '508.namd_r',
+                '510.parest_r',
+                '511.povray_r',
+                '519.lbm_r',
+                '619.lbm_s',
+                '526.blender_r',
+                '538.imagick_r',
+                '638.imagick_s',
+                '544.nab_r',
+                '644.nab_s'
+            ]
+        }
+    }
+}
+
+
+DETECT_COMMAND = 'if ! . shrc &> /dev/null; then  echo "NX_INSTALL";  elif runspec -h &> /dev/null; then echo "CPU2006"; elif runcpu -h &> /dev/null; then echo "CPU2017"; else echo "SPEC_AUTODETECT_ERROR"; fi'
 LOG_DIR = 'logs/'
 
 # Regular expressions.
@@ -266,6 +558,8 @@ def writeStats(stats, spills, weighted, times, blocks, trackOptSchedSpills):
             totalTimedOutImproved = 0
             totalTimedOutNotImproved = 0
             totalCost = 0
+            totalAcoImprovement = 0
+            totalAcoPostImprovement = 0
             totalImprovement = 0
             totalOptSchedSpills = 0
             totalEnumeratedSizes = 0
@@ -294,7 +588,10 @@ def writeStats(stats, spills, weighted, times, blocks, trackOptSchedSpills):
                 optimalNotImproved = 0
                 timedOutImproved = 0
                 timedOutNotImproved = 0
-                cost = improvement = 0
+                cost = 0
+                acoImprovement = 0
+                acoPostImprovement = 0
+                improvement = 0
                 optSchedSpills = 0
                 enumeratedSizes = 0
                 optimalImprovedSizes = 0
@@ -313,6 +610,8 @@ def writeStats(stats, spills, weighted, times, blocks, trackOptSchedSpills):
                     if block['success']:
                         successful += 1
                         cost += block['listCost']
+                        acoImprovement += block['acoImprovement']
+                        acoPostImprovement += block['acoPostImprovement']
                         size = block['size']
                         spills = block['optSchedSpills']
                         sizesList.append(size)
@@ -390,10 +689,15 @@ def writeStats(stats, spills, weighted, times, blocks, trackOptSchedSpills):
                                   (timedOutNotImproved, (100 * timedOutNotImproved / enumerated) if enumerated else 0, nonOptimalNotImprovedStr))
                 blocks_file.write('  Heuristic cost: %d\n' %
                                   cost)
+                blocks_file.write('  Aco cost: %d\n' %
+                                  (cost - acoImprovement))
                 blocks_file.write('  B&B cost: %d\n' %
-                                  (cost - improvement))
+                                  (cost - acoImprovement - improvement))
+                fullImprovement = acoImprovement + improvement + acoPostImprovement
+                blocks_file.write('  AcoPost cost: %d\n' %
+                                  (cost - fullImprovement))
                 blocks_file.write('  Cost improvement: %d (%.2f%%)\n' %
-                                  (improvement, (100 * improvement / cost) if cost else 0))
+                                  (fullImprovement, (100 * fullImprovement / cost) if cost else 0))
                 if trackOptSchedSpills:
                     blocks_file.write('  Simulated Block Spills: %d\n' %
                                     optSchedSpills)
@@ -406,6 +710,8 @@ def writeStats(stats, spills, weighted, times, blocks, trackOptSchedSpills):
                 totalTimedOutImproved += timedOutImproved
                 totalTimedOutNotImproved += timedOutNotImproved
                 totalCost += cost
+                totalAcoImprovement += acoImprovement
+                totalAcoPostImprovement += acoPostImprovement
                 totalImprovement += improvement
                 totalOptSchedSpills += optSchedSpills
                 totalEnumeratedSizes += enumeratedSizes
@@ -425,7 +731,7 @@ def writeStats(stats, spills, weighted, times, blocks, trackOptSchedSpills):
             totalOptimalNotImprovedStr = ''
             totalNonOptimalImprovedStr = ''
             totalNonOptimalNotImprovedStr = ''
-            if trackOptSchedSpills and enumerated > 0:
+            if trackOptSchedSpills and totalEnumerated > 0:
                 try:
                     totalEnumeratedStr += '  {:,} instrs, {:,} spills'.format(totalEnumeratedSizes, totalEnumeratedSpills)
 
@@ -462,10 +768,15 @@ def writeStats(stats, spills, weighted, times, blocks, trackOptSchedSpills):
                               (totalTimedOutNotImproved, (100 * totalTimedOutNotImproved / totalEnumerated) if totalEnumerated else 0, totalNonOptimalNotImprovedStr))
             blocks_file.write('  Heuristic cost: %d\n' %
                               totalCost)
+            blocks_file.write('  Aco cost: %d\n' %
+                              (totalCost - totalAcoImprovement))
             blocks_file.write('  B&B cost: %d\n' %
-                              (totalCost - totalImprovement))
+                              (totalCost - totalAcoImprovement - totalImprovement))
+            totalFullImprovement = totalAcoImprovement + totalImprovement + totalAcoPostImprovement
+            blocks_file.write('  AcoPost cost: %d\n' %
+                              (totalCost -totalFullImprovement))
             blocks_file.write('  Cost improvement: %d (%.2f%%)\n' %
-                              (totalImprovement, (100 * totalImprovement / totalCost) if totalCost else 0))
+                              (totalFullImprovement, (100 * totalFullImprovement / totalCost) if totalCost else 0))
             if trackOptSchedSpills:
                 blocks_file.write('  Total Simulated Block Spills: %d\n' %
                                 totalOptSchedSpills)
@@ -491,7 +802,7 @@ def writeStats(stats, spills, weighted, times, blocks, trackOptSchedSpills):
                               ((sum(optimalTimesList) / len(optimalTimesList)) if optimalTimesList else 0))
 
 
-def calculateBlockStats(output, trackOptSchedSpills):
+def calculateBlockStats(output, trackOptSchedSpills, normalized):
     blocks = split_blocks(output)
     stats = []
     for index, block in enumerate(blocks):
@@ -518,7 +829,7 @@ def calculateBlockStats(output, trackOptSchedSpills):
                 else:
                     optSchedSpills = 0
 
-                costLowerBound = events['CostLowerBound']['cost']
+                costLowerBound = events['CostLowerBound']['cost'] if not normalized else 0
                 listCost = costLowerBound + events['HeuristicResult']['cost']
                 # The block is not enumerated if the list schedule is optimal or there is a zero
                 # time limit for enumeration.
@@ -533,10 +844,24 @@ def calculateBlockStats(output, trackOptSchedSpills):
                     The rest of this if-block ensures that this tool doesn't crash.
                     If the improvement is not found, it is assumed to be 0.
                     """
-                    improvement = events['DagSolvedOptimally']['cost_improvement'] if isOptimal else 0
+                    if isOptimal:
+                        improvement = events['DagSolvedOptimally']['cost_improvement']
+                    elif 'DagTimedOut' in events:
+                        improvement = events['DagTimedOut']['cost_improvement']
+                    else:
+                        improvement = 0
                 else:
                     isOptimal = False
                     improvement = 0
+
+            if 'ACO_sched_complete' in events:
+                acoImprovement = events['ACO_sched_complete']['improvement']
+            else:
+                acoImprovement = 0
+            if 'ACOpost_sched_complete' in events:
+                acoPostImprovement = events['ACOpost_sched_complete']['improvement']
+            else:
+                acoPostImprovement = 0
 
             stats.append({
                 'name': name,
@@ -547,9 +872,12 @@ def calculateBlockStats(output, trackOptSchedSpills):
                 'isOptimal': isOptimal,
                 'listCost': listCost,
                 'improvement': improvement,
+                'acoImprovement': acoImprovement,
+                'acoPostImprovement': acoPostImprovement,
                 'optSchedSpills': optSchedSpills
             })
-        except:
+        except Exception as e:
+            print e
             print '  WARNING: Could not parse block #%d:' % (index + 1)
             print "Unexpected error:", sys.exc_info()[0]
             for line in blocks[index].split('\n')[1:-1][:10]:
@@ -602,17 +930,39 @@ Defining this function makes it easier to parse files.
 """
 
 
-def getBenchmarkResult(output, trackOptSchedSpills):
+def getBenchmarkResult(output, trackOptSchedSpills, normalized):
     # Handle parsing log files that were not generated by runspec and have no time information.
     time = int(TIMES_REGEX.findall(output)[1]) if len(TIMES_REGEX.findall(output)) > 0 else -1
     return {
         'time': time,
         'spills': calculateSpills(output),
-        'blocks': calculateBlockStats(output, trackOptSchedSpills),
+        'blocks': calculateBlockStats(output, trackOptSchedSpills, normalized),
     }
 
+def detectSPECInstall():
+    try:
+        p = subprocess.Popen(['/bin/bash', '-c', DETECT_COMMAND], stdout=subprocess.PIPE)
+        output = p.stdout.read().strip()
+    except subprocess.CalledProcessError as e:
+        print "FATAL ERROR in runspec wrapper.  Could not auto detect SPEC installation"
+        sys.exit()
 
-def runBenchmarks(benchmarks, testOutDir, shouldWriteLogs, config, trackOptSchedSpills):
+    if output == "SPEC_AUTODETECT_ERROR":
+        print "Runspec-wrapper found the shrc script, but was unable to find either runspec or runcpu"
+        sys.exit()
+
+    if output == "NX_INSTALL":
+        print "SPEC does not appear to be installed in this directory"
+        sys.exit()
+
+    return output
+
+def runBenchmarks(benchmarks, testOutDir, shouldWriteLogs, config, trackOptSchedSpills, normalized):
+    # Detect Install
+    version = detectSPECInstall()
+    BUILD_COMMAND = specVersions[version]['BUILD_COMMAND']
+    SCRUB_COMMAND = specVersions[version]['SCRUB_COMMAND']
+
     results = {}
     for bench in benchmarks:
         print 'Running', bench
@@ -628,7 +978,7 @@ def runBenchmarks(benchmarks, testOutDir, shouldWriteLogs, config, trackOptSched
         except subprocess.CalledProcessError as e:
             print '  WARNING: Benchmark command failed: %s.' % e
         else:
-            results[bench] = getBenchmarkResult(output, trackOptSchedSpills)
+            results[bench] = getBenchmarkResult(output, trackOptSchedSpills, normalized)
 
             # Optionally write log files to results directory.
             if shouldWriteLogs is True:
@@ -645,48 +995,45 @@ def writeLogs(output, testOutDir, bench):
 
 
 def main(args):
-    ## Select benchmarks.
-    benchArgs = args.bench.split(',')
-    # List of benchmarks to run.
-    benchmarks = []
-    for benchArg in benchArgs:
-        if benchArg not in benchDict:
-            print 'Fatal: Unknown benchmark specified: "%s".' % benchArg
-            if benchArg == 'all':
-                print 'Did you mean ALL?'
-            sys.exit(1)
-
-        benchmarks = list(set(benchmarks + benchDict[benchArg]))
-
     # Parse a log file or multiple log files instead of running benchmark
     results = {}
     if args.logfile is not None:
-        logArgs = args.logfile.split(',')
-        logfiles = []
-        for logArg in logArgs:
-            if logArg not in logFile:
-                print 'Fatal: Unknown log file specified: "%s".' % logArg
-                if logArg == 'all':
-                    print 'Did you mean ALL?'
-                sys.exit(1)
-
-            logfiles = list(set(logfiles + logFile[logArg]))
+        logfiles = [f for f in os.listdir(args.logfile) if os.path.isfile(os.path.join(args.logfile, f)) and f[-4:]=='.log']
 
         for log in logfiles:
-            with open('./' + log + '/' + log + '.log') as log_file:
+            with open(os.path.join(args.logfile, f)) as log_file:
                 output = log_file.read()
-                results[log] = getBenchmarkResult(output, args.trackOptSchedSpills)
+                results[log] = getBenchmarkResult(output, args.trackOptSchedSpills, args.normalized)
 
-            spills = os.path.join(args.outdir, args.spills)
-            weighted = os.path.join(args.outdir, args.weighted)
-            times = os.path.join(args.outdir, args.times)
-            blocks = os.path.join(args.outdir, args.blocks)
+                spills = os.path.join(args.outdir, args.spills)
+                weighted = os.path.join(args.outdir, args.weighted)
+                times = os.path.join(args.outdir, args.times)
+                blocks = os.path.join(args.outdir, args.blocks)
 
-            # Write out the results from the logfile.
-            writeStats(results, spills, weighted, times, blocks, args.trackOptSchedSpills)
+                # Write out the results from the logfile.
+                writeStats(results, spills, weighted, times, blocks, args.trackOptSchedSpills)
 
         # Run the benchmarks and collect results.
     else:
+
+        # Detect Install
+        version = detectSPECInstall()
+        benchDict = specVersions[version]['benchDict']
+        print 'Using benchmark suite: "%s".' % version
+
+        ## Select benchmarks.
+        benchArgs = args.bench.split(',')
+        # List of benchmarks to run.
+        benchmarks = []
+        for benchArg in benchArgs:
+            if benchArg not in benchDict:
+                print 'Fatal: Unknown benchmark specified: "%s".' % benchArg
+                if benchArg == 'all':
+                    print 'Did you mean ALL?'
+                sys.exit(1)
+
+            benchmarks = list(set(benchmarks + benchDict[benchArg]))
+
         # Create a directory for the test results.
         if not os.path.exists(args.outdir):
             os.makedirs(args.outdir)
@@ -723,8 +1070,7 @@ def main(args):
                     os.makedirs(os.path.join(testOutDir, LOG_DIR))
 
             # Run the benchmarks
-            results = runBenchmarks(benchmarks, testOutDir, args.writelogs, args.config, args.trackOptSchedSpills)
-
+            results = runBenchmarks(benchmarks, testOutDir, args.writelogs, args.config, args.trackOptSchedSpills, args.normalized)
 
             spills = os.path.join(testOutDir, args.spills)
             weighted = os.path.join(testOutDir, args.weighted)
@@ -791,5 +1137,10 @@ if __name__ == '__main__':
                       dest="trackOptSchedSpills",
                       default=True,
                       help='Should the simulated number of spills per-block be tracked (%default).')
+    parser.add_option('-n', '--normalized',
+                      action="store_true",
+                      dest="normalized",
+                      default=False,
+                      help='Output normalized/relative costs to blocks.dat instead of absolute costs (%default).')
 
     main(parser.parse_args()[0])
