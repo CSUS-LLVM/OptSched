@@ -879,8 +879,9 @@ void SchedRegion::InitSecondPass() { isSecondPass_ = true; }
 FUNC_RESULT SchedRegion::runACO(InstSchedule *ReturnSched,
                                 InstSchedule *InitSched, bool IsPostBB) {
   InitForSchdulng();
-  ACOScheduler *AcoSchdulr = new ACOScheduler(
-      dataDepGraph_, machMdl_, abslutSchedUprBound_, hurstcPrirts_, vrfySched_, IsPostBB);
+  ACOScheduler *AcoSchdulr =
+      new ACOScheduler(dataDepGraph_, machMdl_, abslutSchedUprBound_,
+                       hurstcPrirts_, vrfySched_, IsPostBB);
   AcoSchdulr->setInitialSched(InitSched);
   FUNC_RESULT Rslt = AcoSchdulr->FindSchedule(ReturnSched, this);
   delete AcoSchdulr;

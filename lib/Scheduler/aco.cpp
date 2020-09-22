@@ -115,8 +115,8 @@ double ACOScheduler::Score(SchedInstruction *from, Choice choice) {
          pow(choice.heuristic, heuristicImportance_);
 }
 
-bool ACOScheduler::shouldReplaceSchedule(InstSchedule* OldSched, InstSchedule* NewSched)
-{
+bool ACOScheduler::shouldReplaceSchedule(InstSchedule *OldSched,
+                                         InstSchedule *NewSched) {
   // return true if the old schedule is null (eg:there is no old schedule)
   // return false if the new schedule is is NULL
   // if it is the 1st pass return the cost comparison
@@ -129,10 +129,9 @@ bool ACOScheduler::shouldReplaceSchedule(InstSchedule* OldSched, InstSchedule* N
     return NewSched->GetCost() < OldSched->GetCost();
   else
     return (NewSched->GetSpillCost() <= OldSched->GetSpillCost()) &&
-           (NewSched->GetCost() <  OldSched->GetCost());
-//           (NewSched->GetCrntLngth() <  OldSched->GetCrntLngth());
+           (NewSched->GetCost() < OldSched->GetCost());
+  //           (NewSched->GetCrntLngth() <  OldSched->GetCrntLngth());
 }
-
 
 Choice ACOScheduler::SelectInstruction(const llvm::ArrayRef<Choice> &ready,
                                        SchedInstruction *lastInst) {
@@ -342,12 +341,14 @@ FUNC_RESULT ACOScheduler::FindSchedule(InstSchedule *schedule_out,
                                        SchedRegion *region) {
   rgn_ = region;
 
-  //get settings
+  // get settings
   Config &schedIni = SchedulerOptions::getInstance();
   bool IsFirst = !rgn_->IsSecondPass();
-  heuristicImportance_ = schedIni.GetInt(IsFirst ? "ACO_HEURISTIC_IMPORTANCE" : "ACO2P_HEURISTIC_IMPORTANCE");
+  heuristicImportance_ = schedIni.GetInt(
+      IsFirst ? "ACO_HEURISTIC_IMPORTANCE" : "ACO2P_HEURISTIC_IMPORTANCE");
   fixed_bias = schedIni.GetInt(IsFirst ? "ACO_FIXED_BIAS" : "ACO2P_FIXED_BIAS");
-  noImprovementMax = schedIni.GetInt(IsFirst ? "ACO_STOP_ITERATIONS" : "ACO2P_STOP_ITERATIONS");
+  noImprovementMax = schedIni.GetInt(IsFirst ? "ACO_STOP_ITERATIONS"
+                                             : "ACO2P_STOP_ITERATIONS");
 
   // compute the relative maximum score inverse
   ScRelMax = rgn_->GetHeuristicCost();
@@ -378,7 +379,7 @@ FUNC_RESULT ACOScheduler::FindSchedule(InstSchedule *schedule_out,
   }
   writePheromoneGraph("initial");
 
-  //int noImprovementMax = schedIni.GetInt("ACO_STOP_ITERATIONS");
+  // int noImprovementMax = schedIni.GetInt("ACO_STOP_ITERATIONS");
   int noImprovement = 0; // how many iterations with no improvement
   int iterations = 0;
   while (true) {
@@ -411,7 +412,7 @@ FUNC_RESULT ACOScheduler::FindSchedule(InstSchedule *schedule_out,
         BestAntEdges = IterAntEdges;
 
       noImprovement = 0;
-      if(bestSchedule && bestSchedule->GetCost()==0)
+      if (bestSchedule && bestSchedule->GetCost() == 0)
         break;
     } else {
       noImprovement++;
@@ -426,9 +427,8 @@ FUNC_RESULT ACOScheduler::FindSchedule(InstSchedule *schedule_out,
   }
 
   Logger::Event(IsPostBB ? "ACOpost_sched_complete" : "ACO_sched_complete",
-                "cost", bestSchedule->GetCost(),
-                "iterations", iterations,
-                "improvement", InitialCost-bestSchedule->GetCost());
+                "cost", bestSchedule->GetCost(), "iterations", iterations,
+                "improvement", InitialCost - bestSchedule->GetCost());
   PrintSchedule(bestSchedule.get());
   schedule_out->Copy(bestSchedule.release());
 
