@@ -25,41 +25,38 @@ def translate_args(cont, **kwargs):
 def format(s, cont=identity):
     return lambda log: cont(s.format(**log))
 
-def produce(s, cont=identity):
-    return lambda _: cont(s)
-
-discard = produce(None)
+discard = lambda _: None
 
 TR_TABLE = {
-    'StaticLowerBoundDebugInfo': format('INFO: DAG {name} spillCostLB {spill_cost_lb} scFactor {sc_factor} lengthLB {length_lb} lenFactor {len_factor} staticLB {static_lb}'),
-    'Enumerating': format('INFO: Enumerating at target length {target_length}'),
-    'ScheduleVerifiedSuccessfully': discard, # produce('INFO: Schedule verified successfully'),
-    'ProcessDag': discard, # format('INFO: Processing DAG {name} with {num_instructions} insts and max latency {max_latency}.'),
-    'HeuristicResult': discard, # format('INFO: The list schedule is of length {length} and spill cost {spill_cost}. Tot cost = {cost}'),
-    'CostLowerBound': discard, # format('INFO: Lower bound of cost before scheduling: {cost}'),
-    'BypassZeroTimeLimit': discard, # format('INFO: Bypassing optimal scheduling due to zero time limit with cost {cost}'),
-    'HeuristicScheduleOptimal': format('INFO: The initial schedule of length {length} and cost {cost} is optimal.'),
+    'StaticLowerBoundDebugInfo': format('INFO: DAG {name} spillCostLB {spill_cost_lb} scFactor {sc_factor} lengthLB {length_lb} lenFactor {len_factor} staticLB {static_lb} (Time = {time} ms)'),
+    'Enumerating': format('INFO: Enumerating at target length {target_length} (Time = {time} ms)'),
+    'ScheduleVerifiedSuccessfully': discard, # format('INFO: Schedule verified successfully (Time = {time} ms)'),
+    'ProcessDag': discard, # format('INFO: Processing DAG {name} with {num_instructions} insts and max latency {max_latency}. (Time = {time} ms)'),
+    'HeuristicResult': discard, # format('INFO: The list schedule is of length {length} and spill cost {spill_cost}. Tot cost = {cost} (Time = {time} ms)'),
+    'CostLowerBound': discard, # format('INFO: Lower bound of cost before scheduling: {cost} (Time = {time} ms)'),
+    'BypassZeroTimeLimit': discard, # format('INFO: Bypassing optimal scheduling due to zero time limit with cost {cost} (Time = {time} ms)'),
+    'HeuristicScheduleOptimal': format('INFO: The initial schedule of length {length} and cost {cost} is optimal. (Time = {time} ms)'),
     'BestResult': discard,
         # translate_args(
-        #     format('INFO: Best schedule for DAG {name} has cost {cost} and length {length}. The schedule is {optimal}'),
+        #     format('INFO: Best schedule for DAG {name} has cost {cost} and length {length}. The schedule is {optimal} (Time = {time} ms)'),
         #     optimal=lambda opt: 'optimal' if opt else 'not optimal'
         # ),
-    'SlilStats': discard, # format('INFO: SLIL stats: DAG {name} static LB {static_lb} gap size {gap_size} enumerated {is_enumerated} optimal {is_optimal} PERP higher {is_perp_higher}'),
-    'NodeExamineCount': format('INFO: Examined {num_nodes} nodes.'),
-    'DagSolvedOptimally': discard, # format('INFO: DAG solved optimally in {solution_time} ms with length={length}, spill cost = {spill_cost}, tot cost = {total_cost}, cost imp={cost_improvement}.'),
-    'DagTimedOut': format('INFO: DAG timed out with length={length}, spill cost = {spill_cost}, tot cost = {total_cost}, cost imp={cost_improvement}.'),
+    'SlilStats': discard, # format('INFO: SLIL stats: DAG {name} static LB {static_lb} gap size {gap_size} enumerated {is_enumerated} optimal {is_optimal} PERP higher {is_perp_higher} (Time = {time} ms)'),
+    'NodeExamineCount': format('INFO: Examined {num_nodes} nodes. (Time = {time} ms)'),
+    'DagSolvedOptimally': discard, # format('INFO: DAG solved optimally in {solution_time} ms with length={length}, spill cost = {spill_cost}, tot cost = {total_cost}, cost imp={cost_improvement}. (Time = {time} ms)'),
+    'DagTimedOut': format('INFO: DAG timed out with length={length}, spill cost = {spill_cost}, tot cost = {total_cost}, cost imp={cost_improvement}. (Time = {time} ms)'),
     'HeuristicLocalRegAllocSimulation': format(
         dedent('''\
-        INFO: OPT_SCHED LOCAL RA: DAG Name: {dag_name} ***heuristic_schedule*** Number of spills: {num_spills}
-        INFO: Number of stores {num_stores}
-        INFO: Number of loads {num_loads}''')),
+        INFO: OPT_SCHED LOCAL RA: DAG Name: {dag_name} ***heuristic_schedule*** Number of spills: {num_spills} (Time = {time} ms)
+        INFO: Number of stores {num_stores} (Time = {time} ms)
+        INFO: Number of loads {num_loads} (Time = {time} ms)''')),
     'BestLocalRegAllocSimulation': format(
         dedent('''\
-        INFO: OPT_SCHED LOCAL RA: DAG Name: {dag_name} Number of spills: {num_spills}
-        INFO: Number of stores {num_stores}
-        INFO: Number of loads {num_loads}''')),
+        INFO: OPT_SCHED LOCAL RA: DAG Name: {dag_name} Number of spills: {num_spills} (Time = {time} ms)
+        INFO: Number of stores {num_stores} (Time = {time} ms)
+        INFO: Number of loads {num_loads} (Time = {time} ms)''')),
     'LocalRegAllocSimulationChoice': discard,
-    'PassFinished': discard, # lambda log: ('INFO: End of first pass through\n', 'INFO: End of second pass through')[log['num']],
+    'PassFinished': discard, # lambda log: ('INFO: End of first pass through\n (Time = {time} ms)', 'INFO: End of second pass through (Time = {time} ms)')[log['num']].format(time=log['time']),
 }
 
 
