@@ -42,18 +42,18 @@ double RandDouble(double min, double max) {
 
 ACOScheduler::ACOScheduler(DataDepGraph *dataDepGraph,
                            MachineModel *machineModel, InstCount upperBound,
-                           SchedPriorities priorities, bool vrfySched)
+                           SchedPriorities priorities, bool vrfySched,
+                           bool IsPostBB)
     : ConstrainedScheduler(dataDepGraph, machineModel, upperBound) {
   VrfySched_ = vrfySched;
+  this->IsPostBB = IsPostBB;
   prirts_ = priorities;
   rdyLst_ = new ReadyList(dataDepGraph_, priorities);
   count_ = dataDepGraph->GetInstCnt();
   Config &schedIni = SchedulerOptions::getInstance();
 
   use_fixed_bias = schedIni.GetBool("ACO_USE_FIXED_BIAS");
-  heuristicImportance_ = schedIni.GetInt("ACO_HEURISTIC_IMPORTANCE");
   use_tournament = schedIni.GetBool("ACO_TOURNAMENT");
-  fixed_bias = schedIni.GetInt("ACO_FIXED_BIAS");
   bias_ratio = schedIni.GetFloat("ACO_BIAS_RATIO");
   local_decay = schedIni.GetFloat("ACO_LOCAL_DECAY");
   decay_factor = schedIni.GetFloat("ACO_DECAY_FACTOR");
@@ -113,6 +113,23 @@ pheromone_t &ACOScheduler::Pheromone(InstCount from, InstCount to) {
 double ACOScheduler::Score(SchedInstruction *from, Choice choice) {
   return Pheromone(from, choice.inst) *
          pow(choice.heuristic, heuristicImportance_);
+}
+
+bool ACOScheduler::shouldReplaceSchedule(InstSchedule *OldSched,
+                                         InstSchedule *NewSched) {
+  // return true if the old schedule is null (eg:there is no old schedule)
+  // return false if the new schedule is is NULL
+  // if it is the 1st pass return the cost comparison
+  // if it is the 2nd pass return true if the RP cost and ILP cost is less
+  if (!OldSched)
+    return true;
+  else if (!NewSched)
+    return false;
+  else if (!rgn_->IsSecondPass())
+    return NewSched->GetCost() < OldSched->GetCost();
+  else
+    return (NewSched->GetSpillCost() <= OldSched->GetSpillCost()) &&
+           (NewSched->GetCost() < OldSched->GetCost());
 }
 
 Choice ACOScheduler::SelectInstruction(const llvm::ArrayRef<Choice> &ready,
@@ -323,6 +340,15 @@ FUNC_RESULT ACOScheduler::FindSchedule(InstSchedule *schedule_out,
                                        SchedRegion *region) {
   rgn_ = region;
 
+  // get settings
+  Config &schedIni = SchedulerOptions::getInstance();
+  bool IsFirst = !rgn_->IsSecondPass();
+  heuristicImportance_ = schedIni.GetInt(
+      IsFirst ? "ACO_HEURISTIC_IMPORTANCE" : "ACO2P_HEURISTIC_IMPORTANCE");
+  fixed_bias = schedIni.GetInt(IsFirst ? "ACO_FIXED_BIAS" : "ACO2P_FIXED_BIAS");
+  noImprovementMax = schedIni.GetInt(IsFirst ? "ACO_STOP_ITERATIONS"
+                                             : "ACO2P_STOP_ITERATIONS");
+
   // compute the relative maximum score inverse
   ScRelMax = rgn_->GetHeuristicCost();
 
@@ -335,6 +361,7 @@ FUNC_RESULT ACOScheduler::FindSchedule(InstSchedule *schedule_out,
   std::unique_ptr<InstSchedule> heuristicSched = FindOneSchedule();
   InstCount heuristicCost =
       heuristicSched->GetCost() + 1; // prevent divide by zero
+  InstCount InitialCost = InitialSchedule ? InitialSchedule->GetCost() : 0;
 
 #if USE_ACS
   initialValue_ = 2.0 / ((double)count_ * heuristicCost);
@@ -345,14 +372,12 @@ FUNC_RESULT ACOScheduler::FindSchedule(InstSchedule *schedule_out,
     pheromone_[i] = initialValue_;
   std::cerr << "initialValue_" << initialValue_ << std::endl;
 
-  writePheromoneGraph("initial");
-
   std::unique_ptr<InstSchedule> bestSchedule = std::move(InitialSchedule);
   if (bestSchedule) {
     UpdatePheromone(bestSchedule.get());
   }
-  Config &schedIni = SchedulerOptions::getInstance();
-  int noImprovementMax = schedIni.GetInt("ACO_STOP_ITERATIONS");
+  writePheromoneGraph("initial");
+
   int noImprovement = 0; // how many iterations with no improvement
   int iterations = 0;
   while (true) {
@@ -362,8 +387,7 @@ FUNC_RESULT ACOScheduler::FindSchedule(InstSchedule *schedule_out,
       std::unique_ptr<InstSchedule> schedule = FindOneSchedule();
       if (print_aco_trace)
         PrintSchedule(schedule.get());
-      if (iterationBest == nullptr ||
-          schedule->GetCost() < iterationBest->GetCost()) {
+      if (shouldReplaceSchedule(iterationBest.get(), schedule.get())) {
         iterationBest = std::move(schedule);
         if (IsDbg)
           IterAntEdges = CrntAntEdges;
@@ -373,8 +397,7 @@ FUNC_RESULT ACOScheduler::FindSchedule(InstSchedule *schedule_out,
     /* PrintSchedule(iterationBest); */
     /* std::cout << iterationBest->GetCost() << std::endl; */
     // TODO DRY
-    if (bestSchedule == nullptr ||
-        iterationBest->GetCost() < bestSchedule->GetCost()) {
+    if (shouldReplaceSchedule(bestSchedule.get(), iterationBest.get())) {
       bestSchedule = std::move(iterationBest);
       Logger::Info("ACO found schedule with spill cost %d",
                    bestSchedule->GetCost());
@@ -387,6 +410,8 @@ FUNC_RESULT ACOScheduler::FindSchedule(InstSchedule *schedule_out,
         BestAntEdges = IterAntEdges;
 
       noImprovement = 0;
+      if (bestSchedule && bestSchedule->GetCost() == 0)
+        break;
     } else {
       noImprovement++;
       /* if (*iterationBest == *bestSchedule) */
@@ -398,6 +423,10 @@ FUNC_RESULT ACOScheduler::FindSchedule(InstSchedule *schedule_out,
     writePheromoneGraph("iteration" + std::to_string(iterations));
     iterations++;
   }
+
+  Logger::Event(IsPostBB ? "AcoPostSchedComplete" : "ACOSchedComplete", "cost",
+                bestSchedule->GetCost(), "iterations", iterations,
+                "improvement", InitialCost - bestSchedule->GetCost());
   PrintSchedule(bestSchedule.get());
   schedule_out->Copy(bestSchedule.release());
 
@@ -536,9 +565,9 @@ void ACOScheduler::writePheromoneGraph(std::string Stage) {
       OutPath + "/" + dataDepGraph_->GetDagID() + "@" + Stage + ".dot";
   FILE *Out = fopen(FullOutPath.c_str(), "w");
   if (!Out) {
-    Logger::Info("Could now open file to write pheromone display at %s."
-                 " Skipping.",
-                 FullOutPath.c_str());
+    Logger::Error("Could now open file to write pheromone display at %s."
+                  " Skipping.",
+                  FullOutPath.c_str());
     return;
   }
 

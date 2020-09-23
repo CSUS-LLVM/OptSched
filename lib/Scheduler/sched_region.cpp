@@ -280,7 +280,7 @@ FUNC_RESULT SchedRegion::FindOptimalSchedule(
     AcoStart = Utilities::GetProcessorTime();
     AcoSchedule = new InstSchedule(machMdl_, dataDepGraph_, vrfySched_);
 
-    rslt = runACO(AcoSchedule, lstSched);
+    rslt = runACO(AcoSchedule, lstSched, false);
     if (rslt != RES_SUCCESS) {
       llvm::report_fatal_error("ACO scheduling failed", false);
       if (lstSchdulr)
@@ -482,7 +482,7 @@ FUNC_RESULT SchedRegion::FindOptimalSchedule(
     InstSchedule *AcoAfterEnumSchedule =
         new InstSchedule(machMdl_, dataDepGraph_, vrfySched_);
 
-    FUNC_RESULT acoRslt = runACO(AcoAfterEnumSchedule, bestSched);
+    FUNC_RESULT acoRslt = runACO(AcoAfterEnumSchedule, bestSched, true);
     if (acoRslt != RES_SUCCESS) {
       Logger::Info("Running final ACO failed");
       delete AcoAfterEnumSchedule;
@@ -877,10 +877,11 @@ void SchedRegion::RegAlloc_(InstSchedule *&bestSched, InstSchedule *&lstSched) {
 void SchedRegion::InitSecondPass() { isSecondPass_ = true; }
 
 FUNC_RESULT SchedRegion::runACO(InstSchedule *ReturnSched,
-                                InstSchedule *InitSched) {
+                                InstSchedule *InitSched, bool IsPostBB) {
   InitForSchdulng();
-  ACOScheduler *AcoSchdulr = new ACOScheduler(
-      dataDepGraph_, machMdl_, abslutSchedUprBound_, hurstcPrirts_, vrfySched_);
+  ACOScheduler *AcoSchdulr =
+      new ACOScheduler(dataDepGraph_, machMdl_, abslutSchedUprBound_,
+                       hurstcPrirts_, vrfySched_, IsPostBB);
   AcoSchdulr->setInitialSched(InitSched);
   FUNC_RESULT Rslt = AcoSchdulr->FindSchedule(ReturnSched, this);
   delete AcoSchdulr;

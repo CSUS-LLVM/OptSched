@@ -106,6 +106,8 @@ public:
   void UpdateScheduleCost(InstSchedule *sched);
   SPILL_COST_FUNCTION GetSpillCostFunc();
 
+  bool IsSecondPass() const { return isSecondPass_; }
+
   // Initialize variables for the second pass of the two-pass-optsched
   void InitSecondPass();
 
@@ -178,8 +180,6 @@ protected:
   // protected accessors:
   SchedulerType GetHeuristicSchedulerType() const { return HeurSchedType_; }
 
-  bool IsSecondPass() const { return isSecondPass_; }
-
   void SetBestCost(InstCount bestCost) { bestCost_ = bestCost; }
 
   void SetBestSchedLength(InstCount bestSchedLngth) {
@@ -242,7 +242,8 @@ protected:
   // (Chris) Get the SLIL for each set
   virtual const std::vector<int> &GetSLIL_() const = 0;
 
-  FUNC_RESULT runACO(InstSchedule *ReturnSched, InstSchedule *InitSched);
+  FUNC_RESULT runACO(InstSchedule *ReturnSched, InstSchedule *InitSched,
+                     bool IsPostBB);
 };
 
 } // namespace opt_sched
