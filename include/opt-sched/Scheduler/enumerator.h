@@ -150,9 +150,12 @@ private:
 
   InstCount cost_;
   InstCount costLwrBound_;
+  InstCount SpillCostLwrBound_;
   InstCount peakSpillCost_;
   InstCount spillCostSum_;
+  InstCount TotalSpillCost_ = -1;
   InstCount totalCost_ = -1;
+  InstCount SpillCost_;
   bool totalCostIsActualCost_ = false;
   ReserveSlot *rsrvSlots_;
 
@@ -270,11 +273,19 @@ public:
   inline void SetCostLwrBound(InstCount bound);
   inline InstCount GetCostLwrBound();
 
+  inline void setSpillCostLwrBound(InstCount bound) {
+    SpillCostLwrBound_ = bound;
+  }
+  inline InstCount getSpillCostLwrBound() const { return SpillCostLwrBound_; }
+
   inline void SetPeakSpillCost(InstCount cost);
   inline InstCount GetPeakSpillCost();
 
   inline void SetSpillCostSum(InstCount cost);
   inline InstCount GetSpillCostSum();
+
+  inline void setSpillCost(InstCount SpillCost);
+  inline InstCount getSpillCost();
 
   bool ChkInstRdndncy(SchedInstruction *inst, int brnchNum);
   bool IsNxtSlotStall();
@@ -284,12 +295,18 @@ public:
   int GetRealSlotNum() { return realSlotNum_; }
   void SetRealSlotNum(int num) { realSlotNum_ = num; }
 
+  inline InstCount getTotalSpillCost() const { return TotalSpillCost_; }
+  inline void setTotalSpillCost(InstCount TotalSpillCost) {
+    TotalSpillCost_ = TotalSpillCost;
+  }
+
   inline InstCount GetTotalCost() const { return totalCost_; }
   inline void SetTotalCost(InstCount totalCost) { totalCost_ = totalCost; }
 
   inline InstCount GetTotalCostIsActualCost() const {
     return totalCostIsActualCost_;
   }
+
   inline void SetTotalCostIsActualCost(bool totalCostIsActualCost) {
     totalCostIsActualCost_ = totalCostIsActualCost;
   }
@@ -327,6 +344,9 @@ protected:
 
   // The target length of which we are trying to find a feasible schedule
   InstCount trgtSchedLngth_;
+
+  // The target spill constraint we are trying to meet
+  InstCount TrgtSpillConstraint_;
 
   // A pointer to a relaxed scheduler
   RJ_RelaxedScheduler *rlxdSchdulr_;
@@ -407,6 +427,10 @@ protected:
   int imprvmntCnt_;
   InstCount prevTrgtLngth_;
 
+  // Algorithm type state variables
+  bool IsTwoPassEnabled_;
+  bool IsSecondPass_;
+
   LISTSCHED_HEURISTIC enumHurstc_;
 
   bool isEarlySubProbDom_;
@@ -484,6 +508,16 @@ protected:
   virtual void SetupAllocators_();
   virtual void FreeAllocators_();
   virtual void ResetAllocators_();
+
+  inline bool getIsTwoPass() { return IsTwoPassEnabled_; }
+  inline bool getIsSecondPass() { return IsSecondPass_; }
+
+  inline void setIsTwoPass(bool IsTwoPassEnabled) {
+    IsTwoPassEnabled_ = IsTwoPassEnabled;
+  }
+  inline void setIsSecondPass(bool IsSecondPass) {
+    IsSecondPass_ = IsSecondPass;
+  }
 
   void PrintLog_();
 
@@ -571,6 +605,7 @@ private:
   int costChkCnt_;
   int costPruneCnt_;
   int costLwrBound_;
+  int SpillCostLwrBound_;
   MemAlloc<CostHistEnumTreeNode> *histNodeAlctr_;
   SPILL_COST_FUNCTION spillCostFunc_;
 
@@ -584,8 +619,13 @@ private:
   void FreeHistNode_(HistEnumTreeNode *histNode);
 
   bool WasObjctvMet_();
+  bool WasObjctvMetWghtd_();
+  bool WasObjctvMetFrstPss_();
+  bool WasObjctvMetScndPss_();
   bool BackTrack_();
   InstCount GetBestCost_();
+  InstCount getBestSpillCost_();
+  InstCount getBestSchedLength_();
   void CreateRootNode_();
 
   // Check if branching from the current node by scheduling this instruction
@@ -616,6 +656,11 @@ public:
   bool IsCostEnum();
   SPILL_COST_FUNCTION GetSpillCostFunc() { return spillCostFunc_; }
   inline InstCount GetBestCost() { return GetBestCost_(); }
+  inline InstCount getBestSpillCost() { return getBestSpillCost_(); }
+  inline InstCount getBestSchedLength() { return getBestSchedLength_(); }
+
+  inline InstCount getTrgtLngth() { return trgtSchedLngth_; }
+  inline InstCount getTrgtSpillCostConstrnt() { return TrgtSpillConstraint_; }
 };
 /*****************************************************************************/
 
@@ -849,6 +894,15 @@ void EnumTreeNode::SetSpillCostSum(InstCount cost) {
 /*****************************************************************************/
 
 InstCount EnumTreeNode::GetSpillCostSum() { return spillCostSum_; }
+/*****************************************************************************/
+
+void EnumTreeNode::setSpillCost(InstCount SpillCost) {
+  assert(SpillCost >= 0);
+  SpillCost_ = SpillCost;
+}
+/*****************************************************************************/
+
+InstCount EnumTreeNode::getSpillCost() { return SpillCost_; }
 /*****************************************************************************/
 
 bool EnumTreeNode::IsNxtCycleNew_() {

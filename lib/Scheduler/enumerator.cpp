@@ -689,7 +689,7 @@ void Enumerator::SetInstSigs_() {
     // now, place the instruction number in the least significant bits
     sig |= i;
 
-    //    sig &= 0x7fffffffffffffff;
+    // sig &= 0x7fffffffffffffff;
     sig &= 0x7fffffff;
 
     assert(sig != 0);
@@ -820,44 +820,48 @@ void AppendAndCheckSuffixSchedules(
                   concatSched->GetCrntLngth(), trgtSchedLngth_);
   }
 #endif
-  auto oldCost = thisAsLengthCostEnum->GetBestCost();
-  auto newCost = rgn_->UpdtOptmlSched(concatSched.get(), thisAsLengthCostEnum);
-#if defined(IS_DEBUG_SUFFIX_SCHED)
-  Logger::Info("Found a concatenated schedule with node instruction %d",
-               crntNode_->GetInstNum());
-#endif
-  if (newCost < oldCost) {
-#if defined(IS_DEBUG_SUFFIX_SCHED)
-    Logger::Info("Suffix Scheduling: Concatenated schedule has better "
-                 "cost %d than best schedule %d!",
-                 newCost, oldCost);
-#endif
-    // Don't forget to update the total cost and suffix for this node,
-    // because we intentionally backtrack without visiting its
-    // children.
-    crntNode_->SetTotalCost(newCost);
-    crntNode_->SetTotalCostIsActualCost(true);
-    if (newCost == 0) {
-      Logger::Info(
-          "Suffix Scheduling: ***GOOD*** Schedule of cost 0 was found!");
-    }
-  } else {
-#if defined(IS_DEBUG_SUFFIX_SCHED)
-    Logger::Info("Suffix scheduling: Concatenated schedule does not have "
-                 "better cost %d than best schedule %d.",
-                 newCost, oldCost);
-#endif
-  }
 
-  // Before backtracking, reset the SchedRegion state to where it was before
-  // concatenation.
-  rgn_->InitForSchdulng();
-  InstCount cycleNum, slotNum;
-  for (auto instNum = crntSched_->GetFrstInst(cycleNum, slotNum);
-       instNum != INVALID_VALUE;
-       instNum = crntSched_->GetNxtInst(cycleNum, slotNum)) {
-    rgn_->SchdulInst(dataDepGraph_->GetInstByIndx(instNum), cycleNum, slotNum,
-                     false);
+  if (!rgn_->isTwoPassEnabled()) {
+    auto oldCost = thisAsLengthCostEnum->GetBestCost();
+    auto newCost =
+        (rgn_->UpdtOptmlSched(concatSched.get(), thisAsLengthCostEnum))[0];
+#if defined(IS_DEBUG_SUFFIX_SCHED)
+    Logger::Info("Found a concatenated schedule with node instruction %d",
+                 crntNode_->GetInstNum());
+#endif
+    if (newCost < oldCost) {
+#if defined(IS_DEBUG_SUFFIX_SCHED)
+      Logger::Info("Suffix Scheduling: Concatenated schedule has better "
+                   "cost %d than best schedule %d!",
+                   newCost, oldCost);
+#endif
+      // Don't forget to update the total cost and suffix for this node,
+      // because we intentionally backtrack without visiting its
+      // children.
+      crntNode_->SetTotalCost(newCost);
+      crntNode_->SetTotalCostIsActualCost(true);
+      if (newCost == 0) {
+        Logger::Info(
+            "Suffix Scheduling: ***GOOD*** Schedule of cost 0 was found!");
+      }
+    } else {
+#if defined(IS_DEBUG_SUFFIX_SCHED)
+      Logger::Info("Suffix scheduling: Concatenated schedule does not have "
+                   "better cost %d than best schedule %d.",
+                   newCost, oldCost);
+#endif
+    }
+
+    // Before backtracking, reset the SchedRegion state to where it was before
+    // concatenation.
+    rgn_->InitForSchdulng();
+    InstCount cycleNum, slotNum;
+    for (auto instNum = crntSched_->GetFrstInst(cycleNum, slotNum);
+         instNum != INVALID_VALUE;
+         instNum = crntSched_->GetNxtInst(cycleNum, slotNum)) {
+      rgn_->SchdulInst(dataDepGraph_->GetInstByIndx(instNum), cycleNum, slotNum,
+                       false);
+    }
   }
 }
 } // namespace
@@ -926,6 +930,7 @@ FUNC_RESULT Enumerator::FindFeasibleSchedule_(InstSchedule *sched,
         isCrntNodeFsbl = BackTrack_();
       }
     } else {
+
       // All branches from the current node have been explored, and no more
       // branches that lead to feasible nodes have been found.
       if (crntNode_ == rootNode_) {
@@ -1046,6 +1051,7 @@ bool Enumerator::FindNxtFsblBrnch_(EnumTreeNode *&newNode) {
 bool Enumerator::ProbeBranch_(SchedInstruction *inst, EnumTreeNode *&newNode,
                               bool &isNodeDmntd, bool &isRlxInfsbl,
                               bool &isLngthFsbl) {
+
   bool fsbl;
   newNode = NULL;
   isLngthFsbl = false;
@@ -1315,6 +1321,7 @@ void SetTotalCostsAndSuffixes(EnumTreeNode *const currentNode,
     Logger::Info("Leaf node total cost %d", currentNode->GetCost());
 #endif
     currentNode->SetTotalCost(currentNode->GetCost());
+    currentNode->setTotalSpillCost(currentNode->getSpillCost());
     currentNode->SetTotalCostIsActualCost(true);
   } else {
     if (!currentNode->GetTotalCostIsActualCost() &&
@@ -1326,6 +1333,7 @@ void SetTotalCostsAndSuffixes(EnumTreeNode *const currentNode,
                    currentNode->GetCostLwrBound());
 #endif
       currentNode->SetTotalCost(currentNode->GetCostLwrBound());
+      currentNode->setTotalSpillCost(currentNode->getSpillCostLwrBound());
     }
   }
 
@@ -1358,6 +1366,7 @@ void SetTotalCostsAndSuffixes(EnumTreeNode *const currentNode,
                      currentNode->GetTotalCost());
 #endif
         parentNode->SetTotalCost(currentNode->GetTotalCost());
+        parentNode->setTotalSpillCost(currentNode->getTotalSpillCost());
         parentNode->SetTotalCostIsActualCost(true);
         parentNode->SetSuffix(std::move(parentSuffix));
       } else if (currentNode->GetTotalCost() < parentNode->GetTotalCost()) {
@@ -1367,6 +1376,7 @@ void SetTotalCostsAndSuffixes(EnumTreeNode *const currentNode,
             currentNode->GetTotalCost(), parentNode->GetTotalCost());
 #endif
         parentNode->SetTotalCost(currentNode->GetTotalCost());
+        parentNode->setTotalSpillCost(currentNode->getTotalSpillCost());
         parentNode->SetSuffix(std::move(parentSuffix));
       }
     }
@@ -1529,6 +1539,7 @@ bool Enumerator::WasDmnntSubProbExmnd_(SchedInstruction *,
             (exNode->GetSuffix() != nullptr) ? exNode : nullptr;
         mostRecentMatchWasSet = true;
       }
+
       if (exNode->DoesDominate(newNode, this)) {
 
 #ifdef IS_DEBUG_SPD
@@ -2017,6 +2028,17 @@ FUNC_RESULT LengthCostEnumerator::FindFeasibleSchedule(InstSchedule *sched,
                                                        Milliseconds deadline) {
   rgn_ = rgn;
   costLwrBound_ = costLwrBound;
+  SpillCostLwrBound_ = rgn_->getSpillCostLwrBound();
+
+  this->setIsSecondPass(rgn_->IsSecondPass());
+  this->setIsTwoPass(rgn_->isTwoPassEnabled());
+
+  if (rgn_->IsSecondPass())
+    TrgtSpillConstraint_ = rgn_->getSpillCostConstraint();
+
+  else
+    TrgtSpillConstraint_ = SpillCostLwrBound_;
+
   FUNC_RESULT rslt = FindFeasibleSchedule_(sched, trgtLngth, deadline);
 
 #ifdef IS_DEBUG_TRACE_ENUM
@@ -2031,22 +2053,71 @@ FUNC_RESULT LengthCostEnumerator::FindFeasibleSchedule(InstSchedule *sched,
 /*****************************************************************************/
 
 bool LengthCostEnumerator::WasObjctvMet_() {
+  if (!IsSchedComplete_())
+    return false;
+
   assert(GetBestCost_() >= 0);
 
   if (WasSolnFound_() == false) {
     return false;
   }
 
+  if (!rgn_->isTwoPassEnabled())
+    return WasObjctvMetWghtd_();
+
+  else {
+    if (!rgn_->IsSecondPass())
+      return WasObjctvMetFrstPss_();
+    else
+      return WasObjctvMetScndPss_();
+  }
+}
+/*****************************************************************************/
+
+bool LengthCostEnumerator::WasObjctvMetWghtd_() {
+  // llvm::SmallVector<InstCount,4> ObjctvValues;
+  std::vector<InstCount> ObjctvValues;
+
   InstCount crntCost = GetBestCost_();
 
-  InstCount newCost = rgn_->UpdtOptmlSched(crntSched_, this);
-  assert(newCost <= GetBestCost_());
+  ObjctvValues = rgn_->UpdtOptmlSchedWghtd(crntSched_, this);
 
-  if (newCost < crntCost) {
+  if (ObjctvValues[0] < crntCost)
     imprvmntCnt_++;
-  }
 
-  return newCost == costLwrBound_;
+  return (ObjctvValues[0] == costLwrBound_);
+}
+/*****************************************************************************/
+
+bool LengthCostEnumerator::WasObjctvMetFrstPss_() {
+  // llvm::SmallVector<InstCount,4> ObjctvValues;
+  std::vector<InstCount> ObjctvValues;
+
+  InstCount crntSpillCost = getBestSpillCost_();
+
+  ObjctvValues = rgn_->UpdtOptmlSchedFrstPss(crntSched_, this);
+
+  if (ObjctvValues[0] < crntSpillCost)
+    imprvmntCnt_++;
+
+  return (ObjctvValues[0] == SpillCostLwrBound_);
+}
+/*****************************************************************************/
+
+bool LengthCostEnumerator::WasObjctvMetScndPss_() {
+  // llvm::SmallVector<InstCount,4> ObjctvValues;
+  std::vector<InstCount> ObjctvValues;
+
+  InstCount crntSchedLength = getBestSchedLength_();
+
+  ObjctvValues = rgn_->UpdtOptmlSchedScndPss(crntSched_, this);
+
+  if (ObjctvValues[1] < crntSchedLength &&
+      ObjctvValues[0] == rgn_->getSpillCostConstraint())
+    imprvmntCnt_++;
+
+  return (ObjctvValues[1] <= trgtSchedLngth_ &&
+          ObjctvValues[0] == rgn_->getSpillCostConstraint());
 }
 /*****************************************************************************/
 
@@ -2069,9 +2140,8 @@ bool LengthCostEnumerator::ProbeBranch_(SchedInstruction *inst,
 
   isFsbl = ChkCostFsblty_(inst, newNode);
 
-  if (isFsbl == false) {
+  if (isFsbl == false)
     return false;
-  }
 
   if (IsHistDom()) {
     assert(newNode != NULL);
@@ -2131,7 +2201,11 @@ bool LengthCostEnumerator::BackTrack_() {
   if (prune_.spillCost) {
     if (fsbl) {
       assert(crntNode_->GetCostLwrBound() >= 0);
-      fsbl = crntNode_->GetCostLwrBound() < GetBestCost_();
+      if (!rgn_->isTwoPassEnabled())
+        fsbl = crntNode_->GetCostLwrBound() < GetBestCost_();
+      else {
+        fsbl = crntNode_->getSpillCostLwrBound() < getBestSpillCost();
+      }
     }
   }
 
@@ -2140,6 +2214,15 @@ bool LengthCostEnumerator::BackTrack_() {
 /*****************************************************************************/
 
 InstCount LengthCostEnumerator::GetBestCost_() { return rgn_->GetBestCost(); }
+
+InstCount LengthCostEnumerator::getBestSpillCost_() {
+  return rgn_->getBestSpillCost();
+}
+
+InstCount LengthCostEnumerator::getBestSchedLength_() {
+  return rgn_->getBestSchedLength();
+}
+
 /*****************************************************************************/
 
 void LengthCostEnumerator::CreateRootNode_() {

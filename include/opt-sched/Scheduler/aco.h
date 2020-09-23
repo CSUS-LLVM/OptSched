@@ -32,8 +32,8 @@ struct Choice {
 class ACOScheduler : public ConstrainedScheduler {
 public:
   ACOScheduler(DataDepGraph *dataDepGraph, MachineModel *machineModel,
-               InstCount upperBound, SchedPriorities priorities,
-               bool vrfySched);
+               InstCount upperBound, SchedPriorities priorities, bool vrfySched,
+               bool IsPostBB);
   virtual ~ACOScheduler();
   FUNC_RESULT FindSchedule(InstSchedule *schedule, SchedRegion *region);
   inline void UpdtRdyLst_(InstCount cycleNum, int slotNum);
@@ -45,6 +45,7 @@ private:
   pheromone_t &Pheromone(SchedInstruction *from, SchedInstruction *to);
   pheromone_t &Pheromone(InstCount from, InstCount to);
   double Score(SchedInstruction *from, Choice choice);
+  bool shouldReplaceSchedule(InstSchedule *OldSched, InstSchedule *NewSched);
 
   void PrintPheromone();
 
@@ -80,9 +81,11 @@ private:
   double local_decay;
   double decay_factor;
   int ants_per_iteration;
+  int noImprovementMax;
   bool print_aco_trace;
   std::unique_ptr<InstSchedule> InitialSchedule;
   bool VrfySched_;
+  bool IsPostBB;
   pheromone_t ScRelMax;
 };
 

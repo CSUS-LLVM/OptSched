@@ -115,13 +115,18 @@ protected:
   InstCount partialCost_ = -1;
   bool totalCostIsActualCost_ = false;
 
+  InstCount TotalSpillCost_ = -1;
+  InstCount PartialSpillCost_ = -1;
+
   bool isLngthFsbl_;
 #ifdef IS_DEBUG
   bool costInfoSet_;
 #endif
 
-  bool ChkCostDmntnForBBSpill_(EnumTreeNode *node, Enumerator *enumrtr);
-  bool ChkCostDmntn_(EnumTreeNode *node, Enumerator *enumrtr,
+  bool chkCostDmntnForSinglePass(EnumTreeNode *node,
+                                 LengthCostEnumerator *enumrtr);
+  bool chkCostDmntnForTwoPass(EnumTreeNode *Node, LengthCostEnumerator *E);
+  bool ChkCostDmntn_(EnumTreeNode *node, LengthCostEnumerator *enumrtr,
                      InstCount &maxShft);
   virtual void Init_();
 };

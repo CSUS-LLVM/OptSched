@@ -97,9 +97,10 @@ private:
   ConstrainedScheduler *AllocHeuristicScheduler_();
   bool EnableEnum_();
 
-  // BBWithSpill-specific Functions:
+  // BBWithSpill-specific Functions
   InstCount CmputCostLwrBound_(InstCount schedLngth);
   InstCount CmputCostLwrBound_();
+
   void InitForCostCmputtn_();
   InstCount CmputDynmcCost_();
 
@@ -120,10 +121,20 @@ public:
   ~BBWithSpill();
 
   int CmputCostLwrBound();
+  int cmputSpillCostLwrBound();
 
-  InstCount UpdtOptmlSched(InstSchedule *crntSched,
-                           LengthCostEnumerator *enumrtr);
+  std::vector<InstCount> UpdtOptmlSched(InstSchedule *crntSched,
+                                        LengthCostEnumerator *enumrtr);
+  std::vector<InstCount> UpdtOptmlSchedFrstPss(InstSchedule *crntSched,
+                                               LengthCostEnumerator *enumrtr);
+  std::vector<InstCount> UpdtOptmlSchedScndPss(InstSchedule *crntSched,
+                                               LengthCostEnumerator *enumrtr);
+  std::vector<InstCount> UpdtOptmlSchedWghtd(InstSchedule *crntSched,
+                                             LengthCostEnumerator *enumrtr);
   bool ChkCostFsblty(InstCount trgtLngth, EnumTreeNode *treeNode);
+  bool ChkCostFsbltyFrstPss(InstCount trgtLngth, EnumTreeNode *treeNode);
+  bool ChkCostFsbltyScndPss(InstCount trgtLngth, EnumTreeNode *treeNode);
+  bool ChkCostFsbltyWghtd(InstCount trgtLngth, EnumTreeNode *treeNode);
   void SchdulInst(SchedInstruction *inst, InstCount cycleNum, InstCount slotNum,
                   bool trackCnflcts);
   void UnschdulInst(SchedInstruction *inst, InstCount cycleNum,

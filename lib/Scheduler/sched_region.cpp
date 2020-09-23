@@ -38,11 +38,15 @@ SchedRegion::SchedRegion(MachineModel *machMdl, DataDepGraph *dataDepGraph,
   prune_ = PruningStrategy;
   HeurSchedType_ = HeurSchedType;
   isSecondPass_ = false;
+  TwoPassEnabled_ = false;
 
   totalSimSpills_ = INVALID_VALUE;
   bestCost_ = INVALID_VALUE;
   bestSchedLngth_ = INVALID_VALUE;
   hurstcCost_ = INVALID_VALUE;
+
+  BestSpillCost_ = INVALID_VALUE;
+
   enumCrntSched_ = NULL;
   enumBestSched_ = NULL;
   schedLwrBound_ = 0;
@@ -230,6 +234,9 @@ FUNC_RESULT SchedRegion::FindOptimalSchedule(
   else
     CmputLwrBounds_(false);
 
+  // Set the lowerbound of spill cost (need to CmptCostLWrBound() first)
+  SpillCostLwrBound_ = getSpillCostLwrBound();
+
   // Cost calculation must be below lower bounds calculation
   if (HeuristicSchedulerEnabled || IsSecondPass()) {
     heuristicScheduleLength = lstSched->GetCrntLngth();
@@ -238,6 +245,9 @@ FUNC_RESULT SchedRegion::FindOptimalSchedule(
     // calling GetCost() on the InstSchedule instance.
     CmputNormCost_(lstSched, CCM_DYNMC, hurstcExecCost, true);
     hurstcCost_ = lstSched->GetCost();
+
+    // Get unweighted spill cost for Heurstic list scheduler
+    HurstcSpillCost_ = lstSched->GetSpillCost();
 
     // This schedule is optimal so ACO will not be run
     // so set bestSched here.
@@ -273,6 +283,8 @@ FUNC_RESULT SchedRegion::FindOptimalSchedule(
   // TODO(justin): Remove once relevant scripts have been updated:
   // plaidbench-validation-test.py, runspec-wrapper-SLIL.py
   Logger::Info("Lower bound of cost before scheduling: %d", costLwrBound_);
+  Logger::Info("Lower bound of spill cost before scheduling: %d",
+               SpillCostLwrBound_);
 
   // Step #2: Use ACO to find a schedule if enabled and no optimal schedule is
   // yet to be found.
@@ -280,7 +292,7 @@ FUNC_RESULT SchedRegion::FindOptimalSchedule(
     AcoStart = Utilities::GetProcessorTime();
     AcoSchedule = new InstSchedule(machMdl_, dataDepGraph_, vrfySched_);
 
-    rslt = runACO(AcoSchedule, lstSched);
+    rslt = runACO(AcoSchedule, lstSched, false);
     if (rslt != RES_SUCCESS) {
       llvm::report_fatal_error("ACO scheduling failed", false);
       if (lstSchdulr)
@@ -324,6 +336,7 @@ FUNC_RESULT SchedRegion::FindOptimalSchedule(
       bestSched = bestSched_ = lstSched;
       bestSchedLngth_ = heuristicScheduleLength;
       bestCost_ = hurstcCost_;
+      BestSpillCost_ = HurstcSpillCost_;
     }
     // B) Heuristic was never run. In that case, just use ACO and run with its
     // results, into B&B.
@@ -331,6 +344,8 @@ FUNC_RESULT SchedRegion::FindOptimalSchedule(
       bestSched = bestSched_ = AcoSchedule;
       bestSchedLngth_ = AcoScheduleLength_;
       bestCost_ = AcoScheduleCost_;
+      // need to set spillCost
+
       // C) Neither scheduler was optimal. In that case, compare the two
       // schedules and use the one that's better as the input (initialSched) for
       // B&B.
@@ -339,6 +354,7 @@ FUNC_RESULT SchedRegion::FindOptimalSchedule(
       bestSched = bestSched_;
       bestSchedLngth_ = bestSched_->GetCrntLngth();
       bestCost_ = bestSched_->GetCost();
+      // need to set spillCost
     }
   }
   // Step #3: Compute the cost upper bound.
@@ -413,7 +429,12 @@ FUNC_RESULT SchedRegion::FindOptimalSchedule(
     Milliseconds enumStart = Utilities::GetProcessorTime();
     if (!isLstOptml) {
       dataDepGraph_->SetHard(true);
-      rslt = Optimize_(enumStart, rgnTimeout, lngthTimeout);
+      if ((IsSecondPass() && dataDepGraph_->GetMaxLtncy() <= 1))
+        Logger::Info("Problem size not increased after introducing latencies, "
+                     "skipping enumeration");
+      else
+        rslt = Optimize_(enumStart, rgnTimeout, lngthTimeout);
+
       Milliseconds enumTime = Utilities::GetProcessorTime() - enumStart;
 
       // TODO: Implement this stat for ACO also.
@@ -482,7 +503,7 @@ FUNC_RESULT SchedRegion::FindOptimalSchedule(
     InstSchedule *AcoAfterEnumSchedule =
         new InstSchedule(machMdl_, dataDepGraph_, vrfySched_);
 
-    FUNC_RESULT acoRslt = runACO(AcoAfterEnumSchedule, bestSched);
+    FUNC_RESULT acoRslt = runACO(AcoAfterEnumSchedule, bestSched, true);
     if (acoRslt != RES_SUCCESS) {
       Logger::Info("Running final ACO failed");
       delete AcoAfterEnumSchedule;
@@ -742,6 +763,7 @@ void SchedRegion::CmputLwrBounds_(bool useFileBounds) {
     UseFileBounds_();
 
   costLwrBound_ = CmputCostLwrBound();
+  // SpillCostLwrBound_ = getSpillCostLwrBound();
 
   delete rlxdSchdulr;
   delete rvrsRlxdSchdulr;
@@ -876,11 +898,14 @@ void SchedRegion::RegAlloc_(InstSchedule *&bestSched, InstSchedule *&lstSched) {
 
 void SchedRegion::InitSecondPass() { isSecondPass_ = true; }
 
+void SchedRegion::initTwoPassAlg() { TwoPassEnabled_ = true; }
+
 FUNC_RESULT SchedRegion::runACO(InstSchedule *ReturnSched,
-                                InstSchedule *InitSched) {
+                                InstSchedule *InitSched, bool IsPostBB) {
   InitForSchdulng();
-  ACOScheduler *AcoSchdulr = new ACOScheduler(
-      dataDepGraph_, machMdl_, abslutSchedUprBound_, hurstcPrirts_, vrfySched_);
+  ACOScheduler *AcoSchdulr =
+      new ACOScheduler(dataDepGraph_, machMdl_, abslutSchedUprBound_,
+                       hurstcPrirts_, vrfySched_, IsPostBB);
   AcoSchdulr->setInitialSched(InitSched);
   FUNC_RESULT Rslt = AcoSchdulr->FindSchedule(ReturnSched, this);
   delete AcoSchdulr;
