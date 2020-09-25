@@ -1,18 +1,46 @@
 #!/usr/bin/env python3
 import argparse
 import sys
+import os
 import json
 from textwrap import dedent
 
-parser = argparse.ArgumentParser(description='Convert data_dep WriteToFile format to a .dot file')
-parser.add_argument('-i', '--input', required=True, nargs='+', help='The WriteToFile format file to convert.')
-parser.add_argument('-o', '--output', required=True, nargs='+', help='The destination to write to.')
+parser = argparse.ArgumentParser(
+    description='Convert JSON style logfiles to the older INFO only format',
+    epilog=dedent('''\
+    example usage:
+        # Translate to output/a.log and output/dir/b.log:
+        python3 json2infolog.py -i a.log dir/b.log -d output
+
+        # Manually specify destinations (a.log -> a.tr.log, b.log -> b.tr.log):
+        python3 json2infolog.py -i a.log dir/b.log -o a.tr.log b.tr.log
+    '''),
+    formatter_class=argparse.RawDescriptionHelpFormatter
+)
+parser.add_argument('-i', '--input', required=True, nargs='+',
+                    help='The WriteToFile format file to convert.')
+parser.add_argument('-o', '--output', nargs='+',
+                    help='The destination to write to.')
+parser.add_argument(
+    '-d', '--outdir', help='The destination directory to write the output to. Writes each output to OUTDIR/INPUT')
 
 args = parser.parse_args()
-if len(args.input) != len(args.output):
-    parser.error(f'Differing number of inputs and outputs: {args.input} vs {args.output}')
+if args.output is not None and args.outdir is not None:
+    parser.error(
+        f'Only one of --output and --outdir may be provided: --output {args.output}, --outdir {args.outdir}')
 
-identity = lambda x: x
+if args.outdir:
+    args.output = [os.path.join(args.outdir, i) for i in args.input]
+
+if len(args.input) != len(args.output):
+    parser.error(
+        f'Differing number of inputs and outputs: {args.input} vs {args.output}')
+
+
+# Functions for defining translations:
+
+def identity(x): return x
+
 
 def translate_args(cont, **kwargs):
     def translate(log):
@@ -22,11 +50,23 @@ def translate_args(cont, **kwargs):
         return cont(log)
     return translate
 
+
 def format(s, cont=identity):
     return lambda log: cont(s.format(**log))
 
-discard = lambda _: None
 
+def discard(_): return None
+
+
+########
+# Defines the translations for each event_id.
+#
+# Commented out translations that follow a `discard` are translations for logs
+# which have a duplicate `Logger::Info(...)`` call following the
+# `Logger::Event(...)`.
+#
+# If the `Logger::Info(...)` call is removed,
+# the commented out code should replace the `discard`.
 TR_TABLE = {
     'StaticLowerBoundDebugInfo': format('INFO: DAG {name} spillCostLB {spill_cost_lb} scFactor {sc_factor} lengthLB {length_lb} lenFactor {len_factor} staticLB {static_lb} (Time = {time} ms)'),
     'Enumerating': format('INFO: Enumerating at target length {target_length} (Time = {time} ms)'),
@@ -67,7 +107,14 @@ def translate(infile, outfile):
             outfile.write(line)
             continue
 
-        parsed = json.loads(line.split(' ', 1)[1])
+        try:
+            parsed = json.loads(line.split(' ', 1)[1])
+        except json.decoder.JSONDecodeError as e:
+            e.colno += len('EVENT:')
+            print(f'Invalid JSON for line:\n{line}'
+                  + ' ' * e.colno + '^\n', file=sys.stderr)
+            raise
+
         tr = TR_TABLE[parsed['event_id']]
         result = tr(parsed)
         if result is not None:
@@ -75,6 +122,8 @@ def translate(infile, outfile):
 
 
 for inpath, outpath in zip(args.input, args.output):
-    with open(inpath, 'r') as infile,\
-        open(outpath, 'w') as outfile:
+    os.makedirs(os.path.dirname(outpath), exist_ok=True)
+
+    with open(inpath, 'r') as infile, \
+            open(outpath, 'w') as outfile:
         translate(infile, outfile)
