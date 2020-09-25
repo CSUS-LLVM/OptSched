@@ -864,7 +864,7 @@ InstCount BBWithSpill::UpdtOptmlSched(InstSchedule *crntSched,
 
   if (crntCost < GetBestCost()) {
 
-    if (crntSched->GetCrntLngth() > schedLwrBound_)
+    if (crntSched->GetCrntLngth() > schedLwrBound_ && !(isTwoPassEnabled()))
       Logger::Info("$$$ GOOD_HIT: Better spill cost for a longer schedule");
 
     SetBestCost(crntCost);
@@ -873,7 +873,7 @@ InstCount BBWithSpill::UpdtOptmlSched(InstSchedule *crntSched,
     enumBestSched_->Copy(crntSched);
     bestSched_ = enumBestSched_;
   }
-
+  
   return GetBestCost();
 }
 /*****************************************************************************/

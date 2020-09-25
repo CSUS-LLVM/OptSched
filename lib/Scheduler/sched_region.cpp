@@ -239,6 +239,9 @@ FUNC_RESULT SchedRegion::FindOptimalSchedule(
     CmputNormCost_(lstSched, CCM_DYNMC, hurstcExecCost, true);
     hurstcCost_ = lstSched->GetCost();
 
+    // Get unweighted spill cost for Heurstic list scheduler
+    HurstcSpillCost_ = lstSched->GetSpillCost();
+
     // This schedule is optimal so ACO will not be run
     // so set bestSched here.
     if (hurstcCost_ == 0) {
@@ -413,7 +416,12 @@ FUNC_RESULT SchedRegion::FindOptimalSchedule(
     Milliseconds enumStart = Utilities::GetProcessorTime();
     if (!isLstOptml) {
       dataDepGraph_->SetHard(true);
-      rslt = Optimize_(enumStart, rgnTimeout, lngthTimeout);
+
+      if ((IsSecondPass() && dataDepGraph_->GetMaxLtncy() <= 1))
+        Logger::Info("Problem size not increased after introducing latencies, skipping enumeration");
+      else
+        rslt = Optimize_(enumStart, rgnTimeout, lngthTimeout);
+      
       Milliseconds enumTime = Utilities::GetProcessorTime() - enumStart;
 
       // TODO: Implement this stat for ACO also.
@@ -873,6 +881,8 @@ void SchedRegion::RegAlloc_(InstSchedule *&bestSched, InstSchedule *&lstSched) {
                 "num_stores", regAllocChoice->GetNumStores(), //
                 "num_loads", regAllocChoice->GetNumLoads());
 }
+
+void SchedRegion::initTwoPassAlg() { TwoPassEnabled_ = true; }
 
 void SchedRegion::InitSecondPass() { isSecondPass_ = true; }
 

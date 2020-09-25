@@ -826,7 +826,7 @@ void AppendAndCheckSuffixSchedules(
   Logger::Info("Found a concatenated schedule with node instruction %d",
                crntNode_->GetInstNum());
 #endif
-  if (newCost < oldCost) {
+  if (newCost < oldCost && !(rgn_->IsSecondPass())) {
 #if defined(IS_DEBUG_SUFFIX_SCHED)
     Logger::Info("Suffix Scheduling: Concatenated schedule has better "
                  "cost %d than best schedule %d!",
@@ -2040,13 +2040,25 @@ bool LengthCostEnumerator::WasObjctvMet_() {
   InstCount crntCost = GetBestCost_();
 
   InstCount newCost = rgn_->UpdtOptmlSched(crntSched_, this);
-  assert(newCost <= GetBestCost_());
-
-  if (newCost < crntCost) {
-    imprvmntCnt_++;
+  if (rgn_->IsSecondPass()) {
+    // for second pass -- newCost is value of RP for sched
+    if (newCost == rgn_->getSpillCostConstraint() && 
+        trgtSchedLngth_ < getBestSchedLength_()) {
+      imprvmntCnt_++;
+    }
+    
+    return newCost == rgn_->getSpillCostConstraint();
   }
 
-  return newCost == costLwrBound_;
+  else {
+    assert(newCost <= GetBestCost_());
+    // for first pass & non-twoPass alg -- newCost is weighted sum cost for sched
+    if (newCost < crntCost) {
+      imprvmntCnt_++;
+    }
+
+    return newCost == costLwrBound_;
+  }
 }
 /*****************************************************************************/
 
@@ -2140,6 +2152,10 @@ bool LengthCostEnumerator::BackTrack_() {
 /*****************************************************************************/
 
 InstCount LengthCostEnumerator::GetBestCost_() { return rgn_->GetBestCost(); }
+
+InstCount LengthCostEnumerator::getBestSchedLength_() { 
+  return rgn_->getBestSchedLength();
+}
 /*****************************************************************************/
 
 void LengthCostEnumerator::CreateRootNode_() {

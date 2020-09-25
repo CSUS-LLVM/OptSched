@@ -60,10 +60,15 @@ public:
   inline InstCount GetBestCost() { return bestCost_; }
   // Returns the heuristic cost for this region.
   inline InstCount GetHeuristicCost() { return hurstcCost_; }
+  // Return the spill cost for first pass of this region
+  inline InstCount getSpillCostConstraint() const { return HurstcSpillCost_; }
   // Returns a pointer to the list scheduler heurisitcs.
   inline SchedPriorities GetHeuristicPriorities() { return hurstcPrirts_; }
   // Get the number of simulated spills code added for this block.
   inline int GetSimSpills() { return totalSimSpills_; }
+
+  // Get the length of best schedule found so far
+  inline InstCount getBestSchedLength() { return bestSchedLngth_; }
 
   // TODO(max): Document.
   virtual FUNC_RESULT
@@ -106,6 +111,10 @@ public:
   void UpdateScheduleCost(InstSchedule *sched);
   SPILL_COST_FUNCTION GetSpillCostFunc();
 
+  void initTwoPassAlg();
+
+  bool isTwoPassEnabled() const { return TwoPassEnabled_; }
+
   bool IsSecondPass() const { return isSecondPass_; }
 
   // Initialize variables for the second pass of the two-pass-optsched
@@ -122,6 +131,9 @@ private:
   // The normal heuristic scheduling results.
   InstCount hurstcCost_;
 
+  // Spill cost for heuristic schedule
+  InstCount HurstcSpillCost_;
+
   // total simulated spills.
   int totalSimSpills_;
 
@@ -130,6 +142,9 @@ private:
 
   // Used for two-pass-optsched to enable second pass functionalies.
   bool isSecondPass_;
+
+  // Use for enable two-pass-optsched functionalities
+  bool TwoPassEnabled_;
 
   // The absolute cost lower bound to be used as a ref for normalized costs.
   InstCount costLwrBound_ = 0;

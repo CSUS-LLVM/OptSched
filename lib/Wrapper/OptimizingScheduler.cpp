@@ -433,6 +433,9 @@ void ScheduleDAGOptSched::schedule() {
   if (SecondPass)
     region->InitSecondPass();
 
+  if (TwoPassEnabled)
+    region->initTwoPassAlg();
+
   // Setup time before scheduling
   Utilities::startTime = std::chrono::high_resolution_clock::now();
   // Schedule region.
