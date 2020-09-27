@@ -23,6 +23,7 @@ parser.add_argument('-o', '--output', nargs='+',
                     help='The destination to write to.')
 parser.add_argument(
     '-d', '--outdir', help='The destination directory to write the output to. Writes each output to OUTDIR/INPUT')
+parser.add_argument('-k', '--ignore-unknown', action='store_true', help='Ignores events with an unknown event_id.')
 
 args = parser.parse_args()
 if args.output is not None and args.outdir is not None:
@@ -39,23 +40,26 @@ if len(args.input) != len(args.output):
 
 # Functions for defining translations:
 
-def identity(x): return x
+def identity(line, x): return x
 
 
 def translate_args(cont, **kwargs):
-    def translate(log):
+    def translate(line, log):
         for name, f in kwargs.items():
             log[name] = f(log[name])
 
-        return cont(log)
+        return cont(line, log)
     return translate
 
 
 def format(s, cont=identity):
-    return lambda log: cont(s.format(**log))
+    return lambda line, log: cont(line, s.format(**log))
 
 
-def discard(_): return None
+def discard(a, b): return None
+
+
+def pass_through(line, log): return line
 
 
 ########
@@ -115,14 +119,33 @@ def translate(infile, outfile):
                   + ' ' * e.colno + '^\n', file=sys.stderr)
             raise
 
-        tr = TR_TABLE[parsed['event_id']]
-        result = tr(parsed)
+        event_id = parsed['event_id']
+
+        if event_id not in TR_TABLE:
+            print(f'Unknown event_id: `{event_id}`.', file=sys.stderr)
+
+            if not args.ignore_unknown:
+                print(dedent(f'''\
+                    To temporarily ignore this error, pass -k or --ignore-unknown.
+
+                    To fix this, add an entry to json2infolog.py's TR_TABLE:
+                        '{event_id}': ...,
+                    Example `...`s could be `pass_through` or `discard`.'''),
+                    file=sys.stderr)
+                exit()
+
+        tr = TR_TABLE.get(event_id, pass_through)
+
+        result = tr(
+            line[:-1], # Remove the trailing newline
+            parsed,
+        )
         if result is not None:
             print(result, file=outfile)
 
 
 for inpath, outpath in zip(args.input, args.output):
-    os.makedirs(os.path.dirname(outpath), exist_ok=True)
+    os.makedirs(os.path.dirname(os.path.abspath(outpath)), exist_ok=True)
 
     with open(inpath, 'r') as infile, \
             open(outpath, 'w') as outfile:
