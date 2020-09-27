@@ -101,6 +101,9 @@ TR_TABLE = {
         INFO: Number of loads {num_loads} (Time = {time} ms)''')),
     'LocalRegAllocSimulationChoice': discard,
     'PassFinished': discard, # lambda log: ('INFO: End of first pass through\n (Time = {time} ms)', 'INFO: End of second pass through (Time = {time} ms)')[log['num'] - 1].format(time=log['time']),
+
+    'AcoPostSchedComplete': pass_through,
+    'ACOSchedComplete': pass_through,
 }
 
 
