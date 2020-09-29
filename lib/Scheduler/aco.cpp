@@ -399,10 +399,13 @@ FUNC_RESULT ACOScheduler::FindSchedule(InstSchedule *schedule_out,
       Logger::Info("ACO found schedule with spill cost %d",
                    bestSchedule->GetCost());
       Logger::Info("ACO found schedule "
-                   "cost:%d, rp cost:%d, sched length: %d, and "
-                   "iteration:%d",
-                   bestSchedule->GetCost(), bestSchedule->GetSpillCost(),
-                   bestSchedule->GetCrntLngth(), iterations);
+                   "cost:%d, rp cost:%d, exec cost: %d, and "
+                   "iteration:%d"
+                   " (sched length: %d, abs rp cost: %d, rplb: %d)",
+                   bestSchedule->GetCost(), bestSchedule->GetNormSpillCost(),
+                   bestSchedule->GetExecCost(), iterations,
+                   bestSchedule->GetCrntLngth(), bestSchedule->GetSpillCost(),
+                   rgn_->GetRPCostLwrBound());
       if (IsDbg)
         BestAntEdges = IterAntEdges;
 

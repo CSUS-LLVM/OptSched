@@ -315,9 +315,9 @@ FUNC_RESULT SchedRegion::FindOptimalSchedule(
 
   // This must be done after SetupForSchdulng() or UpdateSetupForSchdulng() to
   // avoid resetting lower bound values.
-  if (!BbSchedulerEnabled)
+  if (!BbSchedulerEnabled) {
     costLwrBound_ = CmputCostLwrBound();
-  else
+  } else
     CmputLwrBounds_(false);
 
   // Cost calculation must be below lower bounds calculation

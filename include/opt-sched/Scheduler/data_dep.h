@@ -629,6 +629,9 @@ private:
   // The schedule's spill cost according to the cost function used
   InstCount spillCost_;
 
+  // The normalized spill cost (absolute Spill Cost - lower bound of spill cost)
+  InstCount NormSpillCost;
+
   // An array of peak reg pressures for all reg types in the schedule
   InstCount *peakRegPressures_;
 
@@ -676,6 +679,8 @@ public:
   InstCount GetExecCost() const;
   void SetSpillCost(InstCount cost);
   InstCount GetSpillCost() const;
+  void SetNormSpillCost(InstCount cost);
+  InstCount GetNormSpillCost() const;
 
   void ResetInstIter();
   InstCount GetFrstInst(InstCount &cycleNum, InstCount &slotNum);

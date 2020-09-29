@@ -288,21 +288,11 @@ static InstCount ComputeSLILStaticLowerBound(int64_t regTypeCnt_,
 /*****************************************************************************/
 
 InstCount BBWithSpill::CmputCostLwrBound() {
-  InstCount spillCostLwrBound = 0;
-
-  if (GetSpillCostFunc() == SCF_SLIL) {
-    spillCostLwrBound =
-        ComputeSLILStaticLowerBound(regTypeCnt_, regFiles_, dataDepGraph_);
-    dynamicSlilLowerBound_ = spillCostLwrBound;
-    staticSlilLowerBound_ = spillCostLwrBound;
-  }
-
   // for(InstCount i=0; i< dataDepGraph_->GetInstCnt(); i++) {
   //   inst = dataDepGraph_->GetInstByIndx(i);
   // }
 
-  InstCount staticLowerBound =
-      schedLwrBound_ * schedCostFactor_ + spillCostLwrBound * SCW_;
+  InstCount staticLowerBound = CmputExecCostLwrBound() + CmputRPCostLwrBound();
 
 #if defined(IS_DEBUG_STATIC_LOWER_BOUND)
   Logger::Event("StaticLowerBoundDebugInfo", "name", dataDepGraph_->GetDagID(),
@@ -313,6 +303,26 @@ InstCount BBWithSpill::CmputCostLwrBound() {
 
   return staticLowerBound;
 }
+
+InstCount BBWithSpill::CmputExecCostLwrBound() {
+  ExecCostLwrBound_ = schedLwrBound_ * schedCostFactor_;
+  return ExecCostLwrBound_;
+}
+
+InstCount BBWithSpill::CmputRPCostLwrBound() {
+  InstCount spillCostLwrBound = 0;
+
+  if (GetSpillCostFunc() == SCF_SLIL) {
+    spillCostLwrBound =
+        ComputeSLILStaticLowerBound(regTypeCnt_, regFiles_, dataDepGraph_);
+    dynamicSlilLowerBound_ = spillCostLwrBound;
+    staticSlilLowerBound_ = spillCostLwrBound;
+  }
+
+  RpCostLwrBound_ = spillCostLwrBound * SCW_;
+  return RpCostLwrBound_;
+}
+
 /*****************************************************************************/
 
 void BBWithSpill::InitForSchdulng() {
@@ -365,10 +375,11 @@ InstCount BBWithSpill::CmputNormCost_(InstSchedule *sched,
   InstCount cost = CmputCost_(sched, compMode, execCost, trackCnflcts);
 
   cost -= GetCostLwrBound();
-  execCost -= GetCostLwrBound();
+  execCost -= GetExecCostLwrBound();
 
   sched->SetCost(cost);
   sched->SetExecCost(execCost);
+  sched->SetNormSpillCost(sched->GetSpillCost() * SCW_ - GetRPCostLwrBound());
   return cost;
 }
 /*****************************************************************************/

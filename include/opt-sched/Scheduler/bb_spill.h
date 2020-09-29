@@ -119,7 +119,9 @@ public:
               SchedulerType HeurSchedType);
   ~BBWithSpill();
 
-  int CmputCostLwrBound();
+  InstCount CmputCostLwrBound();
+  InstCount CmputExecCostLwrBound();
+  InstCount CmputRPCostLwrBound();
 
   InstCount UpdtOptmlSched(InstSchedule *crntSched,
                            LengthCostEnumerator *enumrtr);

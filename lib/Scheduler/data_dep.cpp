@@ -3055,6 +3055,12 @@ void InstSchedule::SetSpillCost(InstCount cost) { spillCost_ = cost; }
 
 InstCount InstSchedule::GetSpillCost() const { return spillCost_; }
 
+// NOTE: ACO needs statically normalized costs.  These are statically normalized
+// costs that don't use the dynamic SLIL lower bound.
+void InstSchedule::SetNormSpillCost(InstCount cost) { NormSpillCost = cost; }
+
+InstCount InstSchedule::GetNormSpillCost() const { return NormSpillCost; }
+
 /*******************************************************************************
  * Previously inlined functions
  ******************************************************************************/
