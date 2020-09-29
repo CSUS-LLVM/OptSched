@@ -73,6 +73,18 @@ const Register::InstSetType &Register::GetDefList() const { return defs_; }
 
 size_t Register::GetSizeOfDefList() const { return defs_.size(); }
 
+__device__
+void Register::ResetDefsAndUses() {
+  // Only called on device, but will not compile without
+  // macro since SmallPtrSet doesnt have a Reset() method
+#ifdef __CUDA_ARCH__
+  defs_.Reset();
+  defCnt_ = 0;
+  uses_.Reset();
+  useCnt_ = 0;
+#endif
+}
+
 __device__ __host__
 int Register::GetCrntUseCnt() const { return crntUseCnt_; }
 
@@ -101,6 +113,7 @@ Register &Register::operator=(const Register &rhs) {
 
 void Register::SetupConflicts(int regCnt) { conflicts_.Construct(regCnt); }
 
+__host__ __device__
 void Register::ResetConflicts() {
   conflicts_.Reset();
   isSpillCnddt_ = false;
@@ -158,6 +171,16 @@ bool Register::IsInPossibleInterval(const SchedInstruction *inst) const {
 
 const Register::InstSetType &Register::GetPossibleLiveInterval() const {
   return possibleLiveIntervalSet_;
+}
+
+__device__
+void Register::ResetLiveIntervals() {
+  // Only called on device, but will not compile without
+  // macro since SmallPtrSet doesnt have a Reset() method
+#ifdef __CUDA_ARCH__
+  liveIntervalSet_.Reset();
+  possibleLiveIntervalSet_.Reset();
+#endif
 }
 
 __host__ __device__
@@ -299,6 +322,7 @@ void RegisterFile::SetupConflicts() {
     Regs[i]->SetupConflicts(getCount());
 }
 
+__host__ __device__
 void RegisterFile::ResetConflicts() {
   for (int i = 0; i < getCount(); i++)
     Regs[i]->ResetConflicts();
@@ -324,6 +348,18 @@ void RegisterFile::AddConflictsWithLiveRegs(int regNum, int liveRegCnt) {
     }
     if (conflictCnt == liveRegCnt)
       break;
+  }
+}
+
+__device__
+void RegisterFile::Reset() {
+  ResetConflicts();
+  ResetCrntUseCnts();
+  ResetCrntLngths();
+  
+  for (int i = 0; i < getCount(); i++) {
+    Regs[i]->ResetDefsAndUses();
+    Regs[i]->ResetLiveIntervals();
   }
 }
 

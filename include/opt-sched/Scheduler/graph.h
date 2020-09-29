@@ -53,7 +53,7 @@ struct GraphEdge {
 
   // Creates an edge between two nodes with labels label and label2.
   __host__ __device__
-  GraphEdge(GraphNode *from, GraphNode *to, UDT_GLABEL label,
+  GraphEdge(GraphNode *from = NULL, GraphNode *to = NULL, UDT_GLABEL label = 0,
             UDT_GLABEL label2 = 0)
       : from(from), to(to), label(label), label2(label2) {}
 

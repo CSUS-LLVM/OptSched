@@ -288,12 +288,13 @@ void ScheduleDAGOptSched::initSchedulers() {
 
 __global__
 void AllocateMaxDDG(MachineModel *dev_machMdl, LATENCY_PRECISION ltncyPcsn,
-		    InstCount maxRegionSize, DataDepGraph **dev_maxDDG) {
+		    InstCount maxRegionSize, DataDepGraph **dev_maxDDG, 
+		    GraphEdge *dev_edges) {
   // Create new DDG and save its pointer for later kernels
   *dev_maxDDG = new DataDepGraph(dev_machMdl, ltncyPcsn);
   // Allocate DDG with maxRegionSize num of nodes and 
   // n-1 edges for each node
-  (*dev_maxDDG)->AllocateMaxDDG(maxRegionSize);
+  (*dev_maxDDG)->AllocateMaxDDG(maxRegionSize, dev_edges);
 }
 
 // schedule called for each basic block
@@ -310,9 +311,24 @@ void ScheduleDAGOptSched::schedule() {
   // If two pass scheduling is enabled then
   // first just record the scheduling region.
   if (OptSchedEnabled && TwoPassEnabled && !TwoPassSchedulingStarted) {
-    //Keep track of largest region
-    if (maxRegionSize < (InstCount)RegionBegin->getParent()->size())
-      maxRegionSize = RegionBegin->getParent()->size();
+    // Find region size
+    InstCount regionSize = 0;
+    InstCount edgeCnt = 0;
+    SetupLLVMDag();
+    for (MachineBasicBlock::iterator I = RegionBegin, E = RegionEnd; 
+         I != E; ++I) {
+      edgeCnt += SUnits[regionSize].Succs.size();
+      //Logger::Info("Inst %d has %d successors", regionSize, SUnits[regionSize].Succs.size());
+      regionSize++;
+    }
+
+    // Keep track of largest amount of edges
+    if (maxEdgeCnt < edgeCnt)
+      maxEdgeCnt = edgeCnt;
+
+    // Keep track of largest region
+    if (maxRegionSize < regionSize)
+      maxRegionSize = regionSize;
 
     Regions.push_back(std::make_pair(RegionBegin, RegionEnd));
     LLVM_DEBUG(
@@ -437,7 +453,7 @@ void ScheduleDAGOptSched::schedule() {
       printf("Error increasing stack size: %s\n",
              cudaGetErrorString(cudaGetLastError()));
 
-    if (cudaSuccess != cudaDeviceSetLimit(cudaLimitMallocHeapSize, 2048000000))
+    if (cudaSuccess != cudaDeviceSetLimit(cudaLimitMallocHeapSize, 1024000000))
       printf("Error increasing heap size: %s\n",
              cudaGetErrorString(cudaGetLastError()));
 
@@ -458,15 +474,39 @@ void ScheduleDAGOptSched::schedule() {
 
     //Allocate device memory for dev_maxDDG pointer storage
     if (cudaSuccess != cudaMallocManaged((void**)&dev_maxDDG,
-                                         sizeof(DataDepGraph)))
+                                         sizeof(DataDepGraph *)))
       printf("Error allocating device space for dev_maxDDG: %s\n",
              cudaGetErrorString(cudaGetLastError()));
-    //debug
-    Logger::Info("Launching AllocateMaxDDG kernel with size %d", maxRegionSize + 1);
 
+    // create blank edges and copy them to device
+/*    InstCount edgeCnt;
+
+    if ((maxRegionSize + 2)  * 5 > (maxRegionSize + 2) * ((maxRegionSize + 2) - 1))
+      edgeCnt = (maxRegionSize + 2) * ((maxRegionSize + 2) - 1);
+    else
+      edgeCnt = (maxRegionSize + 2) * 5;
+*/
+    //add edges for artificial root/leaf
+    maxEdgeCnt += 2;
+
+    GraphEdge *edges = new GraphEdge[maxEdgeCnt];
+    GraphEdge *dev_edges;
+
+    if (cudaSuccess != cudaMallocManaged((void**)&dev_edges, 
+			                 sizeof(GraphEdge) * maxEdgeCnt))
+      Logger::Fatal("Failed to allocate dev mem for edges: %s", 
+		    cudaGetErrorString(cudaGetLastError()));
+
+    if (cudaSuccess != cudaMemcpy(dev_edges, edges, sizeof(GraphEdge) * maxEdgeCnt,
+			          cudaMemcpyHostToDevice))
+      Logger::Fatal("Failed to copy blank edges to device: %s", 
+		    cudaGetErrorString(cudaGetLastError()));
+
+    delete[] edges;
+
+    Logger::Info("Launching AllocateMaxDDG kernel with size %d and %d edges", maxRegionSize + 2, maxEdgeCnt);
     AllocateMaxDDG<<<1,1>>>(dev_MM, LatencyPrecision, maxRegionSize + 2, 
-		            dev_maxDDG);
-
+		            dev_maxDDG, dev_edges);
     cudaDeviceSynchronize();
     Logger::Info("Post Kernel Error: %s", cudaGetErrorString(cudaGetLastError()));
   }
@@ -513,6 +553,7 @@ void ScheduleDAGOptSched::schedule() {
   if (RegionNumber == Regions.size() - 1 && SecondPass) {
     Logger::Info("Calling cudaDeviceReset()");
     cudaDeviceReset();
+    Logger::Info("Done calling cudaDeviceReset()");
     dev_MM = NULL;
     dev_maxDDG = NULL;
   }

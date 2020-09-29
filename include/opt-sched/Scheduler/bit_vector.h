@@ -36,6 +36,7 @@ public:
   void Construct(int length);
 
   // Sets all bits to 0.
+  __host__ __device__
   virtual void Reset();
   // Sets the bit at the given index to the given value.
   __host__ __device__
@@ -117,6 +118,7 @@ inline BitVector::~BitVector() {
     delete[] vctr_;
 }
 
+__host__ __device__
 inline void BitVector::Reset() {
   if (oneCnt_ == 0)
     return;
@@ -247,6 +249,7 @@ public:
   void SetBit(int index, bool bitVal, int weight);
   __host__ __device__
   int GetWghtedCnt() const;
+  __host__ __device__
   virtual void Reset() override;
   //circumvent virtual functions so we can call reset on device
   __device__

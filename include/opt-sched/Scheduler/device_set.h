@@ -79,6 +79,11 @@ class DevicePtrSet {
       }
     }
 
+    __device__
+    void Reset() {
+      size_ = 0;
+    }
+
     // Iterator Class
     class iterator {
     private:

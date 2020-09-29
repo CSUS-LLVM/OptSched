@@ -896,9 +896,6 @@ void SchedInstruction::InitializeNode_(InstCount instNum,
   mustBeInBBExit_ = false;
 
   GraphNode::SetNum(instNum);
-
-  // Reset private values to default and reset LinkedLists
-  //GraphNode::Reset();
 }
 
 /******************************************************************************

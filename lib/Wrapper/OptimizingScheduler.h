@@ -45,6 +45,10 @@ protected:
   // Holds size of largest region. Used for device DDG allocation
   InstCount maxRegionSize;
 
+  // Holds amount of edges in region with most edges
+  // used for maxDDG allocation
+  InstCount maxEdgeCnt;
+
   // Holds device pointer to device max DDG pointer
   DataDepGraph **dev_maxDDG;
 

@@ -1015,7 +1015,7 @@ void DataDepGraph::InitializeEdge_(InstCount frmNodeNum, InstCount toNodeNum,
     Logger::Info("Creating edge from %d to %d of type %d and latency %d",
                  frmNodeNum, toNodeNum, depType, ltncy);
 #endif
-    edge = edges_[initializedEdges_++];
+    edge = &edges_[initializedEdges_++];
     edge->from = frmNode;
     edge->to = toNode;
     edge->label = ltncy;
@@ -1570,20 +1570,14 @@ void DataDepGraph::ReconstructOnDevice(InstCount instCnt, NodeData *nodeData,
 __device__
 void DataDepGraph::InitializeOnDevice(InstCount instCnt, NodeData *nodeData,
                                         RegFileData *regFileData) {
-  //debug
-  printf("In DataDepGraph::InitializeOnDevice with instCnt %d\n", instCnt);
+  //if (blockIdx.x == 0) {
+    instCnt_ = instCnt;
+    DirAcycGraph::nodeCnt_ = instCnt;
+  //}
 
-  instCnt_ = instCnt;
-  DirAcycGraph::nodeCnt_ = instCnt;
-
-  // Instantiate nodes
+  // Instantiate nodes in parallel
   for (InstCount i = 0; i < instCnt; i++) {
-    //debug
-    //printf("Initializing node %d with name %s\n", i, nodeData[i].instName_);
-
-    if (insts_[i]->GetNum() != nodeData[i].instNum_)
-      printf("NODE NUM MISMATCH!\n");
-
+    //InstCount i = blockIdx.x;
     insts_[i]->InitializeNode_(nodeData[i].instNum_, nodeData[i].instName_,
                                nodeData[i].instType_, nodeData[i].opCode_,
                                nodeData[i].nodeID_, nodeData[i].fileSchedOrder_,
@@ -1601,11 +1595,9 @@ void DataDepGraph::InitializeOnDevice(InstCount instCnt, NodeData *nodeData,
     if (nodeData[i].scsrCnt_ == 0)
       leaf_ = (GraphNode *)insts_[i];
   }
-
-  //debug
-  //printf("Initializing Edges\n");
-
-  // Create edges
+  // Single threaded
+  //if (blockIdx.x == 0) {
+  // Instantiate edges
   for (InstCount i = 0; i < instCnt; i++) {
     for (int j = 0; j < nodeData[i].prdcsrCnt_; j++) {
       InitializeEdge_(nodeData[i].prdcsrs_[j].toNodeNum_, nodeData[i].instNum_,
@@ -1618,9 +1610,6 @@ void DataDepGraph::InitializeOnDevice(InstCount instCnt, NodeData *nodeData,
                   nodeData[i].scsrs_[j].ltncy_, nodeData[i].scsrs_[j].depType_);
     }
   }
-
-  //debug
-  //printf("Done initializing edges\n");
 
   SchedInstruction *inst = NULL;
   Register *reg = NULL;
@@ -1650,14 +1639,13 @@ void DataDepGraph::InitializeOnDevice(InstCount instCnt, NodeData *nodeData,
       }    
     }    
   }
-
-  //debug
-  printf("Done with DataDepGraph::InitializeOnDevice\n");
+  //}
+  
 }
 
 
 __device__
-void DataDepGraph::AllocateMaxDDG(InstCount maxRgnSize) {
+void DataDepGraph::AllocateMaxDDG(InstCount maxRgnSize, GraphEdge *dev_edges) {
   AllocArrays_(maxRgnSize);
 
   DirAcycGraph::tplgclOrdr_ = new GraphNode *[maxRgnSize];
@@ -1677,18 +1665,30 @@ void DataDepGraph::AllocateMaxDDG(InstCount maxRgnSize) {
     }
   }
 
+  // Set edges_ pointer to point at dev_edges
+  edges_ = dev_edges;
+
   // Allocate n * n-1 blank edges
   // Hold all pointers in edges for later initilization
-  edges_ = new GraphEdge *[instCnt_ * (instCnt_ - 1)];
+  // edges_ = new GraphEdge *[instCnt_ * (instCnt_ - 1)];
+/*
+  InstCount edgeCnt;
 
-  for (InstCount i = 0; i < (instCnt_ * (instCnt_ - 1)); i++) {
+  if (instCnt_ * 5 > instCnt_ * (instCnt_ - 1))
+    edgeCnt = instCnt_ * (instCnt_ - 1);
+  else
+    edgeCnt = instCnt_ * 5;
+
+  edges_ = new GraphEdge[edgeCnt];
+
+  for (InstCount i = 0; i < edgeCnt; i++) {
     edges_[i] = new GraphEdge(NULL, NULL, UNINITIATED_NUM);
 
     if (!edges_[i])
       printf("Node creationg failed for edge num %d\n", i);
   }
-
-  // Reset unused edge pool counter
+*/
+  // Set unused edge pool counter
   initializedEdges_ = 0;
 }
 
@@ -1700,7 +1700,10 @@ void DataDepGraph::Reset() {
   for (InstCount i = 0; i < instCnt_; i++)
     ((GraphNode *)insts_[i])->Reset();
 
-  RegFiles = new RegisterFile[machMdl_->GetRegTypeCnt()];
+  // Reset RegFiles for next region
+  for (int i = 0; i < machMdl_->GetRegTypeCnt(); i++) {
+    RegFiles[i].Reset();
+  }
 
   wasSetupForSchduling_ = false;
   dpthFrstSrchDone_ = false; 

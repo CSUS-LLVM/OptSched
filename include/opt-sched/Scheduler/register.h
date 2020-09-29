@@ -71,6 +71,10 @@ public:
   const InstSetType &GetDefList() const;
   size_t GetSizeOfDefList() const;
 
+  // Resets uses_/defs_ and their respecive counts
+  __device__
+  void ResetDefsAndUses();
+
   __host__ __device__
   void AddCrntUse();
   void DelCrntUse();
@@ -98,6 +102,7 @@ public:
   Register &operator=(const Register &rhs);
 
   void SetupConflicts(int regCnt);
+  __host__ __device__
   void ResetConflicts();
   __host__ __device__
   void AddConflict(int regNum, bool isSpillCnddt);
@@ -115,6 +120,11 @@ public:
   __host__ __device__
   bool IsInPossibleInterval(const SchedInstruction *inst) const;
   const InstSetType &GetPossibleLiveInterval() const;
+
+  // Resets liveIntervalSet_ and possibleLiveIntervalSet_ 
+  // for reinitialization in the next region
+  __device__
+  void ResetLiveIntervals();
 
 private:
   int16_t type_;
@@ -194,6 +204,11 @@ public:
   // Increase the size of the register file by one and
   // return the RegNum of the created register.
   Register *getNext();
+
+  // Resets the RegisterFile and its Registers to blank state
+  // so they can be reinitialized for the next region
+  __device__
+  void Reset();
 
   void CopyPointersToDevice(RegisterFile *dev_regFile);
 
