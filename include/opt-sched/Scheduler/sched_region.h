@@ -244,6 +244,8 @@ protected:
   // TODO(max): Document.
   InstCount crntSlotNum_;
 
+  bool needsTransitiveClosure(Milliseconds rgnTimeout) const;
+
   // protected accessors:
   SchedulerType GetHeuristicSchedulerType() const { return HeurSchedType_; }
 
@@ -324,6 +326,8 @@ protected:
 
   FUNC_RESULT runACO(InstSchedule *ReturnSched, InstSchedule *InitSched,
                      bool IsPostBB);
+
+  FUNC_RESULT applyGraphTransformations();
 };
 
 } // namespace opt_sched
