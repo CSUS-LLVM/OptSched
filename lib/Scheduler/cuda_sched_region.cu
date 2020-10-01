@@ -86,19 +86,30 @@ static bool isBbEnabled(Config &schedIni, Milliseconds rgnTimeout) {
 }
 
 __global__
+void CreateDDG(SchedRegion *dev_rgn, DataDepGraph **dev_maxDDG,
+               NodeData *dev_nodeData, RegFileData *dev_regFileData,
+               InstCount instCnt, bool cmputTrnstvClsr,
+	       MachineModel *dev_machMdl, LATENCY_PRECISION ltncyPcsn) {
+  *dev_maxDDG = new DataDepGraph(dev_machMdl, ltncyPcsn);
+
+  (*dev_maxDDG)->ReconstructOnDevice(instCnt, dev_nodeData, dev_regFileData);
+
+  dev_rgn->SetDepGraph(*dev_maxDDG);
+  (*dev_maxDDG)->SetupForSchdulng(cmputTrnstvClsr);
+  ((BBWithSpill *)dev_rgn)->SetRegFiles((*dev_maxDDG)->getRegFiles());
+}
+
+__global__
 void InitializeDDG(SchedRegion *dev_rgn, DataDepGraph **dev_maxDDG, 
 		   NodeData *dev_nodeData, RegFileData *dev_regFileData,
                    InstCount instCnt, bool cmputTrnstvClsr) {
-  // execute in parrallel
+
   (*dev_maxDDG)->InitializeOnDevice(instCnt, dev_nodeData, dev_regFileData);
 
-  // Execute on one thread
-  //if (blockIdx.x == 0) {
-    // Update dev_rgn->dataDepGraph_ to device DDG
-    dev_rgn->SetDepGraph(*dev_maxDDG);
-    (*dev_maxDDG)->SetupForSchdulng(cmputTrnstvClsr);
-    ((BBWithSpill *)dev_rgn)->SetRegFiles((*dev_maxDDG)->getRegFiles());
-  //}
+  // Update dev_rgn->dataDepGraph_ to device DDG
+  dev_rgn->SetDepGraph(*dev_maxDDG);
+  (*dev_maxDDG)->SetupForSchdulng(cmputTrnstvClsr);
+  ((BBWithSpill *)dev_rgn)->SetRegFiles((*dev_maxDDG)->getRegFiles());
 }
 
 __global__
@@ -107,15 +118,6 @@ void DevListSched(MachineModel *dev_machMdl, SchedRegion *dev_rgn,
 		  SchedPriorities prirts, bool vrfy,
 		  LATENCY_PRECISION ltncyPcsn,
 		  InstSchedule *dev_lstSched, SchedulerType SCHED_TYPE) {
-
-  //(*dev_maxDDG)->InitializeOnDevice(instCnt, dev_nodeData, dev_regFileData); 
-
-  // Update dev_rgn->dataDepGraph_ to device DDG
-  //dev_rgn->SetDepGraph(*dev_maxDDG);
-  
-  //(*dev_maxDDG)->SetupForSchdulng(cmputTrnstvClsr);
-
-  //((BBWithSpill *)dev_rgn)->SetRegFiles((*dev_maxDDG)->getRegFiles());
 
   ConstrainedScheduler *dev_lstSchdulr;
  
@@ -136,9 +138,6 @@ void DevListSched(MachineModel *dev_machMdl, SchedRegion *dev_rgn,
   // Compute schedule costs
   InstCount hurstcExecCost;
   ((BBWithSpill *)(dev_rgn))->Dev_CmputNormCost_(dev_lstSched, CCM_DYNMC, hurstcExecCost, true);
-
-  // Reset state of maxDDG so that next region can be initialized
-  //(*dev_maxDDG)->Reset();
 }
 
 __global__
@@ -363,9 +362,18 @@ FUNC_RESULT SchedRegion::FindOptimalSchedule(
              cudaGetErrorString(cudaGetLastError()));
 
     // num of blocks
-    unsigned N = dataDepGraph_->GetInstCnt();
+    //unsigned N = dataDepGraph_->GetInstCnt();
+/*
+    // Launch DDG creation kernel
+    Logger::Info("Launching DDG creation kernel");
+    CreateDDG<<<1,1>>>(dev_rgn, dev_maxDDG, dev_nodeData, dev_regFileData,
+                          dataDepGraph_->GetInstCnt(), needTransitiveClosure,
+			  dev_machMdl_, dataDepGraph_->GetLtncyPrcsn());
+    cudaDeviceSynchronize();
+    Logger::Info("Post Kernel Error: %s", cudaGetErrorString(cudaGetLastError()));
+*/    
     // Launch maxDDG initialization kernel
-    Logger::Info("Launching maxDDG initialization kernel with %d threads", N);
+    Logger::Info("Launching maxDDG initialization kernel");
     InitializeDDG<<<1,1>>>(dev_rgn, dev_maxDDG, dev_nodeData, dev_regFileData,
                           dataDepGraph_->GetInstCnt(), needTransitiveClosure);
     cudaDeviceSynchronize();

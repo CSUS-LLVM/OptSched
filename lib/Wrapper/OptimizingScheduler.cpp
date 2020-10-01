@@ -214,6 +214,7 @@ ScheduleDAGOptSched::ScheduleDAGOptSched(
         OptSchedTargetRegistry::Registry.getFactoryWithName("generic");
 
   maxRegionSize = 0;
+  maxEdgeCnt = 0;
 
   OST = TargetFactory();
   MM = OST->createMachineModel(PathCfgMM.c_str());
@@ -289,12 +290,12 @@ void ScheduleDAGOptSched::initSchedulers() {
 __global__
 void AllocateMaxDDG(MachineModel *dev_machMdl, LATENCY_PRECISION ltncyPcsn,
 		    InstCount maxRegionSize, DataDepGraph **dev_maxDDG, 
-		    GraphEdge *dev_edges) {
+		    InstCount maxEdgeCnt, GraphEdge *dev_edges) {
   // Create new DDG and save its pointer for later kernels
   *dev_maxDDG = new DataDepGraph(dev_machMdl, ltncyPcsn);
   // Allocate DDG with maxRegionSize num of nodes and 
   // n-1 edges for each node
-  (*dev_maxDDG)->AllocateMaxDDG(maxRegionSize, dev_edges);
+  (*dev_maxDDG)->AllocateMaxDDG(maxRegionSize, maxEdgeCnt, dev_edges);
 }
 
 // schedule called for each basic block
@@ -317,7 +318,7 @@ void ScheduleDAGOptSched::schedule() {
     SetupLLVMDag();
     for (MachineBasicBlock::iterator I = RegionBegin, E = RegionEnd; 
          I != E; ++I) {
-      edgeCnt += SUnits[regionSize].Succs.size();
+      edgeCnt += (InstCount)SUnits[regionSize].Succs.size();
       //Logger::Info("Inst %d has %d successors", regionSize, SUnits[regionSize].Succs.size());
       regionSize++;
     }
@@ -479,15 +480,9 @@ void ScheduleDAGOptSched::schedule() {
              cudaGetErrorString(cudaGetLastError()));
 
     // create blank edges and copy them to device
-/*    InstCount edgeCnt;
-
-    if ((maxRegionSize + 2)  * 5 > (maxRegionSize + 2) * ((maxRegionSize + 2) - 1))
-      edgeCnt = (maxRegionSize + 2) * ((maxRegionSize + 2) - 1);
-    else
-      edgeCnt = (maxRegionSize + 2) * 5;
-*/
-    //add edges for artificial root/leaf
-    maxEdgeCnt += 2;
+    //add nodes and edges for artificial root/leaf
+    maxRegionSize += 2;
+    maxEdgeCnt += maxRegionSize;
 
     GraphEdge *edges = new GraphEdge[maxEdgeCnt];
     GraphEdge *dev_edges;
@@ -504,11 +499,13 @@ void ScheduleDAGOptSched::schedule() {
 
     delete[] edges;
 
-    Logger::Info("Launching AllocateMaxDDG kernel with size %d and %d edges", maxRegionSize + 2, maxEdgeCnt);
-    AllocateMaxDDG<<<1,1>>>(dev_MM, LatencyPrecision, maxRegionSize + 2, 
-		            dev_maxDDG, dev_edges);
+    Logger::Info("Launching AllocateMaxDDG kernel with size %d and %d edges",
+		 maxRegionSize, maxEdgeCnt);
+    AllocateMaxDDG<<<1,1>>>(dev_MM, LatencyPrecision, maxRegionSize,
+		            dev_maxDDG, maxEdgeCnt, dev_edges);
     cudaDeviceSynchronize();
     Logger::Info("Post Kernel Error: %s", cudaGetErrorString(cudaGetLastError()));
+
   }
   
   // create region

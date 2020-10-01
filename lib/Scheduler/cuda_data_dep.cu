@@ -1645,7 +1645,7 @@ void DataDepGraph::InitializeOnDevice(InstCount instCnt, NodeData *nodeData,
 
 
 __device__
-void DataDepGraph::AllocateMaxDDG(InstCount maxRgnSize, GraphEdge *dev_edges) {
+void DataDepGraph::AllocateMaxDDG(InstCount maxRgnSize, InstCount maxEdgeCnt, GraphEdge *dev_edges) {
   AllocArrays_(maxRgnSize);
 
   DirAcycGraph::tplgclOrdr_ = new GraphNode *[maxRgnSize];
@@ -1668,26 +1668,9 @@ void DataDepGraph::AllocateMaxDDG(InstCount maxRgnSize, GraphEdge *dev_edges) {
   // Set edges_ pointer to point at dev_edges
   edges_ = dev_edges;
 
-  // Allocate n * n-1 blank edges
   // Hold all pointers in edges for later initilization
-  // edges_ = new GraphEdge *[instCnt_ * (instCnt_ - 1)];
-/*
-  InstCount edgeCnt;
+  //edges_ = new GraphEdge[maxEdgeCnt];
 
-  if (instCnt_ * 5 > instCnt_ * (instCnt_ - 1))
-    edgeCnt = instCnt_ * (instCnt_ - 1);
-  else
-    edgeCnt = instCnt_ * 5;
-
-  edges_ = new GraphEdge[edgeCnt];
-
-  for (InstCount i = 0; i < edgeCnt; i++) {
-    edges_[i] = new GraphEdge(NULL, NULL, UNINITIATED_NUM);
-
-    if (!edges_[i])
-      printf("Node creationg failed for edge num %d\n", i);
-  }
-*/
   // Set unused edge pool counter
   initializedEdges_ = 0;
 }

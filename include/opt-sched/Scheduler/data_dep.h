@@ -509,7 +509,7 @@ public:
 		       DependenceType depType);
   // Allocates a full DDG with nodes = maxRgnSize and n-1 edges per node
   __device__
-  void AllocateMaxDDG(InstCount maxRgnSize, GraphEdge *dev_edges);
+  void AllocateMaxDDG(InstCount maxRgnSize, InstCount maxEdgeCnt, GraphEdge *dev_edges);
   // Resets DDG to blank state for later reinitilization
   __device__
   void Reset();
