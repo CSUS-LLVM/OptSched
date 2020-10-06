@@ -313,6 +313,10 @@ protected:
   // An array of pointers to instructions.
   // TODO(max): Elaborate.
   SchedInstruction **insts_;
+  // An array of instructions, used on device to lower time 
+  // spent looking up pointers and allow them to all be in a
+  // contiguos piece of memory
+  SchedInstruction *insts_array_;
   // An array of pointers to allocated edges
   // used by maxDDG to reset and initialize edges without reallocating
   GraphEdge *edges_;
@@ -384,6 +388,9 @@ public:
   // followed by critical path computation
   __host__ __device__
   FUNC_RESULT SetupForSchdulng(bool cmputTrnstvClsr);
+  // Parallelized device version of SetupForSchdulng
+  __device__
+  FUNC_RESULT Dev_SetupForSchdulng(bool cmputTrnstvClsr);
   // Update the Dep after applying graph transformations
   FUNC_RESULT UpdateSetupForSchdulng(bool cmputTrnstvClsr);
 
@@ -509,7 +516,8 @@ public:
 		       DependenceType depType);
   // Allocates a full DDG with nodes = maxRgnSize and n-1 edges per node
   __device__
-  void AllocateMaxDDG(InstCount maxRgnSize, InstCount maxEdgeCnt, GraphEdge *dev_edges);
+  void AllocateMaxDDG(InstCount maxRgnSize, InstCount maxEdgeCnt, 
+		      GraphEdge *dev_edges, SchedInstruction *dev_insts);
   // Resets DDG to blank state for later reinitilization
   __device__
   void Reset();

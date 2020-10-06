@@ -25,6 +25,19 @@ GraphNode::GraphNode(UDT_GNODES num, UDT_GNODES maxNodeCnt) {
 }
 
 __host__ __device__
+GraphNode::GraphNode() {
+  scsrLblSum_ = 0;
+  prdcsrLblSum_ = 0;
+  maxEdgLbl_ = 0;
+  color_ = COL_WHITE;
+
+  rcrsvScsrLst_ = NULL;
+  rcrsvPrdcsrLst_ = NULL;
+  isRcrsvScsr_ = NULL;
+  isRcrsvPrdcsr_ = NULL;
+}
+
+__host__ __device__
 GraphNode::~GraphNode() {
   DelScsrLst();
   delete scsrLst_;
@@ -37,6 +50,12 @@ GraphNode::~GraphNode() {
     delete isRcrsvScsr_;
   if (isRcrsvPrdcsr_ != NULL)
     delete isRcrsvPrdcsr_;
+}
+
+__device__
+void GraphNode::CreatePrdcsrScsrLists(UDT_GNODES maxNodeCnt) {
+  scsrLst_ = new PriorityList<GraphEdge>(maxNodeCnt);
+  prdcsrLst_ = new LinkedList<GraphEdge>(maxNodeCnt);
 }
 
 void GraphNode::DelPrdcsrLst() {

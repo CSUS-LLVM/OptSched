@@ -72,6 +72,10 @@ SchedInstruction::SchedInstruction(InstCount num, const char *name,
 }
 
 __host__ __device__
+SchedInstruction::SchedInstruction()
+  :GraphNode() {}
+
+__host__ __device__
 SchedInstruction::~SchedInstruction() {
   if (memAllocd_)
     DeAllocMem_();
@@ -896,6 +900,11 @@ void SchedInstruction::InitializeNode_(InstCount instNum,
   mustBeInBBExit_ = false;
 
   GraphNode::SetNum(instNum);
+}
+
+__device__
+void SchedInstruction::CreateSchedRange() {
+  crntRange_ = new SchedRange(this);
 }
 
 /******************************************************************************

@@ -98,9 +98,9 @@ const int SCHD_STALL = -2;
 
 // TODO(max): Eliminate these limits.
 // The maximum number of register definition per instruction node.
-const int MAX_DEFS_PER_INSTR = 4096;
+const int MAX_DEFS_PER_INSTR = 256;
 // The maximum number of register usages per instruction node.
-const int MAX_USES_PER_INSTR = 4096;
+const int MAX_USES_PER_INSTR = 256;
 
 // Forward declarations used to reduce the number of #includes.
 class DataDepGraph;
@@ -142,6 +142,9 @@ public:
                    const char *opCode, InstCount maxInstCnt, int nodeID,
                    InstCount fileSchedCycle, InstCount fileSchedOrder,
                    InstCount fileLB, InstCount fileUB, MachineModel *model);
+  // Allocate blank instructions, used for allocating blank DDG on device
+  __host__ __device__
+  SchedInstruction();
   // Deallocates the memory used by the instruction and destroys the object.
   __host__ __device__
   ~SchedInstruction();
@@ -515,6 +518,9 @@ public:
 		        int nodeID, InstCount fileSchedOrder,
                         InstCount fileSchedCycle, InstCount fileLB, 
 			InstCount fileUB, int blkNum, MachineModel *model);
+  // Creates a new SchedRange for the inst. used after it is copied to device
+  __device__
+  void CreateSchedRange();
 
   // Resets prdcsr/scsr lists so new inst can be initialized
   __device__
@@ -524,9 +530,9 @@ public:
 
 protected:
   // The "name" of this instruction. Usually a string indicating its type.
-  char name_[50];
+  char name_[20];
   // The mnemonic of this instruction, e.g. "add" or "jmp".
-  char opCode_[50];
+  char opCode_[20];
   // A numberical ID for this instruction.
   int nodeID_;
   // The type of this instruction.

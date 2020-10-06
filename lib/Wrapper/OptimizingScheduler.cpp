@@ -290,12 +290,13 @@ void ScheduleDAGOptSched::initSchedulers() {
 __global__
 void AllocateMaxDDG(MachineModel *dev_machMdl, LATENCY_PRECISION ltncyPcsn,
 		    InstCount maxRegionSize, DataDepGraph **dev_maxDDG, 
-		    InstCount maxEdgeCnt, GraphEdge *dev_edges) {
+		    InstCount maxEdgeCnt, GraphEdge *dev_edges,
+		    SchedInstruction *dev_insts) {
   // Create new DDG and save its pointer for later kernels
   *dev_maxDDG = new DataDepGraph(dev_machMdl, ltncyPcsn);
-  // Allocate DDG with maxRegionSize num of nodes and 
-  // n-1 edges for each node
-  (*dev_maxDDG)->AllocateMaxDDG(maxRegionSize, maxEdgeCnt, dev_edges);
+  // Allocate DDG and set dev_insts and dev_edges as its insts and edges
+  (*dev_maxDDG)->AllocateMaxDDG(maxRegionSize, maxEdgeCnt, dev_edges, 
+		                dev_insts);
 }
 
 // schedule called for each basic block
@@ -454,7 +455,7 @@ void ScheduleDAGOptSched::schedule() {
       printf("Error increasing stack size: %s\n",
              cudaGetErrorString(cudaGetLastError()));
 
-    if (cudaSuccess != cudaDeviceSetLimit(cudaLimitMallocHeapSize, 1024000000))
+    if (cudaSuccess != cudaDeviceSetLimit(cudaLimitMallocHeapSize, 512000000))
       printf("Error increasing heap size: %s\n",
              cudaGetErrorString(cudaGetLastError()));
 
@@ -473,17 +474,17 @@ void ScheduleDAGOptSched::schedule() {
     // Copy over all pointers to device
     MM.get()->CopyPointersToDevice(dev_MM);
 
-    //Allocate device memory for dev_maxDDG pointer storage
+    // Allocate device memory for dev_maxDDG pointer storage
     if (cudaSuccess != cudaMallocManaged((void**)&dev_maxDDG,
                                          sizeof(DataDepGraph *)))
       printf("Error allocating device space for dev_maxDDG: %s\n",
              cudaGetErrorString(cudaGetLastError()));
 
-    // create blank edges and copy them to device
-    //add nodes and edges for artificial root/leaf
+    // add nodes and edges for artificial root/leaf
     maxRegionSize += 2;
     maxEdgeCnt += maxRegionSize;
 
+    // create blank edges and copy them to device
     GraphEdge *edges = new GraphEdge[maxEdgeCnt];
     GraphEdge *dev_edges;
 
@@ -499,10 +500,27 @@ void ScheduleDAGOptSched::schedule() {
 
     delete[] edges;
 
+    // Create blank nodes and copy them to device
+    SchedInstruction *insts = new SchedInstruction[maxRegionSize];
+    SchedInstruction *dev_insts;
+
+    if (cudaSuccess != cudaMallocManaged((void**)&dev_insts,
+                                 sizeof(SchedInstruction) * maxRegionSize))
+      Logger::Fatal("Failed to allocate dev mem for insts: %s",
+                    cudaGetErrorString(cudaGetLastError()));
+
+    if (cudaSuccess != cudaMemcpy(dev_insts, insts, 
+			          sizeof(SchedInstruction) * maxRegionSize,
+                                  cudaMemcpyHostToDevice))
+      Logger::Fatal("Failed to copy blank nodes to device: %s",
+                    cudaGetErrorString(cudaGetLastError()));
+
+    //delete[] insts;
+
     Logger::Info("Launching AllocateMaxDDG kernel with size %d and %d edges",
 		 maxRegionSize, maxEdgeCnt);
     AllocateMaxDDG<<<1,1>>>(dev_MM, LatencyPrecision, maxRegionSize,
-		            dev_maxDDG, maxEdgeCnt, dev_edges);
+		            dev_maxDDG, maxEdgeCnt, dev_edges, dev_insts);
     cudaDeviceSynchronize();
     Logger::Info("Post Kernel Error: %s", cudaGetErrorString(cudaGetLastError()));
 

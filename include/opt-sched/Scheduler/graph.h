@@ -74,9 +74,15 @@ public:
   // contains multiple nodes with the same number.
   __host__ __device__
   GraphNode(UDT_GNODES num, UDT_GNODES maxNodeCnt);
+  // Allocates a blank node, used for allocating nodes on device
+  __host__ __device__
+  GraphNode();
   // Destroys the node.
   __host__ __device__
   ~GraphNode();
+  // Creates a new prdcsr/scsr list, for use on blank nodes on device
+  __device__
+  void CreatePrdcsrScsrLists(UDT_GNODES maxNodeCnt);
   // Clears the node's predecessor list.
   __host__ __device__
   void DelPrdcsrLst();

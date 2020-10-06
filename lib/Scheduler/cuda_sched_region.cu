@@ -105,11 +105,12 @@ void InitializeDDG(SchedRegion *dev_rgn, DataDepGraph **dev_maxDDG,
                    InstCount instCnt, bool cmputTrnstvClsr) {
 
   (*dev_maxDDG)->InitializeOnDevice(instCnt, dev_nodeData, dev_regFileData);
-
   // Update dev_rgn->dataDepGraph_ to device DDG
-  dev_rgn->SetDepGraph(*dev_maxDDG);
-  (*dev_maxDDG)->SetupForSchdulng(cmputTrnstvClsr);
-  ((BBWithSpill *)dev_rgn)->SetRegFiles((*dev_maxDDG)->getRegFiles());
+  if (blockIdx.x == 0) {
+    dev_rgn->SetDepGraph(*dev_maxDDG);
+    (*dev_maxDDG)->SetupForSchdulng(cmputTrnstvClsr);
+    ((BBWithSpill *)dev_rgn)->SetRegFiles((*dev_maxDDG)->getRegFiles());
+  }
 }
 
 __global__
@@ -362,7 +363,7 @@ FUNC_RESULT SchedRegion::FindOptimalSchedule(
              cudaGetErrorString(cudaGetLastError()));
 
     // num of blocks
-    //unsigned N = dataDepGraph_->GetInstCnt();
+    unsigned N = max(dataDepGraph_->GetInstCnt(), machMdl_->GetRegTypeCnt());
 /*
     // Launch DDG creation kernel
     Logger::Info("Launching DDG creation kernel");
@@ -373,8 +374,8 @@ FUNC_RESULT SchedRegion::FindOptimalSchedule(
     Logger::Info("Post Kernel Error: %s", cudaGetErrorString(cudaGetLastError()));
 */    
     // Launch maxDDG initialization kernel
-    Logger::Info("Launching maxDDG initialization kernel");
-    InitializeDDG<<<1,1>>>(dev_rgn, dev_maxDDG, dev_nodeData, dev_regFileData,
+    Logger::Info("Launching maxDDG initialization kernel with %d blocks", N);
+    InitializeDDG<<<N,1>>>(dev_rgn, dev_maxDDG, dev_nodeData, dev_regFileData,
                           dataDepGraph_->GetInstCnt(), needTransitiveClosure);
     cudaDeviceSynchronize();
     Logger::Info("Post Kernel Error: %s", cudaGetErrorString(cudaGetLastError()));
@@ -398,26 +399,11 @@ FUNC_RESULT SchedRegion::FindOptimalSchedule(
 
     cudaFree(dev_nodeData);
     cudaFree(dev_regFileData);
+    cudaFree(dev_rgn);
 
     // Launch device maxDDG reset kernel
     Reset<<<1,1>>>(dev_maxDDG);
-    //****End Code for ListScheduling on Device****
-
-    //debug
-    Logger::Info("Running host list scheduling to check for correctness");
-
-    InstSchedule *host_lstSched = new InstSchedule(machMdl_, dataDepGraph_, vrfySched_);
-
-    lstSchdulr = AllocHeuristicScheduler_();
-
-    rslt = lstSchdulr->FindSchedule(host_lstSched, this);
-
-    if (rslt != RES_SUCCESS) {
-      Logger::Fatal("List scheduling failed");
-      delete lstSchdulr;
-      delete lstSched;
-      return rslt;
-    }
+    /****End Device Code****/
 
     hurstcTime = Utilities::GetProcessorTime() - hurstcStart;
     stats::heuristicTime.Record(hurstcTime);
@@ -425,25 +411,52 @@ FUNC_RESULT SchedRegion::FindOptimalSchedule(
       Logger::Info("Heuristic_Time %d", hurstcTime);
 
     heuristicScheduleLength = lstSched->GetCrntLngth();
-    InstCount hurstcExecCost = lstSched->GetExecCost();
-    // Compute cost for Heuristic list scheduler, this must be called before
-    // calling GetCost() on the InstSchedule instance.
-    //Computing sched cost now happens on device
-    CmputNormCost_(host_lstSched, CCM_DYNMC, hurstcExecCost, true);
-    
+    InstCount hurstcExecCost = lstSched->GetExecCost(); 
     hurstcCost_ = lstSched->GetCost();
 
-    bool match = true;
+    // If true, run list scheduling on the host to check for correctness
+    if (true) {
+      Logger::Info("Running host list scheduling to check for correctness");
 
-    for (InstCount i = 0; i < dataDepGraph_->GetInstCnt(); i++) {
-      if (host_lstSched->GetSchedCycle(i) != lstSched->GetSchedCycle(i))
-        match = false;
-    }
+      InstSchedule *host_lstSched = new InstSchedule(machMdl_, dataDepGraph_, vrfySched_);
 
-    if (match)
-      Logger::Info("Host and device schedules match!");
-    else {
-      Logger::Fatal("******** Host and Device Schedule mismatch ********");
+      lstSchdulr = AllocHeuristicScheduler_();
+
+      rslt = lstSchdulr->FindSchedule(host_lstSched, this);
+
+      if (rslt != RES_SUCCESS) {
+        Logger::Fatal("List scheduling failed");
+        delete lstSchdulr;
+        delete lstSched;
+        return rslt;
+      }
+
+      // Compute cost for Heuristic list scheduler, this must be called before
+      // calling GetCost() on the InstSchedule instance.
+      CmputNormCost_(host_lstSched, CCM_DYNMC, hurstcExecCost, true);
+    
+      bool match = true;
+    
+      for (InstCount i = 0; i < dataDepGraph_->GetInstCnt(); i++) {
+        if (host_lstSched->GetSchedCycle(i) != lstSched->GetSchedCycle(i))
+          match = false;
+      }
+
+      if (lstSched->GetCost() != host_lstSched->GetCost()) {
+        Logger::Info("Host Schedule Cost: %d", host_lstSched->GetCost());
+	Logger::Info("Device Schedule Cost: %d", lstSched->GetCost());
+        Logger::Info("**** Host and Device Schedules have different costs ****");
+      }
+
+      if (match)
+        Logger::Info("Host and device schedules match!");
+      else {
+        Logger::Info("Host Schedule:");
+        host_lstSched->Print();
+        Logger::Info("Device Schedule");
+        lstSched->Print();
+        Logger::Info("******** Host and Device Schedule mismatch ********");
+      }
     }
 
     // This schedule is optimal so ACO will not be run
