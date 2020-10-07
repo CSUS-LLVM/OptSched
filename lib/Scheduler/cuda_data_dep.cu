@@ -1649,7 +1649,7 @@ void DataDepGraph::InitializeOnDevice(InstCount instCnt, NodeData *nodeData,
       leaf_ = (GraphNode *)insts_[i];
   }
   // Single threaded
-  if (blockIdx.x == 0) {
+  if (i == 0) {
     // Instantiate edges
     for (InstCount i = 0; i < instCnt; i++) {
       for (int j = 0; j < nodeData[i].prdcsrCnt_; j++) {

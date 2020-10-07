@@ -366,8 +366,8 @@ FUNC_RESULT SchedRegion::FindOptimalSchedule(
     unsigned N = max(dataDepGraph_->GetInstCnt(), machMdl_->GetRegTypeCnt());
 /*
     // Launch DDG creation kernel
-    Logger::Info("Launching DDG creation kernel");
-    CreateDDG<<<1,1>>>(dev_rgn, dev_maxDDG, dev_nodeData, dev_regFileData,
+    Logger::Info("Launching DDG creation kernel with %d blocks", N);
+    CreateDDG<<<N,1>>>(dev_rgn, dev_maxDDG, dev_nodeData, dev_regFileData,
                           dataDepGraph_->GetInstCnt(), needTransitiveClosure,
 			  dev_machMdl_, dataDepGraph_->GetLtncyPrcsn());
     cudaDeviceSynchronize();
