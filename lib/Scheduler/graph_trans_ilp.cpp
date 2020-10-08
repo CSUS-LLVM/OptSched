@@ -4,6 +4,8 @@
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallVector.h"
 #include <cassert>
+#include <cstddef> // std::size_t
+#include <limits>
 #include <vector>
 
 using namespace llvm::opt_sched;
@@ -61,9 +63,6 @@ static size_t castUnsigned(int x) {
 
 static size_t getNum(GraphNode *Node) { return castUnsigned(Node->GetNum()); }
 
-template <typename... Ts>
-[[gnu::always_inline]] static inline void suppressUnused(Ts &&...) {}
-
 static int computeSuperiorArrayValue(DataDepGraph &DDG,
                                      ArrayRef2D<int> DistanceTable, //
                                      const int i_, const int j_) {
@@ -91,8 +90,8 @@ static int computeSuperiorArrayValue(DataDepGraph &DDG,
   const int NumBadSuccessors =
       llvm::count_if(NodeJ->GetSuccessors(), [&](GraphEdge &e) {
         DEBUG_LOG("    LATENCY(%d, %d) = %d <> DISTANCE(%d, %d) = %d", //
-                  j, getNum(e.from), e.label,                          //
-                  i, getNum(e.from), DistanceTable[{i, getNum(e.to)}]);
+                  j, getNum(e.to), e.label,                            //
+                  i, getNum(e.to), DistanceTable[{i, getNum(e.to)}]);
         return e.label > DistanceTable[{i, getNum(e.to)}];
       });
 
@@ -158,43 +157,42 @@ StaticNodeSupILPTrans::DataAlloc::DataAlloc(DataDepGraph &DDG)
           createSuperiorArray(DDG, wrapAs2D(DistanceTable, DDG.GetNodeCnt()))),
       SuperiorNodesList(
           createSuperiorNodesList(wrapAs2D(SuperiorArray, DDG.GetNodeCnt()))),
-      Stats(), Data_(llvm::make_unique<Data>(Data{
-                   DDG,
-                   wrapAs2D(this->DistanceTable, DDG.GetNodeCnt()),
-                   wrapAs2D(this->SuperiorArray, DDG.GetNodeCnt()),
-                   this->SuperiorNodesList,
-                   this->Stats,
-               })) {}
+      AddedEdges(), Stats(),
+      Data_(llvm::make_unique<Data>(Data{
+          DDG,
+          wrapAs2D(this->DistanceTable, DDG.GetNodeCnt()),
+          wrapAs2D(this->SuperiorArray, DDG.GetNodeCnt()),
+          this->SuperiorNodesList,
+          this->AddedEdges,
+          this->Stats,
+      })) {}
 
-void StaticNodeSupILPTrans::updateSuperiorArray(Data &Data, int i_, int j_) {
+static void decrementSuperiorArray(
+    llvm::SmallVectorImpl<std::pair<int, int>> &SuperiorNodesList,
+    MutableArrayRef2D<int> SuperiorArray, int i_, int j_) {
   const size_t i = castUnsigned(i_);
   const size_t j = castUnsigned(j_);
 
-  const int OldValue = Data.SuperiorArray[{i, j}];
-  suppressUnused(OldValue);
+  const int OldValue = SuperiorArray[{i, j}];
+  const int NewValue = OldValue - 1;
 
-  const int NewValue =
-      computeSuperiorArrayValue(Data.DDG, Data.DistanceTable, i, j);
-  Data.SuperiorArray[{i, j}] = NewValue;
+  SuperiorArray[{i, j}] = NewValue;
   DEBUG_LOG("  Updating SUPERIOR(%d, %d) = %d (old = %d)", i, j, NewValue,
             OldValue);
-  // Not necessarily true due to the way we update the SUPERIOR array.
-  // After fully updating the SUPERIOR array, it will be true.
-  // However, in the process of doing so, we might increase.
-  // assert(NewValue <= OldValue);
+  assert(NewValue >= 0);
 
   if (NewValue == 0) {
     DEBUG_LOG("   Tracking (%d, %d) as a possible superior edge", i, j);
-    Data.SuperiorNodesList.push_back({i, j});
+    SuperiorNodesList.push_back({i_, j_});
   }
 }
 
-void StaticNodeSupILPTrans::addZeroLatencyEdge(DataDepGraph &DDG, int i, int j,
-                                               Statistics &Stats) {
-  SchedInstruction *NodeI = DDG.GetInstByIndx(i);
-  SchedInstruction *NodeJ = DDG.GetInstByIndx(j);
-  addSuperiorEdge(DDG, NodeI, NodeJ);
-  ++Stats.NumEdgesAdded;
+void StaticNodeSupILPTrans::addZeroLatencyEdge(Data &Data, int i, int j) {
+  SchedInstruction *NodeI = Data.DDG.GetInstByIndx(i);
+  SchedInstruction *NodeJ = Data.DDG.GetInstByIndx(j);
+  GraphEdge *e = addSuperiorEdge(Data.DDG, NodeI, NodeJ);
+  Data.AddedEdges.insert(e);
+  ++Data.Stats.NumEdgesAdded;
   DEBUG_LOG(" Added (%d, %d) superior edge", i, j);
 }
 
@@ -205,23 +203,54 @@ void StaticNodeSupILPTrans::addNecessaryResourceEdges(DataDepGraph &DDG, //
 }
 
 void StaticNodeSupILPTrans::setDistanceTable(StaticNodeSupILPTrans::Data &Data,
-                                             int i_, int j_, int Val) {
+                                             int i_, int j_, int NewDistance) {
   const size_t i = castUnsigned(i_);
   const size_t j = castUnsigned(j_);
   const int OldDistance = Data.DistanceTable[{i, j}];
-  Data.DistanceTable[{i, j}] = Val;
-  DEBUG_LOG("  Updated DISTANCE(%d, %d) = %d (old = %d)", i, j, Val,
+  Data.DistanceTable[{i, j}] = NewDistance;
+  DEBUG_LOG("  Updated DISTANCE(%d, %d) = %d (old = %d)", i, j, NewDistance,
             OldDistance);
 
-  if (Val > OldDistance) {
-    SchedInstruction *NodeI = Data.DDG.GetInstByIndx(i);
-    SchedInstruction *NodeJ = Data.DDG.GetInstByIndx(j);
+  assert(NewDistance > OldDistance);
 
-    for (GraphEdge &e : NodeI->GetPredecessors()) {
-      updateSuperiorArray(Data, e.from->GetNum(), j);
+  SchedInstruction *NodeI = Data.DDG.GetInstByIndx(i);
+  SchedInstruction *NodeJ = Data.DDG.GetInstByIndx(j);
+
+  DEBUG_LOG("  . Checking I's successors");
+  for (GraphEdge &e : NodeI->GetSuccessors()) {
+    const int Latency = e.label;
+    const size_t k = castUnsigned(e.to->GetNum());
+
+    if (Data.AddedEdges.find(&e) != Data.AddedEdges.end()) {
+      DEBUG_LOG("   Skipping; successor from superior edge: (%d, %d)", i, k);
+      continue;
     }
-    for (GraphEdge &e : NodeJ->GetSuccessors()) {
-      updateSuperiorArray(Data, i, e.to->GetNum());
+    if (!areNodesIndependent(NodeJ, static_cast<SchedInstruction *>(e.to))) {
+      DEBUG_LOG("   Skipping; not independent with J. K: %d J: %d", k, j);
+      continue;
+    }
+
+    if (Latency <= NewDistance && Latency > OldDistance) {
+      decrementSuperiorArray(Data.SuperiorNodesList, Data.SuperiorArray, k, j);
+    }
+  }
+
+  DEBUG_LOG("  . Checking J's predecessors");
+  for (GraphEdge &e : NodeJ->GetPredecessors()) {
+    const int Latency = e.label;
+    const size_t k = castUnsigned(e.from->GetNum());
+
+    if (Data.AddedEdges.find(&e) != Data.AddedEdges.end()) {
+      DEBUG_LOG("   Skipping; predecessor from superior edge: (%d, %d)", k, j);
+      continue;
+    }
+    if (!areNodesIndependent(NodeI, static_cast<SchedInstruction *>(e.from))) {
+      DEBUG_LOG("   Skipping; not independent with I. K: %d I: %d", k, i);
+      continue;
+    }
+
+    if (Latency <= NewDistance && Latency > OldDistance) {
+      decrementSuperiorArray(Data.SuperiorNodesList, Data.SuperiorArray, i, k);
     }
   }
 }
@@ -235,7 +264,9 @@ void StaticNodeSupILPTrans::updateDistanceTable(Data &Data, int i_, int j_) {
   MutableArrayRef2D<int> DistanceTable = Data.DistanceTable;
 
   // Adding the edge (i, j) increases DISTANCE(i, j) to 0 (from -infinity).
-  setDistanceTable(Data, i, j, 0);
+  if (DistanceTable[{i, j}] < 0) {
+    setDistanceTable(Data, i, j, 0);
+  }
 
   const int MaxLatency = DDG.GetMaxLtncy();
 
@@ -334,12 +365,14 @@ FUNC_RESULT StaticNodeSupILPTrans::ApplyTrans() {
     addNecessaryResourceEdges(Data, i, j);
 
     updateDistanceTable(Data, i, j);
-    updateSuperiorArray(Data, i, j);
     removeRedundantEdges(Data, i, j);
 
     DEBUG_LOG("Finished iteration for (%d, %d)\n", i, j);
   }
 
+  assert(Data.AddedEdges.size() <=
+         static_cast<std::size_t>(std::numeric_limits<int>::max()));
+  assert(Data.Stats.NumEdgesAdded == static_cast<int>(Data.AddedEdges.size()));
   Logger::Event("GraphTransILPNodeSuperiorityFinished",      //
                 "superior_edges", Data.Stats.NumEdgesAdded,  //
                 "removed_edges", Data.Stats.NumEdgesRemoved, //
