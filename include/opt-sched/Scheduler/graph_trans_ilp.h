@@ -3,6 +3,7 @@
 
 #include "opt-sched/Scheduler/array_ref2d.h"
 #include "opt-sched/Scheduler/graph_trans.h"
+#include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/SmallVector.h"
 #include <memory>
 
@@ -29,6 +30,7 @@ public:
     MutableArrayRef2D<int> DistanceTable;
     MutableArrayRef2D<int> SuperiorArray;
     llvm::SmallVectorImpl<std::pair<int, int>> &SuperiorNodesList;
+    llvm::SmallPtrSetImpl<GraphEdge *> &AddedEdges;
     Statistics &Stats;
   };
 
@@ -54,6 +56,7 @@ public:
     llvm::SmallVector<int, SmallSize> DistanceTable;
     llvm::SmallVector<int, SmallSize> SuperiorArray;
     llvm::SmallVector<std::pair<int, int>, SmallSize> SuperiorNodesList;
+    llvm::SmallPtrSet<GraphEdge *, 32> AddedEdges;
     Statistics Stats = {};
 
   private:
@@ -62,18 +65,11 @@ public:
 
   static DataAlloc createData(DataDepGraph &DDG) { return DataAlloc(DDG); }
 
-  static void updateSuperiorArray(Data &Data, int i, int j);
-
   static void setDistanceTable(Data &Data, int i, int j, int Val);
 
   static void updateDistanceTable(Data &Data, int i, int j);
 
-  static void addZeroLatencyEdge(DataDepGraph &DDG, int i, int j,
-                                 Statistics &Stats);
-
-  static void addZeroLatencyEdge(Data &Data, int i, int j) {
-    addZeroLatencyEdge(Data.DDG, i, j, Data.Stats);
-  }
+  static void addZeroLatencyEdge(Data &Data, int i, int j);
 
   static void addNecessaryResourceEdges(DataDepGraph &DDG, int i, int j,
                                         Statistics &Stats);
