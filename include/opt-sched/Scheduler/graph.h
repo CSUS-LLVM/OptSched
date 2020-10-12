@@ -81,7 +81,7 @@ public:
   __host__ __device__
   ~GraphNode();
   // Creates a new prdcsr/scsr list, for use on blank nodes on device
-  __device__
+  __host__ __device__
   void CreatePrdcsrScsrLists(UDT_GNODES maxNodeCnt);
   // Clears the node's predecessor list.
   __host__ __device__
@@ -346,8 +346,8 @@ protected:
   GraphEdge *GetLastPrdcsrEdge();
   __host__ __device__
   GraphEdge *GetPrevPrdcsrEdge();
-  // Sets num when instantiating on device
-  __device__
+  // Sets num when instantiating a node
+  __host__ __device__
   void SetNum(UDT_GNODES num) { num_ = num; }
 };
 
@@ -408,7 +408,7 @@ protected:
   UDT_GNODES nodeCnt_;
   // The total number of edges in the graph.
   UDT_GEDGES edgeCnt_;
-  // An array of pointers to the graph's nodes.
+  // An array of the graph's nodes.
   GraphNode **nodes_;
   // The maximum number of successors per node.
   UDT_GEDGES maxScsrCnt_;

@@ -217,8 +217,8 @@ void OptSchedDDGWrapperBasic::addUse(unsigned RegUnit, InstCount Index) {
   }
 
   for (Register *Reg : LastDef[RegUnit]) {
-    insts_[Index]->AddUse(Reg);
-    Reg->AddUse(insts_[Index]);
+    insts_[Index].AddUse(Reg);
+    Reg->AddUse(&insts_[Index]);
   }
 }
 
@@ -226,9 +226,9 @@ void OptSchedDDGWrapperBasic::addDef(unsigned RegUnit, InstCount Index) {
   std::vector<Register *> Regs;
   for (int Type : getRegisterType(RegUnit)) {
     Register *Reg = RegFiles[Type].GetReg(RegIndices[Type]++);
-    insts_[Index]->AddDef(Reg);
+    insts_[Index].AddDef(Reg);
     Reg->SetWght(getRegisterWeight(RegUnit));
-    Reg->AddDef(insts_[Index]);
+    Reg->AddDef(&insts_[Index]);
     Regs.push_back(Reg);
   }
   LastDef[RegUnit] = Regs;
@@ -256,7 +256,7 @@ void OptSchedDDGWrapperBasic::addLiveOutReg(unsigned RegUnit) {
     LLVM_DEBUG(TargetRegisterInfo::dumpReg(RegUnit, 0, DAG->TRI));
   }
 
-  auto LeafInstr = insts_[DAG->SUnits.size() + 1];
+  auto LeafInstr = &insts_[DAG->SUnits.size() + 1];
   std::vector<Register *> Regs = LastDef[RegUnit];
   for (Register *Reg : Regs) {
     LeafInstr->AddUse(Reg);
@@ -267,7 +267,7 @@ void OptSchedDDGWrapperBasic::addLiveOutReg(unsigned RegUnit) {
 
 void OptSchedDDGWrapperBasic::addDefAndNotUsed(Register *Reg) {
   int LeafIndex = DAG->SUnits.size() + 1;
-  auto LeafInstr = insts_[LeafIndex];
+  auto LeafInstr = &insts_[LeafIndex];
   if (!LeafInstr->FindUse(Reg)) {
     LeafInstr->AddUse(Reg);
     Reg->AddUse(LeafInstr);
@@ -385,7 +385,7 @@ inline void OptSchedDDGWrapperBasic::setupRoot() {
 
   // Add edges between root nodes in graph and optsched artificial root.
   for (size_t i = 0; i < DAG->SUnits.size(); i++)
-    if (insts_[i]->GetPrdcsrCnt() == 0)
+    if (insts_[i].GetPrdcsrCnt() == 0)
       CreateEdge_(RootNum, i, 0, DEP_OTHER);
 }
 
@@ -403,7 +403,7 @@ inline void OptSchedDDGWrapperBasic::setupLeaf() {
 
   // Add edges between leaf nodes in graph and optsched artificial leaf.
   for (size_t i = 0; i < DAG->SUnits.size(); i++)
-    if (insts_[i]->GetScsrCnt() == 0)
+    if (insts_[i].GetScsrCnt() == 0)
       CreateEdge_(i, LeafNum, 0, DEP_OTHER);
 }
 

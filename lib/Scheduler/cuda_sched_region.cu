@@ -256,165 +256,167 @@ FUNC_RESULT SchedRegion::FindOptimalSchedule(
   // Note: Heuristic scheduler is required for the two-pass scheduler
   // to use the sequential list scheduler which inserts stalls into
   // the schedule found in the first pass.
-  if (HeuristicSchedulerEnabled || IsSecondPass()) {
-   
- 
+  if (HeuristicSchedulerEnabled || IsSecondPass()) { 
+    InstCount hurstcExecCost;
     //****Begin Code for ListScheduling on Device****
     Milliseconds hurstcStart = Utilities::GetProcessorTime();
-    // Create and copy NodeData and RegData arrays to device for dev DDG
-    // holds data about nodes and edges
-    NodeData *nodeData = new NodeData[dataDepGraph_->GetInstCnt()];
+    //if true run DevListSched
+    if (false) {
+      // Create and copy NodeData and RegData arrays to device for dev DDG
+      // holds data about nodes and edges
+      NodeData *nodeData = new NodeData[dataDepGraph_->GetInstCnt()];
 
-    dataDepGraph_->CreateNodeData(nodeData);
+      dataDepGraph_->CreateNodeData(nodeData);
 
-    NodeData *dev_nodeData = NULL;
+      NodeData *dev_nodeData = NULL;
 
-    // Allocate dev mem
-    if (cudaSuccess != cudaMallocManaged((void**)&dev_nodeData, 
+      // Allocate dev mem
+      if (cudaSuccess != cudaMallocManaged((void**)&dev_nodeData, 
 			                 dataDepGraph_->GetInstCnt() 
 					 * sizeof(NodeData)))
-      printf("Failed to allocate device mem for dev_nodeData: %s\n", 
-	     cudaGetErrorString(cudaGetLastError()));
+        printf("Failed to allocate device mem for dev_nodeData: %s\n", 
+ 	       cudaGetErrorString(cudaGetLastError()));
 
-    // Copy nodeData to device
-    if (cudaSuccess != cudaMemcpy(dev_nodeData, nodeData, 
+      // Copy nodeData to device
+      if (cudaSuccess != cudaMemcpy(dev_nodeData, nodeData, 
 			          dataDepGraph_->GetInstCnt() 
 				  * sizeof(NodeData), 
 				  cudaMemcpyHostToDevice))
-      printf("Failed to copy nodeData to device: %s\n", 
-	     cudaGetErrorString(cudaGetLastError()));
+       printf("Failed to copy nodeData to device: %s\n", 
+  	       cudaGetErrorString(cudaGetLastError()));
 
-    // Copy EdgeData arrays inside NodeData struct to device
-    for (int i = 0; i < dataDepGraph_->GetInstCnt(); i++)
-      nodeData[i].CopyPointersToDevice(&dev_nodeData[i]);
+      // Copy EdgeData arrays inside NodeData struct to device
+      for (int i = 0; i < dataDepGraph_->GetInstCnt(); i++)
+        nodeData[i].CopyPointersToDevice(&dev_nodeData[i]);
 
-    // Free up host nodeData
-    delete[] nodeData;
+      // Free up host nodeData
+      delete[] nodeData;
 
-    // Holds data about RegFiles, its regs, and their defs and uses
-    RegFileData *regFileData = new RegFileData[machMdl_->GetRegTypeCnt()];
+      // Holds data about RegFiles, its regs, and their defs and uses
+      RegFileData *regFileData = new RegFileData[machMdl_->GetRegTypeCnt()];
 
-    dataDepGraph_->CreateRegData(regFileData);
+      dataDepGraph_->CreateRegData(regFileData);
 
-    // Copy regfiledata to device
-    RegFileData *dev_regFileData = NULL;
+      // Copy regfiledata to device
+      RegFileData *dev_regFileData = NULL;
 
-    // Allocate dev mem
-    if (cudaSuccess != cudaMallocManaged((void**)&dev_regFileData, 
+      // Allocate dev mem
+      if (cudaSuccess != cudaMallocManaged((void**)&dev_regFileData, 
 			                 machMdl_->GetRegTypeCnt() 
 					 * sizeof(RegFileData)))
-      printf("Failed to allocate device mem for dev_regFileData: %s\n", 
-	     cudaGetErrorString(cudaGetLastError()));
+        printf("Failed to allocate device mem for dev_regFileData: %s\n", 
+  	       cudaGetErrorString(cudaGetLastError()));
 
-    // Copy array of regFileData to device
-    if (cudaSuccess != cudaMemcpy(dev_regFileData, regFileData, 
-			          machMdl_->GetRegTypeCnt() 
-				  * sizeof(RegFileData), 
-				  cudaMemcpyHostToDevice))
-      printf("Failed to copy regFileData to device: %s\n", 
-	     cudaGetErrorString(cudaGetLastError()));
+      // Copy array of regFileData to device
+      if (cudaSuccess != cudaMemcpy(dev_regFileData, regFileData, 
+			            machMdl_->GetRegTypeCnt() 
+				    * sizeof(RegFileData), 
+				    cudaMemcpyHostToDevice))
+        printf("Failed to copy regFileData to device: %s\n", 
+	       cudaGetErrorString(cudaGetLastError()));
 
-    for (int i = 0; i < machMdl_->GetRegTypeCnt(); i++)
-      regFileData[i].CopyPointersToDevice(&dev_regFileData[i]);
+      for (int i = 0; i < machMdl_->GetRegTypeCnt(); i++)
+        regFileData[i].CopyPointersToDevice(&dev_regFileData[i]);
 
-    // Free up host regFileData
-    delete[] regFileData;
+      // Free up host regFileData
+      delete[] regFileData;
 
-    // Copy this(BBWithSpill) to device
-    BBWithSpill *dev_rgn = NULL;
+      // Copy this(BBWithSpill) to device
+      BBWithSpill *dev_rgn = NULL;
 
-    // Allocate device mem
-    if (cudaSuccess != cudaMallocManaged((void**)&dev_rgn, sizeof(BBWithSpill)))
-      printf("Error allocating dev mem for dev_rgn: %s\n", 
-	     cudaGetErrorString(cudaGetLastError()));
+      // Allocate device mem
+      if (cudaSuccess != cudaMallocManaged((void**)&dev_rgn, sizeof(BBWithSpill)))
+        printf("Error allocating dev mem for dev_rgn: %s\n", 
+	       cudaGetErrorString(cudaGetLastError()));
 
-    // Copy this to device
-    if (cudaSuccess != cudaMemcpy(dev_rgn, this, sizeof(BBWithSpill), 
-			          cudaMemcpyHostToDevice))
-      printf("Error copying this to device: %s\n", 
-	     cudaGetErrorString(cudaGetLastError()));
+      // Copy this to device
+      if (cudaSuccess != cudaMemcpy(dev_rgn, this, sizeof(BBWithSpill), 
+			            cudaMemcpyHostToDevice))
+        printf("Error copying this to device: %s\n", 
+	       cudaGetErrorString(cudaGetLastError()));
 
-    // Update dev_rgn->machMdl_ to dev_machMdl
-    if (cudaSuccess != cudaMemcpy(&(dev_rgn->machMdl_), &dev_machMdl_, 
-			          sizeof(MachineModel *), 
-				  cudaMemcpyHostToDevice))
-      printf("Error updating dev_rgn->machMdl_ on device: %s\n", 
-             cudaGetErrorString(cudaGetLastError()));
+      // Update dev_rgn->machMdl_ to dev_machMdl
+      if (cudaSuccess != cudaMemcpy(&(dev_rgn->machMdl_), &dev_machMdl_, 
+			            sizeof(MachineModel *), 
+	  			    cudaMemcpyHostToDevice))
+        printf("Error updating dev_rgn->machMdl_ on device: %s\n", 
+               cudaGetErrorString(cudaGetLastError()));
 
-    CopyPointersToDevice(dev_rgn);
+      CopyPointersToDevice(dev_rgn);
 
-    // Create and copy lstSched
-    lstSched = new InstSchedule(machMdl_, dataDepGraph_, vrfySched_);
+      // Create and copy lstSched
+      lstSched = new InstSchedule(machMdl_, dataDepGraph_, vrfySched_);
 
-    InstSchedule *dev_lstSched = NULL;
+      InstSchedule *dev_lstSched = NULL;
 
-    // Move lstSched arrays to device
-    lstSched->CopyPointersToDevice(dev_machMdl_);
+      // Move lstSched arrays to device
+      lstSched->CopyPointersToDevice(dev_machMdl_);
 
-    // Allocate dev mem for dev_lstSched
-    if (cudaSuccess != cudaMalloc((void**)&dev_lstSched, sizeof(InstSchedule)))
-      printf("Error allocating dev mem for dev_lstSched: %s\n",
-             cudaGetErrorString(cudaGetLastError()));
+      // Allocate dev mem for dev_lstSched
+      if (cudaSuccess != cudaMalloc((void**)&dev_lstSched, sizeof(InstSchedule)))
+        printf("Error allocating dev mem for dev_lstSched: %s\n",
+               cudaGetErrorString(cudaGetLastError()));
 
-    // Copy lstSched to device
-    if (cudaSuccess != cudaMemcpy(dev_lstSched, lstSched, sizeof(InstSchedule),
-			          cudaMemcpyHostToDevice))
-      printf("Error copying lstSched to device: %s\n",
-             cudaGetErrorString(cudaGetLastError()));
+      // Copy lstSched to device
+      if (cudaSuccess != cudaMemcpy(dev_lstSched, lstSched, sizeof(InstSchedule),
+	  		            cudaMemcpyHostToDevice))
+        printf("Error copying lstSched to device: %s\n",
+               cudaGetErrorString(cudaGetLastError()));
 
-    // num of blocks
-    unsigned N = max(dataDepGraph_->GetInstCnt(), machMdl_->GetRegTypeCnt());
+      // num of blocks
+      unsigned N = max(dataDepGraph_->GetInstCnt(), machMdl_->GetRegTypeCnt());
 /*
-    // Launch DDG creation kernel
-    Logger::Info("Launching DDG creation kernel with %d blocks", N);
-    CreateDDG<<<N,1>>>(dev_rgn, dev_maxDDG, dev_nodeData, dev_regFileData,
-                          dataDepGraph_->GetInstCnt(), needTransitiveClosure,
-			  dev_machMdl_, dataDepGraph_->GetLtncyPrcsn());
-    cudaDeviceSynchronize();
-    Logger::Info("Post Kernel Error: %s", cudaGetErrorString(cudaGetLastError()));
+      // Launch DDG creation kernel
+      Logger::Info("Launching DDG creation kernel with %d blocks", N);
+      CreateDDG<<<N,1>>>(dev_rgn, dev_maxDDG, dev_nodeData, dev_regFileData,
+                            dataDepGraph_->GetInstCnt(), needTransitiveClosure,
+			    dev_machMdl_, dataDepGraph_->GetLtncyPrcsn());
+      cudaDeviceSynchronize();
+      Logger::Info("Post Kernel Error: %s", cudaGetErrorString(cudaGetLastError()));
 */    
-    // Launch maxDDG initialization kernel
-    Logger::Info("Launching maxDDG initialization kernel with %d blocks", N);
-    InitializeDDG<<<N,1>>>(dev_rgn, dev_maxDDG, dev_nodeData, dev_regFileData,
-                          dataDepGraph_->GetInstCnt(), needTransitiveClosure);
-    cudaDeviceSynchronize();
-    Logger::Info("Post Kernel Error: %s", cudaGetErrorString(cudaGetLastError()));
+      // Launch maxDDG initialization kernel
+      Logger::Info("Launching maxDDG initialization kernel with %d blocks", N);
+      InitializeDDG<<<N,1>>>(dev_rgn, dev_maxDDG, dev_nodeData, dev_regFileData,
+                            dataDepGraph_->GetInstCnt(), needTransitiveClosure);
+      cudaDeviceSynchronize();
+      Logger::Info("Post Kernel Error: %s", cudaGetErrorString(cudaGetLastError()));
 
-    // Launch device list sched kernel
-    Logger::Info("Launching device list scheduling kernel");
-    DevListSched<<<1,1>>>(dev_machMdl_, dev_rgn, dev_maxDDG, 
-		          abslutSchedUprBound_, GetHeuristicPriorities(), 
-			  vrfySched_, dataDepGraph_->GetLtncyPrcsn(), 
-			  dev_lstSched, GetHeuristicSchedulerType());
-    cudaDeviceSynchronize(); 
-    Logger::Info("Post Kernel Error: %s", cudaGetErrorString(cudaGetLastError()));
+      // Launch device list sched kernel
+      Logger::Info("Launching device list scheduling kernel");
+      DevListSched<<<1,1>>>(dev_machMdl_, dev_rgn, dev_maxDDG, 
+		            abslutSchedUprBound_, GetHeuristicPriorities(), 
+			    vrfySched_, dataDepGraph_->GetLtncyPrcsn(), 
+  			    dev_lstSched, GetHeuristicSchedulerType());
+      cudaDeviceSynchronize(); 
+      Logger::Info("Post Kernel Error: %s", cudaGetErrorString(cudaGetLastError()));
 
-    // Copy ListSchedule to Host
-    if (cudaSuccess != cudaMemcpy(lstSched, dev_lstSched, sizeof(InstSchedule),
-			          cudaMemcpyDeviceToHost))
-     Logger::Info("Error copying lstSched to host: %s",
-             cudaGetErrorString(cudaGetLastError())); 
+      // Copy ListSchedule to Host
+      if (cudaSuccess != cudaMemcpy(lstSched, dev_lstSched, sizeof(InstSchedule),
+       			            cudaMemcpyDeviceToHost))
+       Logger::Info("Error copying lstSched to host: %s",
+               cudaGetErrorString(cudaGetLastError())); 
 
-    lstSched->CopyPointersToHost(machMdl_);
+      lstSched->CopyPointersToHost(machMdl_);
 
-    cudaFree(dev_nodeData);
-    cudaFree(dev_regFileData);
-    cudaFree(dev_rgn);
+      cudaFree(dev_nodeData);
+      cudaFree(dev_regFileData);
+      cudaFree(dev_rgn);
 
-    // Launch device maxDDG reset kernel
-    Reset<<<1,1>>>(dev_maxDDG);
-    /****End Device Code****/
+      // Launch device maxDDG reset kernel
+      Reset<<<1,1>>>(dev_maxDDG);
+    
+      heuristicScheduleLength = lstSched->GetCrntLngth();
+      hurstcExecCost = lstSched->GetExecCost();  
+      hurstcCost_ = lstSched->GetCost();
+      /****End Device Code****/
+    }
 
     hurstcTime = Utilities::GetProcessorTime() - hurstcStart;
     stats::heuristicTime.Record(hurstcTime);
     if (hurstcTime > 0)
       Logger::Info("Heuristic_Time %d", hurstcTime);
 
-    heuristicScheduleLength = lstSched->GetCrntLngth();
-    InstCount hurstcExecCost = lstSched->GetExecCost(); 
-    hurstcCost_ = lstSched->GetCost();
-
-    // If true, run list scheduling on the host to check for correctness
+    // If true, run list scheduling on the host
     if (true) {
       Logger::Info("Running host list scheduling to check for correctness");
 
@@ -433,29 +435,37 @@ FUNC_RESULT SchedRegion::FindOptimalSchedule(
 
       // Compute cost for Heuristic list scheduler, this must be called before
       // calling GetCost() on the InstSchedule instance.
+      InstCount hurstcExecCost;
       CmputNormCost_(host_lstSched, CCM_DYNMC, hurstcExecCost, true);
+      
+      // if true compare dev and lstsched, if false set hostlstsched as lstsched
+      if (false) {
+        bool match = true;
     
-      bool match = true;
-    
-      for (InstCount i = 0; i < dataDepGraph_->GetInstCnt(); i++) {
-        if (host_lstSched->GetSchedCycle(i) != lstSched->GetSchedCycle(i))
-          match = false;
-      }
+        for (InstCount i = 0; i < dataDepGraph_->GetInstCnt(); i++) {
+          if (host_lstSched->GetSchedCycle(i) != lstSched->GetSchedCycle(i))
+            match = false;
+        }
 
-      if (lstSched->GetCost() != host_lstSched->GetCost()) {
-        Logger::Info("Host Schedule Cost: %d", host_lstSched->GetCost());
-	Logger::Info("Device Schedule Cost: %d", lstSched->GetCost());
-        Logger::Info("**** Host and Device Schedules have different costs ****");
-      }
+        if (lstSched->GetCost() != host_lstSched->GetCost()) {
+          Logger::Info("Host Schedule Cost: %d", host_lstSched->GetCost());
+	  Logger::Info("Device Schedule Cost: %d", lstSched->GetCost());
+          Logger::Info("**** Host and Device Schedules have different costs ****");
+        }
 
-      if (match)
-        Logger::Info("Host and device schedules match!");
-      else {
-        Logger::Info("Host Schedule:");
-        host_lstSched->Print();
-        Logger::Info("Device Schedule");
-        lstSched->Print();
-        Logger::Info("******** Host and Device Schedule mismatch ********");
+        if (match) {
+          Logger::Info("Host and device schedules match!");
+	} else {
+          Logger::Info("Host Schedule:");
+          host_lstSched->Print();
+          Logger::Info("Device Schedule");
+          lstSched->Print();
+          Logger::Info("******** Host and Device Schedule mismatch ********");
+	}
+      } else {
+        lstSched = host_lstSched;
+        heuristicScheduleLength = lstSched->GetCrntLngth();
+        hurstcCost_ = lstSched->GetCost();
       }
     }
 

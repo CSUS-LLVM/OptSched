@@ -310,13 +310,8 @@ protected:
   // The total number of instructions in the graph.
   InstCount instCnt_;
 
-  // An array of pointers to instructions.
-  // TODO(max): Elaborate.
-  SchedInstruction **insts_;
-  // An array of instructions, used on device to lower time 
-  // spent looking up pointers and allow them to all be in a
-  // contiguos piece of memory
-  SchedInstruction *insts_array_;
+  // An array of instructions
+  SchedInstruction *insts_;
   // An array of pointers to allocated edges
   // used by maxDDG to reset and initialize edges without reallocating
   GraphEdge *edges_;
@@ -648,7 +643,7 @@ protected:
 
   void AdjstFileSchedCycles_();
 };
-/*****************************************************************************/
+/*****************************************************************************
 
 class DataDepSubGraph : public DataDepStruct {
 protected:
@@ -685,11 +680,6 @@ protected:
   struct LostInst{
     SchedInstruction *inst;
     InstCount indx;
-
-    void CopyPointersToDevice(LostInst *dev_inst){
-      Logger::Fatal("Unimplemented.\n");
-      return;
-    }
   };
 
   Stack<LostInst> *lostInsts_;

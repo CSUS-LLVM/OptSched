@@ -52,7 +52,7 @@ GraphNode::~GraphNode() {
     delete isRcrsvPrdcsr_;
 }
 
-__device__
+__host__ __device__
 void GraphNode::CreatePrdcsrScsrLists(UDT_GNODES maxNodeCnt) {
   scsrLst_ = new PriorityList<GraphEdge>(maxNodeCnt);
   prdcsrLst_ = new LinkedList<GraphEdge>(maxNodeCnt);

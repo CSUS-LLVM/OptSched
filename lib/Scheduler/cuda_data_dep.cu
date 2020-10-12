@@ -141,8 +141,7 @@ InstCount DataDepStruct::CmputAbslutUprBound_() {
   InstCount ltncySum = 0;
 
   for (i = 0; i < instCnt_; i++) {
-    SchedInstruction *inst = insts_[i];
-    UDT_GLABEL maxLtncy = inst->GetMaxEdgeLabel();
+    UDT_GLABEL maxLtncy = insts_[i].GetMaxEdgeLabel();
 
     if (1 > maxLtncy)
       maxLtncy = 1;
@@ -226,11 +225,6 @@ DataDepGraph::DataDepGraph(MachineModel *machMdl, LATENCY_PRECISION ltncyPrcsn)
 __host__ __device__
 DataDepGraph::~DataDepGraph() {
   if (insts_ != NULL) {
-    for (InstCount i = 0; i < instCnt_; i++) {
-      if (insts_[i] != NULL) {
-        delete insts_[i];
-      }
-    }
     delete[] insts_;
   }
   delete[] instCntPerType_;
@@ -245,7 +239,7 @@ FUNC_RESULT DataDepGraph::SetupForSchdulng(bool cmputTrnstvClsr) {
   maxUseCnt_ = 0;
 
   for (i = 0; i < instCnt_; i++) {
-    SchedInstruction *inst = insts_[i];
+    SchedInstruction *inst = &insts_[i];
     inst->SetupForSchdulng(instCnt_, cmputTrnstvClsr, cmputTrnstvClsr);
     InstType instType = inst->GetInstType();
     IssueType issuType = machMdl_->GetIssueType(instType);
@@ -296,7 +290,7 @@ FUNC_RESULT DataDepGraph::Dev_SetupForSchdulng(bool cmputTrnstvClsr) {
   maxUseCnt_ = 0;
   
   if (i < instCnt_) {
-    SchedInstruction *inst = insts_[i];
+    SchedInstruction *inst = &insts_[i];
     inst->SetupForSchdulng(instCnt_, cmputTrnstvClsr, cmputTrnstvClsr);
     InstType instType = inst->GetInstType();
     IssueType issuType = machMdl_->GetIssueType(instType);
@@ -341,7 +335,7 @@ FUNC_RESULT DataDepGraph::Dev_SetupForSchdulng(bool cmputTrnstvClsr) {
 FUNC_RESULT DataDepGraph::UpdateSetupForSchdulng(bool cmputTrnstvClsr) {
   InstCount i;
   for (i = 0; i < instCnt_; i++) {
-    SchedInstruction *inst = insts_[i];
+    SchedInstruction *inst = &insts_[i];
     inst->SetupForSchdulng(instCnt_, cmputTrnstvClsr, cmputTrnstvClsr);
     InstType instType = inst->GetInstType();
     IssueType issuType = machMdl_->GetIssueType(instType);
@@ -549,14 +543,14 @@ FUNC_RESULT DataDepGraph::Finish_() {
       return RES_ERROR;
     }
 
-    if (insts_[i]->GetPrdcsrCnt() == 0) {
+    if (insts_[i].GetPrdcsrCnt() == 0) {
       if (root_ != NULL) {
         Logger::Error("Invalid format in DAG (%s): multiple root nodes.",
                       dagID_);
         return RES_ERROR;
       }
 
-      root_ = insts_[i];
+      root_ = &insts_[i];
     }
   }
 
@@ -570,14 +564,18 @@ FUNC_RESULT DataDepGraph::Finish_() {
 
 void DataDepGraph::AllocArrays_(InstCount instCnt) {
   InstCount i;
-
+ 
   instCnt_ = instCnt;
   nodeCnt_ = instCnt;
-  insts_ = new SchedInstruction *[instCnt_];
-  nodes_ = (GraphNode **)insts_;
+  insts_ = new SchedInstruction[instCnt_];
+  // bit of a hack. Cannot simply do nodes_ = (GN*)insts_ anymore
+  // since their sizes do not match so nodes indexes incorrectly
+  // instead I am keeping nodes as pointers to insts for now
+  // since this would be simple to recreate on device
+  nodes_ = new GraphNode *[instCnt_];
 
-  for (i = 0; i < instCnt_; i++) {
-    insts_[i] = NULL;
+  for (InstCount i = 0; i < instCnt_; i++) {
+    nodes_[i] = (GraphNode *)&insts_[i];
   }
 }
 
@@ -774,7 +772,7 @@ void DataDepGraph::AdjstFileSchedCycles_() {
   InstCount i;
 
   for (i = 1; i < (instCnt_ - 1); i++) {
-    inst = insts_[i];
+    inst = &insts_[i];
     fileSchedCycle = inst->GetFileSchedCycle();
 
     if (i == 1) {
@@ -785,7 +783,7 @@ void DataDepGraph::AdjstFileSchedCycles_() {
   }
 
   for (i = 1; i < (instCnt_ - 1); i++) {
-    inst = insts_[i];
+    inst = &insts_[i];
     fileSchedCycle = inst->GetFileSchedCycle();
     fileSchedCycle -= minFileSchedCycle;
     maxFileSchedCycle = std::max(maxFileSchedCycle, fileSchedCycle);
@@ -804,7 +802,7 @@ InstCount DataDepGraph::GetAdjustedFileSchedCycle(InstCount instNum) {
     adjstdSchedCycle = fileSchedLngth_ - 1;
   } else {
     adjstdSchedCycle =
-        insts_[instNum]->GetFileSchedCycle() - minFileSchedCycle_ + 1;
+        insts_[instNum].GetFileSchedCycle() - minFileSchedCycle_ + 1;
   }
 
   return adjstdSchedCycle;
@@ -853,7 +851,7 @@ FUNC_RESULT DataDepGraph::ParseF2Edges_(SpecsBuffer *buf,
       if (useFileLtncs_ && pieceCnt == 5) {
         ltncy = atoi(strngs[4]);
       } else {
-        InstType frmInstType = insts_[frmNodeNum]->GetInstType();
+        InstType frmInstType = insts_[frmNodeNum].GetInstType();
         ltncy = machMdl->GetLatency(frmInstType, depType);
       }
 
@@ -907,22 +905,16 @@ SchedInstruction *DataDepGraph::CreateNode_(
     InstCount instNum, const char *const instName, InstType instType,
     const char *const opCode, int nodeID, InstCount fileSchedOrder,
     InstCount fileSchedCycle, InstCount fileLB, InstCount fileUB, int blkNum) {
+  insts_[instNum].InitializeNode_(instNum, instName, instType, opCode,
+                                  2 * instCnt_, nodeID, fileSchedOrder,
+                                  fileSchedCycle, fileLB, fileUB, machMdl_);
 
-  SchedInstruction *newInstPtr;
-  newInstPtr = new SchedInstruction(instNum, instName, instType, opCode,
-                                    2 * instCnt_, nodeID, fileSchedOrder,
-                                    fileSchedCycle, fileLB, fileUB, machMdl_);
   if ((instNum < 0 || instNum >= instCnt_) && instNum != UNINITIATED_NUM)
     printf("Invalid instruction number\n");
-  //  Logger::Fatal("Invalid instruction number");
-  //  Logger::Info("Instruction order = %d, instCnt_ = %d", fileSchedOrder,
-  //  instCnt_);
   if (fileSchedOrder > maxFileSchedOrder_)
     maxFileSchedOrder_ = fileSchedOrder;
 
-  insts_[instNum] = newInstPtr;
-
-  return newInstPtr;
+  return &insts_[instNum];
 }
 
 void DataDepGraph::CreateEdge(SchedInstruction *frmNode,
@@ -994,7 +986,7 @@ void DataDepGraph::CreateEdge_(InstCount frmNodeNum, InstCount toNodeNum,
 
   GraphNode *frmNode = nodes_[frmNodeNum];
   GraphNode *toNode = nodes_[toNodeNum];
-
+  
 #ifdef IS_DEBUG_LATENCIES
   stats::dependenceTypeLatencies.Add(GetDependenceTypeName(depType), ltncy);
   if (depType == DEP_DATA) {
@@ -1012,7 +1004,6 @@ void DataDepGraph::CreateEdge_(InstCount frmNodeNum, InstCount toNodeNum,
                  frmNodeNum, toNodeNum, depType, ltncy);
 #endif
     edge = new GraphEdge(frmNode, toNode, ltncy, depType);
-
     frmNode->AddScsr(edge);
     toNode->AddPrdcsr(edge);
   } else {
@@ -1096,10 +1087,10 @@ void DataDepGraph::InitializeEdge_(InstCount frmNodeNum, InstCount toNodeNum,
 
 FUNC_RESULT DataDepGraph::FinishNode_(InstCount nodeNum, InstCount edgeCnt) {
   if (edgeCnt != -1) {
-    assert(edgeCnt == nodes_[nodeNum]->GetScsrCnt());
+    assert(edgeCnt == insts_[nodeNum]->GetScsrCnt());
   }
 
-  edgeCnt = nodes_[nodeNum]->GetScsrCnt();
+  edgeCnt = insts_[nodeNum].GetScsrCnt();
 
   if (edgeCnt > maxScsrCnt_) {
     maxScsrCnt_ = edgeCnt;
@@ -1112,10 +1103,10 @@ FUNC_RESULT DataDepGraph::FinishNode_(InstCount nodeNum, InstCount edgeCnt) {
       return RES_ERROR;
     }
 
-    leaf_ = nodes_[nodeNum];
+    leaf_ = &insts_[nodeNum];
   }
 
-  UDT_GLABEL ltncySum = insts_[nodeNum]->GetLtncySum();
+  UDT_GLABEL ltncySum = insts_[nodeNum].GetLtncySum();
 
   if (ltncySum > maxLtncySum_) {
     maxLtncySum_ = ltncySum;
@@ -1134,7 +1125,7 @@ void DataDepGraph::EnforceProgOrder() {
 
 void DataDepGraph::RestoreAbsoluteBounds() {
   for (InstCount i = 0; i < instCnt_; i++) {
-    insts_[i]->RestoreAbsoluteBounds();
+    insts_[i].RestoreAbsoluteBounds();
   }
 }
 
@@ -1214,7 +1205,7 @@ void DataDepGraph::WriteNodeInfoToF2File_(FILE *file) {
   fprintf(file, "nodes\n");
 
   for (i = 0; i < instCnt_; i++) {
-    SchedInstruction *inst = insts_[i];
+    SchedInstruction *inst = &insts_[i];
     fprintf(file, "  node %d ", inst->GetNum());
 
     if (i > 0 && i < (instCnt_ - 1)) {
@@ -1234,7 +1225,7 @@ void DataDepGraph::WriteDepInfoToF2File_(FILE *file) {
   fprintf(file, "dependencies\n");
 
   for (InstCount i = 0; i < instCnt_; i++) {
-    SchedInstruction *inst = insts_[i];
+    SchedInstruction *inst = &insts_[i];
 
     int ltncy;
     DependenceType depType;
@@ -1270,13 +1261,13 @@ void DataDepGraph::CmputRltvCrtclPaths_(DIRECTION dir) {
 
   if (dir == DIR_FRWRD) {
     for (i = 0; i < instCnt_; i++) {
-      CmputCrtclPathsFrmRcrsvPrdcsr_(insts_[i]);
+      CmputCrtclPathsFrmRcrsvPrdcsr_(&insts_[i]);
     }
   } else {
     assert(dir == DIR_BKWRD);
 
     for (i = 0; i < instCnt_; i++) {
-      CmputCrtclPathsFrmRcrsvScsr_(insts_[i]);
+      CmputCrtclPathsFrmRcrsvScsr_(&insts_[i]);
     }
   }
 }
@@ -1330,7 +1321,7 @@ void DataDepGraph::PrintLwrBounds(DIRECTION dir, std::ostream &out,
                                   const char *const title) {
   out << '\n' << title;
   for (InstCount i = 0; i < instCnt_; i++) {
-    out << "\nLB(" << i << ")= " << insts_[i]->GetLwrBound(dir);
+    out << "\nLB(" << i << ")= " << insts_[i].GetLwrBound(dir);
   }
 }
 
@@ -1349,7 +1340,7 @@ void DataDepGraph::CountDeps(InstCount &totDepCnt, InstCount &crossDepCnt) {
   crossDepCnt = 0;
 
   for (InstCount i = 0; i < instCnt_; i++) {
-    SchedInstruction *inst = insts_[i];
+    SchedInstruction *inst = &insts_[i];
     int ltncy;
 
     for (SchedInstruction *child = inst->GetFrstScsr(&ltncy); child != NULL;
@@ -1603,14 +1594,14 @@ void DataDepGraph::ReconstructOnDevice(InstCount instCnt, NodeData *nodeData,
 
       //add uses
       for (int x = 0; x < regFileData[i].regs_[j].useCnt_; x++) {
-        inst = insts_[regFileData[i].regs_[j].uses_[x]];
+        inst = &insts_[regFileData[i].regs_[j].uses_[x]];
 	inst->AddUse(reg);
 	reg->AddUse(inst);
       }
  
       //add defs
       for (int x = 0; x < regFileData[i].regs_[j].defCnt_; x++) {
-        inst = insts_[regFileData[i].regs_[j].defs_[x]];
+        inst = &insts_[regFileData[i].regs_[j].defs_[x]];
         inst->AddDef(reg);
         reg->AddDef(inst);
       }
@@ -1631,22 +1622,22 @@ void DataDepGraph::InitializeOnDevice(InstCount instCnt, NodeData *nodeData,
   // Instantiate nodes in parallel
   //for (InstCount i = 0; i < instCnt; i++) {
   if (i < instCnt){
-    insts_[i]->InitializeNode_(nodeData[i].instNum_, nodeData[i].instName_,
+    insts_[i].InitializeNode_(nodeData[i].instNum_, nodeData[i].instName_,
                                nodeData[i].instType_, nodeData[i].opCode_,
                                nodeData[i].nodeID_, nodeData[i].fileSchedOrder_,
                                nodeData[i].fileSchedCycle_, nodeData[i].fileLB_,
                                nodeData[i].fileUB_, 0, machMdl_);
 
-    if (!insts_[i])
-      printf("Node creation failed for node num %d\n", i);
+    //if (!insts_[i])
+      //printf("Node creation failed for node num %d\n", i);
  
     //set root_
     if (nodeData[i].prdcsrCnt_ == 0)
-      root_ = (GraphNode *)insts_[i];
+      root_ = (GraphNode *)&insts_[i];
 
     //set leaf_
     if (nodeData[i].scsrCnt_ == 0)
-      leaf_ = (GraphNode *)insts_[i];
+      leaf_ = (GraphNode *)&insts_[i];
   }
   // Single threaded
   if (i == 0) {
@@ -1681,14 +1672,14 @@ void DataDepGraph::InitializeOnDevice(InstCount instCnt, NodeData *nodeData,
 
       //add uses
       for (int x = 0; x < regFileData[i].regs_[j].useCnt_; x++) {
-        inst = insts_[regFileData[i].regs_[j].uses_[x]];
+        inst = &insts_[regFileData[i].regs_[j].uses_[x]];
         inst->AddUse(reg);
         reg->AddUse(inst);
       }    
  
       //add defs
       for (int x = 0; x < regFileData[i].regs_[j].defCnt_; x++) {
-        inst = insts_[regFileData[i].regs_[j].defs_[x]];
+        inst = &insts_[regFileData[i].regs_[j].defs_[x]];
         inst->AddDef(reg);
         reg->AddDef(inst);
       }    
@@ -1705,13 +1696,13 @@ void DataDepGraph::AllocateMaxDDG(InstCount maxRgnSize, InstCount maxEdgeCnt,
 
   DirAcycGraph::tplgclOrdr_ = new GraphNode *[maxRgnSize];
 
-  insts_array_ = dev_insts;
+  insts_ = dev_insts;
 
   SchedInstruction *inst;
   for (InstCount i = 0; i < maxRgnSize; i++) {
-    insts_[i] = &dev_insts[i];
-    insts_[i]->CreatePrdcsrScsrLists(maxRgnSize);
-    insts_[i]->CreateSchedRange();
+    //insts_[i] = &dev_insts[i];
+    insts_[i].CreatePrdcsrScsrLists(maxRgnSize);
+    insts_[i].CreateSchedRange();
 
 /*    // Allocate blank nodes for later 
     inst = CreateNode_( i, "UNINITIATED",
@@ -1743,7 +1734,7 @@ void DataDepGraph::Reset() {
   initializedEdges_ = 0;
   // Reset all insts that were initialized
   for (InstCount i = 0; i < instCnt_; i++)
-    ((GraphNode *)insts_[i])->Reset();
+    ((GraphNode)insts_[i]).Reset();
 
   // Reset RegFiles for next region
   for (int i = 0; i < machMdl_->GetRegTypeCnt(); i++) {
@@ -1760,6 +1751,7 @@ InstCount DataDepGraph::GetRltvCrtclPath(SchedInstruction *ref,
   return inst->GetRltvCrtclPath(dir, ref);
 }
 
+/*
 DataDepSubGraph::DataDepSubGraph(DataDepGraph *fullGraph, InstCount maxInstCnt,
                                  MachineModel *machMdl)
     : DataDepStruct(machMdl) {
@@ -2771,9 +2763,9 @@ bool DataDepSubGraph::ChkInstRange_(SchedInstruction *inst, InstCount indx,
     }
   }
   */
-  return true;
-}
-
+  //return true;
+//}
+/*
 InstCount DataDepSubGraph::CmputMaxReleaseTime_() {
   SchedInstruction *leaf;
   InstCount maxReleaseTime = 0;
@@ -3059,6 +3051,7 @@ InstCount DataDepSubGraph::GetDistFrmLeaf(SchedInstruction *inst) {
       std::max(bkwrdLwrBounds_[indx], bkwrdCrtclPaths_[indx]);
   return distFrmLeaf;
 }
+*/
 
 __host__ __device__
 InstSchedule::InstSchedule(MachineModel *machMdl, DataDepGraph *dataDepGraph,
@@ -3120,9 +3113,6 @@ bool InstSchedule::operator==(InstSchedule &b) const {
 
 __host__ __device__
 bool InstSchedule::AppendInst(InstCount instNum) {
-  //debug
-  //printf("crntSlotNum: %d, totSlotCnt_: %d\n", crntSlotNum_, totSlotCnt_);
-
   assert(crntSlotNum_ < totSlotCnt_);
   instInSlot_[crntSlotNum_] = instNum;
 
@@ -3712,7 +3702,7 @@ int DataDepGraph::GetBscBlkCnt() { return bscBlkCnt_; }
 __host__ __device__
 SchedInstruction *DataDepGraph::GetInstByIndx(InstCount instIndx) {
   //assert(instIndx >= 0 && instIndx < instCnt_);
-  return insts_[instIndx];
+  return &insts_[instIndx];
 }
 
 SchedInstruction *DataDepGraph::GetInstByTplgclOrdr(InstCount ordr) {
@@ -3729,7 +3719,7 @@ void DataDepGraph::GetCrntLwrBounds(DIRECTION dir, InstCount crntLwrBounds[]) {
   InstCount i;
 
   for (i = 0; i < instCnt_; i++) {
-    crntLwrBounds[i] = insts_[i]->GetCrntLwrBound(dir);
+    crntLwrBounds[i] = insts_[i].GetCrntLwrBound(dir);
   }
 }
 
@@ -3737,7 +3727,7 @@ void DataDepGraph::SetCrntLwrBounds(DIRECTION dir, InstCount crntLwrBounds[]) {
   InstCount i;
 
   for (i = 0; i < instCnt_; i++) {
-    insts_[i]->SetCrntLwrBound(dir, crntLwrBounds[i]);
+    insts_[i].SetCrntLwrBound(dir, crntLwrBounds[i]);
   }
 }
 
@@ -3826,7 +3816,7 @@ bool DataDepGraph::DoesFeedUser(SchedInstruction *inst) {
 }
 
 int DataDepGraph::GetFileCostUprBound() { return fileCostUprBound_; }
-
+/*
 SchedInstruction *DataDepSubGraph::GetInstByTplgclOrdr(InstCount ordr) {
   assert(ordr >= 0 && ordr < instCnt_);
   return insts_[ordr];
@@ -3910,7 +3900,7 @@ InstCount DataDepSubGraph::GetLwrBound() { return schedLwrBound_ - 2; }
 InstCount DataDepSubGraph::GetLostInstCnt_() {
   return lostInsts_->GetElmntCnt();
 }
-
+*/
 __host__ __device__
 bool DataDepStruct::IncludesUnpipelined() { return includesUnpipelined_; }
 

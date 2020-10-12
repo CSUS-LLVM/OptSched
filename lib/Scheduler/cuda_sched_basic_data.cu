@@ -836,14 +836,14 @@ int16_t SchedInstruction::CmputLastUseCnt() {
   return lastUseCnt_;
 }
 
-__device__
+__host__ __device__
 void SchedInstruction::InitializeNode_(InstCount instNum, 
 		         const char *const instName,
                          InstType instType, const char *const opCode,
-                         int nodeID, InstCount fileSchedOrder,
-                         InstCount fileSchedCycle, InstCount fileLB,
-                         InstCount fileUB, int blkNum, MachineModel *model) {
-
+                         InstCount maxNodeCnt, int nodeID, 
+			 InstCount fileSchedOrder, InstCount fileSchedCycle, 
+			 InstCount fileLB, InstCount fileUB, 
+			 MachineModel *model) {
   int i = 0;
   do {
     name_[i] = instName[i];}
@@ -898,6 +898,12 @@ void SchedInstruction::InitializeNode_(InstCount instNum,
 
   mustBeInBBEntry_ = false;
   mustBeInBBExit_ = false;
+
+  // if not on device create a new SchedRange/PrdcsrList/ScsrList
+#ifndef __CUDA_ARCH__
+  crntRange_ = new SchedRange(this);
+  GraphNode::CreatePrdcsrScsrLists(maxNodeCnt);
+#endif
 
   GraphNode::SetNum(instNum);
 }

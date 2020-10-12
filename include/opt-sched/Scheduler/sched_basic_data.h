@@ -510,14 +510,13 @@ public:
   __host__ __device__
   InstType GetCrtclPathFrmRoot() { return crtclPathFrmRoot_; }
 
-  // Sets values of nodes/edges in dev_maxDDG to correct values
-  // for current region
-  __device__
+  // Sets values of a previously created node to the specified values
+  __host__ __device__
   void InitializeNode_(InstCount instNum, const char *const instName, 
-		        InstType instType, const char *const opCode, 
-		        int nodeID, InstCount fileSchedOrder,
-                        InstCount fileSchedCycle, InstCount fileLB, 
-			InstCount fileUB, int blkNum, MachineModel *model);
+		       InstType instType, const char *const opCode, 
+		       InstCount maxNodeCnt, int nodeID, 
+		       InstCount fileSchedOrder, InstCount fileSchedCycle, 
+		       InstCount fileLB, InstCount fileUB, MachineModel *model);
   // Creates a new SchedRange for the inst. used after it is copied to device
   __device__
   void CreateSchedRange();

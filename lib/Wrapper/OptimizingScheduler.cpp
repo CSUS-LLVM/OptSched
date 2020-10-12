@@ -313,7 +313,7 @@ void ScheduleDAGOptSched::schedule() {
   // If two pass scheduling is enabled then
   // first just record the scheduling region.
   if (OptSchedEnabled && TwoPassEnabled && !TwoPassSchedulingStarted) {
-    // Find region size
+/*    // Find region size
     InstCount regionSize = 0;
     InstCount edgeCnt = 0;
     SetupLLVMDag();
@@ -331,7 +331,7 @@ void ScheduleDAGOptSched::schedule() {
     // Keep track of largest region
     if (maxRegionSize < regionSize)
       maxRegionSize = regionSize;
-
+*/
     Regions.push_back(std::make_pair(RegionBegin, RegionEnd));
     LLVM_DEBUG(
         dbgs() << "Recording scheduling region before scheduling with two pass "
@@ -449,7 +449,7 @@ void ScheduleDAGOptSched::schedule() {
   auto *BDDG = static_cast<OptSchedDDGWrapperBasic *>(DDG.get());
   addGraphTransformations(BDDG);
 
-  if (dev_MM == NULL) {
+  if (dev_MM == NULL && false) {
     // Increase heap/stack size to allow large DDGs to be allocated
     if (cudaSuccess != cudaDeviceSetLimit(cudaLimitStackSize, 65536))
       printf("Error increasing stack size: %s\n",
@@ -565,7 +565,7 @@ void ScheduleDAGOptSched::schedule() {
 
   // Deallocate all device memory after completing second pass
   // on the last scheduling region
-  if (RegionNumber == Regions.size() - 1 && SecondPass) {
+  if (RegionNumber == Regions.size() - 1 && SecondPass && false) {
     Logger::Info("Calling cudaDeviceReset()");
     cudaDeviceReset();
     Logger::Info("Done calling cudaDeviceReset()");
