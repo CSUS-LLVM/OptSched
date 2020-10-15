@@ -180,7 +180,7 @@ void SchedInstruction::AllocMem_(InstCount instCnt, bool isCP_FromScsr,
   rdyCyclePerPrdcsr_ = new InstCount[prdcsrCnt_];
   ltncyPerPrdcsr_ = new InstCount[prdcsrCnt_];
   prevMinRdyCyclePerPrdcsr_ = new InstCount[prdcsrCnt_];
-  sortedPrdcsrLst_ = new PriorityList<SchedInstruction>;
+  sortedPrdcsrLst_ = new PriorityArrayList<SchedInstruction *>(prdcsrCnt_);
 
   InstCount predecessorIndex = 0;
   for (GraphEdge *edge = GetFrstPrdcsrEdge(); edge != NULL;
@@ -224,9 +224,9 @@ void SchedInstruction::DeAllocMem_() {
   if (ltncyPerPrdcsr_ != NULL)
     delete[] ltncyPerPrdcsr_;
   if (sortedPrdcsrLst_ != NULL)
-    //delete sortedPrdcsrLst_;
+    delete sortedPrdcsrLst_;
   if (sortedScsrLst_ != NULL)
-    //delete sortedScsrLst_;
+    delete sortedScsrLst_;
   if (crtclPathFrmRcrsvScsr_ != NULL)
     delete[] crtclPathFrmRcrsvScsr_;
   if (crtclPathFrmRcrsvPrdcsr_ != NULL)
@@ -243,7 +243,7 @@ InstCount SchedInstruction::CmputCrtclPath_(DIRECTION dir,
   // predecessor (successor) and then taking the maximum value among all these
   // paths.
   InstCount crtclPath = 0;
-  LinkedList<GraphEdge> *nghbrLst = GetNghbrLst(dir);
+  ArrayList<GraphEdge *> *nghbrLst = GetNghbrLst(dir);
 
   for (GraphEdge *edg = nghbrLst->GetFrstElmnt(); edg != NULL;
        edg = nghbrLst->GetNxtElmnt()) {

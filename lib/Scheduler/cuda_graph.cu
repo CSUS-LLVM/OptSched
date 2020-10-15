@@ -15,8 +15,8 @@ GraphNode::GraphNode(UDT_GNODES num, UDT_GNODES maxNodeCnt) {
   maxEdgLbl_ = 0;
   color_ = COL_WHITE;
 
-  scsrLst_ = new PriorityList<GraphEdge>(maxNodeCnt);
-  prdcsrLst_ = new LinkedList<GraphEdge>(maxNodeCnt);
+  scsrLst_ = new PriorityArrayList<GraphEdge *>(maxNodeCnt);
+  prdcsrLst_ = new ArrayList<GraphEdge *>(maxNodeCnt);
 
   rcrsvScsrLst_ = NULL;
   rcrsvPrdcsrLst_ = NULL;
@@ -54,8 +54,8 @@ GraphNode::~GraphNode() {
 
 __host__ __device__
 void GraphNode::CreatePrdcsrScsrLists(UDT_GNODES maxNodeCnt) {
-  scsrLst_ = new PriorityList<GraphEdge>(maxNodeCnt);
-  prdcsrLst_ = new LinkedList<GraphEdge>(maxNodeCnt);
+  scsrLst_ = new PriorityArrayList<GraphEdge*>(maxNodeCnt);
+  prdcsrLst_ = new ArrayList<GraphEdge*>(maxNodeCnt);
 }
 
 void GraphNode::DelPrdcsrLst() {
@@ -130,7 +130,7 @@ void GraphNode::FindRcrsvNghbrs(DIRECTION dir, DirAcycGraph *graph) {
 }
 
 void GraphNode::AddRcrsvNghbr(GraphNode *nghbr, DIRECTION dir) {
-  LinkedList<GraphNode> *rcrsvNghbrLst = GetRcrsvNghbrLst(dir);
+  ArrayList<GraphNode *> *rcrsvNghbrLst = GetRcrsvNghbrLst(dir);
   BitVector *isRcrsvNghbr = GetRcrsvNghbrBitVector(dir);
 
   rcrsvNghbrLst->InsrtElmnt(nghbr);
@@ -148,7 +148,7 @@ void GraphNode::AllocRcrsvInfo(DIRECTION dir, UDT_GNODES nodeCnt) {
       isRcrsvScsr_ = NULL;
     }
     assert(rcrsvScsrLst_ == NULL && isRcrsvScsr_ == NULL);
-    rcrsvScsrLst_ = new LinkedList<GraphNode>;
+    rcrsvScsrLst_ = new ArrayList<GraphNode *>(nodeCnt);
     isRcrsvScsr_ = new BitVector(nodeCnt);
   } else {
     if (rcrsvPrdcsrLst_ != NULL) {
@@ -160,7 +160,7 @@ void GraphNode::AllocRcrsvInfo(DIRECTION dir, UDT_GNODES nodeCnt) {
       isRcrsvPrdcsr_ = NULL;
     }
     assert(rcrsvPrdcsrLst_ == NULL && isRcrsvPrdcsr_ == NULL);
-    rcrsvPrdcsrLst_ = new LinkedList<GraphNode>;
+    rcrsvPrdcsrLst_ = new ArrayList<GraphNode *>(nodeCnt);
     isRcrsvPrdcsr_ = new BitVector(nodeCnt);
   }
 }
@@ -224,7 +224,7 @@ bool GraphNode::FindScsr_(GraphNode *&crntScsr, UDT_GNODES trgtNum,
 
 void GraphNode::FindRcrsvNghbrs_(GraphNode *root, DIRECTION dir,
                                  DirAcycGraph *graph) {
-  LinkedList<GraphEdge> *nghbrLst = (dir == DIR_FRWRD) ? scsrLst_ : prdcsrLst_;
+  ArrayList<GraphEdge *> *nghbrLst = (dir == DIR_FRWRD) ? scsrLst_ : prdcsrLst_;
 
   color_ = COL_GRAY;
 

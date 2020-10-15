@@ -575,10 +575,10 @@ protected:
 
   // The priority list of this instruction's predecessors, sorted by deadline
   // for relaxed scheduling.
-  PriorityList<SchedInstruction> *sortedPrdcsrLst_;
+  PriorityArrayList<SchedInstruction *> *sortedPrdcsrLst_;
   // The priority list of this instruction's successors, sorted by deadline
   // for relaxed scheduling.
-  PriorityList<SchedInstruction> *sortedScsrLst_;
+  PriorityArrayList<SchedInstruction *> *sortedScsrLst_;
 
   /***************************************************************************
    * Used during scheduling                                                  *

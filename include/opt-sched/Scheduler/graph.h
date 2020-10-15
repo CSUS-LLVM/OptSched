@@ -12,6 +12,7 @@ Last Update:  Mar. 2011
 #include "opt-sched/Scheduler/bit_vector.h"
 #include "opt-sched/Scheduler/defines.h"
 #include "opt-sched/Scheduler/cuda_lnkd_lst.cuh"
+#include "opt-sched/Scheduler/array_list.h"
 #include <cuda_runtime.h>
 
 namespace llvm {
@@ -243,7 +244,7 @@ public:
   // Returns the node's recursive predecessor or successor list, depending on
   // the specified direction.
   __host__ __device__
-  LinkedList<GraphNode> *GetRcrsvNghbrLst(DIRECTION dir);
+  ArrayList<GraphNode *> *GetRcrsvNghbrLst(DIRECTION dir);
   // Returns the node's recursive predecessor or successor bitset, depending
   // on the specified direction. Nodes which are in the list have the bits
   // indexed by their number set.
@@ -280,14 +281,14 @@ private:
   // The node number. Should be unique within a single graph.
   UDT_GNODES num_;
   // A list of the immediate successors of this node.
-  PriorityList<GraphEdge> *scsrLst_;
+  PriorityArrayList<GraphEdge *> *scsrLst_;
   // A list of the immediate predecessors of this node.
-  LinkedList<GraphEdge> *prdcsrLst_;
+  ArrayList<GraphEdge *> *prdcsrLst_;
   
   // A list of all recursively successors of this node.
-  LinkedList<GraphNode> *rcrsvScsrLst_;
+  ArrayList<GraphNode *> *rcrsvScsrLst_;
   // A list of all recursively predecessors of this node.
-  LinkedList<GraphNode> *rcrsvPrdcsrLst_;
+  ArrayList<GraphNode *> *rcrsvPrdcsrLst_;
   // A bitset indicating whether each of the other nodes in the graph is a
   // recursive successor of this node.
   BitVector *isRcrsvScsr_;
@@ -318,7 +319,7 @@ protected:
   // Returns the node's predecessor or successor list, depending on
   // the specified direction.
   __host__ __device__
-  LinkedList<GraphEdge> *GetNghbrLst(DIRECTION dir);
+  ArrayList<GraphEdge *> *GetNghbrLst(DIRECTION dir);
 
   // Returns a pointer to the edge for the first successor of the node. Sets the
   // successor iterator.
@@ -586,7 +587,7 @@ __host__ __device__
 inline UDT_GLABEL GraphNode::GetMaxEdgeLabel() const { return maxEdgLbl_; }
 
 __host__ __device__
-inline LinkedList<GraphNode> *GraphNode::GetRcrsvNghbrLst(DIRECTION dir) {
+inline ArrayList<GraphNode *> *GraphNode::GetRcrsvNghbrLst(DIRECTION dir) {
   return dir == DIR_FRWRD ? rcrsvScsrLst_ : rcrsvPrdcsrLst_;
 }
 
@@ -631,7 +632,7 @@ inline UDT_GEDGES GraphNode::GetRcrsvScsrCnt() const {
 }
 
 __host__ __device__
-inline LinkedList<GraphEdge> *GraphNode::GetNghbrLst(DIRECTION dir) {
+inline ArrayList<GraphEdge *> *GraphNode::GetNghbrLst(DIRECTION dir) {
   return dir == DIR_FRWRD ? prdcsrLst_ : scsrLst_;
 }
 

@@ -145,9 +145,11 @@ template <typename T>
 __host__ __device__
 T ArrayList<T>::GetLastElmnt() {
   if (size_ > 0)
-    return elmnts_[size_ - 1];
+    crnt_ = size_ - 1;
   else
     return NULL;
+  
+  return elmnts_[crnt_];
 }
 
 template <typename T>

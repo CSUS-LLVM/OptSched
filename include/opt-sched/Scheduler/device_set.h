@@ -1,5 +1,5 @@
-//(VLAD) Created my own class to replace SmallPtrSet in Register class
-//since SmallPtrSet is not supported
+//  (VLAD) Created my own class to replace SmallPtrSet in Register class
+//  since SmallPtrSet is not supported on device
 
 template <typename T>
 class DevicePtrSet {

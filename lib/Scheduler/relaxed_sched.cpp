@@ -675,7 +675,7 @@ InstCount LC_RelaxedScheduler::SchdulSubGraph_(SchedInstruction *leaf,
   InstCount schedCycle;
   InstCount trgtLastCycle;
   DIRECTION trvrslDir = DirAcycGraph::ReverseDirection(schedDir);
-  LinkedList<GraphNode> *rcrsvPrdcsrLst = leaf->GetRcrsvNghbrLst(trvrslDir);
+  ArrayList<GraphNode *> *rcrsvPrdcsrLst = leaf->GetRcrsvNghbrLst(trvrslDir);
   GraphNode *node;
   InstCount rltvCP;
   DEP_GRAPH_TYPE graphType = dataDepGraph_->GetType();

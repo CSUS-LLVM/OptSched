@@ -1274,7 +1274,7 @@ void DataDepGraph::CmputRltvCrtclPaths_(DIRECTION dir) {
 
 __host__ __device__
 void DataDepGraph::CmputCrtclPathsFrmRcrsvPrdcsr_(SchedInstruction *ref) {
-  LinkedList<GraphNode> *rcrsvScsrLst = ref->GetRcrsvNghbrLst(DIR_FRWRD);
+  ArrayList<GraphNode *> *rcrsvScsrLst = ref->GetRcrsvNghbrLst(DIR_FRWRD);
   SchedInstruction *inst = GetLeafInst();
   GraphNode *node;
 
@@ -1297,7 +1297,7 @@ void DataDepGraph::CmputCrtclPathsFrmRcrsvPrdcsr_(SchedInstruction *ref) {
 
 __host__ __device__
 void DataDepGraph::CmputCrtclPathsFrmRcrsvScsr_(SchedInstruction *ref) {
-  LinkedList<GraphNode> *rcrsvPrdcsrLst = ref->GetRcrsvNghbrLst(DIR_BKWRD);
+  ArrayList<GraphNode *> *rcrsvPrdcsrLst = ref->GetRcrsvNghbrLst(DIR_BKWRD);
   SchedInstruction *inst = GetRootInst();
   GraphNode *node;
 
@@ -3789,7 +3789,7 @@ bool DataDepGraph::DoesFeedUser(SchedInstruction *inst) {
 #ifdef IS_DEBUG_RP_ONLY
   Logger::Info("Testing inst %d", inst->GetNum());
 #endif
-  LinkedList<GraphNode> *rcrsvSuccs = inst->GetRcrsvNghbrLst(DIR_FRWRD);
+  ArrayList<GraphNode *> *rcrsvSuccs = inst->GetRcrsvNghbrLst(DIR_FRWRD);
   for (GraphNode *succ = rcrsvSuccs->GetFrstElmnt(); succ != NULL;
        succ = rcrsvSuccs->GetNxtElmnt()) {
     SchedInstruction *succInst = static_cast<SchedInstruction *>(succ);

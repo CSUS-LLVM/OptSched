@@ -89,8 +89,8 @@ bool GraphTrans::AreNodesIndep_(SchedInstruction *inst1,
 
 void GraphTrans::UpdatePrdcsrAndScsr_(SchedInstruction *nodeA,
                                       SchedInstruction *nodeB) {
-  LinkedList<GraphNode> *nodeBScsrLst = nodeB->GetRcrsvNghbrLst(DIR_FRWRD);
-  LinkedList<GraphNode> *nodeAPrdcsrLst = nodeA->GetRcrsvNghbrLst(DIR_BKWRD);
+  ArrayList<GraphNode *> *nodeBScsrLst = nodeB->GetRcrsvNghbrLst(DIR_FRWRD);
+  ArrayList<GraphNode *> *nodeAPrdcsrLst = nodeA->GetRcrsvNghbrLst(DIR_BKWRD);
 
   // Update lists for the nodes themselves.
   nodeA->AddRcrsvScsr(nodeB);
