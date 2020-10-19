@@ -9,6 +9,14 @@
 #include <list>
 #include <vector>
 
+// #define IS_DEBUG_GRAPH_TRANS
+
+#ifdef IS_DEBUG_GRAPH_TRANS
+#define DEBUG_LOG(...) Logger::Info(__VA_ARGS__)
+#else
+#define DEBUG_LOG(...) static_cast<void>(0)
+#endif
+
 using namespace llvm::opt_sched;
 
 bool llvm::opt_sched::areNodesIndependent(const SchedInstruction *A,
@@ -66,9 +74,7 @@ StaticNodeSupTrans::StaticNodeSupTrans(DataDepGraph *dataDepGraph,
 
 static void addRPSuperiorEdge(DataDepGraph &DDG, SchedInstruction *A,
                               SchedInstruction *B) {
-#if defined(IS_DEBUG_GRAPH_TRANS_RES) || defined(IS_DEBUG_GRAPH_TRANS)
-  Logger::Info("Node %d is superior to node %d", A->GetNum(), B->GetNum());
-#endif
+  DEBUG_LOG("Node %d is superior to node %d", A->GetNum(), B->GetNum());
   addSuperiorEdge(DDG, A, B);
 }
 
@@ -101,9 +107,8 @@ FUNC_RESULT StaticNodeSupTrans::ApplyTrans() {
   // A list of independent nodes.
   std::list<std::pair<SchedInstruction *, SchedInstruction *>> indepNodes;
   bool didAddEdge = false;
-#ifdef IS_DEBUG_GRAPH_TRANS
-  Logger::Info("Applying node superiority graph transformation.");
-#endif
+  int NumAdded = 0;
+  Logger::Event("GraphTransRPNodeSuperiority");
 
   // For the first pass visit all nodes. Add sets of independent nodes to a
   // list.
@@ -114,9 +119,8 @@ FUNC_RESULT StaticNodeSupTrans::ApplyTrans() {
         continue;
       SchedInstruction *nodeB = graph->GetInstByIndx(j);
 
-#ifdef IS_DEBUG_GRAPH_TRANS
-      Logger::Info("Checking nodes %d:%d", i, j);
-#endif
+      DEBUG_LOG("Checking nodes %d:%d", i, j);
+
       if (areNodesIndependent(nodeA, nodeB)) {
         didAddEdge = TryAddingSuperiorEdge_(nodeA, nodeB);
         // If the nodes are independent and no superiority was found add the
@@ -124,9 +128,14 @@ FUNC_RESULT StaticNodeSupTrans::ApplyTrans() {
         // future passes.
         if (!didAddEdge)
           indepNodes.push_back(std::make_pair(nodeA, nodeB));
+        else
+          NumAdded++;
       }
     }
   }
+
+  Logger::Event("GraphTransRPNodeSuperiorityFinished", "superior_edges",
+                NumAdded);
 
   if (IsMultiPass)
     nodeMultiPass_(indepNodes);
@@ -139,10 +148,8 @@ bool StaticNodeSupTrans::isNodeSuperior(DataDepGraph &DDG, int A, int B) {
   SchedInstruction *nodeB = DDG.GetInstByIndx(B);
 
   if (nodeA->GetIssueType() != nodeB->GetIssueType()) {
-#ifdef IS_DEBUG_GRAPH_TRANS
-    Logger::Info("Node %d is not of the same issue type as node %d",
-                 nodeA->GetNum(), nodeB->GetNum());
-#endif
+    DEBUG_LOG("Node %d is not of the same issue type as node %d",
+              nodeA->GetNum(), nodeB->GetNum());
     return false;
   }
 
@@ -150,11 +157,9 @@ bool StaticNodeSupTrans::isNodeSuperior(DataDepGraph &DDG, int A, int B) {
   BitVector *predsA = nodeA->GetRcrsvNghbrBitVector(DIR_BKWRD);
   BitVector *predsB = nodeB->GetRcrsvNghbrBitVector(DIR_BKWRD);
   if (!predsA->IsSubVector(predsB)) {
-#ifdef IS_DEBUG_GRAPH_TRANS
-    Logger::Info(
+    DEBUG_LOG(
         "Pred list of node %d is not a sub-list of the pred list of node %d",
         nodeA->GetNum(), nodeB->GetNum());
-#endif
     return false;
   }
 
@@ -162,11 +167,9 @@ bool StaticNodeSupTrans::isNodeSuperior(DataDepGraph &DDG, int A, int B) {
   BitVector *succsA = nodeA->GetRcrsvNghbrBitVector(DIR_FRWRD);
   BitVector *succsB = nodeB->GetRcrsvNghbrBitVector(DIR_FRWRD);
   if (!succsB->IsSubVector(succsA)) {
-#ifdef IS_DEBUG_GRAPH_TRANS
-    Logger::Info(
+    DEBUG_LOG(
         "Succ list of node %d is not a sub-list of the succ list of node %d",
         nodeB->GetNum(), nodeA->GetNum());
-#endif
     return false;
   }
 
@@ -277,9 +280,7 @@ bool StaticNodeSupTrans::isNodeSuperior(DataDepGraph &DDG, int A, int B) {
 
 void StaticNodeSupTrans::nodeMultiPass_(
     std::list<std::pair<SchedInstruction *, SchedInstruction *>> indepNodes) {
-#ifdef IS_DEBUG_GRAPH_TRANS
-  Logger::Info("Applying multi-pass node superiority");
-#endif
+  Logger::Event("MultiPassGraphTransRPNodeSuperiority");
   // Try to add superior edges until there are no more independent nodes or no
   // edges can be added.
   bool didAddEdge = true;
