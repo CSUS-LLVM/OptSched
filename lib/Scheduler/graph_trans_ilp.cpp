@@ -309,32 +309,31 @@ void StaticNodeSupILPTrans::removeRedundantEdges(DataDepGraph &DDG,
                                                  ArrayRef2D<int> DistanceTable,
                                                  int i, int j,
                                                  Statistics &stats) {
-  // We can't remove redundant edges at this time, because the LinkedList class
-  // doesn't support removal if it uses its custom allocator.
+  DEBUG_LOG(" Removing redundant edges");
+  SchedInstruction *NodeI = DDG.GetInstByIndx(i);
+  SchedInstruction *NodeJ = DDG.GetInstByIndx(j);
 
-  // DEBUG_LOG(" Removing redundant edges");
-  // SchedInstruction *NodeI = DDG.GetInstByIndx(i);
-  // SchedInstruction *NodeJ = DDG.GetInstByIndx(j);
+  for (GraphNode &Pred : *NodeI->GetRecursivePredecessors()) {
+    LinkedList<GraphEdge> &PSuccs = Pred.GetSuccessors();
 
-  // for (GraphNode &Pred : *NodeI->GetRecursivePredecessors()) {
-  //   LinkedList<GraphEdge> &PSuccs = Pred.GetSuccessors();
+    for (auto it = PSuccs.begin(); it != PSuccs.end();) {
+      GraphEdge &e = *it;
 
-  //   for (auto it = PSuccs.begin(); it != PSuccs.end();) {
-  //     GraphEdge &e = *it;
+      const size_t From = castUnsigned(e.from->GetNum());
+      const size_t To = castUnsigned(e.to->GetNum());
 
-  //     if (NodeJ->IsRcrsvScsr(e.to) &&
-  //         e.label <= DistanceTable[{e.from->GetNum(), e.to->GetNum()}]) {
-  //       it = PSuccs.RemoveAt(it);
-  //       e.to->RemovePredFrom(&Pred);
-  //       DEBUG_LOG("  Deleting GraphEdge* at %p: (%d, %d)", (void *)&e,
-  //                 e.from->GetNum(), e.to->GetNum());
-  //       delete &e;
-  //       ++stats.NumEdgesRemoved;
-  //     } else {
-  //       ++it;
-  //     }
-  //   }
-  // }
+      if (NodeJ->IsRcrsvScsr(e.to) && e.label <= DistanceTable[{From, To}]) {
+        it = PSuccs.RemoveAt(it);
+        e.to->RemovePredFrom(&Pred);
+        DEBUG_LOG("  Deleting GraphEdge* at %p: (%zu, %zu)", (void *)&e, From,
+                  To);
+        delete &e;
+        ++stats.NumEdgesRemoved;
+      } else {
+        ++it;
+      }
+    }
+  }
 }
 
 StaticNodeSupILPTrans::StaticNodeSupILPTrans(DataDepGraph *dataDepGraph)
