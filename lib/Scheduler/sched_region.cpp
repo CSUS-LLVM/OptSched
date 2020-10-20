@@ -429,7 +429,7 @@ FUNC_RESULT SchedRegion::FindOptimalSchedule(
     Milliseconds enumStart = Utilities::GetProcessorTime();
     if (!isLstOptml) {
       dataDepGraph_->SetHard(true);
-      if ((IsSecondPass() && dataDepGraph_->GetMaxLtncy() <= 1))
+      if (IsSecondPass() && dataDepGraph_->GetMaxLtncy() <= 1)
         Logger::Info("Problem size not increased after introducing latencies, "
                      "skipping enumeration");
       else

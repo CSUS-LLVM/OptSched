@@ -2076,7 +2076,7 @@ bool LengthCostEnumerator::WasObjctvMet_() {
 
 bool LengthCostEnumerator::WasObjctvMetWghtd_() {
   // llvm::SmallVector<InstCount,4> ObjctvValues;
-  std::vector<InstCount> ObjctvValues;
+  llvm::SmallVector<InstCount, 4> ObjctvValues;
 
   InstCount crntCost = GetBestCost_();
 
@@ -2091,7 +2091,7 @@ bool LengthCostEnumerator::WasObjctvMetWghtd_() {
 
 bool LengthCostEnumerator::WasObjctvMetFrstPss_() {
   // llvm::SmallVector<InstCount,4> ObjctvValues;
-  std::vector<InstCount> ObjctvValues;
+  llvm::SmallVector<InstCount, 4> ObjctvValues;
 
   InstCount crntSpillCost = getBestSpillCost_();
 
@@ -2106,7 +2106,7 @@ bool LengthCostEnumerator::WasObjctvMetFrstPss_() {
 
 bool LengthCostEnumerator::WasObjctvMetScndPss_() {
   // llvm::SmallVector<InstCount,4> ObjctvValues;
-  std::vector<InstCount> ObjctvValues;
+  llvm::SmallVector<InstCount, 4> ObjctvValues;
 
   InstCount crntSchedLength = getBestSchedLength_();
 
@@ -2204,7 +2204,10 @@ bool LengthCostEnumerator::BackTrack_() {
       if (!rgn_->isTwoPassEnabled())
         fsbl = crntNode_->GetCostLwrBound() < GetBestCost_();
       else {
-        fsbl = crntNode_->getSpillCostLwrBound() < getBestSpillCost();
+        if (!rgn_->IsSecondPass())
+          fsbl = crntNode_->getSpillCostLwrBound() < getBestSpillCost();
+        else
+          fsbl = crntNode_->getSpillCostLwrBound() <= getBestSpillCost();
       }
     }
   }

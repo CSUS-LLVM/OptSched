@@ -855,8 +855,9 @@ FUNC_RESULT BBWithSpill::Enumerate_(Milliseconds startTime,
 }
 /*****************************************************************************/
 
-std::vector<InstCount> BBWithSpill::UpdtOptmlSched(InstSchedule *crntSched,
-                                                   LengthCostEnumerator *node) {
+SmallVector<InstCount, 4>
+BBWithSpill::UpdtOptmlSched(InstSchedule *crntSched,
+                            LengthCostEnumerator *node) {
 
   if (isTwoPassEnabled()) {
     if (!IsSecondPass())
@@ -871,14 +872,13 @@ std::vector<InstCount> BBWithSpill::UpdtOptmlSched(InstSchedule *crntSched,
 
 /*****************************************************************************/
 
-std::vector<InstCount>
+SmallVector<InstCount, 4>
 BBWithSpill::UpdtOptmlSchedFrstPss(InstSchedule *crntSched,
                                    LengthCostEnumerator *) {
   InstCount crntCost;
   InstCount crntExecCost;
   InstCount TmpSpillCost;
-  // llvm::SmallVector<InstCount, 4> retVec;
-  std::vector<InstCount> retVec;
+  llvm::SmallVector<InstCount, 4> retVec;
 
   //  crntCost = CmputNormCost_(crntSched, CCM_DYNMC, crntExecCost, false);
   crntCost = CmputNormCost_(crntSched, CCM_STTC, crntExecCost, false);
@@ -908,14 +908,13 @@ BBWithSpill::UpdtOptmlSchedFrstPss(InstSchedule *crntSched,
 
 /*****************************************************************************/
 
-std::vector<InstCount>
+SmallVector<InstCount, 4>
 BBWithSpill::UpdtOptmlSchedScndPss(InstSchedule *crntSched,
                                    LengthCostEnumerator *) {
   InstCount crntCost;
   InstCount crntExecCost;
   InstCount TmpSpillCost;
-  // llvm::SmallVector<InstCount,4> retVec;
-  std::vector<InstCount> retVec;
+  llvm::SmallVector<InstCount, 4> retVec;
 
   //  crntCost = CmputNormCost_(crntSched, CCM_DYNMC, crntExecCost, false);
   crntCost = CmputNormCost_(crntSched, CCM_STTC, crntExecCost, false);
@@ -946,11 +945,10 @@ BBWithSpill::UpdtOptmlSchedScndPss(InstSchedule *crntSched,
 
 /*****************************************************************************/
 
-std::vector<InstCount>
+SmallVector<InstCount, 4>
 BBWithSpill::UpdtOptmlSchedWghtd(InstSchedule *crntSched,
                                  LengthCostEnumerator *) {
-  // llvm::SmallVector<InstCount,4> retVec;
-  std::vector<InstCount> retVec;
+  llvm::SmallVector<InstCount, 4> retVec;
 
   InstCount crntCost;
   InstCount crntExecCost;

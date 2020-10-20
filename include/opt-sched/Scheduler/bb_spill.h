@@ -123,14 +123,14 @@ public:
   int CmputCostLwrBound();
   int cmputSpillCostLwrBound();
 
-  std::vector<InstCount> UpdtOptmlSched(InstSchedule *crntSched,
-                                        LengthCostEnumerator *enumrtr);
-  std::vector<InstCount> UpdtOptmlSchedFrstPss(InstSchedule *crntSched,
-                                               LengthCostEnumerator *enumrtr);
-  std::vector<InstCount> UpdtOptmlSchedScndPss(InstSchedule *crntSched,
-                                               LengthCostEnumerator *enumrtr);
-  std::vector<InstCount> UpdtOptmlSchedWghtd(InstSchedule *crntSched,
-                                             LengthCostEnumerator *enumrtr);
+  SmallVector<InstCount, 4> UpdtOptmlSched(InstSchedule *crntSched,
+                                           LengthCostEnumerator *enumrtr);
+  SmallVector<InstCount, 4>
+  UpdtOptmlSchedFrstPss(InstSchedule *crntSched, LengthCostEnumerator *enumrtr);
+  SmallVector<InstCount, 4>
+  UpdtOptmlSchedScndPss(InstSchedule *crntSched, LengthCostEnumerator *enumrtr);
+  SmallVector<InstCount, 4> UpdtOptmlSchedWghtd(InstSchedule *crntSched,
+                                                LengthCostEnumerator *enumrtr);
   bool ChkCostFsblty(InstCount trgtLngth, EnumTreeNode *treeNode);
   bool ChkCostFsbltyFrstPss(InstCount trgtLngth, EnumTreeNode *treeNode);
   bool ChkCostFsbltyScndPss(InstCount trgtLngth, EnumTreeNode *treeNode);

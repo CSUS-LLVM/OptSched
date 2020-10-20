@@ -90,18 +90,18 @@ public:
   virtual int cmputSpillCostLwrBound() = 0;
 
   // TODO(max): Document.
-  virtual std::vector<InstCount>
+  virtual llvm::SmallVector<InstCount, 4>
   UpdtOptmlSched(InstSchedule *crntSched, LengthCostEnumerator *enumrtr) = 0;
 
-  virtual std::vector<InstCount>
+  virtual llvm::SmallVector<InstCount, 4>
   UpdtOptmlSchedFrstPss(InstSchedule *crntSched,
                         LengthCostEnumerator *enumrtr) = 0;
 
-  virtual std::vector<InstCount>
+  virtual llvm::SmallVector<InstCount, 4>
   UpdtOptmlSchedScndPss(InstSchedule *crntSched,
                         LengthCostEnumerator *enumrtr) = 0;
 
-  virtual std::vector<InstCount>
+  virtual llvm::SmallVector<InstCount, 4>
   UpdtOptmlSchedWghtd(InstSchedule *crntSched,
                       LengthCostEnumerator *enumrtr) = 0;
 
