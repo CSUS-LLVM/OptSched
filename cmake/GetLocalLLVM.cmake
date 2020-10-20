@@ -1,6 +1,7 @@
 set(LOCAL_LLVM_BINARY_DIR ${CMAKE_CURRENT_BINARY_DIR}/.LocalLLVM
   CACHE PATH "")
-mark_as_advanced(LOCAL_LLVM_BINARY_DIR)
+set(LOCAL_LLVM_LIST_DIR ${CMAKE_CURRENT_LIST_DIR})
+mark_as_advanced(LOCAL_LLVM_BINARY_DIR LOCAL_LLVM_LIST_DIR)
 
 set(LOCAL_LLVM_DIR ${LOCAL_LLVM_BINARY_DIR}/llvm-project
   CACHE PATH "Path to a local copy of llvm-project, for use in unit tests and the AMDGPU build")
@@ -66,6 +67,20 @@ function(get_local_llvm)
   endif()
 
   if(ARG_AMDGPU)
-    message(FATAL_ERROR "Unimplemented AMDGPU stuff")
+    list(APPEND LLVM_TABLEGEN_FLAGS -I ${llvm_dir}/lib/Target)
+    set(LLVM_TABLEGEN_EXE llvm-tblgen CACHE PATH "Path to llvm-tblgen")
+    include(TableGen)
+
+    # Adapted from llvm-project/llvm/lib/Targets/AMDGPU/CMakeLists.txt
+    set(AMDGPU_PATH ${llvm_dir}/lib/Target/AMDGPU)
+    set(AMDGPU_SOURCE_DIR ${LOCAL_LLVM_BINARY_DIR}/amdgpu-tblgen-source)
+    set(AMDGPU_BINARY_DIR ${LOCAL_LLVM_BINARY_DIR}/amdgpu-tblgen-binary)
+
+    file(COPY ${AMDGPU_PATH} DESTINATION ${LOCAL_LLVM_BINARY_DIR})
+    file(RENAME ${LOCAL_LLVM_BINARY_DIR}/AMDGPU ${AMDGPU_SOURCE_DIR})
+    file(COPY ${LOCAL_LLVM_LIST_DIR}/amdgpu-tblgen/CMakeLists.txt DESTINATION ${AMDGPU_SOURCE_DIR})
+    add_subdirectory(${AMDGPU_SOURCE_DIR} ${AMDGPU_BINARY_DIR})
+
+    include_directories(${AMDGPU_SOURCE_DIR} ${AMDGPU_BINARY_DIR})
   endif()
 endfunction()
