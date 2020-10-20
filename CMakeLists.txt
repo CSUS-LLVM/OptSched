@@ -11,7 +11,11 @@ set(OPTSCHED_EXTRA_LINK_LIBRARIES "" CACHE STRING "Extra link_libraries to pass 
 set(OPTSCHED_EXTRA_DEFINITIONS "" CACHE STRING "Extra add_definitions to pass to OptSched, ;-separated")
 
 if(NOT TARGET LLVMCodeGen)
-  find_package(LLVM 6.0 REQUIRED CONFIG)
+  if(OPTSCHED_ENABLE_AMDGPU)
+    find_package(LLVM 9.0 REQUIRED CONFIG)
+  else()
+    find_package(LLVM 6.0 REQUIRED CONFIG)
+  endif()
 endif()
 
 if(NOT CMAKE_BUILD_TYPE)
