@@ -36,7 +36,7 @@ set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 set(OPTSCHED_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR})
 set(OPTSCHED_BINARY_DIR ${CMAKE_CURRENT_BINARY_DIR})
 
-list(APPEND CMAKE_MODULE_PATH "${LLVM_CMAKE_DIR}")
+list(APPEND CMAKE_MODULE_PATH "${LLVM_CMAKE_DIR}" ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
 include(AddLLVM)
 
 get_directory_property(HAS_PARENT PARENT_DIRECTORY)
@@ -51,6 +51,20 @@ link_directories(${OPTSCHED_EXTRA_LINK_LIBRARIES})
 
 if(LLVM_VERSION VERSION_LESS 7.0)
   add_definitions(-DLLVM_DEBUG=DEBUG)
+endif()
+
+if(NOT HAS_PARENT)
+  include(GetLocalLLVM)
+
+  set(args)
+  if(OPTSCHED_INCLUDE_TESTS)
+    list(APPEND args GTEST)
+  endif()
+  if(OPTSCHED_ENABLE_AMDGPU)
+    list(APPEND args AMDGPU)
+  endif()
+
+  get_local_llvm(${args})
 endif()
 
 add_subdirectory(lib)
