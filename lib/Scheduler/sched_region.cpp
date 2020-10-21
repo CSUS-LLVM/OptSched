@@ -236,6 +236,10 @@ FUNC_RESULT SchedRegion::FindOptimalSchedule(
   for (auto &GT : *GraphTransformations) {
     rslt = GT->ApplyTrans();
 
+    if (DumpDDGs_) {
+      dumpDDG(dataDepGraph_, DDGDumpPath_, GT->Name());
+    }
+
     if (rslt != RES_SUCCESS)
       return rslt;
 
@@ -244,10 +248,6 @@ FUNC_RESULT SchedRegion::FindOptimalSchedule(
     if (rslt != RES_SUCCESS) {
       Logger::Info("Invalid DAG after graph transformations");
       return rslt;
-    }
-
-    if (DumpDDGs_) {
-      dumpDDG(dataDepGraph_, DDGDumpPath_, GT->Name());
     }
   }
 
