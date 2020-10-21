@@ -25,6 +25,54 @@ extern bool OPTSCHED_gPrintSpills;
 using namespace llvm::opt_sched;
 namespace fs = llvm::sys::fs;
 
+static bool GetDumpDDGs() {
+  // Cache the result so that we don't have to keep looking it up.
+  // This is in a function so that the initialization is definitely delayed
+  // until after the SchedulerOptions has a chance to be initialized.
+  static bool DumpDDGs =
+      SchedulerOptions::getInstance().GetBool("DUMP_DDGS", false);
+  return DumpDDGs;
+}
+
+static std::string ComputeDDGDumpPath() {
+  std::string Path =
+      SchedulerOptions::getInstance().GetString("DDG_DUMP_PATH", "");
+
+  if (GetDumpDDGs()) {
+    // Force the user to set DDG_DUMP_PATH
+    if (Path.empty())
+      llvm::report_fatal_error(
+          "DDG_DUMP_PATH must be set if trying to DUMP_DDGS.", false);
+
+    // Do some niceness to the input path to produce the actual path.
+    llvm::SmallString<32> FixedPath;
+    const std::error_code ec =
+        fs::real_path(Path, FixedPath, /* expand_tilde = */ true);
+    if (!ec)
+      llvm::report_fatal_error(
+          "Unable to expand DDG_DUMP_PATH. " + ec.message(), false);
+    Path.assign(FixedPath.begin(), FixedPath.end());
+
+    // The path must be a directory, and it must exist.
+    if (!fs::is_directory(Path))
+      llvm::report_fatal_error(
+          "DDG_DUMP_PATH is set to a non-existent directory or non-directory " +
+              Path,
+          false);
+
+    // Force the path to be considered a directory.
+    // Note that redundant `/`s are okay in the path.
+    Path.push_back('/');
+  }
+
+  return Path;
+}
+
+static std::string GetDDGDumpPath() {
+  static std::string DDGDumpPath = ComputeDDGDumpPath();
+  return DDGDumpPath;
+}
+
 SchedRegion::SchedRegion(MachineModel *machMdl, DataDepGraph *dataDepGraph,
                          long rgnNum, int16_t sigHashSize, LB_ALG lbAlg,
                          SchedPriorities hurstcPrirts,
@@ -54,36 +102,8 @@ SchedRegion::SchedRegion(MachineModel *machMdl, DataDepGraph *dataDepGraph,
 
   spillCostFunc_ = spillCostFunc;
 
-  Config &schedIni = SchedulerOptions::getInstance();
-  DumpDDGs_ = schedIni.GetBool("DUMP_DDGS", false);
-  DDGDumpPath_ = schedIni.GetString("DDG_DUMP_PATH", "");
-
-  if (DumpDDGs_) {
-    // Force the user to set DDG_DUMP_PATH
-    if (DDGDumpPath_.empty())
-      llvm::report_fatal_error(
-          "DDG_DUMP_PATH must be set if trying to DUMP_DDGS.", false);
-
-    // Do some niceness to the input path to produce the actual path.
-    llvm::SmallString<32> FixedPath;
-    const std::error_code ec =
-        fs::real_path(DDGDumpPath_, FixedPath, /* expand_tilde = */ true);
-    if (!ec)
-      llvm::report_fatal_error(
-          "Unable to expand DDG_DUMP_PATH. " + ec.message(), false);
-    DDGDumpPath_.assign(FixedPath.begin(), FixedPath.end());
-
-    // The path must be a directory, and it must exist.
-    if (!fs::is_directory(DDGDumpPath_))
-      llvm::report_fatal_error(
-          "DDG_DUMP_PATH is set to a non-existent directory or non-directory " +
-              DDGDumpPath_,
-          false);
-
-    // Force the path to be considered a directory.
-    // Note that redundant `/`s are okay in the path.
-    DDGDumpPath_.push_back('/');
-  }
+  DumpDDGs_ = GetDumpDDGs();
+  DDGDumpPath_ = GetDDGDumpPath();
 }
 
 void SchedRegion::UseFileBounds_() {
