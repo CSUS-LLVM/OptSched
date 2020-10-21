@@ -1,4 +1,5 @@
 #include <algorithm>
+#include <cstdio>
 #include <memory>
 #include <utility>
 
@@ -15,11 +16,14 @@
 #include "opt-sched/Scheduler/sched_region.h"
 #include "opt-sched/Scheduler/stats.h"
 #include "opt-sched/Scheduler/utilities.h"
+#include "llvm/ADT/SmallString.h"
 #include "llvm/Support/ErrorHandling.h"
+#include "llvm/Support/FileSystem.h"
 
 extern bool OPTSCHED_gPrintSpills;
 
 using namespace llvm::opt_sched;
+namespace fs = llvm::sys::fs;
 
 SchedRegion::SchedRegion(MachineModel *machMdl, DataDepGraph *dataDepGraph,
                          long rgnNum, int16_t sigHashSize, LB_ALG lbAlg,
@@ -55,11 +59,30 @@ SchedRegion::SchedRegion(MachineModel *machMdl, DataDepGraph *dataDepGraph,
   DDGDumpPath_ = schedIni.GetString("DDG_DUMP_PATH", "");
 
   if (DumpDDGs_) {
+    // Force the user to set DDG_DUMP_PATH
     if (DDGDumpPath_.empty())
       llvm::report_fatal_error(
           "DDG_DUMP_PATH must be set if trying to DUMP_DDGS.", false);
-    if (DDGDumpPath_.back() != '/')
-      DDGDumpPath_.push_back('/');
+
+    // Do some niceness to the input path to produce the actual path.
+    llvm::SmallString<32> FixedPath;
+    const std::error_code ec =
+        fs::real_path(DDGDumpPath_, FixedPath, /* expand_tilde = */ true);
+    if (!ec)
+      llvm::report_fatal_error(
+          "Unable to expand DDG_DUMP_PATH. " + ec.message(), false);
+    DDGDumpPath_.assign(FixedPath.begin(), FixedPath.end());
+
+    // The path must be a directory, and it must exist.
+    if (!fs::is_directory(DDGDumpPath_))
+      llvm::report_fatal_error(
+          "DDG_DUMP_PATH is set to a non-existent directory or non-directory " +
+              DDGDumpPath_,
+          false);
+
+    // Force the path to be considered a directory.
+    // Note that redundant `/`s are okay in the path.
+    DDGDumpPath_.push_back('/');
   }
 }
 
@@ -112,9 +135,14 @@ static void dumpDDG(DataDepGraph *DDG, llvm::StringRef DDGDumpPath,
 
   Logger::Info("Writing DDG to %s", Path.c_str());
 
-  auto f = fopen(Path.c_str(), "w");
+  FILE *f = std::fopen(Path.c_str(), "w");
+  if (!f) {
+    Logger::Error("Unable to open the file: %s. %s", Path.c_str(),
+                  std::strerror(errno));
+    return;
+  }
   DDG->WriteToFile(f, RES_SUCCESS, 1, 0);
-  fclose(f);
+  std::fclose(f);
 }
 
 FUNC_RESULT SchedRegion::FindOptimalSchedule(
