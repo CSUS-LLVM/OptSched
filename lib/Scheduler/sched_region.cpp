@@ -48,7 +48,7 @@ static std::string ComputeDDGDumpPath() {
     llvm::SmallString<32> FixedPath;
     const std::error_code ec =
         fs::real_path(Path, FixedPath, /* expand_tilde = */ true);
-    if (!ec)
+    if (ec)
       llvm::report_fatal_error(
           "Unable to expand DDG_DUMP_PATH. " + ec.message(), false);
     Path.assign(FixedPath.begin(), FixedPath.end());
