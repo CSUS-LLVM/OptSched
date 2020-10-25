@@ -22,6 +22,20 @@ static void UpdateRecursiveNeighbors(SchedInstruction *A, SchedInstruction *B) {
   B->AddRcrsvPrdcsr(A);
 
   for (GraphNode &X : *A->GetRecursivePredecessors()) {
+    if (!B->IsRcrsvPrdcsr(&X)) {
+      B->AddRcrsvPrdcsr(&X);
+      X.AddRcrsvScsr(B);
+    }
+  }
+
+  for (GraphNode &Y : *B->GetRecursiveSuccessors()) {
+    if (!A->IsRcrsvScsr(&Y)) {
+      A->AddRcrsvScsr(&Y);
+      Y.AddRcrsvPrdcsr(A);
+    }
+  }
+
+  for (GraphNode &X : *A->GetRecursivePredecessors()) {
     for (GraphNode &Y : *B->GetRecursiveSuccessors()) {
       if (!X.IsRcrsvScsr(&Y)) {
         Y.AddRcrsvPrdcsr(&X);
