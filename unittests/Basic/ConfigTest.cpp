@@ -19,6 +19,16 @@ TEST(Config, ReadString) {
   EXPECT_EQ("VALUE", config.GetString("KEY"));
 }
 
+TEST(Config, ReadStringPath) {
+  Config config;
+  std::istringstream input(R"(
+        KEY some/path/
+    )");
+  config.Load(input);
+
+  EXPECT_EQ("some/path/", config.GetString("KEY"));
+}
+
 TEST(Config, ReadInt) {
   Config config;
   std::istringstream input(R"(
