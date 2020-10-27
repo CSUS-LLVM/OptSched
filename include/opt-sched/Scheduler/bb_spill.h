@@ -98,9 +98,10 @@ private:
   ConstrainedScheduler *AllocHeuristicScheduler_();
   bool EnableEnum_();
 
-  // BBWithSpill-specific Functions:
+  // BBWithSpill-specific Functions
   InstCount CmputCostLwrBound_(InstCount schedLngth);
   InstCount CmputCostLwrBound_();
+
   void InitForCostCmputtn_();
   InstCount CmputDynmcCost_();
 
@@ -123,7 +124,6 @@ public:
               SchedulerType HeurSchedType);
   ~BBWithSpill();
 
-  InstCount CmputCostLwrBound();
   InstCount CmputExecCostLwrBound();
   InstCount CmputRPCostLwrBound();
 
@@ -131,10 +131,24 @@ public:
   // cost of the schedule using Scf whenever the spill cost updates
   void addRecordedCost(SPILL_COST_FUNCTION Scf);
   void storeExtraCost(InstSchedule *sched, SPILL_COST_FUNCTION Scf);
+  int CmputCostLwrBound();
+  int cmputSpillCostLwrBound();
 
-  InstCount UpdtOptmlSched(InstSchedule *crntSched,
-                           LengthCostEnumerator *enumrtr);
-  bool ChkCostFsblty(InstCount trgtLngth, EnumTreeNode *treeNode);
+  SmallVector<InstCount, 4> UpdtOptmlSched(InstSchedule *crntSched,
+                                           LengthCostEnumerator *enumrtr);
+  SmallVector<InstCount, 4>
+  UpdtOptmlSchedFrstPss(InstSchedule *crntSched, LengthCostEnumerator *enumrtr);
+  SmallVector<InstCount, 4>
+  UpdtOptmlSchedScndPss(InstSchedule *crntSched, LengthCostEnumerator *enumrtr);
+  SmallVector<InstCount, 4> UpdtOptmlSchedWghtd(InstSchedule *crntSched,
+                                                LengthCostEnumerator *enumrtr);
+  bool ChkCostFsblty(InstCount trgtLngth, EnumTreeNode *treeNode,
+                     InstCount &RPCost);
+  bool ChkCostFsbltyFrstPss(InstCount trgtLngth, EnumTreeNode *treeNode,
+                            InstCount &RPCost);
+  bool ChkCostFsbltyScndPss(InstCount trgtLngth, EnumTreeNode *treeNode,
+                            InstCount &RPCost);
+  bool ChkCostFsbltyWghtd(InstCount trgtLngth, EnumTreeNode *treeNode);
   void SchdulInst(SchedInstruction *inst, InstCount cycleNum, InstCount slotNum,
                   bool trackCnflcts);
   void UnschdulInst(SchedInstruction *inst, InstCount cycleNum,
