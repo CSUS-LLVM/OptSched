@@ -9,8 +9,8 @@
 using namespace llvm::opt_sched;
 
 __host__ __device__
-InstScheduler::InstScheduler(DataDepStruct *dataDepGraph, MachineModel *machMdl,
-                             InstCount schedUprBound) {
+InstScheduler::InstScheduler(DataDepGraph *dataDepGraph, MachineModel *machMdl,
+                             InstCount schedUprBound) {	
   assert(dataDepGraph != NULL);
   assert(machMdl != NULL);
   machMdl_ = machMdl;
@@ -68,7 +68,7 @@ __host__ __device__
 ConstrainedScheduler::ConstrainedScheduler(DataDepGraph *dataDepGraph,
                                            MachineModel *machMdl,
                                            InstCount schedUprBound)
-    : InstScheduler(dataDepGraph, machMdl, schedUprBound) {
+    : InstScheduler(dataDepGraph, machMdl, schedUprBound) { 
   dataDepGraph_ = dataDepGraph;
 
   // Allocate the array of first-ready lists - one list per cycle.

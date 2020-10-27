@@ -4,7 +4,7 @@
 template <typename T>
 class DevicePtrSet {
   public:
-    __device__
+    __host__ __device__
     DevicePtrSet(int size = 0) {
       size_ = size;
       alloc_ = size;
@@ -14,7 +14,7 @@ class DevicePtrSet {
       else
         elmnt = NULL;
     }
-    __device__
+    __host__ __device__
     ~DevicePtrSet() {
       if (elmnt)
         delete[] elmnt;
@@ -22,7 +22,7 @@ class DevicePtrSet {
     
     //inserts entry into set, returns true if
     //entry is a duplicate
-    __device__
+    __host__ __device__
     bool insert(T entry) {
       bool dupl = false;
       if (alloc_ == 0) {
@@ -54,13 +54,13 @@ class DevicePtrSet {
       return dupl;
     }
 
-    __device__
+    __host__ __device__
     int size() const {
       return size_;
     }
 
     //searches set for entry, returns true if match is found
-    __device__
+    __host__ __device__
     bool contains(T entry) const {
       for (int i = 0; i < size_; i++) {
         if (elmnt[i] == entry)
@@ -69,7 +69,7 @@ class DevicePtrSet {
       return false;
     }
 
-    __device__
+    __host__ __device__
     T& operator[](int indx) {
       if (indx < size_ && indx >= 0)
         return elmnt[indx];
@@ -79,7 +79,7 @@ class DevicePtrSet {
       }
     }
 
-    __device__
+    __host__ __device__
     void Reset() {
       size_ = 0;
     }
@@ -134,7 +134,6 @@ class DevicePtrSet {
       return iterator(elmnt + size_);
     }
 
-  private:
     int size_;
     int alloc_;
     T *elmnt;

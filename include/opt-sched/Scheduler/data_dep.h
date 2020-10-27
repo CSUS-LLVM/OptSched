@@ -274,15 +274,15 @@ public:
   __host__ __device__
   InstCount GetInstCnt();
   virtual InstCount GetOrgnlInstCnt();
-  __host__ __device__
-  virtual SchedInstruction *GetInstByIndx(InstCount instIndx) = 0;
+  //__host__ __device__
+  //virtual SchedInstruction *GetInstByIndx(InstCount instIndx) = 0;
   virtual SchedInstruction *GetInstByTplgclOrdr(InstCount ordr) = 0;
   virtual SchedInstruction *GetInstByRvrsTplgclOrdr(InstCount ordr) = 0;
 
-  __host__ __device__
-  virtual SchedInstruction *GetRootInst() = 0;
-  __host__ __device__
-  virtual SchedInstruction *GetLeafInst() = 0;
+  //__host__ __device__
+  //virtual SchedInstruction *GetRootInst() = 0;
+  //__host__ __device__
+  //virtual SchedInstruction *GetLeafInst() = 0;
 
   __host__ __device__
   void GetInstCntPerIssuType(InstCount instCntPerIssuType[]);
@@ -487,6 +487,10 @@ public:
 
   __host__ __device__
   RegisterFile *getRegFiles() { return RegFiles; }
+  __host__ __device__
+  Register *getRegByTuple(RegIndxTuple *tuple) { 
+    return RegFiles[tuple->regType_].GetReg(tuple->regNum_); 
+  }
 
   // Creates an array of NodeData which hold the information
   // about the DDG in order to create DDG on device
@@ -516,6 +520,8 @@ public:
   // Resets DDG to blank state for later reinitilization
   __device__
   void Reset();
+  // Deep Copies DDG's arrays to device and links them to device DDG pointer
+  void CopyPointersToDevice(DataDepGraph *dev_DDG);
 
 protected:
   // TODO(max): Get rid of this.
@@ -809,7 +815,6 @@ public:
   void InstLost(SchedInstruction *inst);
   void UndoInstLost(SchedInstruction *inst);
   InstCount GetAvlblSlots(IssueType issuType);
-  //Copy pointers required by device code to device
 };
 /*****************************************************************************/
 

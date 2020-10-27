@@ -22,6 +22,9 @@ using namespace llvm;
 namespace llvm {
 namespace opt_sched {
 
+// Forward Declaration to treat circular dependence
+class SchedInstruction;
+
 // Represents a a single register of a certain type and tracks the number of
 // times this register is defined and used.
 class Register {
@@ -29,12 +32,13 @@ public:
   __host__ __device__
   Register(int16_t type = 0, int num = 0, int physicalNumber = INVALID_VALUE);
 
-#ifdef __CUDA_ARCH__
-  //use my DeviceSet class on device
-  using InstSetType = DevicePtrSet<const SchedInstruction *>;
-#else
-  using InstSetType = SmallPtrSet<const SchedInstruction *, 8>;
-#endif
+//#ifdef __CUDA_ARCH__
+  // use DeviceSet class on host and device instead of SmallPtrSet which
+  // does not work on device
+  using InstSetType = DevicePtrSet<InstCount>;
+//#else
+  //using InstSetType = DevicePtrSet<InstCount>;
+//#endif
 
   __host__ __device__
   int16_t GetType() const;
@@ -125,6 +129,8 @@ public:
   // for reinitialization in the next region
   __device__
   void ResetLiveIntervals();
+
+  void CopyPointersToDevice(Register *dev_reg);
 
 private:
   int16_t type_;

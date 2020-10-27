@@ -4,6 +4,8 @@
 // whole array must be copied in those cases. This class works on both host
 // and device and contains methods to copy to device
 
+#define END -1
+
 // Base ArrayList class, replaces LinkedList
 template <typename T>
 class ArrayList {
@@ -46,7 +48,6 @@ class ArrayList {
     __host__ __device__
     void Reset();
 
-  protected:
     int maxSize_;
     int size_;
     int crnt_;
@@ -69,9 +70,105 @@ class PriorityArrayList : public ArrayList<T> {
     __host__ __device__
     void InsrtElmnt(T elmnt, K key, bool allowDplct);
   
-  private:
     K *keys_;
 
+};
+
+template <>
+class ArrayList<int> {
+  public:
+    __host__ __device__
+    ArrayList(int maxSize) {
+      maxSize_ = maxSize;
+      size_ = 0;
+      crnt_ = 0;
+      elmnts_ = new int[maxSize_];
+    }
+
+    __host__ __device__
+    ~ArrayList() {
+      delete[] elmnts_;
+    }
+
+    // Appends a new element to the end of the list
+    __host__ __device__
+    void InsrtElmnt(int elmnt) {
+      if (size_ < maxSize_)
+        elmnts_[size_++] = elmnt;
+    }
+
+    // Returns number of elements in ArrayList
+    __host__ __device__
+    int GetElmntCnt() {
+      return size_;
+    }
+
+    // Returns first element, resets iterator
+    __host__ __device__
+    int GetFrstElmnt() {
+      crnt_ = 0;
+  
+      if (crnt_ < size_)
+        return elmnts_[crnt_];
+      else
+        return END;
+    }
+
+    // Returns next element in the array
+    __host__ __device__
+    int GetNxtElmnt() {
+      if (crnt_ != size_)
+        crnt_++;
+      else
+        return END;
+
+      if (crnt_ < size_ && crnt_ >= 0)
+        return elmnts_[crnt_];
+      else
+        return END;
+    }
+
+    // Returns previous element in the array
+    __host__ __device__
+    int GetPrevElmnt() {
+      if (crnt_ != 0)
+        crnt_--;
+      else
+        return END;
+
+      if (crnt_ >= 0 && crnt_ < size_)
+        return elmnts_[crnt_];
+      else
+        return END;
+    }
+
+    // Returns last element in array
+    __host__ __device__
+    int GetLastElmnt() {
+      if (size_ > 0)
+        crnt_ = size_ - 1;
+      else 
+	return END;
+
+      return elmnts_[crnt_];
+    }
+
+    // Removes last element in array
+    __host__ __device__
+    void RmvLastElmnt() {
+      size_--;
+    }
+
+    // Resets ArrayList to empty state
+    __host__ __device__
+    void Reset() {
+      size_ = 0;
+    }
+
+    int maxSize_;
+    int size_;
+    int crnt_;
+    int *elmnts_;
 };
 
 template <typename T>

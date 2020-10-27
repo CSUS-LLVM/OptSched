@@ -6,7 +6,7 @@
 
 using namespace llvm::opt_sched;
 
-RelaxedScheduler::RelaxedScheduler(DataDepStruct *dataDepGraph,
+RelaxedScheduler::RelaxedScheduler(DataDepGraph *dataDepGraph,
                                    MachineModel *machMdl,
                                    InstCount schedUprBound, DIRECTION mainDir,
                                    RLXD_SCHED_TYPE schedType,
@@ -250,7 +250,7 @@ void RelaxedScheduler::ClearFxng() {
 /*****************************************************************************/
 
 RJ_RelaxedScheduler::RJ_RelaxedScheduler(
-    DataDepStruct *dataDepGraph, MachineModel *machMdl, InstCount schedUprBound,
+    DataDepGraph *dataDepGraph, MachineModel *machMdl, InstCount schedUprBound,
     DIRECTION mainDir, RLXD_SCHED_TYPE type, InstCount maxInstCnt)
     : RelaxedScheduler(dataDepGraph, machMdl, schedUprBound, mainDir, type,
                        maxInstCnt) {
@@ -588,7 +588,7 @@ void RJ_RelaxedScheduler::UnFixInst(SchedInstruction *inst, InstCount cycle) {
 }
 /*****************************************************************************/
 
-LC_RelaxedScheduler::LC_RelaxedScheduler(DataDepStruct *dataDepGraph,
+LC_RelaxedScheduler::LC_RelaxedScheduler(DataDepGraph *dataDepGraph,
                                          MachineModel *machMdl,
                                          InstCount schedUprBound,
                                          DIRECTION mainDir)
@@ -675,8 +675,8 @@ InstCount LC_RelaxedScheduler::SchdulSubGraph_(SchedInstruction *leaf,
   InstCount schedCycle;
   InstCount trgtLastCycle;
   DIRECTION trvrslDir = DirAcycGraph::ReverseDirection(schedDir);
-  ArrayList<GraphNode *> *rcrsvPrdcsrLst = leaf->GetRcrsvNghbrLst(trvrslDir);
-  GraphNode *node;
+  ArrayList<InstCount> *rcrsvPrdcsrLst = leaf->GetRcrsvNghbrLst(trvrslDir);
+  InstCount nodeNum;
   InstCount rltvCP;
   DEP_GRAPH_TYPE graphType = dataDepGraph_->GetType();
 
@@ -696,11 +696,11 @@ InstCount LC_RelaxedScheduler::SchdulSubGraph_(SchedInstruction *leaf,
   */
 
   // Visit the nodes in topological order
-  assert(graphType == DGT_SUB || rcrsvPrdcsrLst->GetFrstElmnt() == rootInst_);
+  assert(graphType == DGT_SUB || rcrsvPrdcsrLst->GetFrstElmnt() == rootInst_->GetNum());
 
-  for (node = rcrsvPrdcsrLst->GetFrstElmnt(); node != NULL;
-       node = rcrsvPrdcsrLst->GetNxtElmnt()) {
-    inst = (SchedInstruction *)node;
+  for (nodeNum = rcrsvPrdcsrLst->GetFrstElmnt(); nodeNum != END;
+       nodeNum = rcrsvPrdcsrLst->GetNxtElmnt()) {
+    inst = dataDepGraph_->GetInstByIndx(nodeNum);
     assert(graphType == DGT_FULL || inst != rootInst_);
 
     if (dataDepGraph_->IsInGraph(inst) == false) {
@@ -754,7 +754,7 @@ InstCount LC_RelaxedScheduler::CmputReleaseTime_(SchedInstruction *inst) {
 }
 /*****************************************************************************/
 
-LPP_RelaxedScheduler::LPP_RelaxedScheduler(DataDepStruct *dataDepGraph,
+LPP_RelaxedScheduler::LPP_RelaxedScheduler(DataDepGraph *dataDepGraph,
                                            MachineModel *machMdl,
                                            InstCount schedUprBound,
                                            DIRECTION mainDir)

@@ -169,13 +169,13 @@ static InstCount ComputeSLILStaticLowerBound(int64_t regTypeCnt_,
   for (int i = 0; i < regTypeCnt_; ++i) {
     for (int j = 0; j < regFiles_[i].GetRegCnt(); ++j) {
       const auto &reg = regFiles_[i].GetReg(j);
-      for (const auto &instruction : reg->GetDefList()) {
-        if (reg->AddToInterval(instruction)) {
+      for (const auto &instNum : reg->GetDefList()) {
+        if (reg->AddToInterval(dataDepGraph_->GetInstByIndx(instNum))) {
           ++naiveLowerBound;
         }
       }
-      for (const auto &instruction : reg->GetUseList()) {
-        if (reg->AddToInterval(instruction)) {
+      for (const auto &instNum : reg->GetUseList()) {
+        if (reg->AddToInterval(dataDepGraph_->GetInstByIndx(instNum))) {
           ++naiveLowerBound;
         }
       }
@@ -197,19 +197,21 @@ static InstCount ComputeSLILStaticLowerBound(int64_t regTypeCnt_,
     // For each register this instruction defines, compute the intersection
     // between the recursive successor list of this instruction and the
     // recursive predecessors of the dependent instruction.
-    Register **definedRegisters = nullptr;
+    RegIndxTuple *definedRegisters = nullptr;
     auto defRegCount = inst->GetDefs(definedRegisters);
     auto recSuccBV = inst->GetRcrsvNghbrBitVector(DIR_FRWRD);
     for (int j = 0; j < defRegCount; ++j) {
-      for (const auto &dependentInst : definedRegisters[j]->GetUseList()) {
-        auto recPredBV = const_cast<SchedInstruction *>(dependentInst)
+      for (const auto &dependentInstNum : 
+           dataDepGraph_->getRegByTuple(&definedRegisters[j])->GetUseList()) {
+        auto recPredBV = const_cast<SchedInstruction *>(
+			 dataDepGraph_->GetInstByIndx(dependentInstNum))
                              ->GetRcrsvNghbrBitVector(DIR_BKWRD);
         assert(recSuccBV->GetSize() == recPredBV->GetSize() &&
                "Successor list size doesn't match predecessor list size!");
         for (int k = 0; k < recSuccBV->GetSize(); ++k) {
           if (recSuccBV->GetBit(k) & recPredBV->GetBit(k)) {
-            if (definedRegisters[j]->AddToInterval(
-                    dataDepGraph_->GetInstByIndx(k))) {
+            if (dataDepGraph_->getRegByTuple(&definedRegisters[j])->
+		AddToInterval(dataDepGraph_->GetInstByIndx(k))) {
               ++closureLowerBound;
             }
           }
@@ -230,16 +232,17 @@ static InstCount ComputeSLILStaticLowerBound(int64_t regTypeCnt_,
   std::vector<std::pair<const SchedInstruction *, Register *>> usedInsts;
   for (int i = 0; i < dataDepGraph_->GetInstCnt(); ++i) {
     const auto &inst = dataDepGraph_->GetInstByIndx(i);
-    Register **usedRegisters = nullptr;
+    RegIndxTuple *usedRegisters = nullptr;
     auto usedRegCount = inst->GetUses(usedRegisters);
 
     // Get a list of instructions that define the registers, in array form.
     usedInsts.clear();
     for (int j = 0; j < usedRegCount; ++j) {
-      Register *reg = usedRegisters[j];
+      Register *reg = dataDepGraph_->getRegByTuple(&usedRegisters[j]);
       assert(reg->GetDefList().size() == 1 &&
              "Number of defs for register is not 1!");
-      usedInsts.push_back(std::make_pair(*(reg->GetDefList().begin()), reg));
+      usedInsts.push_back(std::make_pair(
+	  dataDepGraph_->GetInstByIndx(*(reg->GetDefList().begin())), reg));
     }
 
 #if defined(IS_DEBUG_SLIL_COMMON_USE_LB)
@@ -500,7 +503,7 @@ void BBWithSpill::UpdateSpillInfoForSchdul_(SchedInstruction *inst,
                                             bool trackCnflcts) {
   int16_t regType;
   int defCnt, useCnt, regNum, physRegNum;
-  Register **defs, **uses;
+  RegIndxTuple *defs, *uses;
   Register *def, *use;
   int liveRegs;
   InstCount newSpillCost;
@@ -516,7 +519,7 @@ void BBWithSpill::UpdateSpillInfoForSchdul_(SchedInstruction *inst,
 
   // Update Live regs after uses
   for (int i = 0; i < useCnt; i++) {
-    use = uses[i];
+    use = dataDepGraph_->getRegByTuple(&uses[i]);
     regType = use->GetType();
     regNum = use->GetNum();
     physRegNum = use->GetPhysicalNumber();
@@ -572,7 +575,7 @@ void BBWithSpill::UpdateSpillInfoForSchdul_(SchedInstruction *inst,
 
   // Update Live regs after defs
   for (int i = 0; i < defCnt; i++) {
-    def = defs[i];
+    def = dataDepGraph_->getRegByTuple(&defs[i]);
     regType = def->GetType();
     regNum = def->GetNum();
     physRegNum = def->GetPhysicalNumber();
@@ -774,7 +777,7 @@ void BBWithSpill::UpdateSpillInfoForSchdul_(SchedInstruction *inst,
 void BBWithSpill::UpdateSpillInfoForUnSchdul_(SchedInstruction *inst) {
   int16_t regType;
   int i, defCnt, useCnt, regNum, physRegNum;
-  Register **defs, **uses;
+  RegIndxTuple *defs, *uses;
   Register *def, *use;
   bool isLive;
 
@@ -805,7 +808,7 @@ void BBWithSpill::UpdateSpillInfoForUnSchdul_(SchedInstruction *inst) {
 
   // Update Live regs
   for (i = 0; i < defCnt; i++) {
-    def = defs[i];
+    def = dataDepGraph_->getRegByTuple(&defs[i]);
     regType = def->GetType();
     regNum = def->GetNum();
     physRegNum = def->GetPhysicalNumber();
@@ -831,7 +834,7 @@ void BBWithSpill::UpdateSpillInfoForUnSchdul_(SchedInstruction *inst) {
   }
 
   for (i = 0; i < useCnt; i++) {
-    use = uses[i];
+    use = dataDepGraph_->getRegByTuple(&uses[i]);
     regType = use->GetType();
     regNum = use->GetNum();
     physRegNum = use->GetPhysicalNumber();

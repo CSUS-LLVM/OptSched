@@ -112,7 +112,7 @@ InstCount DataDepStruct::CmputRsrcLwrBound_() {
   }
 
   for (InstCount i = 0; i < GetInstCnt(); i++) {
-    SchedInstruction *inst = GetInstByIndx(i);
+    SchedInstruction *inst = ((DataDepGraph*)(this))->GetInstByIndx(i);
     IssueType issuType = inst->GetIssueType();
     assert(issuType <= issuTypeCnt_);
     instCntPerIssuType_[issuType]++;
@@ -562,9 +562,7 @@ FUNC_RESULT DataDepGraph::Finish_() {
   return RES_SUCCESS;
 }
 
-void DataDepGraph::AllocArrays_(InstCount instCnt) {
-  InstCount i;
- 
+void DataDepGraph::AllocArrays_(InstCount instCnt) { 
   instCnt_ = instCnt;
   nodeCnt_ = instCnt;
   insts_ = new SchedInstruction[instCnt_];
@@ -907,7 +905,8 @@ SchedInstruction *DataDepGraph::CreateNode_(
     InstCount fileSchedCycle, InstCount fileLB, InstCount fileUB, int blkNum) {
   insts_[instNum].InitializeNode_(instNum, instName, instType, opCode,
                                   2 * instCnt_, nodeID, fileSchedOrder,
-                                  fileSchedCycle, fileLB, fileUB, machMdl_);
+                                  fileSchedCycle, fileLB, fileUB, machMdl_,
+				  nodes_, RegFiles);
 
   if ((instNum < 0 || instNum >= instCnt_) && instNum != UNINITIATED_NUM)
     printf("Invalid instruction number\n");
@@ -956,13 +955,14 @@ void DataDepGraph::CreateEdge(SchedInstruction *frmNode,
 
     if (crntLtncy < ltncy) {
       edge->label = ltncy;
-      edge->from->UpdtMaxEdgLbl(ltncy);
+      insts_[edge->from].UpdtMaxEdgLbl(ltncy);
     }
 
     return;
   }
 
-  GraphEdge *newEdg = new GraphEdge(frmNode, toNode, ltncy, depType);
+  GraphEdge *newEdg = new GraphEdge(frmNode->GetNum(), toNode->GetNum(), 
+		                    ltncy, depType);
 
   frmNode->AddScsr(newEdg);
   toNode->AddPrdcsr(newEdg);
@@ -1003,7 +1003,7 @@ void DataDepGraph::CreateEdge_(InstCount frmNodeNum, InstCount toNodeNum,
     Logger::Info("Creating edge from %d to %d of type %d and latency %d",
                  frmNodeNum, toNodeNum, depType, ltncy);
 #endif
-    edge = new GraphEdge(frmNode, toNode, ltncy, depType);
+    edge = new GraphEdge(frmNode->GetNum(), toNode->GetNum(), ltncy, depType);
     frmNode->AddScsr(edge);
     toNode->AddPrdcsr(edge);
   } else {
@@ -1013,7 +1013,7 @@ void DataDepGraph::CreateEdge_(InstCount frmNodeNum, InstCount toNodeNum,
                    frmNodeNum, toNodeNum, ltncy);
 #endif
       edge->label = ltncy;
-      edge->from->UpdtMaxEdgLbl(ltncy);
+      insts_[edge->from].UpdtMaxEdgLbl(ltncy);
     }
   }
 
@@ -1058,8 +1058,8 @@ void DataDepGraph::InitializeEdge_(InstCount frmNodeNum, InstCount toNodeNum,
                  frmNodeNum, toNodeNum, depType, ltncy);
 #endif
     edge = &edges_[initializedEdges_++];
-    edge->from = frmNode;
-    edge->to = toNode;
+    edge->from = frmNode->GetNum();
+    edge->to = toNode->GetNum();
     edge->label = ltncy;
     edge->label2 = depType;
 
@@ -1072,7 +1072,7 @@ void DataDepGraph::InitializeEdge_(InstCount frmNodeNum, InstCount toNodeNum,
                    frmNodeNum, toNodeNum, ltncy);
 #endif
       edge->label = ltncy;
-      edge->from->UpdtMaxEdgLbl(ltncy);
+      insts_[edge->from].UpdtMaxEdgLbl(ltncy);
     }
   }
 
@@ -1274,16 +1274,16 @@ void DataDepGraph::CmputRltvCrtclPaths_(DIRECTION dir) {
 
 __host__ __device__
 void DataDepGraph::CmputCrtclPathsFrmRcrsvPrdcsr_(SchedInstruction *ref) {
-  ArrayList<GraphNode *> *rcrsvScsrLst = ref->GetRcrsvNghbrLst(DIR_FRWRD);
+  ArrayList<InstCount> *rcrsvScsrLst = ref->GetRcrsvNghbrLst(DIR_FRWRD);
   SchedInstruction *inst = GetLeafInst();
-  GraphNode *node;
+  InstCount nodeNum;
 
   assert(rcrsvScsrLst != NULL);
 
   // Visit the nodes in reverse topological order
-  for (node = rcrsvScsrLst->GetLastElmnt(); node != NULL;
-       node = rcrsvScsrLst->GetPrevElmnt()) {
-    inst = (SchedInstruction *)node;
+  for (nodeNum = rcrsvScsrLst->GetLastElmnt(); nodeNum != END;
+       nodeNum = rcrsvScsrLst->GetPrevElmnt()) {
+    inst = &insts_[nodeNum];
     inst->CmputCrtclPathFrmRcrsvPrdcsr(ref);
   }
 
@@ -1297,16 +1297,16 @@ void DataDepGraph::CmputCrtclPathsFrmRcrsvPrdcsr_(SchedInstruction *ref) {
 
 __host__ __device__
 void DataDepGraph::CmputCrtclPathsFrmRcrsvScsr_(SchedInstruction *ref) {
-  ArrayList<GraphNode *> *rcrsvPrdcsrLst = ref->GetRcrsvNghbrLst(DIR_BKWRD);
+  ArrayList<InstCount> *rcrsvPrdcsrLst = ref->GetRcrsvNghbrLst(DIR_BKWRD);
   SchedInstruction *inst = GetRootInst();
-  GraphNode *node;
+  InstCount nodeNum;
 
   assert(rcrsvPrdcsrLst != NULL);
 
   // Visit the nodes in reverse topological order
-  for (node = rcrsvPrdcsrLst->GetLastElmnt(); node != NULL;
-       node = rcrsvPrdcsrLst->GetPrevElmnt()) {
-    inst = (SchedInstruction *)node;
+  for (nodeNum = rcrsvPrdcsrLst->GetLastElmnt(); nodeNum != END;
+       nodeNum = rcrsvPrdcsrLst->GetPrevElmnt()) {
+    inst = &insts_[nodeNum];
     inst->CmputCrtclPathFrmRcrsvScsr(ref);
   }
 
@@ -1499,14 +1499,14 @@ void DataDepGraph::CreateRegData(RegFileData *regFileData) {
         regFileData[i].regs_[j].uses_ = new InstCount[reg->GetSizeOfUseList()];
 
 	x = 0;
-        for (const auto &inst : reg->GetUseList()) {
-	  regFileData[i].regs_[j].uses_[x++] = (InstCount)inst->GetNum();
+        for (const auto &instNum : reg->GetUseList()) {
+	  regFileData[i].regs_[j].uses_[x++] = (InstCount)instNum;
 	  regFileData[i].regs_[j].useCnt_++;
         }
 
 	//debug
-	if (regFileData[i].regs_[j].useCnt_ != (InstCount)reg->GetSizeOfUseList())
-          printf("regFileData[%d].regs_[%d].useCnt_ != (InstCount)reg->GetSizeOfUseList()\n", i, j);
+	//if (regFileData[i].regs_[j].useCnt_ != (InstCount)reg->GetSizeOfUseList())
+          //printf("regFileData[%d].regs_[%d].useCnt_ != (InstCount)reg->GetSizeOfUseList()\n", i, j);
 
       } else
         regFileData[i].regs_[j].uses_ = NULL;
@@ -1517,8 +1517,8 @@ void DataDepGraph::CreateRegData(RegFileData *regFileData) {
         regFileData[i].regs_[j].defs_ = new InstCount[reg->GetSizeOfDefList()];
 
 	x = 0;
-        for (const auto &inst : reg->GetDefList()) {
-          regFileData[i].regs_[j].defs_[x++] = (InstCount)inst->GetNum();
+        for (const auto &instNum : reg->GetDefList()) {
+          regFileData[i].regs_[j].defs_[x++] = (InstCount)instNum;
 	  regFileData[i].regs_[j].defCnt_++;
 	}
 
@@ -1626,7 +1626,8 @@ void DataDepGraph::InitializeOnDevice(InstCount instCnt, NodeData *nodeData,
                                nodeData[i].instType_, nodeData[i].opCode_,
                                nodeData[i].nodeID_, nodeData[i].fileSchedOrder_,
                                nodeData[i].fileSchedCycle_, nodeData[i].fileLB_,
-                               nodeData[i].fileUB_, 0, machMdl_);
+                               nodeData[i].fileUB_, 0, machMdl_, nodes_, 
+			       RegFiles);
 
     //if (!insts_[i])
       //printf("Node creation failed for node num %d\n", i);
@@ -1698,7 +1699,6 @@ void DataDepGraph::AllocateMaxDDG(InstCount maxRgnSize, InstCount maxEdgeCnt,
 
   insts_ = dev_insts;
 
-  SchedInstruction *inst;
   for (InstCount i = 0; i < maxRgnSize; i++) {
     //insts_[i] = &dev_insts[i];
     insts_[i].CreatePrdcsrScsrLists(maxRgnSize);
@@ -3523,93 +3523,92 @@ void InstSchedule::SetSpillCost(InstCount cost) { spillCost_ = cost; }
 InstCount InstSchedule::GetSpillCost() const { return spillCost_; }
 
 void InstSchedule::CopyPointersToDevice(MachineModel *dev_machMdl) {
-  //copy instInSlot_ to device
+  // Copy instInSlot_ to device
   InstCount *dev_instInSlot = NULL;
-
-  if (cudaSuccess != cudaMalloc((void**)&dev_instInSlot, totSlotCnt_ * sizeof(InstCount)))
+  size_t memSize = totSlotCnt_ * sizeof(InstCount);
+  if (cudaSuccess != cudaMalloc((void**)&dev_instInSlot, memSize))
     printf("Error allocating dev_mem for dev_instInSlot: %s\n", 
 		    cudaGetErrorString(cudaGetLastError()));
 
-  if (cudaSuccess != cudaMemcpy(dev_instInSlot, instInSlot_, totSlotCnt_ * sizeof(InstCount), cudaMemcpyHostToDevice))
-    printf("Error copying instInSlot_ to device: %s\n", cudaGetErrorString(cudaGetLastError()));
+  if (cudaSuccess != cudaMemcpy(dev_instInSlot, instInSlot_, memSize, 
+			        cudaMemcpyHostToDevice))
+    printf("Error copying instInSlot_ to device: %s\n", 
+		    cudaGetErrorString(cudaGetLastError()));
 
   delete[] instInSlot_;
 
   instInSlot_ = dev_instInSlot;
-  //if (cudaSuccess != cudaMemcpy(&instInSlot_, &dev_instInSlot_, sizeof(InstCount *), cudaMemcpyHostToDevice))
-    //printf("Error updating instInSlot_ pointer on device: %s\n", cudaGetErrorString(cudaGetLastError()));
 
   //copy slotForInst_ to device
   InstCount *dev_slotForInst = NULL;
-
-  if (cudaSuccess != cudaMalloc((void**)&dev_slotForInst, totInstCnt_ * sizeof(InstCount)))
+  memSize = totInstCnt_ * sizeof(InstCount);
+  if (cudaSuccess != cudaMalloc((void**)&dev_slotForInst, memSize))
     printf("Error allocating dev_mem for dev_slotForInst: %s\n",
                     cudaGetErrorString(cudaGetLastError()));
 
-  if (cudaSuccess != cudaMemcpy(dev_slotForInst, slotForInst_, totInstCnt_ * sizeof(InstCount), cudaMemcpyHostToDevice))
-    printf("Error copying slotForInst_ to device: %s\n", cudaGetErrorString(cudaGetLastError()));
+  if (cudaSuccess != cudaMemcpy(dev_slotForInst, slotForInst_, memSize, 
+			        cudaMemcpyHostToDevice))
+    printf("Error copying slotForInst_ to device: %s\n", 
+		    cudaGetErrorString(cudaGetLastError()));
 
   delete[] slotForInst_;
 
   slotForInst_ = dev_slotForInst;
-  //if (cudaSuccess != cudaMemcpy(&slotForInst_, &dev_slotForInst_, sizeof(InstCount *), cudaMemcpyHostToDevice))
-    //printf("Error updating slotForInst_ pointer on device: %s\n", cudaGetErrorString(cudaGetLastError()));
 
   //copy spillCosts_ to device
   InstCount *dev_spillCosts = NULL;
-
-  if (cudaSuccess != cudaMalloc((void**)&dev_spillCosts, totInstCnt_ * sizeof(InstCount)))
+  if (cudaSuccess != cudaMalloc((void**)&dev_spillCosts, memSize))
     printf("Error allocating dev_mem for dev_spillCosts: %s\n",
                     cudaGetErrorString(cudaGetLastError()));
 
-  if (cudaSuccess != cudaMemcpy(dev_spillCosts, spillCosts_, totInstCnt_ * sizeof(InstCount), cudaMemcpyHostToDevice))
-    printf("Error copying spillCosts_ to device: %s\n", cudaGetErrorString(cudaGetLastError()));
+  if (cudaSuccess != cudaMemcpy(dev_spillCosts, spillCosts_, memSize, 
+			        cudaMemcpyHostToDevice))
+    printf("Error copying spillCosts_ to device: %s\n", 
+		    cudaGetErrorString(cudaGetLastError()));
 
   delete[] spillCosts_;
 
   spillCosts_ = dev_spillCosts;
-  //if (cudaSuccess != cudaMemcpy(&spillCosts_, &dev_spillCosts_, sizeof(InstCount *), cudaMemcpyHostToDevice))
-    //printf("Error updating spillCosts_ pointer on device: %s\n", cudaGetErrorString(cudaGetLastError()));
 
   //copy peakRegPressures_ to device
   InstCount *dev_peakRegPressures = NULL;
-
-  if (cudaSuccess != cudaMalloc((void**)&dev_peakRegPressures, machMdl_->GetRegTypeCnt() * sizeof(InstCount)))
+  memSize = machMdl_->GetRegTypeCnt() * sizeof(InstCount);
+  if (cudaSuccess != cudaMalloc((void**)&dev_peakRegPressures, memSize))
     printf("Error allocating dev_mem for dev_peakRegPressures: %s\n",
                     cudaGetErrorString(cudaGetLastError()));
 
-  if (cudaSuccess != cudaMemcpy(dev_peakRegPressures, peakRegPressures_, machMdl_->GetRegTypeCnt() * sizeof(InstCount), cudaMemcpyHostToDevice))
-    printf("Error copying peakRegPressures_ to device: %s\n", cudaGetErrorString(cudaGetLastError()));
+  if (cudaSuccess != cudaMemcpy(dev_peakRegPressures, peakRegPressures_, 
+			        memSize, cudaMemcpyHostToDevice))
+    printf("Error copying peakRegPressures_ to device: %s\n", 
+		    cudaGetErrorString(cudaGetLastError()));
 
   delete[] peakRegPressures_;
 
   peakRegPressures_ = dev_peakRegPressures;
-  //if (cudaSuccess != cudaMemcpy(&peakRegPressures_, &dev_peakRegPressures_, sizeof(InstCount *), cudaMemcpyHostToDevice))
-    //printf("Error updating peakRegPressures_ pointer on device: %s\n", cudaGetErrorString(cudaGetLastError()));
-
   machMdl_ = dev_machMdl;
-  //update machMdl_ to dev_machMdl
-  //if (cudaSuccess != cudaMemcpy(&machMdl_, &dev_machMdl, sizeof(MachineModel *), cudaMemcpyHostToDevice))
-    //printf("Error updating machMdl_ pointer on device: %s\n", cudaGetErrorString(cudaGetLastError()));
 }
 
 void InstSchedule::CopyPointersToHost(MachineModel *machMdl) {
+  size_t memSize;
   //update machMdl_ pointer to host machMdl
   machMdl_ = machMdl;
-
   InstCount *host_instInSlot = new InstCount[totSlotCnt_];
-  
-  if (cudaSuccess != cudaMemcpy(host_instInSlot, instInSlot_, totSlotCnt_ * sizeof(InstCount), cudaMemcpyDeviceToHost))
-    printf("Error copying instInSlot_ to host: %s\n", cudaGetErrorString(cudaGetLastError()));
+  memSize = totSlotCnt_ * sizeof(InstCount);
+  if (cudaSuccess != cudaMemcpy(host_instInSlot, instInSlot_, memSize, 
+			        cudaMemcpyDeviceToHost))
+    printf("Error copying instInSlot_ to host: %s\n", 
+		    cudaGetErrorString(cudaGetLastError()));
 
   cudaFree(instInSlot_);
 
   instInSlot_ = host_instInSlot;
 
   InstCount *host_slotForInst = new InstCount[totInstCnt_];
-
-  if (cudaSuccess != cudaMemcpy(host_slotForInst, slotForInst_, totInstCnt_ * sizeof(InstCount), cudaMemcpyDeviceToHost))
-    printf("Error copying slotForInst_ to host: %s\n", cudaGetErrorString(cudaGetLastError()));
+  memSize = totInstCnt_ * sizeof(InstCount);
+  if (cudaSuccess != cudaMemcpy(host_slotForInst, slotForInst_, memSize, 
+			        cudaMemcpyDeviceToHost))
+    printf("Error copying slotForInst_ to host: %s\n", 
+		    cudaGetErrorString(cudaGetLastError()));
 
   cudaFree(slotForInst_);
 
@@ -3617,17 +3616,21 @@ void InstSchedule::CopyPointersToHost(MachineModel *machMdl) {
 
   InstCount *host_spillCosts = new InstCount[totInstCnt_];
 
-  if (cudaSuccess != cudaMemcpy(host_spillCosts, spillCosts_, totInstCnt_ * sizeof(InstCount), cudaMemcpyDeviceToHost))
-    printf("Error copying spillCosts_ to host: %s\n", cudaGetErrorString(cudaGetLastError()));
+  if (cudaSuccess != cudaMemcpy(host_spillCosts, spillCosts_, memSize, 
+			        cudaMemcpyDeviceToHost))
+    printf("Error copying spillCosts_ to host: %s\n", 
+		    cudaGetErrorString(cudaGetLastError()));
 
   cudaFree(spillCosts_);
 
   spillCosts_ = host_spillCosts;
 
   InstCount *host_peakRegPressures = new InstCount[machMdl_->GetRegTypeCnt()];
-
-  if (cudaSuccess != cudaMemcpy(host_peakRegPressures, peakRegPressures_, machMdl_->GetRegTypeCnt() * sizeof(InstCount), cudaMemcpyDeviceToHost))
-    printf("Error copying peakRegPressures_ to host: %s\n", cudaGetErrorString(cudaGetLastError()));
+  memSize = machMdl_->GetRegTypeCnt() * sizeof(InstCount);
+  if (cudaSuccess != cudaMemcpy(host_peakRegPressures, peakRegPressures_, 
+			        memSize, cudaMemcpyDeviceToHost))
+    printf("Error copying peakRegPressures_ to host: %s\n", 
+		    cudaGetErrorString(cudaGetLastError()));
 
   cudaFree(peakRegPressures_);
 
@@ -3789,10 +3792,10 @@ bool DataDepGraph::DoesFeedUser(SchedInstruction *inst) {
 #ifdef IS_DEBUG_RP_ONLY
   Logger::Info("Testing inst %d", inst->GetNum());
 #endif
-  ArrayList<GraphNode *> *rcrsvSuccs = inst->GetRcrsvNghbrLst(DIR_FRWRD);
-  for (GraphNode *succ = rcrsvSuccs->GetFrstElmnt(); succ != NULL;
-       succ = rcrsvSuccs->GetNxtElmnt()) {
-    SchedInstruction *succInst = static_cast<SchedInstruction *>(succ);
+  ArrayList<InstCount> *rcrsvSuccs = inst->GetRcrsvNghbrLst(DIR_FRWRD);
+  for (InstCount succNum = rcrsvSuccs->GetFrstElmnt(); succNum != END;
+       succNum = rcrsvSuccs->GetNxtElmnt()) {
+    SchedInstruction *succInst = &insts_[succNum];
 
     int curInstAdjUseCnt = succInst->GetAdjustedUseCnt();
     // Ignore successor instructions that does not close live intervals
@@ -3816,6 +3819,169 @@ bool DataDepGraph::DoesFeedUser(SchedInstruction *inst) {
 }
 
 int DataDepGraph::GetFileCostUprBound() { return fileCostUprBound_; }
+
+void DataDepGraph::CopyPointersToDevice(DataDepGraph *dev_DDG) {
+  // use to hold size of array
+  size_t memSize;
+  // Copy instCntPerType_ to device
+  InstCount *dev_instCntPerType;
+  memSize = sizeof(InstCount) * instTypeCnt_;
+  if (cudaSuccess != cudaMalloc(&dev_instCntPerType, memSize))
+    Logger::Fatal("Failed to allocate dev mem for instCntPerType");
+
+  if (cudaSuccess != cudaMemcpy(dev_instCntPerType, instCntPerType_, memSize,
+			        cudaMemcpyHostToDevice))
+    Logger::Fatal("Failed to copy instCntPerType to device");
+
+  if (cudaSuccess != cudaMemcpy(&dev_DDG->instCntPerType_, &dev_instCntPerType,
+			        sizeof(InstCount *), cudaMemcpyHostToDevice))
+    Logger::Fatal("Failed to update dev_DDG->InstCntPerType");
+
+  // Copy instCntPerIssuType_
+  InstCount *dev_instCntPerIssuType;
+  memSize = sizeof(InstCount) * issuTypeCnt_;
+  if (cudaSuccess != cudaMalloc(&dev_instCntPerIssuType, memSize))
+    Logger::Fatal("Failed to allocate dev mem for instCntPerIssuType");
+
+  if (cudaSuccess != cudaMemcpy(dev_instCntPerIssuType, instCntPerIssuType_, memSize,
+                                cudaMemcpyHostToDevice))
+    Logger::Fatal("Failed to copy instCntPerIssuType to device");
+
+  if (cudaSuccess != cudaMemcpy(&dev_DDG->instCntPerIssuType_, &dev_instCntPerIssuType,
+                                sizeof(InstCount *), cudaMemcpyHostToDevice))
+    Logger::Fatal("Failed to update dev_DDG->InstCntPerIssuType");
+
+  // Copy frwrdLwrBounds_ to device
+  InstCount *dev_frwrdLwrBounds;
+  memSize = sizeof(InstCount) * instCnt_;
+  if (cudaSuccess != cudaMalloc(&dev_frwrdLwrBounds, memSize))
+    Logger::Fatal("Failed to allocate dev mem for dev_frwrdLwrBounds");
+
+  if (cudaSuccess != cudaMemcpy(dev_frwrdLwrBounds, frwrdLwrBounds_, memSize,
+                                cudaMemcpyHostToDevice))
+    Logger::Fatal("Failed to copy frwrdLwrBounds to device");
+
+  if (cudaSuccess != cudaMemcpy(&dev_DDG->frwrdLwrBounds_, &dev_frwrdLwrBounds,
+                                sizeof(InstCount *), cudaMemcpyHostToDevice))
+    Logger::Fatal("Failed to update dev_DDG->frwrdLwrBounds");
+
+  // Copy bkwardLwrBounds_ to device
+  InstCount *dev_bkwrdLwrBounds;
+  memSize = sizeof(InstCount) * instCnt_;
+  if (cudaSuccess != cudaMalloc(&dev_bkwrdLwrBounds, memSize))
+    Logger::Fatal("Failed to allocate dev mem for dev_bkwrdLwrBounds");
+
+  if (cudaSuccess != cudaMemcpy(dev_bkwrdLwrBounds, bkwrdLwrBounds_, memSize,
+                                cudaMemcpyHostToDevice))
+    Logger::Fatal("Failed to copy bkwrdLwrBounds to device");
+
+  if (cudaSuccess != cudaMemcpy(&dev_DDG->bkwrdLwrBounds_, &dev_bkwrdLwrBounds,
+                                sizeof(InstCount *), cudaMemcpyHostToDevice))
+    Logger::Fatal("Failed to update dev_DDG->bkwrdLwrBounds");
+
+  // Copy insts_ to device
+  SchedInstruction *dev_insts;
+  memSize = sizeof(SchedInstruction) * instCnt_;
+  if (cudaSuccess != cudaMallocManaged(&dev_insts, memSize))
+    Logger::Fatal("Failed to allocate dev mem for insts");
+
+  if (cudaSuccess != cudaMemcpy(dev_insts, insts_, memSize,
+			        cudaMemcpyHostToDevice))
+    Logger::Fatal("Failed to copy insts to device");
+
+  if (cudaSuccess != cudaMemcpy(&dev_DDG->insts_, &dev_insts,
+			        sizeof(SchedInstruction *), 
+				cudaMemcpyHostToDevice))
+    Logger::Fatal("Failed to update dev_DDG->insts");
+
+  // update values of root_ and leaf_ on device
+  SchedInstruction *dev_root = &dev_insts[root_->GetNum()];
+  memSize = sizeof(SchedInstruction *);
+  if (cudaSuccess != cudaMemcpy(&dev_DDG->root_, &dev_root, memSize,
+			        cudaMemcpyHostToDevice))
+    Logger::Fatal("Failed to update root_ on device");
+
+  SchedInstruction *dev_leaf = &dev_insts[leaf_->GetNum()];
+  if (cudaSuccess != cudaMemcpy(&dev_DDG->leaf_, &dev_leaf, memSize,
+			        cudaMemcpyHostToDevice))
+    Logger::Fatal("Failed to update leaf_ on device");
+
+  // Copy nodes_ to device
+  SchedInstruction **dev_nodes;
+  memSize = sizeof(SchedInstruction *) * instCnt_;
+  if (cudaSuccess != cudaMalloc(&dev_nodes, memSize))
+    Logger::Fatal("Failed to alloc dev mem for nodes_");
+
+  if (cudaSuccess != cudaMemcpy(dev_nodes, nodes_, memSize,
+			       cudaMemcpyHostToDevice))
+    Logger::Fatal("Failed to copy nodes to device");
+
+  if (cudaSuccess != cudaMemcpy(&dev_DDG->nodes_, &dev_nodes,
+			        sizeof(SchedInstruction **),
+				cudaMemcpyHostToDevice))
+    Logger::Fatal("Failed to update dev_DDG->nodes_");
+
+  // update nodes_ values on device
+  SchedInstruction *dev_inst;
+  memSize = sizeof(SchedInstruction *);
+  for (InstCount i = 0; i < instCnt_; i++) {
+    dev_inst = &dev_insts[i];
+    if (cudaSuccess != cudaMemcpy(&dev_DDG->nodes_[i], &dev_inst, memSize,
+			          cudaMemcpyHostToDevice))
+      Logger::Fatal("Failed to update nodes_[%d] on device", i);
+  }
+
+  // Copy tplgclOrdr_ to device
+  SchedInstruction **dev_tplgclOrdr;
+  memSize = sizeof(SchedInstruction *) * instCnt_;
+  if (cudaSuccess != cudaMalloc(&dev_tplgclOrdr, memSize))
+    Logger::Fatal("Failed to alloc dev mem for tplgclOrdr_");
+
+  if (cudaSuccess != cudaMemcpy(dev_tplgclOrdr, tplgclOrdr_, memSize,
+                               cudaMemcpyHostToDevice))
+    Logger::Fatal("Failed to copy tplgclOrdr_ to device");
+
+  if (cudaSuccess != cudaMemcpy(&dev_DDG->tplgclOrdr_, &dev_tplgclOrdr,
+                                sizeof(SchedInstruction **),
+                                cudaMemcpyHostToDevice))
+    Logger::Fatal("Failed to update dev_DDG->tplgclOrdr_");
+
+  // update tplgclOrdr values on device
+  memSize = sizeof(SchedInstruction *);
+  for (InstCount i = 0; i < instCnt_; i++) {
+    dev_inst = &dev_insts[tplgclOrdr_[i]->GetNum()];
+    if (cudaSuccess != cudaMemcpy(&dev_DDG->tplgclOrdr_[i], &dev_inst, memSize,
+                                  cudaMemcpyHostToDevice))
+      Logger::Fatal("Failed to update tplgclOrdr_[%d] on device", i);
+  }
+
+  // Copy RegFiles
+  RegisterFile *dev_regFiles;
+  memSize = sizeof(RegisterFile) * machMdl_->GetRegTypeCnt();
+  if (cudaSuccess != cudaMallocManaged(&dev_regFiles, memSize))
+    Logger::Fatal("Failed to alloc dev mem for dev_regFiles");
+
+  if (cudaSuccess != cudaMemcpy(dev_regFiles, RegFiles, memSize,
+			        cudaMemcpyHostToDevice))
+    Logger::Fatal("Failed to copy regFiles to device");
+
+  if (cudaSuccess != cudaMemcpy(&dev_DDG->RegFiles, &dev_regFiles,
+			        sizeof(RegisterFile *), 
+				cudaMemcpyHostToDevice))
+    Logger::Fatal("Failed to update dev_DDG->RegFiles");
+  //dev_DDG->RegFiles = dev_regFiles;
+
+  // Also copy each RegFile's pointers
+  for (InstCount i = 0; i < machMdl_->GetRegTypeCnt(); i++)
+    RegFiles[i].CopyPointersToDevice(&dev_DDG->RegFiles[i]);
+
+  // Copy SchedInstruction/GraphNode pointers and link them to device inst
+  // and update RegFiles poitner to dev_regFiles
+  for (InstCount i = 0; i < instCnt_; i++)
+    insts_[i].CopyPointersToDevice(&dev_DDG->insts_[i], dev_DDG->nodes_, 
+		                   instCnt_, dev_regFiles);
+}
+
 /*
 SchedInstruction *DataDepSubGraph::GetInstByTplgclOrdr(InstCount ordr) {
   assert(ordr >= 0 && ordr < instCnt_);

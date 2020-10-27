@@ -42,14 +42,14 @@ void LocalRegAlloc::AllocRegs() {
     Logger::Info("REG_ALLOC: Processing instruction %d.", instNum);
 #endif
 
-    Register **uses;
-    Register **defs;
+    RegIndxTuple *uses;
+    RegIndxTuple *defs;
     int useCnt = inst->GetUses(uses);
     int defCnt = inst->GetDefs(defs);
 
     // Find registers for this instruction's VReg uses.
     for (int u = 0; u < useCnt; u++) {
-      Register *use = uses[u];
+      Register *use = dataDepGraph_->getRegByTuple(&uses[u]);
       int16_t regType = use->GetType();
       int virtRegNum = use->GetNum();
       RegMap &map = regMaps_[regType][virtRegNum];
@@ -70,7 +70,7 @@ void LocalRegAlloc::AllocRegs() {
 
     // Kill registers if this is the last use for them.
     for (int u = 0; u < useCnt; u++) {
-      Register *use = uses[u];
+      Register *use = dataDepGraph_->getRegByTuple(&uses[u]);
       int16_t regType = use->GetType();
       int virtRegNum = use->GetNum();
       RegMap &map = regMaps_[regType][virtRegNum];
@@ -91,7 +91,7 @@ void LocalRegAlloc::AllocRegs() {
 
     // Process definitions.
     for (int d = 0; d < defCnt; d++) {
-      Register *def = defs[d];
+      Register *def = dataDepGraph_->getRegByTuple(&defs[d]);
       int16_t regType = def->GetType();
       int virtRegNum = def->GetNum();
 #ifdef IS_DEBUG_REG_ALLOC
@@ -210,14 +210,14 @@ void LocalRegAlloc::ScanUses_() {
       continue;
 
     int instNum = i;
-    Register **uses;
+    RegIndxTuple *uses;
     int useCnt = inst->GetUses(uses);
 #ifdef IS_DEBUG_REG_ALLOC
     Logger::Info("REG_ALLOC: Scanning for uses for instruction %d.", instNum);
 #endif
 
     for (int j = 0; j < useCnt; j++) {
-      Register *use = uses[j];
+      Register *use = dataDepGraph_->getRegByTuple(&uses[j]);
       int virtRegNum = use->GetNum();
       int16_t regType = use->GetType();
       if (regMaps_[regType].find(virtRegNum) == regMaps_[regType].end()) {
@@ -245,11 +245,11 @@ void LocalRegAlloc::ScanUses_() {
 
 void LocalRegAlloc::AddLiveIn_(SchedInstruction *artificialEntry) {
   // Process live-in regs.
-  Register **defs;
+  RegIndxTuple *defs;
   int defCnt = artificialEntry->GetDefs(defs);
 
   for (int d = 0; d < defCnt; d++) {
-    Register *def = defs[d];
+    Register *def = dataDepGraph_->getRegByTuple(&defs[d]);
     int16_t regType = def->GetType();
     int virtRegNum = def->GetNum();
 #ifdef IS_DEBUG_REG_ALLOC

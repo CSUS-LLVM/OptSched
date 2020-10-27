@@ -44,7 +44,7 @@ class DirAcycGraph;
 
 struct GraphEdge {
   // The two nodes between which the edge is.
-  GraphNode *from, *to;
+  UDT_GNODES from, to;
   // Two labels for the edge.
   UDT_GLABEL label, label2;
   // The first node's order in the second node's predecessor list.
@@ -54,16 +54,16 @@ struct GraphEdge {
 
   // Creates an edge between two nodes with labels label and label2.
   __host__ __device__
-  GraphEdge(GraphNode *from = NULL, GraphNode *to = NULL, UDT_GLABEL label = 0,
+  GraphEdge(UDT_GNODES from, UDT_GNODES to, UDT_GLABEL label = 0,
             UDT_GLABEL label2 = 0)
       : from(from), to(to), label(label), label2(label2) {}
 
   // Returns the node on the other side of the edge from the provided node.
   // Assumes that the argument is one of the nodes on the sides of the edge.
   __host__ __device__
-  GraphNode *GetOtherNode(GraphNode *node) const {
-    assert(node == from || node == to);
-    return node == from ? to : from;
+  UDT_GNODES GetOtherNodeNum(UDT_GNODES nodeNum) const {
+    assert(nodeNum == from || nodeNum == to);
+    return nodeNum == from ? to : from;
   }
 };
 
@@ -101,6 +101,8 @@ public:
   // Adds a new node as a recursive successor.
   __host__ __device__
   void AddRcrsvScsr(GraphNode *node);
+  __host__ __device__
+  void AddRcrsvScsr(InstCount nodeNum);
   // Removes the last edge from the successor list and optionally deletes
   // the edge object. scsr must be the destination node of that edge.
   __host__ __device__
@@ -119,6 +121,8 @@ public:
   // Adds a new node as a recursive predecessor.
   __host__ __device__
   void AddRcrsvPrdcsr(GraphNode *node);
+  __host__ __device__
+  void AddRcrsvPrdcsr(InstCount nodeNum);
   // Removes the last edge from the predecessor list and optionally deletes
   // the edge object. scsr must be the destination node of that edge.
   __host__ __device__
@@ -179,7 +183,7 @@ public:
   // Returns a pointer to the next predecessor of the node. Must be called after
   // GetFrstPrdcsr() which starts the predecessor iterator.
   __host__ __device__
-  GraphNode *GetNxtPrdcsr(UDT_GLABEL &label);
+ GraphNode *GetNxtPrdcsr(UDT_GLABEL &label);
   // Checks if a given node is predecessor-equivalent to this node. Two nodes
   // are predecessor-equivalent if they have identical predecessor lists.
   __host__ __device__
@@ -244,7 +248,7 @@ public:
   // Returns the node's recursive predecessor or successor list, depending on
   // the specified direction.
   __host__ __device__
-  ArrayList<GraphNode *> *GetRcrsvNghbrLst(DIRECTION dir);
+  ArrayList<InstCount> *GetRcrsvNghbrLst(DIRECTION dir);
   // Returns the node's recursive predecessor or successor bitset, depending
   // on the specified direction. Nodes which are in the list have the bits
   // indexed by their number set.
@@ -277,6 +281,10 @@ public:
   __device__
   void Reset();
 
+  // Copy GraphNode arrays/pointers to device
+  void CopyPointersToDevice(GraphNode *dev_node, GraphNode **dev_nodes,
+		            InstCount instCnt);
+
 private:
   // The node number. Should be unique within a single graph.
   UDT_GNODES num_;
@@ -286,9 +294,9 @@ private:
   ArrayList<GraphEdge *> *prdcsrLst_;
   
   // A list of all recursively successors of this node.
-  ArrayList<GraphNode *> *rcrsvScsrLst_;
+  ArrayList<InstCount> *rcrsvScsrLst_;
   // A list of all recursively predecessors of this node.
-  ArrayList<GraphNode *> *rcrsvPrdcsrLst_;
+  ArrayList<InstCount> *rcrsvPrdcsrLst_;
   // A bitset indicating whether each of the other nodes in the graph is a
   // recursive successor of this node.
   BitVector *isRcrsvScsr_;
@@ -309,6 +317,10 @@ private:
   GNODE_COLOR color_;
 
 protected:
+  // A pointer to the full array of instructions. Needed in order to save
+  // succs/preds and GraphEdge pointers as instNums instead. This allows for
+  // much faster copying to the Device
+  GraphNode **nodes_;
   // TODO(max): Document what this is.
   __host__ __device__
   bool FindScsr_(GraphNode *&crntScsr, UDT_GNODES trgtNum, UDT_GLABEL trgtLbl);
@@ -438,14 +450,14 @@ inline bool GraphNode::IsLeaf() const { return scsrLst_->GetElmntCnt() == 0; }
 __host__ __device__
 inline void GraphNode::ApndScsr(GraphEdge *edge) {
   assert(edge->from == this);
-  scsrLst_->InsrtElmnt(edge, edge->to->GetNum(), true);
+  scsrLst_->InsrtElmnt(edge, edge->to, true);
 }
 
 __host__ __device__
 inline void GraphNode::AddScsr(GraphEdge *edge) {
   assert(edge->from == this);
   UDT_GEDGES scsrNum = scsrLst_->GetElmntCnt();
-  scsrLst_->InsrtElmnt(edge, edge->to->GetNum(), true);
+  scsrLst_->InsrtElmnt(edge, edge->to, true);
   edge->succOrder = scsrNum;
   scsrLblSum_ += edge->label;
 
@@ -456,14 +468,26 @@ inline void GraphNode::AddScsr(GraphEdge *edge) {
 
 __host__ __device__
 inline void GraphNode::AddRcrsvPrdcsr(GraphNode *node) {
-  rcrsvPrdcsrLst_->InsrtElmnt(node);
+  rcrsvPrdcsrLst_->InsrtElmnt(node->GetNum());
   isRcrsvPrdcsr_->SetBit(node->GetNum());
 }
 
 __host__ __device__
+inline void GraphNode::AddRcrsvPrdcsr(InstCount nodeNum) {
+  rcrsvPrdcsrLst_->InsrtElmnt(nodeNum);
+  isRcrsvPrdcsr_->SetBit(nodeNum);
+}
+
+__host__ __device__
 inline void GraphNode::AddRcrsvScsr(GraphNode *node) {
-  rcrsvScsrLst_->InsrtElmnt(node);
+  rcrsvScsrLst_->InsrtElmnt(node->GetNum());
   isRcrsvScsr_->SetBit(node->GetNum());
+}
+
+__host__ __device__
+inline void GraphNode::AddRcrsvScsr(InstCount nodeNum) {
+  rcrsvScsrLst_->InsrtElmnt(nodeNum);
+  isRcrsvScsr_->SetBit(nodeNum);
 }
 
 __host__ __device__
@@ -532,7 +556,7 @@ inline GraphNode *GraphNode::GetFrstScsr(UDT_GLABEL &label) {
   if (edge == NULL)
     return NULL;
   label = edge->label;
-  return edge->to;
+  return nodes_[edge->to];
 }
 
 __host__ __device__
@@ -541,7 +565,7 @@ inline GraphNode *GraphNode::GetNxtScsr(UDT_GLABEL &label) {
   if (edge == NULL)
     return NULL;
   label = edge->label;
-  return edge->to;
+  return nodes_[edge->to];
 }
 
 __host__ __device__
@@ -550,7 +574,7 @@ inline GraphNode *GraphNode::GetFrstPrdcsr(UDT_GLABEL &label) {
   if (edge == NULL)
     return NULL;
   label = edge->label;
-  return edge->to;
+  return nodes_[edge->to];
 }
 
 __host__ __device__
@@ -559,7 +583,7 @@ inline GraphNode *GraphNode::GetNxtPrdcsr(UDT_GLABEL &label) {
   if (edge == NULL)
     return NULL;
   label = edge->label;
-  return edge->to;
+  return nodes_[edge->to];
 }
 
 __host__ __device__
@@ -587,7 +611,7 @@ __host__ __device__
 inline UDT_GLABEL GraphNode::GetMaxEdgeLabel() const { return maxEdgLbl_; }
 
 __host__ __device__
-inline ArrayList<GraphNode *> *GraphNode::GetRcrsvNghbrLst(DIRECTION dir) {
+inline ArrayList<InstCount> *GraphNode::GetRcrsvNghbrLst(DIRECTION dir) {
   return dir == DIR_FRWRD ? rcrsvScsrLst_ : rcrsvPrdcsrLst_;
 }
 

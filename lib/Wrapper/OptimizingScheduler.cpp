@@ -449,7 +449,7 @@ void ScheduleDAGOptSched::schedule() {
   auto *BDDG = static_cast<OptSchedDDGWrapperBasic *>(DDG.get());
   addGraphTransformations(BDDG);
 
-  if (dev_MM == NULL && false) {
+  if (dev_MM == NULL) {
     // Increase heap/stack size to allow large DDGs to be allocated
     if (cudaSuccess != cudaDeviceSetLimit(cudaLimitStackSize, 65536))
       printf("Error increasing stack size: %s\n",
@@ -473,7 +473,7 @@ void ScheduleDAGOptSched::schedule() {
              cudaGetErrorString(cudaGetLastError()));
     // Copy over all pointers to device
     MM.get()->CopyPointersToDevice(dev_MM);
-
+/*
     // Allocate device memory for dev_maxDDG pointer storage
     if (cudaSuccess != cudaMallocManaged((void**)&dev_maxDDG,
                                          sizeof(DataDepGraph *)))
@@ -523,7 +523,7 @@ void ScheduleDAGOptSched::schedule() {
 		            dev_maxDDG, maxEdgeCnt, dev_edges, dev_insts);
     cudaDeviceSynchronize();
     Logger::Info("Post Kernel Error: %s", cudaGetErrorString(cudaGetLastError()));
-
+*/
   }
   
   // create region
@@ -565,7 +565,7 @@ void ScheduleDAGOptSched::schedule() {
 
   // Deallocate all device memory after completing second pass
   // on the last scheduling region
-  if (RegionNumber == Regions.size() - 1 && SecondPass && false) {
+  if (RegionNumber == Regions.size() - 1 && SecondPass) {
     Logger::Info("Calling cudaDeviceReset()");
     cudaDeviceReset();
     Logger::Info("Done calling cudaDeviceReset()");

@@ -46,17 +46,12 @@ __host__ __device__
 void Register::ResetCrntUseCnt() { crntUseCnt_ = 0; }
 
 void Register::AddUse(const SchedInstruction *inst) {
-  //debug
-#ifndef __CUDA_ARCH__
-  if (liveIntervalSet_.count(inst) != 0)
-    printf("Duplicate instruction entered. InstNum: %d\n", inst->GetNum());
-#endif
-  uses_.insert(inst);
+  uses_.insert(inst->GetNum());
   useCnt_++;
 }
 
 void Register::AddDef(const SchedInstruction *inst) {
-  defs_.insert(inst);
+  defs_.insert(inst->GetNum());
   defCnt_++;
 }
 
@@ -77,12 +72,10 @@ __device__
 void Register::ResetDefsAndUses() {
   // Only called on device, but will not compile without
   // macro since SmallPtrSet doesnt have a Reset() method
-#ifdef __CUDA_ARCH__
   defs_.Reset();
   defCnt_ = 0;
   uses_.Reset();
   useCnt_ = 0;
-#endif
 }
 
 __device__ __host__
@@ -132,20 +125,20 @@ int Register::GetConflictCnt() const { return conflicts_.GetOneCnt(); }
 bool Register::IsSpillCandidate() const { return isSpillCnddt_; }
 
 bool Register::AddToInterval(const SchedInstruction *inst) {
-#ifdef __CUDA_ARCH__
-  return liveIntervalSet_.insert(inst);
-#else
-  return liveIntervalSet_.insert(inst).second;
-#endif
+//#ifdef __CUDA_ARCH__
+  return liveIntervalSet_.insert(inst->GetNum());
+//#else
+  //return liveIntervalSet_.insert(inst->GetNum()).second;
+//#endif
 }
 
 __host__ __device__
 bool Register::IsInInterval(const SchedInstruction *inst) const {
-#ifdef __CUDA_ARCH__
-  return liveIntervalSet_.contains(inst);
-#else
-  return liveIntervalSet_.count(inst) != 0;
-#endif
+//#ifdef __CUDA_ARCH__
+  return liveIntervalSet_.contains(inst->GetNum());
+//#else
+  //return liveIntervalSet_.count(inst->GetNum()) != 0;
+//#endif
 }
 
 const Register::InstSetType &Register::GetLiveInterval() const {
@@ -153,20 +146,20 @@ const Register::InstSetType &Register::GetLiveInterval() const {
 }
 
 bool Register::AddToPossibleInterval(const SchedInstruction *inst) {
-#ifdef __CUDA_ARCH__
-  return possibleLiveIntervalSet_.insert(inst);
-#else
-  return possibleLiveIntervalSet_.insert(inst).second;
-#endif
+//#ifdef __CUDA_ARCH__
+  return possibleLiveIntervalSet_.insert(inst->GetNum());
+//#else
+  //return possibleLiveIntervalSet_.insert(inst->GetNum()).second;
+//#endif
 }
 
 __host__ __device__
 bool Register::IsInPossibleInterval(const SchedInstruction *inst) const {
-#ifdef __CUDA_ARCH__
-  return possibleLiveIntervalSet_.contains(inst);
-#else
-  return possibleLiveIntervalSet_.count(inst) != 0;
-#endif
+//#ifdef __CUDA_ARCH__
+  return possibleLiveIntervalSet_.contains(inst->GetNum());
+//#else
+  //return possibleLiveIntervalSet_.count(inst->GetNum()) != 0;
+//#endif
 }
 
 const Register::InstSetType &Register::GetPossibleLiveInterval() const {
@@ -177,10 +170,92 @@ __device__
 void Register::ResetLiveIntervals() {
   // Only called on device, but will not compile without
   // macro since SmallPtrSet doesnt have a Reset() method
-#ifdef __CUDA_ARCH__
+//#ifdef __CUDA_ARCH__
   liveIntervalSet_.Reset();
   possibleLiveIntervalSet_.Reset();
-#endif
+//#endif
+}
+
+void Register::CopyPointersToDevice(Register *dev_reg) {
+  size_t memSize;
+  // Copy conflicts->vctr_ to device
+  unsigned long *dev_vctr;
+  if (conflicts_.GetUnitCnt() > 0) {
+    memSize = sizeof(unsigned long) * conflicts_.GetUnitCnt();
+    if (cudaSuccess != cudaMalloc(&dev_vctr, memSize))
+      Logger::Fatal("Failed to alloc dev mem for conflicts_->vctr");
+
+    if (cudaSuccess != cudaMemcpy(dev_vctr, conflicts_.vctr_, memSize,
+                                  cudaMemcpyHostToDevice))
+      Logger::Fatal("Failed to copy conflicts_.vctr to device");
+
+    if (cudaSuccess != cudaMemcpy(&dev_reg->conflicts_.vctr_, &dev_vctr,
+                                  sizeof(unsigned long *),
+                                  cudaMemcpyHostToDevice))
+      Logger::Fatal("Failed to update conflicts_->vctr");
+  }
+
+  // Copy uses_.elmnt array
+  InstCount *dev_elmnt;
+  if (uses_.alloc_ > 0) {
+    memSize = sizeof(InstCount) * uses_.alloc_;
+    if (cudaSuccess != cudaMalloc(&dev_elmnt, memSize))
+      Logger::Fatal("Failed to alloc dev mem for dev_uses.elmnt");
+
+    if (cudaSuccess != cudaMemcpy(dev_elmnt, uses_.elmnt, memSize,
+			          cudaMemcpyHostToDevice))
+      Logger::Fatal("Failed to copy uses_.elmnt to dev");
+
+    if (cudaSuccess != cudaMemcpy(&dev_reg->uses_.elmnt, &dev_elmnt,
+			          sizeof(InstCount *), cudaMemcpyHostToDevice))
+      Logger::Fatal("Failed to update dev pointers for uses.elmnt");
+  }
+
+  // Copy defs_.elmnt array
+  if (defs_.alloc_ > 0) {
+    memSize = sizeof(InstCount) * defs_.alloc_;
+    if (cudaSuccess != cudaMalloc(&dev_elmnt, memSize))
+      Logger::Fatal("Failed to alloc dev mem for dev_defs.elmnt");
+
+    if (cudaSuccess != cudaMemcpy(dev_elmnt, defs_.elmnt, memSize,
+                                  cudaMemcpyHostToDevice))
+      Logger::Fatal("Failed to copy defs_.elmnt to dev");
+
+    if (cudaSuccess != cudaMemcpy(&dev_reg->defs_.elmnt, &dev_elmnt,
+                                  sizeof(InstCount *), cudaMemcpyHostToDevice))
+      Logger::Fatal("Failed to update dev pointers for defs.elmnt");
+  }
+
+  // Copy liveIntervalSet_.elmnt array
+  if (liveIntervalSet_.alloc_ > 0) {
+    memSize = sizeof(InstCount) * liveIntervalSet_.alloc_;
+    if (cudaSuccess != cudaMalloc(&dev_elmnt, memSize))
+      Logger::Fatal("Failed to alloc dev mem for dev_liveIntervalSet.elmnt");
+
+    if (cudaSuccess != cudaMemcpy(dev_elmnt, liveIntervalSet_.elmnt, memSize,
+                                  cudaMemcpyHostToDevice))
+      Logger::Fatal("Failed to copy liveIntervalSet_.elmnt to dev");
+
+    if (cudaSuccess != cudaMemcpy(&dev_reg->liveIntervalSet_.elmnt, &dev_elmnt,
+                                  sizeof(InstCount *), cudaMemcpyHostToDevice))
+      Logger::Fatal("Failed to update dev pointers for liveIntervalSet.elmnt");
+  }
+
+  // Copy possibleLiveIntervalSet_.elmnt array
+  if (possibleLiveIntervalSet_.alloc_ > 0) {
+    memSize = sizeof(InstCount) * possibleLiveIntervalSet_.alloc_;
+    if (cudaSuccess != cudaMalloc(&dev_elmnt, memSize))
+      Logger::Fatal("Failed to alloc dev mem for possibleLiveIntervalSet.elmnt");
+
+    if (cudaSuccess != cudaMemcpy(dev_elmnt, possibleLiveIntervalSet_.elmnt, 
+			          memSize, cudaMemcpyHostToDevice))
+      Logger::Fatal("Failed to copy possibleLiveIntervalSet_.elmnt to dev");
+
+    if (cudaSuccess != cudaMemcpy(&dev_reg->possibleLiveIntervalSet_.elmnt, 
+			          &dev_elmnt, sizeof(InstCount *), 
+				  cudaMemcpyHostToDevice))
+      Logger::Fatal("Failed to updt dev ptr for possibleLiveIntervalSet.elmnt");
+  }
 }
 
 __host__ __device__
@@ -368,14 +443,18 @@ void RegisterFile::CopyPointersToDevice(RegisterFile *dev_regFile) {
   dev_regFile->Regs = NULL;
   //declare and allocate array of pointers
   Register **dev_regs = NULL;
-
+  size_t memSize;
   //allocate device memory
-  if (cudaSuccess != cudaMalloc((void**)&dev_regs, getCount() * sizeof(Register *)))
-    printf("Error allocating dev mem for dev_regs: %s\n", cudaGetErrorString(cudaGetLastError()));
+  memSize = getCount() * sizeof(Register *);
+  if (cudaSuccess != cudaMalloc((void**)&dev_regs, memSize))
+    printf("Error allocating dev mem for dev_regs: %s\n", 
+		    cudaGetErrorString(cudaGetLastError()));
 
   //copy array of host pointers to device
-  if (cudaSuccess != cudaMemcpy(dev_regs, Regs, getCount() * sizeof(Register *), cudaMemcpyHostToDevice))
-    printf("Error copying Regs to device: %s\n", cudaGetErrorString(cudaGetLastError()));
+  if (cudaSuccess != cudaMemcpy(dev_regs, Regs, memSize, 
+			        cudaMemcpyHostToDevice))
+    printf("Error copying Regs to device: %s\n", 
+		    cudaGetErrorString(cudaGetLastError()));
 
   //copy each register to device and update its pointer in dev_regs
   Register *dev_reg = NULL;
@@ -383,15 +462,22 @@ void RegisterFile::CopyPointersToDevice(RegisterFile *dev_regFile) {
   for (int i = 0; i < getCount(); i++) {
     //allocate device memory
     if (cudaSuccess != cudaMalloc((void**)&dev_reg, sizeof(Register)))
-      printf("Error allocating dev mem for dev_reg: %s\n", cudaGetErrorString(cudaGetLastError()));
+      printf("Error allocating dev mem for dev_reg: %s\n", 
+		      cudaGetErrorString(cudaGetLastError()));
 
     //copy register to device
-    if (cudaSuccess != cudaMemcpy(dev_reg, Regs[i], sizeof(Register), cudaMemcpyHostToDevice))
-      printf("Error copying Regs[%d] to device: %s\n", i, cudaGetErrorString(cudaGetLastError()));
+    if (cudaSuccess != cudaMemcpy(dev_reg, Regs[i], sizeof(Register), 
+			          cudaMemcpyHostToDevice))
+      printf("Error copying Regs[%d] to device: %s\n", i, 
+		      cudaGetErrorString(cudaGetLastError()));
+
+    Regs[i]->CopyPointersToDevice(dev_reg);
 
     //update dev_regs pointer
-    if (cudaSuccess != cudaMemcpy(&dev_regs[i], &dev_reg, sizeof(Register *), cudaMemcpyHostToDevice))
-      printf("Error updating dev_regs[%d] on device: %s\n", i, cudaGetErrorString(cudaGetLastError()));
+    if (cudaSuccess != cudaMemcpy(&dev_regs[i], &dev_reg, sizeof(Register *), 
+			          cudaMemcpyHostToDevice))
+      printf("Error updating dev_regs[%d] on device: %s\n", i, 
+		      cudaGetErrorString(cudaGetLastError()));
   }
 
   //update dev_regFile->Regs pointer

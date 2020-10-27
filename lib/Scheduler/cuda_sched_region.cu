@@ -115,26 +115,38 @@ void InitializeDDG(SchedRegion *dev_rgn, DataDepGraph **dev_maxDDG,
 
 __global__
 void DevListSched(MachineModel *dev_machMdl, SchedRegion *dev_rgn, 
-		  DataDepGraph **dev_maxDDG, InstCount schedUprBound, 
+		  DataDepGraph *dev_DDG, InstCount schedUprBound, 
 		  SchedPriorities prirts, bool vrfy,
 		  LATENCY_PRECISION ltncyPcsn,
 		  InstSchedule *dev_lstSched, SchedulerType SCHED_TYPE) {
 
+  dev_rgn->SetDepGraph(dev_DDG);
+  ((BBWithSpill *)dev_rgn)->SetRegFiles(dev_DDG->getRegFiles());
+  
+  // debug
+  printf("Set DDG and RegFiles\n");
+
   ConstrainedScheduler *dev_lstSchdulr;
  
   if (SCHED_TYPE == SCHED_LIST)
-    dev_lstSchdulr = new ListScheduler(*dev_maxDDG, dev_machMdl, 
+    dev_lstSchdulr = new ListScheduler(dev_DDG, dev_machMdl, 
 		                       schedUprBound, prirts);
   else
-    dev_lstSchdulr = new SequentialListScheduler(*dev_maxDDG, 
+    dev_lstSchdulr = new SequentialListScheduler(dev_DDG, 
 		                                 dev_machMdl, schedUprBound, 
 						 prirts);
+  
+  // debug
+  printf("Created lstSchdulr, launching find schedule\n");
 
   FUNC_RESULT rslt = dev_lstSchdulr->FindSchedule(dev_lstSched, dev_rgn);
 
   if (rslt != RES_SUCCESS) {
       printf("Device List scheduling failed!\n");
   }
+
+  //debug
+  printf("Finished findSchedule, computing normal cost\n");
 
   // Compute schedule costs
   InstCount hurstcExecCost;
@@ -261,7 +273,18 @@ FUNC_RESULT SchedRegion::FindOptimalSchedule(
     //****Begin Code for ListScheduling on Device****
     Milliseconds hurstcStart = Utilities::GetProcessorTime();
     //if true run DevListSched
-    if (false) {
+    if (true) {
+      // Copy DDG to device
+      DataDepGraph *dev_DDG;
+      if (cudaSuccess != cudaMallocManaged(&dev_DDG, sizeof(DataDepGraph)))
+        Logger::Fatal("Failed to allocate dev mem for dev_ddg");
+
+      if (cudaSuccess != cudaMemcpy(dev_DDG, dataDepGraph_, sizeof(DataDepGraph),
+                                    cudaMemcpyHostToDevice))
+      Logger::Fatal("Failed to copy DDG to device");
+
+      dataDepGraph_->CopyPointersToDevice(dev_DDG);
+      /*
       // Create and copy NodeData and RegData arrays to device for dev DDG
       // holds data about nodes and edges
       NodeData *nodeData = new NodeData[dataDepGraph_->GetInstCnt()];
@@ -320,7 +343,7 @@ FUNC_RESULT SchedRegion::FindOptimalSchedule(
 
       // Free up host regFileData
       delete[] regFileData;
-
+      */
       // Copy this(BBWithSpill) to device
       BBWithSpill *dev_rgn = NULL;
 
@@ -364,7 +387,7 @@ FUNC_RESULT SchedRegion::FindOptimalSchedule(
                cudaGetErrorString(cudaGetLastError()));
 
       // num of blocks
-      unsigned N = max(dataDepGraph_->GetInstCnt(), machMdl_->GetRegTypeCnt());
+      //unsigned N = max(dataDepGraph_->GetInstCnt(), machMdl_->GetRegTypeCnt());
 /*
       // Launch DDG creation kernel
       Logger::Info("Launching DDG creation kernel with %d blocks", N);
@@ -373,17 +396,17 @@ FUNC_RESULT SchedRegion::FindOptimalSchedule(
 			    dev_machMdl_, dataDepGraph_->GetLtncyPrcsn());
       cudaDeviceSynchronize();
       Logger::Info("Post Kernel Error: %s", cudaGetErrorString(cudaGetLastError()));
-*/    
+    
       // Launch maxDDG initialization kernel
       Logger::Info("Launching maxDDG initialization kernel with %d blocks", N);
       InitializeDDG<<<N,1>>>(dev_rgn, dev_maxDDG, dev_nodeData, dev_regFileData,
                             dataDepGraph_->GetInstCnt(), needTransitiveClosure);
       cudaDeviceSynchronize();
       Logger::Info("Post Kernel Error: %s", cudaGetErrorString(cudaGetLastError()));
-
+*/
       // Launch device list sched kernel
       Logger::Info("Launching device list scheduling kernel");
-      DevListSched<<<1,1>>>(dev_machMdl_, dev_rgn, dev_maxDDG, 
+      DevListSched<<<1,1>>>(dev_machMdl_, dev_rgn, dev_DDG, 
 		            abslutSchedUprBound_, GetHeuristicPriorities(), 
 			    vrfySched_, dataDepGraph_->GetLtncyPrcsn(), 
   			    dev_lstSched, GetHeuristicSchedulerType());
@@ -398,12 +421,12 @@ FUNC_RESULT SchedRegion::FindOptimalSchedule(
 
       lstSched->CopyPointersToHost(machMdl_);
 
-      cudaFree(dev_nodeData);
-      cudaFree(dev_regFileData);
+      //cudaFree(dev_nodeData);
+      //cudaFree(dev_regFileData);
       cudaFree(dev_rgn);
 
       // Launch device maxDDG reset kernel
-      Reset<<<1,1>>>(dev_maxDDG);
+      //Reset<<<1,1>>>(dev_maxDDG);
     
       heuristicScheduleLength = lstSched->GetCrntLngth();
       hurstcExecCost = lstSched->GetExecCost();  
@@ -439,7 +462,7 @@ FUNC_RESULT SchedRegion::FindOptimalSchedule(
       CmputNormCost_(host_lstSched, CCM_DYNMC, hurstcExecCost, true);
       
       // if true compare dev and lstsched, if false set hostlstsched as lstsched
-      if (false) {
+      if (true) {
         bool match = true;
     
         for (InstCount i = 0; i < dataDepGraph_->GetInstCnt(); i++) {

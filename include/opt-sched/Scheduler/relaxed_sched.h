@@ -25,7 +25,7 @@ enum RLXD_SCHED_TYPE { RST_STTC, RST_DYNMC, RST_SUBDYNMC };
 // original NP-hard problem.
 class RelaxedScheduler : public InstScheduler {
 protected:
-  DataDepStruct *dataDepGraph_; // the data dependence graph or subgraph
+  DataDepGraph *dataDepGraph_; // the data dependence graph or subgraph
 
   // A list of instructions sorted by scheduling order
   PriorityList<SchedInstruction> *instLst_;
@@ -95,7 +95,7 @@ protected:
   void Reset_(InstCount startIndx);
 
 public:
-  RelaxedScheduler(DataDepStruct *dataDepGraph, MachineModel *machMdl,
+  RelaxedScheduler(DataDepGraph *dataDepGraph, MachineModel *machMdl,
                    InstCount uprBound, DIRECTION schedDir,
                    RLXD_SCHED_TYPE schedType, InstCount maxInstCnt);
   __host__ __device__
@@ -120,7 +120,7 @@ private:
   bool FixInsts_(LinkedList<SchedInstruction> *fxdLst);
 
 public:
-  RJ_RelaxedScheduler(DataDepStruct *dataDepGraph, MachineModel *machMdl,
+  RJ_RelaxedScheduler(DataDepGraph *dataDepGraph, MachineModel *machMdl,
                       InstCount uprBound, DIRECTION schedDir,
                       RLXD_SCHED_TYPE schedType,
                       InstCount maxInstCnt = INVALID_VALUE);
@@ -167,7 +167,7 @@ private:
   InstCount CmputReleaseTime_(SchedInstruction *inst);
 
 public:
-  LC_RelaxedScheduler(DataDepStruct *dataDepGraph, MachineModel *machMdl,
+  LC_RelaxedScheduler(DataDepGraph *dataDepGraph, MachineModel *machMdl,
                       InstCount uprBound, DIRECTION schedDir);
   __host__ __device__
   ~LC_RelaxedScheduler();
@@ -224,7 +224,7 @@ private:
                    InstCount trgtCycle);
 
 public:
-  LPP_RelaxedScheduler(DataDepStruct *dataDepGraph, MachineModel *machMdl,
+  LPP_RelaxedScheduler(DataDepGraph *dataDepGraph, MachineModel *machMdl,
                        InstCount uprBound, DIRECTION schedDir);
   __host__ __device__
   ~LPP_RelaxedScheduler();

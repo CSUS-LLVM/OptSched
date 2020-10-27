@@ -15,12 +15,16 @@ Last Update:  Sept. 2013
 #include "opt-sched/Scheduler/graph.h"
 #include "opt-sched/Scheduler/hash_table.h"
 #include "opt-sched/Scheduler/machine_model.h"
+#include "opt-sched/Scheduler/register.h"
 #include <iostream>
 #include <cuda_runtime.h>
 #include <string.h>
 
 namespace llvm {
 namespace opt_sched {
+
+// Forward declaration to treat circular dependence
+class RegisterFile;
 
 using std::string;
 
@@ -85,6 +89,14 @@ enum SPILL_COST_FUNCTION {
   SCF_SPILLS,
   // Get target specific RP cost (e.g. GCN Occupancy)
   SCF_TARGET
+};
+
+// used to index Registers instead of pointers, faster to copy to device
+struct RegIndxTuple {
+  int regType_, regNum_;
+  __host__ __device__
+  RegIndxTuple(int regType = -1, int regNum = -1) 
+	  : regType_(regType), regNum_(regNum) {}
 };
 
 // The type of instruction signatures, used by the enumerator's history table to
@@ -482,11 +494,11 @@ public:
   // Retrieves the list of registers defined by this node. The array is put
   // into defs and the number of elements is returned.
   __host__ __device__
-  int16_t GetDefs(Register **&defs);
+  int16_t GetDefs(RegIndxTuple *&defs);
   // Retrieves the list of registers used by this node. The array is put
   // into uses and the number of elements is returned.
   __host__ __device__
-  int16_t GetUses(Register **&uses);
+  int16_t GetUses(RegIndxTuple *&uses);
 
   __host__ __device__
   int16_t GetDefCnt() { return defCnt_; }
@@ -516,7 +528,8 @@ public:
 		       InstType instType, const char *const opCode, 
 		       InstCount maxNodeCnt, int nodeID, 
 		       InstCount fileSchedOrder, InstCount fileSchedCycle, 
-		       InstCount fileLB, InstCount fileUB, MachineModel *model);
+		       InstCount fileLB, InstCount fileUB, MachineModel *model,
+		       GraphNode **nodes, RegisterFile *regFiles);
   // Creates a new SchedRange for the inst. used after it is copied to device
   __device__
   void CreateSchedRange();
@@ -525,13 +538,18 @@ public:
   __device__
   void Reset();
 
+  // Copies pointers to device and links them to device inst. Also uses
+  // the device nodes_ array to set nodes_ in GraphNode
+  void CopyPointersToDevice(SchedInstruction *dev_inst, GraphNode **dev_nodes, 
+		            InstCount instCnt, RegisterFile *dev_regFiles);
+
   friend class SchedRange;
 
 protected:
   // The "name" of this instruction. Usually a string indicating its type.
-  char name_[20];
+  char name_[30];
   // The mnemonic of this instruction, e.g. "add" or "jmp".
-  char opCode_[20];
+  char opCode_[30];
   // A numberical ID for this instruction.
   int nodeID_;
   // The type of this instruction.
@@ -575,10 +593,10 @@ protected:
 
   // The priority list of this instruction's predecessors, sorted by deadline
   // for relaxed scheduling.
-  PriorityArrayList<SchedInstruction *> *sortedPrdcsrLst_;
+  PriorityArrayList<InstCount> *sortedPrdcsrLst_;
   // The priority list of this instruction's successors, sorted by deadline
   // for relaxed scheduling.
-  PriorityArrayList<SchedInstruction *> *sortedScsrLst_;
+  PriorityArrayList<InstCount> *sortedScsrLst_;
 
   /***************************************************************************
    * Used during scheduling                                                  *
@@ -646,12 +664,14 @@ protected:
   /***************************************************************************
    * Used for BB-Spill scheduling                                            *
    ***************************************************************************/
+  // Pointer to RegFiles
+  RegisterFile *RegFiles_;
   // The registers defined by this instruction node.
-  Register *defs_[MAX_DEFS_PER_INSTR];
+  RegIndxTuple defs_[MAX_DEFS_PER_INSTR];
   // The number of elements in defs.
   int16_t defCnt_;
   // The registers used by this instruction node.
-  Register *uses_[MAX_USES_PER_INSTR];
+  RegIndxTuple uses_[MAX_USES_PER_INSTR];
   // The number of elements in uses.
   int16_t useCnt_;
   // The number of uses minus live-out registers. Live-out registers are uses

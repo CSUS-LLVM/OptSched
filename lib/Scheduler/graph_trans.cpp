@@ -1,3 +1,4 @@
+/*
 #include "opt-sched/Scheduler/graph_trans.h"
 #include "opt-sched/Scheduler/bit_vector.h"
 #include "opt-sched/Scheduler/logger.h"
@@ -89,22 +90,23 @@ bool GraphTrans::AreNodesIndep_(SchedInstruction *inst1,
 
 void GraphTrans::UpdatePrdcsrAndScsr_(SchedInstruction *nodeA,
                                       SchedInstruction *nodeB) {
-  ArrayList<GraphNode *> *nodeBScsrLst = nodeB->GetRcrsvNghbrLst(DIR_FRWRD);
-  ArrayList<GraphNode *> *nodeAPrdcsrLst = nodeA->GetRcrsvNghbrLst(DIR_BKWRD);
+  ArrayList<InstCount> *nodeBScsrLst = nodeB->GetRcrsvNghbrLst(DIR_FRWRD);
+  ArrayList<InstCount> *nodeAPrdcsrLst = nodeA->GetRcrsvNghbrLst(DIR_BKWRD);
 
   // Update lists for the nodes themselves.
   nodeA->AddRcrsvScsr(nodeB);
   nodeB->AddRcrsvPrdcsr(nodeA);
 
-  for (GraphNode *X = nodeAPrdcsrLst->GetFrstElmnt(); X != NULL;
+  for (InstCount X = nodeAPrdcsrLst->GetFrstElmnt(); X != END;
        X = nodeAPrdcsrLst->GetNxtElmnt()) {
 
-    for (GraphNode *Y = nodeBScsrLst->GetFrstElmnt(); Y != NULL;
+    for (InstCount Y = nodeBScsrLst->GetFrstElmnt(); Y != END;
          Y = nodeBScsrLst->GetNxtElmnt()) {
       // Check if Y is reachable f
-      if (!X->IsRcrsvScsr(Y)) {
-        Y->AddRcrsvPrdcsr(X);
-        X->AddRcrsvScsr(Y);
+      if (!dataDepGraph_->GetInstByIndx(X)->IsRcrsvScsr(
+			      dataDepGraph_->GetInstByIndx(Y))) {
+        dataDepGraph_->GetInstByIndx(Y)->AddRcrsvPrdcsr(X);
+        dataDepGraph_->GetInstByIndx(X)->AddRcrsvScsr(Y);
       }
     }
   }
@@ -308,4 +310,4 @@ void StaticNodeSupTrans::nodeMultiPass_(
       }
     }
   }
-}
+}*/

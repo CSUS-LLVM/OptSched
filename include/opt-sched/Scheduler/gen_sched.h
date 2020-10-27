@@ -53,7 +53,7 @@ public:
   // Constructs a scheduler for the given machine and dependence graph, with
   // the specified upper bound.
   __host__ __device__
-  InstScheduler(DataDepStruct *dataDepGraph, MachineModel *machMdl,
+  InstScheduler(DataDepGraph *dataDepGraph, MachineModel *machMdl,
                 InstCount schedUprBound);
   // Deallocates memory used by the scheduler.
   __host__ __device__
