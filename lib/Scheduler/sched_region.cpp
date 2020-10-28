@@ -191,6 +191,7 @@ FUNC_RESULT SchedRegion::FindOptimalSchedule(
   InstCount heuristicScheduleLength = INVALID_VALUE;
   InstCount AcoScheduleLength_ = INVALID_VALUE;
   InstCount AcoScheduleCost_ = INVALID_VALUE;
+  InstCount AcoSpillCost_ = INVALID_VALUE;
 
   enumCrntSched_ = NULL;
   enumBestSched_ = NULL;
@@ -321,12 +322,9 @@ FUNC_RESULT SchedRegion::FindOptimalSchedule(
   // This must be done after SetupForSchdulng() or UpdateSetupForSchdulng() to
   // avoid resetting lower bound values.
   if (!BbSchedulerEnabled)
-    costLwrBound_ = CmputCostLwrBound();
+    CmputAndSetCostLwrBound();
   else
     CmputLwrBounds_(false);
-
-  // Set the lowerbound of spill cost (need to CmptCostLWrBound() first)
-  SpillCostLwrBound_ = getSpillCostLwrBound();
 
   // Cost calculation must be below lower bounds calculation
   if (HeuristicSchedulerEnabled || IsSecondPass()) {
@@ -347,6 +345,7 @@ FUNC_RESULT SchedRegion::FindOptimalSchedule(
       bestSched = bestSched_ = lstSched;
       bestSchedLngth_ = heuristicScheduleLength;
       bestCost_ = hurstcCost_;
+      BestSpillCost_ = HurstcSpillCost_;
     }
 
     FinishHurstc_();
@@ -367,6 +366,46 @@ FUNC_RESULT SchedRegion::FindOptimalSchedule(
                                   "CP Lower Bounds");
 #endif
   }
+
+  // (Chris): If the cost function is SLIL, then the list schedule is considered
+  // optimal if PERP is 0.
+  if (filterByPerp && !isLstOptml && spillCostFunc_ == SCF_SLIL) {
+    const InstCount *regPressures = nullptr;
+    auto regTypeCount = lstSched->GetPeakRegPressures(regPressures);
+    InstCount sumPerp = 0;
+    for (int i = 0; i < regTypeCount; ++i) {
+      int perp = regPressures[i] - machMdl_->GetPhysRegCnt(i);
+      if (perp > 0)
+        sumPerp += perp;
+    }
+    if (sumPerp == 0) {
+      isLstOptml = true;
+      bestSched = bestSched_ = lstSched;
+      bestSchedLngth_ = heuristicScheduleLength;
+      bestCost_ = hurstcCost_;
+      BestSpillCost_ = HurstcSpillCost_;
+      Logger::Info("Marking SLIL list schedule as optimal due to zero PERP.");
+    }
+  }
+
+#if defined(IS_DEBUG_SLIL_OPTIMALITY)
+  // (Chris): This code prints a statement when a schedule is SLIL-optimal but
+  // not PERP-optimal.
+  if (spillCostFunc_ == SCF_SLIL && bestCost_ == 0) {
+    const InstCount *regPressures = nullptr;
+    auto regTypeCount = lstSched->GetPeakRegPressures(regPressures);
+    InstCount sumPerp = 0;
+    for (int i = 0; i < regTypeCount; ++i) {
+      int perp = regPressures[i] - machMdl_->GetPhysRegCnt(i);
+      if (perp > 0)
+        sumPerp += perp;
+    }
+    if (sumPerp > 0) {
+      Logger::Info("Dag %s is SLIL optimal but not PERP optimal (PERP=%d).",
+                   dataDepGraph_->GetDagID(), sumPerp);
+    }
+  }
+#endif
 
   // Log the lower bound on the cost, allowing tools reading the log to compare
   // absolute rather than relative costs.
@@ -399,8 +438,12 @@ FUNC_RESULT SchedRegion::FindOptimalSchedule(
     if (AcoTime > 0)
       Logger::Info("ACO_Time %d", AcoTime);
 
+    InstCount acoExecCost;
+
     AcoScheduleLength_ = AcoSchedule->GetCrntLngth();
+    CmputNormCost_(AcoSchedule, CCM_DYNMC, acoExecCost, true);
     AcoScheduleCost_ = AcoSchedule->GetCost();
+    AcoSpillCost_ = AcoSchedule->GetSpillCost();
 
     // If ACO is run then that means either:
     // 1.) Heuristic was not run
@@ -412,6 +455,7 @@ FUNC_RESULT SchedRegion::FindOptimalSchedule(
       bestSched = bestSched_ = AcoSchedule;
       bestSchedLngth_ = AcoScheduleLength_;
       bestCost_ = AcoScheduleCost_;
+      BestSpillCost_ = AcoSpillCost_;
     }
   }
 
@@ -435,7 +479,7 @@ FUNC_RESULT SchedRegion::FindOptimalSchedule(
       bestSched = bestSched_ = AcoSchedule;
       bestSchedLngth_ = AcoScheduleLength_;
       bestCost_ = AcoScheduleCost_;
-      // need to set spillCost
+      BestSpillCost_ = AcoSpillCost_;
 
       // C) Neither scheduler was optimal. In that case, compare the two
       // schedules and use the one that's better as the input (initialSched) for
@@ -445,9 +489,10 @@ FUNC_RESULT SchedRegion::FindOptimalSchedule(
       bestSched = bestSched_;
       bestSchedLngth_ = bestSched_->GetCrntLngth();
       bestCost_ = bestSched_->GetCost();
-      // need to set spillCost
+      BestSpillCost_ = bestSched_->GetSpillCost();
     }
   }
+
   // Step #3: Compute the cost upper bound.
   Milliseconds boundStart = Utilities::GetProcessorTime();
   assert(bestSchedLngth_ >= schedLwrBound_);
@@ -466,41 +511,6 @@ FUNC_RESULT SchedRegion::FindOptimalSchedule(
                                 "CP Lower Bounds");
 #endif
 
-  // (Chris): If the cost function is SLIL, then the list schedule is considered
-  // optimal if PERP is 0.
-  if (filterByPerp && !isLstOptml && spillCostFunc_ == SCF_SLIL) {
-    const InstCount *regPressures = nullptr;
-    auto regTypeCount = lstSched->GetPeakRegPressures(regPressures);
-    InstCount sumPerp = 0;
-    for (int i = 0; i < regTypeCount; ++i) {
-      int perp = regPressures[i] - machMdl_->GetPhysRegCnt(i);
-      if (perp > 0)
-        sumPerp += perp;
-    }
-    if (sumPerp == 0) {
-      isLstOptml = true;
-      Logger::Info("Marking SLIL list schedule as optimal due to zero PERP.");
-    }
-  }
-
-#if defined(IS_DEBUG_SLIL_OPTIMALITY)
-  // (Chris): This code prints a statement when a schedule is SLIL-optimal but
-  // not PERP-optimal.
-  if (spillCostFunc_ == SCF_SLIL && bestCost_ == 0) {
-    const InstCount *regPressures = nullptr;
-    auto regTypeCount = lstSched->GetPeakRegPressures(regPressures);
-    InstCount sumPerp = 0;
-    for (int i = 0; i < regTypeCount; ++i) {
-      int perp = regPressures[i] - machMdl_->GetPhysRegCnt(i);
-      if (perp > 0)
-        sumPerp += perp;
-    }
-    if (sumPerp > 0) {
-      Logger::Info("Dag %s is SLIL optimal but not PERP optimal (PERP=%d).",
-                   dataDepGraph_->GetDagID(), sumPerp);
-    }
-  }
-#endif
   if (EnableEnum_() == false) {
     delete lstSchdulr;
     return RES_FAIL;
@@ -853,8 +863,7 @@ void SchedRegion::CmputLwrBounds_(bool useFileBounds) {
   if (useFileBounds)
     UseFileBounds_();
 
-  costLwrBound_ = CmputCostLwrBound();
-  // SpillCostLwrBound_ = getSpillCostLwrBound();
+  CmputAndSetCostLwrBound();
 
   delete rlxdSchdulr;
   delete rvrsRlxdSchdulr;

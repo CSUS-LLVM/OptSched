@@ -98,10 +98,6 @@ private:
   ConstrainedScheduler *AllocHeuristicScheduler_();
   bool EnableEnum_();
 
-  // BBWithSpill-specific Functions
-  InstCount CmputCostLwrBound_(InstCount schedLngth);
-  InstCount CmputCostLwrBound_();
-
   void InitForCostCmputtn_();
   InstCount CmputDynmcCost_();
 
@@ -131,7 +127,7 @@ public:
   // cost of the schedule using Scf whenever the spill cost updates
   void addRecordedCost(SPILL_COST_FUNCTION Scf);
   void storeExtraCost(InstSchedule *sched, SPILL_COST_FUNCTION Scf);
-  int CmputCostLwrBound();
+  void CmputAndSetCostLwrBound();
   int cmputSpillCostLwrBound();
 
   SmallVector<InstCount, 4> UpdtOptmlSched(InstSchedule *crntSched,

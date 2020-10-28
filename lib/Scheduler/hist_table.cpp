@@ -523,7 +523,8 @@ static bool doesHistoryPeakCostDominateScndPss(InstCount OtherPrefixSpillCost,
     // HistPrefixSpillCost > TrgtSpillCost. Based on the way we store history
     // schedules, it is impossible to reach this condition. This assert should
     // never be reached
-    assert(false);
+    llvm::report_fatal_error(
+        "Impossible condition reached in history domination");
   }
 
   return false;
