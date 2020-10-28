@@ -932,7 +932,6 @@ FUNC_RESULT Enumerator::FindFeasibleSchedule_(InstSchedule *sched,
         isCrntNodeFsbl = BackTrack_();
       }
     } else {
-
       // All branches from the current node have been explored, and no more
       // branches that lead to feasible nodes have been found.
       if (crntNode_ == rootNode_) {
@@ -1053,7 +1052,6 @@ bool Enumerator::FindNxtFsblBrnch_(EnumTreeNode *&newNode) {
 bool Enumerator::ProbeBranch_(SchedInstruction *inst, EnumTreeNode *&newNode,
                               bool &isNodeDmntd, bool &isRlxInfsbl,
                               bool &isLngthFsbl) {
-
   bool fsbl;
   newNode = NULL;
   isLngthFsbl = false;
@@ -1940,9 +1938,9 @@ void LengthEnumerator::Reset() { Enumerator::Reset(); }
 /*****************************************************************************/
 
 bool LengthEnumerator::WasObjctvMet_() {
-  bool wasSlonFound = WasSolnFound_();
+  bool wasSolnFound = WasSolnFound_();
 
-  return wasSlonFound;
+  return wasSolnFound;
 }
 /*****************************************************************************/
 

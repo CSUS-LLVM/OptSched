@@ -108,8 +108,8 @@ private:
 
   // Keep trying to find superior nodes until none can be found or there are no
   // more independent nodes.
-  void
-  nodeMultiPass_(std::list<std::pair<SchedInstruction *, SchedInstruction *>>);
+  void nodeMultiPass_(
+      std::list<std::pair<SchedInstruction *, SchedInstruction *>>);
 };
 
 } // namespace opt_sched
