@@ -2092,12 +2092,11 @@ bool LengthCostEnumerator::WasObjctvMet_() {
 /*****************************************************************************/
 
 bool LengthCostEnumerator::WasObjctvMetWghtd_() {
-  // llvm::SmallVector<InstCount,4> ObjctvValues;
-  llvm::SmallVector<InstCount, 4> ObjctvValues;
+  llvm::SmallVector<InstCount, NUM_OPTIMAL_CONDITIONS> ObjctvValues;
 
   InstCount crntCost = GetBestCost_();
 
-  ObjctvValues = rgn_->UpdtOptmlSchedWghtd(crntSched_, this);
+  ObjctvValues = rgn_->UpdtOptmlSched(crntSched_, this);
 
   if (ObjctvValues[0] < crntCost)
     imprvmntCnt_++;
@@ -2107,12 +2106,11 @@ bool LengthCostEnumerator::WasObjctvMetWghtd_() {
 /*****************************************************************************/
 
 bool LengthCostEnumerator::WasObjctvMetFrstPss_() {
-  // llvm::SmallVector<InstCount,4> ObjctvValues;
-  llvm::SmallVector<InstCount, 4> ObjctvValues;
+  llvm::SmallVector<InstCount, NUM_OPTIMAL_CONDITIONS> ObjctvValues;
 
   InstCount crntSpillCost = getBestSpillCost_();
 
-  ObjctvValues = rgn_->UpdtOptmlSchedFrstPss(crntSched_, this);
+  ObjctvValues = rgn_->UpdtOptmlSched(crntSched_, this);
 
   if (ObjctvValues[0] < crntSpillCost)
     imprvmntCnt_++;
@@ -2128,12 +2126,11 @@ bool LengthCostEnumerator::WasObjctvMetFrstPss_() {
 /*****************************************************************************/
 
 bool LengthCostEnumerator::WasObjctvMetScndPss_() {
-  // llvm::SmallVector<InstCount,4> ObjctvValues;
-  llvm::SmallVector<InstCount, 4> ObjctvValues;
+  llvm::SmallVector<InstCount, NUM_OPTIMAL_CONDITIONS> ObjctvValues;
 
   InstCount crntSchedLength = getBestSchedLength_();
 
-  ObjctvValues = rgn_->UpdtOptmlSchedScndPss(crntSched_, this);
+  ObjctvValues = rgn_->UpdtOptmlSched(crntSched_, this);
 
   if (ObjctvValues[1] < crntSchedLength &&
       ObjctvValues[0] == rgn_->getSpillCostConstraint())

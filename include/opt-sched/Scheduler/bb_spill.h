@@ -130,21 +130,26 @@ public:
   void CmputAndSetCostLwrBound();
   int cmputSpillCostLwrBound();
 
-  SmallVector<InstCount, 4> UpdtOptmlSched(InstSchedule *crntSched,
-                                           LengthCostEnumerator *enumrtr);
-  SmallVector<InstCount, 4>
-  UpdtOptmlSchedFrstPss(InstSchedule *crntSched, LengthCostEnumerator *enumrtr);
-  SmallVector<InstCount, 4>
-  UpdtOptmlSchedScndPss(InstSchedule *crntSched, LengthCostEnumerator *enumrtr);
-  SmallVector<InstCount, 4> UpdtOptmlSchedWghtd(InstSchedule *crntSched,
-                                                LengthCostEnumerator *enumrtr);
+  SmallVector<InstCount, NUM_OPTIMAL_CONDITIONS>
+  UpdtOptmlSched(InstSchedule *crntSched, LengthCostEnumerator *enumrtr);
+  SmallVector<InstCount, NUM_OPTIMAL_CONDITIONS>
+  UpdtOptmlSchedFrstPss(InstSchedule *crntSched, LengthCostEnumerator *enumrtr,
+                        InstCount crntCost, InstCount TmpSpillCost);
+  SmallVector<InstCount, NUM_OPTIMAL_CONDITIONS>
+  UpdtOptmlSchedScndPss(InstSchedule *crntSched, LengthCostEnumerator *enumrtr,
+                        InstCount crntCost, InstCount TmpSpillCost);
+  SmallVector<InstCount, NUM_OPTIMAL_CONDITIONS>
+  UpdtOptmlSchedWghtd(InstSchedule *crntSched, LengthCostEnumerator *enumrtr,
+                      InstCount crntCost);
   bool ChkCostFsblty(InstCount trgtLngth, EnumTreeNode *treeNode,
                      InstCount &RPCost);
   bool ChkCostFsbltyFrstPss(InstCount trgtLngth, EnumTreeNode *treeNode,
-                            InstCount &RPCost);
+                            InstCount crntCost, InstCount TmpSpillCost);
   bool ChkCostFsbltyScndPss(InstCount trgtLngth, EnumTreeNode *treeNode,
-                            InstCount &RPCost);
-  bool ChkCostFsbltyWghtd(InstCount trgtLngth, EnumTreeNode *treeNode);
+                            InstCount crntCost, InstCount TmpSpillCost);
+  bool ChkCostFsbltyWghtd(InstCount trgtLngth, EnumTreeNode *treeNode,
+                          InstCount crntCost, InstCount TmpSpillCost);
+
   void SchdulInst(SchedInstruction *inst, InstCount cycleNum, InstCount slotNum,
                   bool trackCnflcts);
   void UnschdulInst(SchedInstruction *inst, InstCount cycleNum,

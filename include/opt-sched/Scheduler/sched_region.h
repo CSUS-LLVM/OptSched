@@ -21,6 +21,13 @@ Last Update:  Jan. 2020
 namespace llvm {
 namespace opt_sched {
 
+// This value is used to determine the size of the smallVector that is
+// returned by updtOptmlSchedule. The return smallVector holds values
+// that we use to see if a schedule is optimal (e.g. weighted cost)
+// in some instances, we are trying to optimize more than one metric
+// (e.g. schedLength, RPCost)
+const int NUM_OPTIMAL_CONDITIONS = 4;
+
 // How to compare cost.
 // TODO(max): Elaborate.
 enum COST_COMP_MODE {
@@ -95,20 +102,20 @@ public:
   virtual int cmputSpillCostLwrBound() = 0;
 
   // TODO(max): Document.
-  virtual llvm::SmallVector<InstCount, 4>
+  virtual llvm::SmallVector<InstCount, NUM_OPTIMAL_CONDITIONS>
   UpdtOptmlSched(InstSchedule *crntSched, LengthCostEnumerator *enumrtr) = 0;
 
-  virtual llvm::SmallVector<InstCount, 4>
-  UpdtOptmlSchedFrstPss(InstSchedule *crntSched,
-                        LengthCostEnumerator *enumrtr) = 0;
+  virtual llvm::SmallVector<InstCount, NUM_OPTIMAL_CONDITIONS>
+  UpdtOptmlSchedFrstPss(InstSchedule *crntSched, LengthCostEnumerator *enumrtr,
+                        InstCount crntCost, InstCount TmpSpillCost) = 0;
 
-  virtual llvm::SmallVector<InstCount, 4>
-  UpdtOptmlSchedScndPss(InstSchedule *crntSched,
-                        LengthCostEnumerator *enumrtr) = 0;
+  virtual llvm::SmallVector<InstCount, NUM_OPTIMAL_CONDITIONS>
+  UpdtOptmlSchedScndPss(InstSchedule *crntSched, LengthCostEnumerator *enumrtr,
+                        InstCount crntCost, InstCount TmpSpillCost) = 0;
 
-  virtual llvm::SmallVector<InstCount, 4>
-  UpdtOptmlSchedWghtd(InstSchedule *crntSched,
-                      LengthCostEnumerator *enumrtr) = 0;
+  virtual llvm::SmallVector<InstCount, NUM_OPTIMAL_CONDITIONS>
+  UpdtOptmlSchedWghtd(InstSchedule *crntSched, LengthCostEnumerator *enumrtr,
+                      InstCount crntCost) = 0;
 
   // TODO(max): Document.
   virtual bool ChkCostFsblty(InstCount trgtLngth, EnumTreeNode *treeNode,
