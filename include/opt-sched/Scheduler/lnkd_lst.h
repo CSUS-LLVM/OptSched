@@ -13,16 +13,20 @@ Last Update:  May  2020
 #include "opt-sched/Scheduler/defines.h"
 #include "opt-sched/Scheduler/logger.h"
 #include "llvm/ADT/ArrayRef.h"
+#include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/iterator.h"
 #include "llvm/Support/ErrorHandling.h"
 #include <cstring>
 #include <iterator>
+#include <type_traits>
 
 namespace llvm {
 namespace opt_sched {
 
 // A container class for the object to be stored in a linked list.
 template <class T> struct Entry {
+  using value_type = T;
+
   T *element;
 
   inline Entry(T *element = NULL, Entry *next = NULL, Entry *prev = NULL)
@@ -59,9 +63,125 @@ template <class T, class K = unsigned long> struct KeyedEntry : Entry<T> {
   }
   virtual KeyedEntry *GetNext() const { return (KeyedEntry *)Entry<T>::next; }
   virtual KeyedEntry *GetPrev() const { return (KeyedEntry *)Entry<T>::prev; }
-  virtual void SetNext(Entry<T> *e) { Entry<T>::next = (Entry<T> *)e; }
-  virtual void SetPrev(Entry<T> *e) { Entry<T>::prev = (Entry<T> *)e; }
 };
+
+/**
+ * \brief An allocator for LinkedList Entry's
+ */
+template <class T> class EntryAllocator {
+public:
+  virtual ~EntryAllocator() = default;
+  virtual Entry<T> *allocate() = 0;
+  virtual void deallocate(Entry<T> *) = 0;
+};
+
+/**
+ * \brief Allocates entries using new/delete
+ * \tparam EntryType a subclass of Entry<T> to allocate
+ */
+template <class EntryType>
+class DynamicEntryAllocator
+    : public EntryAllocator<typename EntryType::value_type> {
+  using T = typename EntryType::value_type;
+
+  static_assert(std::is_base_of<Entry<T>, EntryType>::value &&
+                    std::is_convertible<EntryType *, Entry<T> *>::value,
+                "EntryType should be a subclass of Entry<T>");
+
+public:
+  Entry<T> *allocate() override { return new EntryType(); }
+  void deallocate(Entry<T> *entry) override { delete entry; }
+};
+
+/**
+ * \brief A basic arena alllocator with free list
+ * \tparam EntryType a subclass of Entry<T> to allocate
+ */
+template <class EntryType>
+class ArenaEntryAllocator
+    : public EntryAllocator<typename EntryType::value_type> {
+  using T = typename EntryType::value_type;
+
+  static_assert(std::is_base_of<Entry<T>, EntryType>::value &&
+                    std::is_convertible<EntryType *, Entry<T> *>::value,
+                "EntryType should be a subclass of Entry<T>");
+
+public:
+  /**
+   * \brief Create an arena allocator capable of allocating up to StaticSize
+   * entries
+   */
+  explicit ArenaEntryAllocator(size_t StaticSize) {
+    Arena_.reserve(StaticSize);
+  }
+
+  ArenaEntryAllocator(const ArenaEntryAllocator &) = delete;
+  ArenaEntryAllocator &operator=(const ArenaEntryAllocator &) = delete;
+
+  ArenaEntryAllocator(ArenaEntryAllocator &&Rhs) noexcept
+      : Arena_(std::move(Rhs.Arena_)), FreeList_(Rhs.FreeList_) {}
+
+  ArenaEntryAllocator &operator=(ArenaEntryAllocator &&Rhs) noexcept {
+    Arena_ = std::move(Rhs).Arena_;
+    FreeList_ = Rhs.FreeList_;
+    return *this;
+  }
+
+  Entry<T> *allocate() override {
+    if (Arena_.size() == Arena_.capacity()) {
+      // We have previously allocated all of our entries.
+      // We may still be able to allocate from the freelist.
+      if (!FreeList_) {
+        llvm::report_fatal_error("Trying to allocate too many entries", false);
+      } else {
+        Entry<T> *result = FreeList_;
+        FreeList_ = FreeList_->GetNext();
+        result->SetNext(nullptr);
+
+        return result;
+      }
+    } else {
+      // Take the next element from our storage as the next entry.
+      Arena_.emplace_back();
+      return &Arena_.back();
+    }
+  }
+  void deallocate(Entry<T> *entry) override {
+    if (entry == &Arena_.back()) {
+      // If the entry is the last entry in the array, we can deallocate it by
+      // simply dropping it from the end of the array.
+      Arena_.pop_back();
+    } else {
+      // Otherwise, we add it to the freelist.
+      entry->SetPrev(nullptr);
+      entry->SetNext(FreeList_);
+      FreeList_ = entry;
+    }
+  }
+
+private:
+  // Uses SmallVector for its convenient API, but the vector will never resize.
+  llvm::SmallVector<EntryType, 0> Arena_;
+  Entry<T> *FreeList_ = nullptr;
+};
+
+/**
+ * \brief Creates an ArenaEntryAllocator or DynamicEntryAllocator from MaxSize.
+ * \param MaxSize The maximum number of entries we will need to allocate from
+ *        this allocator.
+ * \tparam EntryType a subclass of Entry<T> to allocate.
+ * \returns a DynamicEntryAllocator for EntryType if MaxSize == INVALID_VALUE
+ *          Otherwise, returns an ArenaEntryAllocator for EntryType if
+ *          MaxSize != INVALID_VALUE
+ */
+template <class EntryType>
+std::unique_ptr<EntryAllocator<typename EntryType::value_type>>
+makeDynamicOrArenaAllocator(int MaxSize) {
+  if (MaxSize == INVALID_VALUE)
+    return llvm::make_unique<DynamicEntryAllocator<EntryType>>();
+  else
+    return llvm::make_unique<ArenaEntryAllocator<EntryType>>(MaxSize);
+}
 
 template <class T> class LinkedList;
 
@@ -157,11 +277,10 @@ public:
   Entry<T> *GetBottomEntry() const { return bottomEntry_; }
 
 protected:
-  int maxSize_;
-  Entry<T> *allocEntries_;
-  int crntAllocIndx_;
+  explicit LinkedList(std::unique_ptr<EntryAllocator<T>> Allocator);
+
+  std::unique_ptr<EntryAllocator<T>> Allocator_;
   Entry<T> *topEntry_, *bottomEntry_, *rtrvEntry_;
-  Entry<T> *freeList_;
   int elmntCnt_;
   bool itrtrReset_;
   bool wasTopRmvd_;
@@ -175,12 +294,19 @@ protected:
   // Resets all state to default values. Warning: does not free memory!
   virtual void Init_();
   // Deletes an entry object in dynamically-sized lists.
-  virtual void FreeEntry_(Entry<T> *entry);
+  void FreeEntry_(Entry<T> *entry);
+
   // Creates a new entry, by allocating memory in dynamically-sized lists or
   // using previously allocated memory in fixed-sized lists.
-  virtual Entry<T> *AllocEntry_(T *element);
-  // Allocates all entries for a fixed-sized list.
-  virtual void AllocEntries_();
+  template <typename EntryType, typename SetValuesFn>
+  EntryType *AllocEntry_(SetValuesFn SetValues) {
+    static_assert(std::is_convertible<EntryType *, Entry<T> *>::value,
+                  "EntryType should be a subclass of Entry<T>");
+
+    EntryType *entry = static_cast<EntryType *>(Allocator_->allocate());
+    SetValues(*entry);
+    return entry;
+  }
 };
 
 template <class T>
@@ -217,12 +343,6 @@ class PriorityList : public LinkedList<T> {
 public:
   // Constructs a priority list, by default using a dynamic size.
   inline PriorityList(int maxSize = INVALID_VALUE);
-  // Constructs a priority list, by default using a dynamic size.
-  ~PriorityList() {
-    if (LinkedList<T>::maxSize_ != INVALID_VALUE) {
-      delete[] allocKeyEntries_;
-    }
-  }
 
   // Insert a new element by automatically finding its place in the list.
   // If allowDplct is false, the element will not be inserted if another
@@ -244,50 +364,30 @@ public:
            llvm::MutableArrayRef<KeyedEntry<T, unsigned long> *> keyedEntries_);
 
 protected:
-  KeyedEntry<T, K> *allocKeyEntries_;
-
   // Creates and returns a keyed entry. For dynamically-sized lists, new
   // memory is allocated. For fixed-size lists, existing memory is used.
   KeyedEntry<T, K> *AllocEntry_(T *elmnt, K key);
-  // Disable the version from LinkedList.
-  Entry<T> *AllocEntry_(T *) {
-    llvm::report_fatal_error("Unimplemented.", false);
-    return NULL;
-  }
-  // Allocates all the keyed entries in a fixed-size list.
-  void AllocEntries_();
   // Inserts entry before next.
   virtual void InsrtEntry_(KeyedEntry<T, K> *entry, KeyedEntry<T, K> *next);
 };
 
-template <class T> inline LinkedList<T>::LinkedList(int maxSize) {
+template <class T>
+inline LinkedList<T>::LinkedList(int MaxSize)
+    : LinkedList(makeDynamicOrArenaAllocator<Entry<T>>(MaxSize)) {}
+
+template <class T>
+inline LinkedList<T>::LinkedList(std::unique_ptr<EntryAllocator<T>> Allocator)
+    : Allocator_(std::move(Allocator)) {
   Init_();
-  maxSize_ = maxSize;
-
-  if (maxSize_ == INVALID_VALUE) {
-    allocEntries_ = NULL;
-  } else {
-    AllocEntries_();
-  }
 }
 
-template <class T> LinkedList<T>::~LinkedList() {
-  Reset();
-
-  if (maxSize_ != INVALID_VALUE) {
-    delete[] allocEntries_;
-  }
-}
+template <class T> LinkedList<T>::~LinkedList() { Reset(); }
 
 template <class T> inline void LinkedList<T>::Reset() {
   Entry<T> *nextEntry;
-
-  if (maxSize_ == INVALID_VALUE) {
-    for (Entry<T> *crntEntry = topEntry_; crntEntry != NULL;
-         crntEntry = nextEntry) {
-      nextEntry = crntEntry->GetNext();
-      FreeEntry_(crntEntry);
-    }
+  for (Entry<T> *crntEntry = topEntry_; crntEntry; crntEntry = nextEntry) {
+    nextEntry = crntEntry->GetNext();
+    FreeEntry_(crntEntry);
   }
 
   Init_();
@@ -296,13 +396,12 @@ template <class T> inline void LinkedList<T>::Reset() {
 template <class T> void LinkedList<T>::InsrtElmnt(T *elmnt) {
   Entry<T> *newEntry;
 
-  newEntry = AllocEntry_(elmnt);
+  newEntry = AllocEntry_<Entry<T>>(
+      [elmnt](Entry<T> &entry) { entry.element = elmnt; });
   AppendEntry_(newEntry);
 }
 
 template <class T> void LinkedList<T>::RmvElmnt(const T *const elmnt) {
-  assert(LinkedList<T>::maxSize_ == INVALID_VALUE);
-
   Entry<T> *crntEntry, *prevEntry = NULL;
 
   for (crntEntry = topEntry_; crntEntry != NULL;
@@ -335,8 +434,6 @@ template <class T> void LinkedList<T>::RmvElmnt(const T *const elmnt) {
 }
 
 template <class T> void LinkedList<T>::RmvLastElmnt() {
-  assert(maxSize_ == INVALID_VALUE);
-
   Entry<T> *rmvdEntry = bottomEntry_;
   assert(bottomEntry_ != NULL);
   bottomEntry_ = bottomEntry_->GetPrev();
@@ -490,54 +587,18 @@ template <class T> void LinkedList<T>::RmvEntry_(Entry<T> *entry, bool free) {
 }
 
 template <class T> void LinkedList<T>::FreeEntry_(Entry<T> *entry) {
-  if (maxSize_ == INVALID_VALUE) {
-    delete entry;
-  } else if (entry - allocEntries_ == crntAllocIndx_ - 1) {
-    assert(crntAllocIndx_ >= 1);
-    crntAllocIndx_--;
-  } else {
-    entry->SetPrev(nullptr);
-    entry->SetNext(freeList_);
-    freeList_ = entry;
-  }
+  Allocator_->deallocate(entry);
 }
 
 template <class T> inline void LinkedList<T>::Init_() {
   topEntry_ = bottomEntry_ = rtrvEntry_ = NULL;
-  freeList_ = nullptr;
   elmntCnt_ = 0;
   itrtrReset_ = true;
   wasTopRmvd_ = false;
   wasBottomRmvd_ = false;
-  crntAllocIndx_ = 0;
-}
-
-template <class T> Entry<T> *LinkedList<T>::AllocEntry_(T *element) {
-  Entry<T> *entry;
-
-  if (maxSize_ == INVALID_VALUE) {
-    entry = new Entry<T>();
-  } else if (crntAllocIndx_ < maxSize_) {
-    entry = allocEntries_ + crntAllocIndx_;
-    crntAllocIndx_++;
-  } else {
-    assert(freeList_);
-    entry = freeList_;
-    freeList_ = freeList_->GetNext();
-  }
-
-  entry->element = element;
-  return entry;
-}
-
-template <class T> void LinkedList<T>::AllocEntries_() {
-  assert(maxSize_ != INVALID_VALUE);
-  allocEntries_ = new Entry<T>[maxSize_];
-  crntAllocIndx_ = 0;
 }
 
 template <class T> inline T *Queue<T>::ExtractElmnt() {
-  // assert(LinkedList<T>::maxSize_ == INVALID_VALUE);
   if (LinkedList<T>::topEntry_ == NULL)
     return NULL;
 
@@ -560,7 +621,6 @@ template <class T> inline T *Queue<T>::ExtractElmnt() {
 }
 
 template <class T> inline T *Stack<T>::ExtractElmnt() {
-  // assert(LinkedList<T>::maxSize_ == INVALID_VALUE);
   if (LinkedList<T>::bottomEntry_ == NULL)
     return NULL;
 
@@ -583,15 +643,8 @@ template <class T> inline T *Stack<T>::ExtractElmnt() {
 }
 
 template <class T, class K>
-PriorityList<T, K>::PriorityList(int maxSize) : LinkedList<T>(maxSize) {
-  if (LinkedList<T>::maxSize_ != INVALID_VALUE) {
-    delete[] LinkedList<T>::allocEntries_;
-    LinkedList<T>::allocEntries_ = new Entry<T>[0];
-    AllocEntries_();
-  } else {
-    allocKeyEntries_ = NULL;
-  }
-}
+PriorityList<T, K>::PriorityList(int MaxSize)
+    : LinkedList<T>(makeDynamicOrArenaAllocator<KeyedEntry<T, K>>(MaxSize)) {}
 
 template <class T, class K>
 KeyedEntry<T, K> *PriorityList<T, K>::InsrtElmnt(T *elmnt, K key,
@@ -747,24 +800,11 @@ void PriorityList<T, K>::CopyList(
 
 template <class T, class K>
 KeyedEntry<T, K> *PriorityList<T, K>::AllocEntry_(T *element, K key) {
-  KeyedEntry<T, K> *newEntry;
-
-  if (LinkedList<T>::maxSize_ == INVALID_VALUE) {
-    newEntry = new KeyedEntry<T, K>(element, key);
-  } else {
-    assert(LinkedList<T>::crntAllocIndx_ < LinkedList<T>::maxSize_);
-    newEntry = allocKeyEntries_ + LinkedList<T>::crntAllocIndx_;
-    newEntry->element = element;
-    newEntry->key = key;
-    LinkedList<T>::crntAllocIndx_++;
-  }
-
-  return newEntry;
-}
-
-template <class T, class K> void PriorityList<T, K>::AllocEntries_() {
-  allocKeyEntries_ = new KeyedEntry<T, K>[LinkedList<T>::maxSize_];
-  LinkedList<T>::crntAllocIndx_ = 0;
+  return LinkedList<T>::template AllocEntry_<KeyedEntry<T, K>>(
+      [element, key](KeyedEntry<T, K> &entry) {
+        entry.element = element;
+        entry.key = key;
+      });
 }
 
 template <class T, class K>
