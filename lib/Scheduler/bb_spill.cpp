@@ -897,7 +897,6 @@ void BBWithSpill::UpdtOptmlSched(InstSchedule *crntSched,
 
   Logger::Event("feasible_sched_found", "length", crntSched->GetCrntLngth(),
                 "spill_cost", crntSched->GetSpillCost(), "cost", crntCost);
-  crntSched->Print(Logger::GetLogStream(), "New Feasible Schedule");
 
   if (isTwoPassEnabled()) {
     if (!IsSecondPass())

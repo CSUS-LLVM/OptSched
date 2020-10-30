@@ -2053,7 +2053,6 @@ FUNC_RESULT LengthCostEnumerator::FindFeasibleSchedule(InstSchedule *sched,
 
   if (rgn_->IsSecondPass())
     TrgtSpillConstraint_ = rgn_->getSpillCostConstraint();
-
   else
     TrgtSpillConstraint_ = SpillCostLwrBound_;
 
@@ -2082,7 +2081,6 @@ bool LengthCostEnumerator::WasObjctvMet_() {
 
   if (!rgn_->isTwoPassEnabled())
     return WasObjctvMetWghtd_();
-
   else {
     if (!rgn_->IsSecondPass())
       return WasObjctvMetFrstPss_();
