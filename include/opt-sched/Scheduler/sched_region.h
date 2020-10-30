@@ -102,20 +102,22 @@ public:
   virtual int cmputSpillCostLwrBound() = 0;
 
   // TODO(max): Document.
-  virtual llvm::SmallVector<InstCount, NUM_OPTIMAL_CONDITIONS>
-  UpdtOptmlSched(InstSchedule *crntSched, LengthCostEnumerator *enumrtr) = 0;
+  virtual void UpdtOptmlSched(InstSchedule *crntSched,
+                              LengthCostEnumerator *enumrtr) = 0;
 
-  virtual llvm::SmallVector<InstCount, NUM_OPTIMAL_CONDITIONS>
-  UpdtOptmlSchedFrstPss(InstSchedule *crntSched, LengthCostEnumerator *enumrtr,
-                        InstCount crntCost, InstCount TmpSpillCost) = 0;
+  virtual void UpdtOptmlSchedFrstPss(InstSchedule *crntSched,
+                                     LengthCostEnumerator *enumrtr,
+                                     InstCount crntCost,
+                                     InstCount TmpSpillCost) = 0;
 
-  virtual llvm::SmallVector<InstCount, NUM_OPTIMAL_CONDITIONS>
-  UpdtOptmlSchedScndPss(InstSchedule *crntSched, LengthCostEnumerator *enumrtr,
-                        InstCount crntCost, InstCount TmpSpillCost) = 0;
+  virtual void UpdtOptmlSchedScndPss(InstSchedule *crntSched,
+                                     LengthCostEnumerator *enumrtr,
+                                     InstCount crntCost,
+                                     InstCount TmpSpillCost) = 0;
 
-  virtual llvm::SmallVector<InstCount, NUM_OPTIMAL_CONDITIONS>
-  UpdtOptmlSchedWghtd(InstSchedule *crntSched, LengthCostEnumerator *enumrtr,
-                      InstCount crntCost) = 0;
+  virtual void UpdtOptmlSchedWghtd(InstSchedule *crntSched,
+                                   LengthCostEnumerator *enumrtr,
+                                   InstCount crntCost) = 0;
 
   // TODO(max): Document.
   virtual bool ChkCostFsblty(InstCount trgtLngth, EnumTreeNode *treeNode,

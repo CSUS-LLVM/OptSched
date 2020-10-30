@@ -130,17 +130,15 @@ public:
   void CmputAndSetCostLwrBound();
   int cmputSpillCostLwrBound();
 
-  SmallVector<InstCount, NUM_OPTIMAL_CONDITIONS>
-  UpdtOptmlSched(InstSchedule *crntSched, LengthCostEnumerator *enumrtr);
-  SmallVector<InstCount, NUM_OPTIMAL_CONDITIONS>
-  UpdtOptmlSchedFrstPss(InstSchedule *crntSched, LengthCostEnumerator *enumrtr,
-                        InstCount crntCost, InstCount TmpSpillCost);
-  SmallVector<InstCount, NUM_OPTIMAL_CONDITIONS>
-  UpdtOptmlSchedScndPss(InstSchedule *crntSched, LengthCostEnumerator *enumrtr,
-                        InstCount crntCost, InstCount TmpSpillCost);
-  SmallVector<InstCount, NUM_OPTIMAL_CONDITIONS>
-  UpdtOptmlSchedWghtd(InstSchedule *crntSched, LengthCostEnumerator *enumrtr,
-                      InstCount crntCost);
+  void UpdtOptmlSched(InstSchedule *crntSched, LengthCostEnumerator *enumrtr);
+  void UpdtOptmlSchedFrstPss(InstSchedule *crntSched,
+                             LengthCostEnumerator *enumrtr, InstCount crntCost,
+                             InstCount TmpSpillCost);
+  void UpdtOptmlSchedScndPss(InstSchedule *crntSched,
+                             LengthCostEnumerator *enumrtr, InstCount crntCost,
+                             InstCount TmpSpillCost);
+  void UpdtOptmlSchedWghtd(InstSchedule *crntSched,
+                           LengthCostEnumerator *enumrtr, InstCount crntCost);
   bool ChkCostFsblty(InstCount trgtLngth, EnumTreeNode *treeNode,
                      InstCount &RPCost);
   bool ChkCostFsbltyFrstPss(InstCount trgtLngth, EnumTreeNode *treeNode,

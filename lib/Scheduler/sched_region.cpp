@@ -438,10 +438,7 @@ FUNC_RESULT SchedRegion::FindOptimalSchedule(
     if (AcoTime > 0)
       Logger::Info("ACO_Time %d", AcoTime);
 
-    InstCount acoExecCost;
-
     AcoScheduleLength_ = AcoSchedule->GetCrntLngth();
-    CmputNormCost_(AcoSchedule, CCM_DYNMC, acoExecCost, true);
     AcoScheduleCost_ = AcoSchedule->GetCost();
     AcoSpillCost_ = AcoSchedule->GetSpillCost();
 

@@ -889,41 +889,37 @@ InstCount BBWithSpill::CmputCostForFunction(SPILL_COST_FUNCTION SpillCF) {
   }
 }
 
-SmallVector<InstCount, NUM_OPTIMAL_CONDITIONS>
-BBWithSpill::UpdtOptmlSched(InstSchedule *crntSched,
-                            LengthCostEnumerator *node) {
+void BBWithSpill::UpdtOptmlSched(InstSchedule *crntSched,
+                                 LengthCostEnumerator *node) {
   InstCount crntCost;
   InstCount crntExecCost;
   crntCost = CmputNormCost_(crntSched, CCM_STTC, crntExecCost, false);
 
-#ifdef IS_DEBUG_SOLN_DETAILS_2
-  Logger::Info(
-      "Found a feasible sched. of length %d, spill cost %d and tot cost %d",
-      crntSched->GetCrntLngth(), crntSched->GetSpillCost(), crntCost);
+  Logger::Event("feasible_sched_found", "length", crntSched->GetCrntLngth(),
+                "spill_cost", crntSched->GetSpillCost(), "cost", crntCost);
   crntSched->Print(Logger::GetLogStream(), "New Feasible Schedule");
-#endif
 
   InstCount TmpSpillCost;
-  TmpSpillCost =
-      GetSpillCostFunc() == SCF_SLIL ? dynamicSlilLowerBound_ : crntSpillCost_;
+  TmpSpillCost = crntSpillCost_;
+  // GetSpillCostFunc() == SCF_SLIL ? dynamicSlilLowerBound_ : crntSpillCost_;
 
   if (isTwoPassEnabled()) {
     if (!IsSecondPass())
-      return UpdtOptmlSchedFrstPss(crntSched, node, crntCost, TmpSpillCost);
+      UpdtOptmlSchedFrstPss(crntSched, node, crntCost, TmpSpillCost);
     else
-      return UpdtOptmlSchedScndPss(crntSched, node, crntCost, TmpSpillCost);
+      UpdtOptmlSchedScndPss(crntSched, node, crntCost, TmpSpillCost);
   }
 
   else
-    return UpdtOptmlSchedWghtd(crntSched, node, crntCost);
+    UpdtOptmlSchedWghtd(crntSched, node, crntCost);
 }
 
 /*****************************************************************************/
 
-SmallVector<InstCount, NUM_OPTIMAL_CONDITIONS>
-BBWithSpill::UpdtOptmlSchedFrstPss(InstSchedule *crntSched,
-                                   LengthCostEnumerator *, InstCount crntCost,
-                                   InstCount TmpSpillCost) {
+void BBWithSpill::UpdtOptmlSchedFrstPss(InstSchedule *crntSched,
+                                        LengthCostEnumerator *,
+                                        InstCount crntCost,
+                                        InstCount TmpSpillCost) {
 
   if (TmpSpillCost < getBestSpillCost()) {
     SetBestCost(crntCost);
@@ -936,15 +932,14 @@ BBWithSpill::UpdtOptmlSchedFrstPss(InstSchedule *crntSched,
 
   llvm::SmallVector<InstCount, NUM_OPTIMAL_CONDITIONS> retVec;
   retVec.push_back(TmpSpillCost);
-  return retVec;
 }
 
 /*****************************************************************************/
 
-SmallVector<InstCount, NUM_OPTIMAL_CONDITIONS>
-BBWithSpill::UpdtOptmlSchedScndPss(InstSchedule *crntSched,
-                                   LengthCostEnumerator *, InstCount crntCost,
-                                   InstCount TmpSpillCost) {
+void BBWithSpill::UpdtOptmlSchedScndPss(InstSchedule *crntSched,
+                                        LengthCostEnumerator *,
+                                        InstCount crntCost,
+                                        InstCount TmpSpillCost) {
 
   if (TmpSpillCost <= getSpillCostConstraint()) {
     SetBestCost(crntCost);
@@ -958,14 +953,13 @@ BBWithSpill::UpdtOptmlSchedScndPss(InstSchedule *crntSched,
   llvm::SmallVector<InstCount, 4> retVec;
   retVec.push_back(TmpSpillCost);
   retVec.push_back(crntSched->GetCrntLngth());
-  return retVec;
 }
 
 /*****************************************************************************/
 
-SmallVector<InstCount, NUM_OPTIMAL_CONDITIONS>
-BBWithSpill::UpdtOptmlSchedWghtd(InstSchedule *crntSched,
-                                 LengthCostEnumerator *, InstCount crntCost) {
+void BBWithSpill::UpdtOptmlSchedWghtd(InstSchedule *crntSched,
+                                      LengthCostEnumerator *,
+                                      InstCount crntCost) {
   if (crntCost < GetBestCost()) {
 
     if (crntSched->GetCrntLngth() > schedLwrBound_)
@@ -980,7 +974,6 @@ BBWithSpill::UpdtOptmlSchedWghtd(InstSchedule *crntSched,
 
   llvm::SmallVector<InstCount, 4> retVec;
   retVec.push_back(crntCost);
-  return retVec;
 }
 
 /*****************************************************************************/

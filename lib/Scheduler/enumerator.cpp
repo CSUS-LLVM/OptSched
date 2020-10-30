@@ -825,8 +825,9 @@ void AppendAndCheckSuffixSchedules(
 
   if (!rgn_->isTwoPassEnabled()) {
     auto oldCost = thisAsLengthCostEnum->GetBestCost();
-    auto newCost =
-        (rgn_->UpdtOptmlSched(concatSched.get(), thisAsLengthCostEnum))[0];
+    rgn_->UpdtOptmlSched(concatSched.get(),
+                         thisAsLengthCostEnum); // update costs
+    auto newCost = crntSched_->GetCost();
 #if defined(IS_DEBUG_SUFFIX_SCHED)
     Logger::Info("Found a concatenated schedule with node instruction %d",
                  crntNode_->GetInstNum());
@@ -2092,58 +2093,54 @@ bool LengthCostEnumerator::WasObjctvMet_() {
 /*****************************************************************************/
 
 bool LengthCostEnumerator::WasObjctvMetWghtd_() {
-  llvm::SmallVector<InstCount, NUM_OPTIMAL_CONDITIONS> ObjctvValues;
-
   InstCount crntCost = GetBestCost_();
 
-  ObjctvValues = rgn_->UpdtOptmlSched(crntSched_, this);
+  rgn_->UpdtOptmlSched(crntSched_, this); // ensure cost information is updated
 
-  if (ObjctvValues[0] < crntCost)
+  if (crntSched_->GetCost() < crntCost)
     imprvmntCnt_++;
 
-  return (ObjctvValues[0] == costLwrBound_);
+  return (crntSched_->GetCost() == costLwrBound_);
 }
 /*****************************************************************************/
 
 bool LengthCostEnumerator::WasObjctvMetFrstPss_() {
-  llvm::SmallVector<InstCount, NUM_OPTIMAL_CONDITIONS> ObjctvValues;
-
   InstCount crntSpillCost = getBestSpillCost_();
 
-  ObjctvValues = rgn_->UpdtOptmlSched(crntSched_, this);
+  rgn_->UpdtOptmlSched(crntSched_, this);
 
-  if (ObjctvValues[0] < crntSpillCost)
+  if (crntSched_->GetSpillCost() < crntSpillCost)
     imprvmntCnt_++;
 
   // Set the suffix RP cost for the current node. Since this node should be a
   // leaf node, it is actually the total RP cost.
   InstCount CrntNodeSuffixRPCost = crntNode_->getSuffixRPCostLowerBound();
-  if (CrntNodeSuffixRPCost == -1 || ObjctvValues[0] < CrntNodeSuffixRPCost)
-    crntNode_->setSuffixRPCostLowerBound(ObjctvValues[0]);
+  if (CrntNodeSuffixRPCost == -1 ||
+      crntSched_->GetSpillCost() < CrntNodeSuffixRPCost)
+    crntNode_->setSuffixRPCostLowerBound(crntSched_->GetSpillCost());
 
-  return (ObjctvValues[0] == SpillCostLwrBound_);
+  return (crntSched_->GetSpillCost() == SpillCostLwrBound_);
 }
 /*****************************************************************************/
 
 bool LengthCostEnumerator::WasObjctvMetScndPss_() {
-  llvm::SmallVector<InstCount, NUM_OPTIMAL_CONDITIONS> ObjctvValues;
-
   InstCount crntSchedLength = getBestSchedLength_();
 
-  ObjctvValues = rgn_->UpdtOptmlSched(crntSched_, this);
+  rgn_->UpdtOptmlSched(crntSched_, this);
 
-  if (ObjctvValues[1] < crntSchedLength &&
-      ObjctvValues[0] == rgn_->getSpillCostConstraint())
+  if (crntSched_->GetCrntLngth() < crntSchedLength &&
+      crntSched_->GetSpillCost() == rgn_->getSpillCostConstraint())
     imprvmntCnt_++;
 
   // Set the suffix RP cost for the current node. Since this node should be a
   // leaf node, it is actually the total RP cost.
   InstCount CrntNodeSuffixRPCost = crntNode_->getSuffixRPCostLowerBound();
-  if (CrntNodeSuffixRPCost == -1 || ObjctvValues[0] < CrntNodeSuffixRPCost)
-    crntNode_->setSuffixRPCostLowerBound(ObjctvValues[0]);
+  if (CrntNodeSuffixRPCost == -1 ||
+      crntSched_->GetSpillCost() < CrntNodeSuffixRPCost)
+    crntNode_->setSuffixRPCostLowerBound(crntSched_->GetSpillCost());
 
-  return (ObjctvValues[1] <= trgtSchedLngth_ &&
-          ObjctvValues[0] == rgn_->getSpillCostConstraint());
+  return (crntSched_->GetCrntLngth() <= trgtSchedLngth_ &&
+          crntSched_->GetSpillCost() == rgn_->getSpillCostConstraint());
 }
 /*****************************************************************************/
 
