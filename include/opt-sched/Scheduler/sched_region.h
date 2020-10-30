@@ -21,13 +21,6 @@ Last Update:  Jan. 2020
 namespace llvm {
 namespace opt_sched {
 
-// This value is used to determine the size of the smallVector that is
-// returned by updtOptmlSchedule. The return smallVector holds values
-// that we use to see if a schedule is optimal (e.g. weighted cost)
-// in some instances, we are trying to optimize more than one metric
-// (e.g. schedLength, RPCost)
-const int NUM_OPTIMAL_CONDITIONS = 4;
-
 // How to compare cost.
 // TODO(max): Elaborate.
 enum COST_COMP_MODE {
@@ -107,13 +100,11 @@ public:
 
   virtual void UpdtOptmlSchedFrstPss(InstSchedule *crntSched,
                                      LengthCostEnumerator *enumrtr,
-                                     InstCount crntCost,
-                                     InstCount TmpSpillCost) = 0;
+                                     InstCount crntCost) = 0;
 
   virtual void UpdtOptmlSchedScndPss(InstSchedule *crntSched,
                                      LengthCostEnumerator *enumrtr,
-                                     InstCount crntCost,
-                                     InstCount TmpSpillCost) = 0;
+                                     InstCount crntCost) = 0;
 
   virtual void UpdtOptmlSchedWghtd(InstSchedule *crntSched,
                                    LengthCostEnumerator *enumrtr,
@@ -149,7 +140,7 @@ public:
   // Initialize variables for the second pass of the two-pass-optsched
   void InitSecondPass();
 
-  // Initiliaze variables to reflect that we are using two-pass version of
+  // Initialize variables to reflect that we are using two-pass version of
   // algorithm
   void initTwoPassAlg();
 

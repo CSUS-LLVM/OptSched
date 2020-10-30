@@ -132,11 +132,9 @@ public:
 
   void UpdtOptmlSched(InstSchedule *crntSched, LengthCostEnumerator *enumrtr);
   void UpdtOptmlSchedFrstPss(InstSchedule *crntSched,
-                             LengthCostEnumerator *enumrtr, InstCount crntCost,
-                             InstCount TmpSpillCost);
+                             LengthCostEnumerator *enumrtr, InstCount crntCost);
   void UpdtOptmlSchedScndPss(InstSchedule *crntSched,
-                             LengthCostEnumerator *enumrtr, InstCount crntCost,
-                             InstCount TmpSpillCost);
+                             LengthCostEnumerator *enumrtr, InstCount crntCost);
   void UpdtOptmlSchedWghtd(InstSchedule *crntSched,
                            LengthCostEnumerator *enumrtr, InstCount crntCost);
   bool ChkCostFsblty(InstCount trgtLngth, EnumTreeNode *treeNode,

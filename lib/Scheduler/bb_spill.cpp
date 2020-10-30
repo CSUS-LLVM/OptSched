@@ -899,15 +899,11 @@ void BBWithSpill::UpdtOptmlSched(InstSchedule *crntSched,
                 "spill_cost", crntSched->GetSpillCost(), "cost", crntCost);
   crntSched->Print(Logger::GetLogStream(), "New Feasible Schedule");
 
-  InstCount TmpSpillCost;
-  TmpSpillCost = crntSpillCost_;
-  // GetSpillCostFunc() == SCF_SLIL ? dynamicSlilLowerBound_ : crntSpillCost_;
-
   if (isTwoPassEnabled()) {
     if (!IsSecondPass())
-      UpdtOptmlSchedFrstPss(crntSched, node, crntCost, TmpSpillCost);
+      UpdtOptmlSchedFrstPss(crntSched, node, crntCost);
     else
-      UpdtOptmlSchedScndPss(crntSched, node, crntCost, TmpSpillCost);
+      UpdtOptmlSchedScndPss(crntSched, node, crntCost);
   }
 
   else
@@ -918,41 +914,30 @@ void BBWithSpill::UpdtOptmlSched(InstSchedule *crntSched,
 
 void BBWithSpill::UpdtOptmlSchedFrstPss(InstSchedule *crntSched,
                                         LengthCostEnumerator *,
-                                        InstCount crntCost,
-                                        InstCount TmpSpillCost) {
-
-  if (TmpSpillCost < getBestSpillCost()) {
+                                        InstCount crntCost) {
+  if (crntSpillCost_ < getBestSpillCost()) {
     SetBestCost(crntCost);
-    optmlSpillCost_ = TmpSpillCost;
+    optmlSpillCost_ = crntSpillCost_;
     setBestSpillCost(optmlSpillCost_);
     SetBestSchedLength(crntSched->GetCrntLngth());
     enumBestSched_->Copy(crntSched);
     bestSched_ = enumBestSched_;
   }
-
-  llvm::SmallVector<InstCount, NUM_OPTIMAL_CONDITIONS> retVec;
-  retVec.push_back(TmpSpillCost);
 }
 
 /*****************************************************************************/
 
 void BBWithSpill::UpdtOptmlSchedScndPss(InstSchedule *crntSched,
                                         LengthCostEnumerator *,
-                                        InstCount crntCost,
-                                        InstCount TmpSpillCost) {
-
-  if (TmpSpillCost <= getSpillCostConstraint()) {
+                                        InstCount crntCost) {
+  if (crntSpillCost_ <= getSpillCostConstraint()) {
     SetBestCost(crntCost);
-    optmlSpillCost_ = TmpSpillCost;
+    optmlSpillCost_ = crntSpillCost_;
     setBestSpillCost(optmlSpillCost_);
     SetBestSchedLength(crntSched->GetCrntLngth());
     enumBestSched_->Copy(crntSched);
     bestSched_ = enumBestSched_;
   }
-
-  llvm::SmallVector<InstCount, 4> retVec;
-  retVec.push_back(TmpSpillCost);
-  retVec.push_back(crntSched->GetCrntLngth());
 }
 
 /*****************************************************************************/
@@ -971,9 +956,6 @@ void BBWithSpill::UpdtOptmlSchedWghtd(InstSchedule *crntSched,
     enumBestSched_->Copy(crntSched);
     bestSched_ = enumBestSched_;
   }
-
-  llvm::SmallVector<InstCount, 4> retVec;
-  retVec.push_back(crntCost);
 }
 
 /*****************************************************************************/
