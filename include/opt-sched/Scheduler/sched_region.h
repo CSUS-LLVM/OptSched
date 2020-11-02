@@ -55,11 +55,11 @@ public:
   // Returns the dependence graph of this region.
   inline DataDepGraph *GetDepGraph() { return dataDepGraph_; }
   // Returns the lower bound on the cost of this region.
-  inline InstCount GetExecCostLwrBound() { return ExecCostLwrBound_; }
-  inline InstCount GetRPCostLwrBound() { return RpCostLwrBound_; }
   inline int GetCostLwrBound() { return costLwrBound_; }
   // Returns the static lower bound on RP
   inline int getSpillCostLwrBound() { return SpillCostLwrBound_; }
+  inline InstCount GetExecCostLwrBound() { return ExecCostLwrBound_; }
+  inline InstCount GetRPCostLwrBound() { return RpCostLwrBound_; }
   // Returns the best cost found so far for this region.
   inline InstCount GetBestCost() { return bestCost_; }
   // Returns the heuristic cost for this region.
@@ -87,7 +87,6 @@ public:
   // External abstract functions.
 
   // TODO(max): Document.
-  virtual InstCount CmputCostLwrBound() = 0;
   virtual InstCount CmputExecCostLwrBound() = 0;
   virtual InstCount CmputRPCostLwrBound() = 0;
   virtual void CmputAndSetCostLwrBound() = 0;
@@ -95,19 +94,15 @@ public:
   virtual int cmputSpillCostLwrBound() = 0;
 
   // TODO(max): Document.
-  virtual void UpdtOptmlSched(InstSchedule *crntSched,
-                              LengthCostEnumerator *enumrtr) = 0;
+  virtual void UpdtOptmlSched(InstSchedule *crntSched) = 0;
 
   virtual void UpdtOptmlSchedFrstPss(InstSchedule *crntSched,
-                                     LengthCostEnumerator *enumrtr,
                                      InstCount crntCost) = 0;
 
   virtual void UpdtOptmlSchedScndPss(InstSchedule *crntSched,
-                                     LengthCostEnumerator *enumrtr,
                                      InstCount crntCost) = 0;
 
   virtual void UpdtOptmlSchedWghtd(InstSchedule *crntSched,
-                                   LengthCostEnumerator *enumrtr,
                                    InstCount crntCost) = 0;
 
   // TODO(max): Document.

@@ -825,8 +825,7 @@ void AppendAndCheckSuffixSchedules(
 
   if (!rgn_->isTwoPassEnabled()) {
     auto oldCost = thisAsLengthCostEnum->GetBestCost();
-    rgn_->UpdtOptmlSched(concatSched.get(),
-                         thisAsLengthCostEnum); // update costs
+    rgn_->UpdtOptmlSched(concatSched.get()); // update costs
     auto newCost = crntSched_->GetCost();
 #if defined(IS_DEBUG_SUFFIX_SCHED)
     Logger::Info("Found a concatenated schedule with node instruction %d",
@@ -2093,7 +2092,7 @@ bool LengthCostEnumerator::WasObjctvMet_() {
 bool LengthCostEnumerator::WasObjctvMetWghtd_() {
   InstCount crntCost = GetBestCost_();
 
-  rgn_->UpdtOptmlSched(crntSched_, this); // ensure cost information is updated
+  rgn_->UpdtOptmlSched(crntSched_); // ensure cost information is updated
 
   if (crntSched_->GetCost() < crntCost)
     imprvmntCnt_++;
@@ -2105,7 +2104,7 @@ bool LengthCostEnumerator::WasObjctvMetWghtd_() {
 bool LengthCostEnumerator::WasObjctvMetFrstPss_() {
   InstCount crntSpillCost = getBestSpillCost_();
 
-  rgn_->UpdtOptmlSched(crntSched_, this);
+  rgn_->UpdtOptmlSched(crntSched_);
 
   if (crntSched_->GetSpillCost() < crntSpillCost)
     imprvmntCnt_++;
@@ -2124,7 +2123,7 @@ bool LengthCostEnumerator::WasObjctvMetFrstPss_() {
 bool LengthCostEnumerator::WasObjctvMetScndPss_() {
   InstCount crntSchedLength = getBestSchedLength_();
 
-  rgn_->UpdtOptmlSched(crntSched_, this);
+  rgn_->UpdtOptmlSched(crntSched_);
 
   if (crntSched_->GetCrntLngth() < crntSchedLength &&
       crntSched_->GetSpillCost() == rgn_->getSpillCostConstraint())

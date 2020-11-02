@@ -130,13 +130,10 @@ public:
   void CmputAndSetCostLwrBound();
   int cmputSpillCostLwrBound();
 
-  void UpdtOptmlSched(InstSchedule *crntSched, LengthCostEnumerator *enumrtr);
-  void UpdtOptmlSchedFrstPss(InstSchedule *crntSched,
-                             LengthCostEnumerator *enumrtr, InstCount crntCost);
-  void UpdtOptmlSchedScndPss(InstSchedule *crntSched,
-                             LengthCostEnumerator *enumrtr, InstCount crntCost);
-  void UpdtOptmlSchedWghtd(InstSchedule *crntSched,
-                           LengthCostEnumerator *enumrtr, InstCount crntCost);
+  void UpdtOptmlSched(InstSchedule *crntSched);
+  void UpdtOptmlSchedFrstPss(InstSchedule *crntSched, InstCount crntCost);
+  void UpdtOptmlSchedScndPss(InstSchedule *crntSched, InstCount crntCost);
+  void UpdtOptmlSchedWghtd(InstSchedule *crntSched, InstCount crntCost);
   bool ChkCostFsblty(InstCount trgtLngth, EnumTreeNode *treeNode,
                      InstCount &RPCost);
   bool ChkCostFsbltyFrstPss(InstCount trgtLngth, EnumTreeNode *treeNode,

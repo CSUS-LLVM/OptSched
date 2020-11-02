@@ -296,7 +296,6 @@ void BBWithSpill::CmputAndSetCostLwrBound() {
   // }
 
   InstCount staticLowerBound = CmputExecCostLwrBound() + CmputRPCostLwrBound();
-
   setCostLwrBound(staticLowerBound);
 
 #if defined(IS_DEBUG_STATIC_LOWER_BOUND)
@@ -313,7 +312,7 @@ InstCount BBWithSpill::CmputExecCostLwrBound() {
 }
 
 InstCount BBWithSpill::CmputRPCostLwrBound() {
-  RpCostLwrBound_ = spillCostLwrBound * SCW_;
+  RpCostLwrBound_ = getSpillCostLwrBound() * SCW_;
   return RpCostLwrBound_;
 }
 
@@ -889,8 +888,7 @@ InstCount BBWithSpill::CmputCostForFunction(SPILL_COST_FUNCTION SpillCF) {
   }
 }
 
-void BBWithSpill::UpdtOptmlSched(InstSchedule *crntSched,
-                                 LengthCostEnumerator *node) {
+void BBWithSpill::UpdtOptmlSched(InstSchedule *crntSched) {
   InstCount crntCost;
   InstCount crntExecCost;
   crntCost = CmputNormCost_(crntSched, CCM_STTC, crntExecCost, false);
@@ -900,19 +898,18 @@ void BBWithSpill::UpdtOptmlSched(InstSchedule *crntSched,
 
   if (isTwoPassEnabled()) {
     if (!IsSecondPass())
-      UpdtOptmlSchedFrstPss(crntSched, node, crntCost);
+      UpdtOptmlSchedFrstPss(crntSched, crntCost);
     else
-      UpdtOptmlSchedScndPss(crntSched, node, crntCost);
+      UpdtOptmlSchedScndPss(crntSched, crntCost);
   }
 
   else
-    UpdtOptmlSchedWghtd(crntSched, node, crntCost);
+    UpdtOptmlSchedWghtd(crntSched, crntCost);
 }
 
 /*****************************************************************************/
 
 void BBWithSpill::UpdtOptmlSchedFrstPss(InstSchedule *crntSched,
-                                        LengthCostEnumerator *,
                                         InstCount crntCost) {
   if (crntSpillCost_ < getBestSpillCost()) {
     SetBestCost(crntCost);
@@ -927,7 +924,6 @@ void BBWithSpill::UpdtOptmlSchedFrstPss(InstSchedule *crntSched,
 /*****************************************************************************/
 
 void BBWithSpill::UpdtOptmlSchedScndPss(InstSchedule *crntSched,
-                                        LengthCostEnumerator *,
                                         InstCount crntCost) {
   if (crntSpillCost_ <= getSpillCostConstraint()) {
     SetBestCost(crntCost);
@@ -942,7 +938,6 @@ void BBWithSpill::UpdtOptmlSchedScndPss(InstSchedule *crntSched,
 /*****************************************************************************/
 
 void BBWithSpill::UpdtOptmlSchedWghtd(InstSchedule *crntSched,
-                                      LengthCostEnumerator *,
                                       InstCount crntCost) {
   if (crntCost < GetBestCost()) {
 

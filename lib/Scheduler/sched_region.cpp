@@ -529,7 +529,7 @@ FUNC_RESULT SchedRegion::FindOptimalSchedule(
       dataDepGraph_->SetHard(true);
       if (IsSecondPass() && dataDepGraph_->GetMaxLtncy() <= 1)
         Logger::Info("Problem size not increased after introducing latencies, "
-                     "skipping enumeration");
+                     "skipping second pass enumeration");
       else
         rslt = Optimize_(enumStart, rgnTimeout, lngthTimeout);
 
