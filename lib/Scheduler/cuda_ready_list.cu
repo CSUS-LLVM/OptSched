@@ -8,6 +8,7 @@ using namespace llvm::opt_sched;
 
 __host__ __device__
 ReadyList::ReadyList(DataDepGraph *dataDepGraph, SchedPriorities prirts) {
+  dataDepGraph_ = dataDepGraph;
   prirts_ = prirts;
   prirtyLst_ = NULL;
   int i;
@@ -15,10 +16,10 @@ ReadyList::ReadyList(DataDepGraph *dataDepGraph, SchedPriorities prirts) {
 
   // Initialize an array of KeyedEntry if a dynamic heuristic is used. This
   // enable fast updating for dynamic heuristics.
-  if (prirts_.isDynmc)
+/*  if (prirts_.isDynmc)
     keyedEntries_ = new KeyedEntry<SchedInstruction, unsigned long>
         *[dataDepGraph->GetInstCnt()];
-  else
+  else*/
     keyedEntries_ = nullptr;
 
   useCntBits_ = crtclPathBits_ = scsrCntBits_ = ltncySumBits_ = nodeID_Bits_ =
@@ -36,9 +37,9 @@ ReadyList::ReadyList(DataDepGraph *dataDepGraph, SchedPriorities prirts) {
       break;
 
     case LSH_LUC:
-      for (int j = 0; j < dataDepGraph->GetInstCnt(); j++) {
+      /*for (int j = 0; j < dataDepGraph->GetInstCnt(); j++) {
         keyedEntries_[j] = NULL;
-      }
+      }*/
       maxUseCnt_ = dataDepGraph->GetMaxUseCnt();
       useCntBits_ = Utilities::clcltBitsNeededToHoldNum(maxUseCnt_);
       totKeyBits += useCntBits_;
@@ -84,8 +85,9 @@ ReadyList::ReadyList(DataDepGraph *dataDepGraph, SchedPriorities prirts) {
   Logger::Info("The ready list key size is %d bits", totKeyBits);
 #endif
 
-  prirtyLst_ = new PriorityList<SchedInstruction>;
-  latestSubLst_ = new LinkedList<SchedInstruction>;
+  prirtyLst_ = 
+      new PriorityArrayList<InstCount>(dataDepGraph_->GetInstCnt());
+  latestSubLst_ = new ArrayList<InstCount>(dataDepGraph_->GetInstCnt());
 
   int16_t keySize = 0;
   maxPriority_ = 0;
@@ -148,7 +150,7 @@ void ReadyList::CopyList(ReadyList *othrLst) {
   // Copy the ready list and create the array of keyed entries. If a dynamic
   // heuristic is not used then the second parameter should be a nullptr and the
   // array will not be created.
-  prirtyLst_->CopyList(othrLst->prirtyLst_, keyedEntries_);
+  prirtyLst_->CopyList(othrLst->prirtyLst_);
 }
 
 __device__ __host__
@@ -210,8 +212,8 @@ unsigned long ReadyList::CmputKey_(SchedInstruction *inst, bool isUpdate,
 }
 
 __host__ __device__
-void ReadyList::AddLatestSubLists(LinkedList<SchedInstruction> *lst1,
-                                  LinkedList<SchedInstruction> *lst2) {
+void ReadyList::AddLatestSubLists(ArrayList<InstCount> *lst1,
+                                  ArrayList<InstCount> *lst2) {
   assert(latestSubLst_->GetElmntCnt() == 0);
   if (lst1 != NULL)
     AddLatestSubList_(lst1);
@@ -222,9 +224,9 @@ void ReadyList::AddLatestSubLists(LinkedList<SchedInstruction> *lst1,
 
 void ReadyList::Print(std::ostream &out) {
   out << "Ready List: ";
-  for (const auto *crntInst = prirtyLst_->GetFrstElmnt(); crntInst != NULL;
+  for (auto crntInst = prirtyLst_->GetFrstElmnt(); crntInst != END;
        crntInst = prirtyLst_->GetNxtElmnt()) {
-    out << " " << crntInst->GetNum();
+    out << " " << crntInst;
   }
   out << '\n';
 
@@ -234,9 +236,9 @@ void ReadyList::Print(std::ostream &out) {
 __host__ __device__
 void ReadyList::Dev_Print() {
   printf("Ready List: ");
-  for (const auto *crntInst = prirtyLst_->GetFrstElmnt(); crntInst != NULL;
+  for (auto crntInst = prirtyLst_->GetFrstElmnt(); crntInst != END;
        crntInst = prirtyLst_->GetNxtElmnt()) {
-    printf(" %d", crntInst->GetNum());
+    printf(" %d", crntInst);
   }
   printf("\n");
 
@@ -244,7 +246,7 @@ void ReadyList::Dev_Print() {
 }
 
 __host__ __device__
-void ReadyList::AddLatestSubList_(LinkedList<SchedInstruction> *lst) {
+void ReadyList::AddLatestSubList_(ArrayList<InstCount> *lst) {
   assert(lst != NULL);
 
 #ifdef IS_DEBUG_READY_LIST2
@@ -253,11 +255,13 @@ void ReadyList::AddLatestSubList_(LinkedList<SchedInstruction> *lst) {
 
   // Start iterating from the bottom of the list to access the most recent
   // instructions first.
-  for (SchedInstruction *crntInst = lst->GetLastElmnt(); crntInst != NULL;
-       crntInst = lst->GetPrevElmnt()) {
+  SchedInstruction *crntInst;
+  for (InstCount crntInstNum = lst->GetLastElmnt(); crntInstNum != END;
+       crntInstNum = lst->GetPrevElmnt()) {
     // Once an instruction that is already in the ready list has been
     // encountered, this instruction and all the ones above it must be in the
     // ready list already.
+    crntInst = dataDepGraph_->GetInstByIndx(crntInstNum);
     if (crntInst->IsInReadyList())
       break;
     AddInst(crntInst);
@@ -265,7 +269,7 @@ void ReadyList::AddLatestSubList_(LinkedList<SchedInstruction> *lst) {
     Logger::GetLogStream() << crntInst->GetNum() << ", ";
 #endif
     crntInst->PutInReadyList();
-    latestSubLst_->InsrtElmnt(crntInst);
+    latestSubLst_->InsrtElmnt(crntInstNum);
   }
 
 #ifdef IS_DEBUG_READY_LIST2
@@ -278,9 +282,10 @@ void ReadyList::RemoveLatestSubList() {
 #ifdef IS_DEBUG_READY_LIST2
   Logger::GetLogStream() << "Removing from the ready list: ";
 #endif
-
-  for (SchedInstruction *inst = latestSubLst_->GetFrstElmnt(); inst != NULL;
-       inst = latestSubLst_->GetNxtElmnt()) {
+  SchedInstruction *inst;
+  for (InstCount instNum = latestSubLst_->GetFrstElmnt(); instNum != END;
+       instNum = latestSubLst_->GetNxtElmnt()) {
+    inst = dataDepGraph_->GetInstByIndx(instNum);
     assert(inst->IsInReadyList());
     inst->RemoveFromReadyList();
 #ifdef IS_DEBUG_READY_LIST2
@@ -301,20 +306,21 @@ void ReadyList::AddInst(SchedInstruction *inst) {
   bool changed;
   unsigned long key = CmputKey_(inst, false, changed);
   assert(changed == true);
-  KeyedEntry<SchedInstruction, unsigned long> *entry =
-      prirtyLst_->InsrtElmnt(inst, key, true);
-  InstCount instNum = inst->GetNum();
+  prirtyLst_->InsrtElmnt(inst->GetNum(), key, true);
+/*  InstCount instNum = inst->GetNum();
   if (prirts_.isDynmc)
     keyedEntries_[instNum] = entry;
+*/
 }
 
 __device__ __host__
-void ReadyList::AddList(LinkedList<SchedInstruction> *lst) {
+void ReadyList::AddList(ArrayList<InstCount> *lst) {
   SchedInstruction *crntInst;
 
   if (lst != NULL)
-    for (crntInst = lst->GetFrstElmnt(); crntInst != NULL;
-         crntInst = lst->GetNxtElmnt()) {
+    for (InstCount crntInstNum = lst->GetFrstElmnt(); crntInstNum != END;
+         crntInstNum = lst->GetNxtElmnt()) {
+      crntInst = dataDepGraph_->GetInstByIndx(crntInstNum);
       AddInst(crntInst);
     }
 
@@ -326,12 +332,16 @@ InstCount ReadyList::GetInstCnt() const { return prirtyLst_->GetElmntCnt(); }
 
 __host__ __device__
 SchedInstruction *ReadyList::GetNextPriorityInst() {
-  return prirtyLst_->GetNxtPriorityElmnt();
+  return dataDepGraph_->GetInstByIndx(prirtyLst_->GetNxtElmnt());
 }
 
 __host__ __device__
 SchedInstruction *ReadyList::GetNextPriorityInst(unsigned long &key) {
-  return prirtyLst_->GetNxtPriorityElmnt(key);
+  int indx;
+  SchedInstruction *inst = dataDepGraph_->
+	            GetInstByIndx(prirtyLst_->GetNxtElmnt(indx));
+  key = prirtyLst_->GetKey(indx);
+  return inst;
 }
 
 __host__ __device__
@@ -340,11 +350,12 @@ void ReadyList::UpdatePriorities() {
 
   SchedInstruction *inst;
   bool instChanged = false;
-  for (inst = prirtyLst_->GetFrstElmnt(); inst != NULL;
-       inst = prirtyLst_->GetNxtElmnt()) {
+  for (InstCount instNum = prirtyLst_->GetFrstElmnt(); instNum != END;
+       instNum = prirtyLst_->GetNxtElmnt()) {
+    inst = dataDepGraph_->GetInstByIndx(instNum);
     unsigned long key = CmputKey_(inst, true, instChanged);
     if (instChanged) {
-      prirtyLst_->BoostEntry(keyedEntries_[inst->GetNum()], key);
+      prirtyLst_->BoostElmnt(instNum, key);
     }
   }
 }
@@ -354,7 +365,7 @@ void ReadyList::RemoveNextPriorityInst() { prirtyLst_->RmvCrntElmnt(); }
 
 __host__ __device__
 bool ReadyList::FindInst(SchedInstruction *inst, int &hitCnt) {
-  return prirtyLst_->FindElmnt(inst, hitCnt);
+  return prirtyLst_->FindElmnt(inst->GetNum(), hitCnt);
 }
 
 __device__ __host__
@@ -370,3 +381,77 @@ void ReadyList::AddPrirtyToKey_(unsigned long &key, int16_t &keySize,
 
 __host__ __device__
 unsigned long ReadyList::MaxPriority() { return maxPriority_; }
+
+void ReadyList::CopyPointersToDevice(ReadyList *dev_rdyLst, 
+		                     DataDepGraph *dev_DDG) {
+  size_t memSize;
+  dev_rdyLst->dataDepGraph_ = dev_DDG;
+
+  // Copy latestSubLst_
+  ArrayList<InstCount> *dev_latestSubLst;
+  InstCount *dev_elmnts;
+  memSize = sizeof(ArrayList<InstCount>);
+  if (cudaSuccess != cudaMallocManaged(&dev_latestSubLst, memSize))
+    Logger::Fatal("Failed to alloc dev mem for latestSubLst_");
+
+  if (cudaSuccess != cudaMemcpy(dev_latestSubLst, latestSubLst_, memSize,
+			        cudaMemcpyHostToDevice))
+    Logger::Fatal("Failed to copy latestSubLst_ to device");
+
+  if (latestSubLst_->elmnts_) {
+    memSize = sizeof(InstCount) * latestSubLst_->size_;
+    if (cudaSuccess != cudaMalloc(&dev_elmnts, memSize))
+      Logger::Fatal("Failed to alloc dev mem for latestSubLst_->elmnts");
+
+    if (cudaSuccess != cudaMemcpy(dev_elmnts, latestSubLst_->elmnts_, memSize,
+			          cudaMemcpyHostToDevice))
+      Logger::Fatal("Failed to copy latestSubLst_->elmnts to device");
+
+    dev_latestSubLst->elmnts_ = dev_elmnts;
+  }
+
+  dev_rdyLst->latestSubLst_ = dev_latestSubLst;
+
+  // Copy prirtyLst_
+  PriorityArrayList<InstCount> *dev_prirtyLst;
+  unsigned long *dev_keys;
+  memSize = sizeof(PriorityArrayList<InstCount>);
+  if (cudaSuccess != cudaMallocManaged(&dev_prirtyLst, memSize))
+    Logger::Fatal("Failed to alloc dev mem for prirtyLst_");
+
+  if (cudaSuccess != cudaMemcpy(dev_prirtyLst, prirtyLst_, memSize,
+                                cudaMemcpyHostToDevice))
+    Logger::Fatal("Failed to copy prirtyLst_ to device");
+
+  if (prirtyLst_->elmnts_) {
+    memSize = sizeof(InstCount) * prirtyLst_->maxSize_;
+    if (cudaSuccess != cudaMalloc(&dev_elmnts, memSize))
+      Logger::Fatal("Failed to alloc dev mem for prirtyLst_->elmnts");
+
+    if (cudaSuccess != cudaMemcpy(dev_elmnts, prirtyLst_->elmnts_, memSize,
+                                  cudaMemcpyHostToDevice))
+      Logger::Fatal("Failed to copy prirtyLst_->elmnts to device");
+
+    dev_prirtyLst->elmnts_ = dev_elmnts;
+
+    memSize = sizeof(unsigned long) * prirtyLst_->maxSize_;
+    if (cudaSuccess != cudaMalloc(&dev_keys, memSize))
+      Logger::Fatal("Failed to alloc dev mem for prirtyLst_->keys");
+
+    if (cudaSuccess != cudaMemcpy(dev_keys, prirtyLst_->keys_, memSize,
+			          cudaMemcpyHostToDevice))
+      Logger::Fatal("Failed to copy prirtyLst_->keys_ to device");
+
+    dev_prirtyLst->keys_ = dev_keys;
+  }
+
+  dev_rdyLst->prirtyLst_ = dev_prirtyLst;
+}
+
+void ReadyList::FreeDevicePointers() {
+  cudaFree(latestSubLst_->elmnts_);
+  cudaFree(latestSubLst_);
+  cudaFree(prirtyLst_->elmnts_);
+  cudaFree(prirtyLst_->keys_);
+  cudaFree(prirtyLst_);
+}

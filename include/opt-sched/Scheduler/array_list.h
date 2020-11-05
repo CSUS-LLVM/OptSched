@@ -32,6 +32,10 @@ class ArrayList {
     __host__ __device__
     T GetNxtElmnt();
 
+    // returns next element allong with its index
+    __host__ __device__
+    T GetNxtElmnt(int &indx);
+
     // Returns previous element in the array
     __host__ __device__
     T GetPrevElmnt();
@@ -47,6 +51,27 @@ class ArrayList {
     // Resets ArrayList to empty state
     __host__ __device__
     void Reset();
+
+    // Resets iterator
+    __host__ __device__
+    void ResetIterator();
+
+    // Removes elmnt at crnt_ index
+    __host__ __device__
+    void RmvCrntElmnt();
+
+    // Calls FindElmnt with initialized hitCnt
+    __host__ __device__
+    bool FindElmnt(const T element) const;
+
+    // Returns true if elmnt is found, places num of matches in
+    // hitCnt. 
+    __host__ __device__
+    bool FindElmnt(const T element, int &hitCnt) const;
+
+    // Removes elmnt that matches passed elmnt
+    __host__ __device__
+    void RmvElmnt(T elmnt);
 
     int maxSize_;
     int size_;
@@ -69,6 +94,24 @@ class PriorityArrayList : public ArrayList<T> {
     // element with the same key exists.
     __host__ __device__
     void InsrtElmnt(T elmnt, K key, bool allowDplct);
+
+    // Copy passed list to this
+    __host__ __device__
+    void CopyList(PriorityArrayList<T,K> *otherLst);
+
+    // Remove elmnt and key at crnt_ indx
+    __host__ __device__
+    void RmvCrntElmnt();
+
+    // Returns key at passed index
+    __host__ __device__
+    K GetKey(int indx) {
+      return keys_[indx];
+    }
+
+    // updates key and then moves elmnt if needed
+    __host__ __device__
+    void BoostElmnt(T elmnt, K newKey);
   
     K *keys_;
 
@@ -128,6 +171,21 @@ class ArrayList<int> {
         return END;
     }
 
+    __host__ __device__
+    int GetNxtElmnt(int &indx) {
+      if (crnt_ != size_)
+        crnt_++;
+      else
+        return END;
+
+      indx = crnt_;
+
+      if (crnt_ < size_ && crnt_ >= 0)
+        return elmnts_[crnt_];
+      else
+        return END;
+    }
+
     // Returns previous element in the array
     __host__ __device__
     int GetPrevElmnt() {
@@ -163,6 +221,40 @@ class ArrayList<int> {
     __host__ __device__
     void Reset() {
       size_ = 0;
+    }
+
+    __host__ __device__
+    void ResetIterator() {
+      crnt_ = -1;
+    }
+
+    __host__ __device__
+    bool FindElmnt(const int element, int &hitCnt) const {
+      for (int i = 0; i < size_; i++) {
+        if (element == elmnts_[i])
+          hitCnt++;
+        }
+      return hitCnt > 0 ? true : false;
+    }
+
+    __host__ __device__
+    bool FindElmnt(const int element) const {
+      int hitCnt;
+      return FindElmnt(element, hitCnt);
+    }
+
+    __host__ __device__
+    void RmvElmnt(int elmnt) {
+      int elmntIndx;
+      for (int i = 0; i < size_; i++) {
+        if (elmnts_[i] == elmnt) {
+          elmntIndx = i;
+          break;
+        }
+      }
+      size_--;
+      for (int i = elmntIndx; i < size_; i++)
+        elmnts_[i] = elmnts_[i + 1];
     }
 
     int maxSize_;
@@ -226,6 +318,22 @@ T ArrayList<T>::GetNxtElmnt() {
 
 template <typename T>
 __host__ __device__
+T ArrayList<T>::GetNxtElmnt(int &indx) {
+  if (crnt_ != size_)
+    crnt_++;
+  else
+    return NULL;
+
+  indx = crnt_;
+
+  if (crnt_ < size_ && crnt_ >= 0)
+    return elmnts_[crnt_];
+  else
+    return NULL;
+}
+
+template <typename T>
+__host__ __device__
 T ArrayList<T>::GetPrevElmnt() {
   if (crnt_ != 0)
     crnt_--;
@@ -260,6 +368,54 @@ template <typename T>
 __host__ __device__
 void ArrayList<T>::Reset() {
   size_ = 0;
+}
+
+template <typename T>
+__host__ __device__
+void ArrayList<T>::ResetIterator() {
+  crnt_ = -1;
+}
+
+template <typename T>
+__host__ __device__
+void ArrayList<T>::RmvCrntElmnt() {
+  assert(crnt_ != -1);
+  assert(size_ > 0);
+  size_--;
+  for (int i = crnt_; i < size_; i++)
+    elmnts_[i] = elmnts_[i + 1];
+}
+
+template <typename T>
+__host__ __device__
+bool ArrayList<T>::FindElmnt(const T element, int &hitCnt) const {
+  for (int i = 0; i < size_; i++) {
+    if (element == elmnts_[i])
+      hitCnt++;
+  }
+  return hitCnt > 0 ? true : false;
+}
+
+template <typename T>
+__host__ __device__
+void ArrayList<T>::RmvElmnt(T elmnt) {
+  int elmntIndx;
+  for (int i = 0; i < size_; i++) {
+    if (elmnts_[i] == elmnt) {
+      elmntIndx = i;
+      break;
+    }
+  }
+  size_--;
+  for (int i = elmntIndx; i < size_; i++)
+    elmnts_[i] = elmnts_[i + 1];
+}
+
+template <typename T>
+__host__ __device__
+bool ArrayList<T>::FindElmnt(const T element) const {
+  int hitCnt;
+  return FindElmnt(element, hitCnt);
 }
 
 template <typename T, typename K>
@@ -313,4 +469,80 @@ void PriorityArrayList<T,K>::InsrtElmnt(T elmnt, K key, bool allowDplct) {
   ArrayList<T>::elmnts_[indx] = elmnt;
   keys_[indx] = key;
   ArrayList<T>::size_++;
+}
+
+template <typename T, typename K>
+__host__ __device__
+void PriorityArrayList<T,K>::CopyList(PriorityArrayList<T,K> *otherLst) {
+  for (int i = 0; i < otherLst->size_; i++) {
+    InsrtElmnt(otherLst->elmnts_[i], otherLst->keys_[i], true);
+  }
+}
+
+template <typename T, typename K>
+__host__ __device__
+void PriorityArrayList<T,K>::RmvCrntElmnt() {
+  assert(ArrayList<T>::crnt_ != -1);
+  assert(ArrayList<T>::size_ > 0);
+  ArrayList<T>::size_--;
+  for (int i = ArrayList<T>::crnt_; i < ArrayList<T>::size_; i++) {
+    ArrayList<T>::elmnts_[i] = ArrayList<T>::elmnts_[i + 1];
+    keys_[i] = keys_[i + 1];
+  }
+}
+
+template <typename T, typename K>
+__host__ __device__
+void PriorityArrayList<T,K>::BoostElmnt(T elmnt, K newKey) {
+  int elmntIndx = -1;
+  int newIndx;
+  // FindElmnt
+  for (int i = 0; i < ArrayList<T>::size_; i++) {
+    if (elmnt == ArrayList<T>::elmnts_[i]) {
+      elmntIndx = i;
+      break;
+    }
+  }
+
+  if (elmntIndx != -1) {
+    if (keys_[elmntIndx] < newKey) {
+      // if elmnt is already at the top or its prev elmnt still has a 
+      // higher key, it is already in place
+      if (elmntIndx == 0 || keys_[elmntIndx - 1] >= newKey)
+        return;
+
+      newIndx = elmntIndx;
+
+      while (newIndx != 0 && keys_[newIndx - 1] < newKey)
+        newIndx--;
+
+      for (int i = elmntIndx; i > newIndx; i--) {
+        ArrayList<T>::elmnts_[i] = ArrayList<T>::elmnts_[i - 1];
+        keys_[i] = keys_[i - 1];
+      }
+
+      ArrayList<T>::elmnts_[newIndx] = elmnt;
+      keys_[newIndx] = newKey;
+    } else if (keys_[elmntIndx] < newKey) {
+      // if elmnt is already at the bottom or next elmnt still has
+      // a lower key, it is already in place
+      if (elmntIndx == ArrayList<T>::size_ - 1 || 
+	  keys_[elmntIndx + 1] <= newKey)
+        return;
+
+      newIndx = elmntIndx;
+
+      while (newIndx != ArrayList<T>::size_ - 1 && 
+	     keys_[newIndx + 1] > newKey)
+        newIndx++;
+
+      for (int i = elmntIndx; i < newIndx; i++) {
+        ArrayList<T>::elmnts_[i] = ArrayList<T>::elmnts_[i + 1];
+        keys_[i] = keys_[i + 1];
+      }
+
+      ArrayList<T>::elmnts_[newIndx] = elmnt;
+      keys_[newIndx] = newKey;
+    }
+  }
 }

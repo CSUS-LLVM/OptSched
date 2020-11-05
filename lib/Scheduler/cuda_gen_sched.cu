@@ -73,7 +73,7 @@ ConstrainedScheduler::ConstrainedScheduler(DataDepGraph *dataDepGraph,
 
   // Allocate the array of first-ready lists - one list per cycle.
   assert(schedUprBound_ > 0);
-  frstRdyLstPerCycle_ = new LinkedList<SchedInstruction> *[schedUprBound_];
+  frstRdyLstPerCycle_ = new ArrayList<InstCount> *[schedUprBound_];
 
   for (InstCount i = 0; i < schedUprBound_; i++) {
     frstRdyLstPerCycle_[i] = NULL;
@@ -118,10 +118,10 @@ bool ConstrainedScheduler::Initialize_(InstCount trgtSchedLngth,
 
   // Allocate the first entry in the array.
   if (frstRdyLstPerCycle_[0] == NULL) {
-    frstRdyLstPerCycle_[0] = new LinkedList<SchedInstruction>;
+    frstRdyLstPerCycle_[0] = new ArrayList<InstCount>(dataDepGraph_->GetInstCnt());
   }
 
-  frstRdyLstPerCycle_[0]->InsrtElmnt(rootInst_);
+  frstRdyLstPerCycle_[0]->InsrtElmnt(rootInst_->GetNum());
 
   if (rsrvSlots_ != NULL) {
     delete[] rsrvSlots_;
@@ -163,12 +163,13 @@ void ConstrainedScheduler::SchdulInst_(SchedInstruction *inst, InstCount) {
 
       // If the first-ready list of that cycle has not been created yet.
       if (frstRdyLstPerCycle_[scsrRdyCycle] == NULL) {
-        frstRdyLstPerCycle_[scsrRdyCycle] = new LinkedList<SchedInstruction>;
+        frstRdyLstPerCycle_[scsrRdyCycle] = 
+		new ArrayList<InstCount>(dataDepGraph_->GetInstCnt());
       }
 
       // Add this succesor to the first-ready list of the future cycle
       // in which we now know it will become ready
-      frstRdyLstPerCycle_[scsrRdyCycle]->InsrtElmnt(crntScsr);
+      frstRdyLstPerCycle_[scsrRdyCycle]->InsrtElmnt(crntScsr->GetNum());
     }
   }
 
@@ -200,7 +201,7 @@ void ConstrainedScheduler::UnSchdulInst_(SchedInstruction *inst) {
       // the scheduling of this instruction has made it ready.
       assert(scsrRdyCycle < schedUprBound_);
       assert(frstRdyLstPerCycle_[scsrRdyCycle] != NULL);
-      frstRdyLstPerCycle_[scsrRdyCycle]->RmvElmnt(crntScsr);
+      frstRdyLstPerCycle_[scsrRdyCycle]->RmvElmnt(crntScsr->GetNum());
     }
   }
 

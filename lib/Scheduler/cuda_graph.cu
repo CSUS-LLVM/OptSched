@@ -537,67 +537,103 @@ void GraphNode::CopyPointersToDevice(GraphNode *dev_node, GraphNode **dev_nodes,
 
   //Copy BitVector *isRcrsvScsr_
   BitVector *dev_isRcrsvScsr;
-  memSize = sizeof(BitVector);
-  if (cudaSuccess != cudaMalloc(&dev_isRcrsvScsr, memSize))
-    Logger::Fatal("Failed to alloc dev mem for dev_isRcrsvScsr");
-
-  if (cudaSuccess != cudaMemcpy(dev_isRcrsvScsr, isRcrsvScsr_, memSize,
-			        cudaMemcpyHostToDevice))
-    Logger::Fatal("Failed to copy isRcrsvScsr to device");
-
-  if (cudaSuccess != cudaMemcpy(&dev_node->isRcrsvScsr_, &dev_isRcrsvScsr,
-			        sizeof(BitVector *), cudaMemcpyHostToDevice))
-    Logger::Fatal("Failed to update dev_node->isRcrsvScsr_ on device");
-
-  // Copy BitVector->vctr_
   unsigned long *dev_vctr;
-  if (isRcrsvScsr_->GetUnitCnt() > 0) {
-    memSize = sizeof(unsigned long) * isRcrsvScsr_->GetUnitCnt();
-    if (cudaSuccess != cudaMalloc(&dev_vctr, memSize))
-      Logger::Fatal("Failed to alloc dev mem for isRcrsvScsr->vctr");
+  if (isRcrsvScsr_) {
+    memSize = sizeof(BitVector);
+    if (cudaSuccess != cudaMalloc(&dev_isRcrsvScsr, memSize))
+      Logger::Fatal("Failed to alloc dev mem for dev_isRcrsvScsr");
 
-    if (cudaSuccess != cudaMemcpy(dev_vctr, isRcrsvScsr_->vctr_, memSize,
+    if (cudaSuccess != cudaMemcpy(dev_isRcrsvScsr, isRcrsvScsr_, memSize,
 			          cudaMemcpyHostToDevice))
-      Logger::Fatal("Failed to copy isRcrsvScsr->vctr to device");
+      Logger::Fatal("Failed to copy isRcrsvScsr to device");
 
-    if (cudaSuccess != cudaMemcpy(&dev_node->isRcrsvScsr_->vctr_, &dev_vctr,
-			          sizeof(unsigned long *), 
-				  cudaMemcpyHostToDevice))
-      Logger::Fatal("Failed to update isRcrsvScsr->vctr");
+    if (cudaSuccess != cudaMemcpy(&dev_node->isRcrsvScsr_, &dev_isRcrsvScsr,
+			          sizeof(BitVector *), cudaMemcpyHostToDevice))
+      Logger::Fatal("Failed to update dev_node->isRcrsvScsr_ on device");
+
+    // Copy BitVector->vctr_
+    if (isRcrsvScsr_->GetUnitCnt() > 0) {
+      memSize = sizeof(unsigned long) * isRcrsvScsr_->GetUnitCnt();
+      if (cudaSuccess != cudaMalloc(&dev_vctr, memSize))
+        Logger::Fatal("Failed to alloc dev mem for isRcrsvScsr->vctr");
+
+      if (cudaSuccess != cudaMemcpy(dev_vctr, isRcrsvScsr_->vctr_, memSize,
+	 		            cudaMemcpyHostToDevice))
+        Logger::Fatal("Failed to copy isRcrsvScsr->vctr to device");
+
+      if (cudaSuccess != cudaMemcpy(&dev_node->isRcrsvScsr_->vctr_, &dev_vctr,
+			            sizeof(unsigned long *), 
+				    cudaMemcpyHostToDevice))
+        Logger::Fatal("Failed to update isRcrsvScsr->vctr");
+    }
   }
 
   // Copy BitVector *isRcrsvPrdcsr
   BitVector *dev_isRcrsvPrdcsr;
-  memSize = sizeof(BitVector);
-  if (cudaSuccess != cudaMalloc(&dev_isRcrsvPrdcsr, memSize))
-    Logger::Fatal("Failed to alloc dev mem for dev_isRcrsvPrdcsr");
+  if (isRcrsvPrdcsr_) {
+    memSize = sizeof(BitVector);
+    if (cudaSuccess != cudaMalloc(&dev_isRcrsvPrdcsr, memSize))
+      Logger::Fatal("Failed to alloc dev mem for dev_isRcrsvPrdcsr");
 
-  if (cudaSuccess != cudaMemcpy(dev_isRcrsvPrdcsr, isRcrsvPrdcsr_, memSize,
-                                cudaMemcpyHostToDevice))
-    Logger::Fatal("Failed to copy isRcrsvPrdcsr to device");
-
-  if (cudaSuccess != cudaMemcpy(&dev_node->isRcrsvPrdcsr_, &dev_isRcrsvPrdcsr,
-                                sizeof(BitVector *), cudaMemcpyHostToDevice))
-    Logger::Fatal("Failed to update dev_node->isRcrsvPrdcsr_ on device");
-
-  // Copy BitVector->vctr_
-  if (isRcrsvPrdcsr_->GetUnitCnt() > 0) {
-    memSize = sizeof(unsigned long) * isRcrsvPrdcsr_->GetUnitCnt();
-    if (cudaSuccess != cudaMalloc(&dev_vctr, memSize))
-      Logger::Fatal("Failed to alloc dev mem for isRcrsvPrdcsr->vctr");
-
-    if (cudaSuccess != cudaMemcpy(dev_vctr, isRcrsvPrdcsr_->vctr_, memSize,
+    if (cudaSuccess != cudaMemcpy(dev_isRcrsvPrdcsr, isRcrsvPrdcsr_, memSize,
                                   cudaMemcpyHostToDevice))
-      Logger::Fatal("Failed to copy isRcrsvPrdcsr->vctr to device");
+      Logger::Fatal("Failed to copy isRcrsvPrdcsr to device");
 
-    if (cudaSuccess != cudaMemcpy(&dev_node->isRcrsvPrdcsr_->vctr_, &dev_vctr,
-                                  sizeof(unsigned long *), 
-                                  cudaMemcpyHostToDevice))
-      Logger::Fatal("Failed to update isRcrsvPrdcsr->vctr");
+    if (cudaSuccess != cudaMemcpy(&dev_node->isRcrsvPrdcsr_, &dev_isRcrsvPrdcsr,
+                                  sizeof(BitVector *), cudaMemcpyHostToDevice))
+      Logger::Fatal("Failed to update dev_node->isRcrsvPrdcsr_ on device");
+
+    // Copy BitVector->vctr_
+    if (isRcrsvPrdcsr_->GetUnitCnt() > 0) {
+      memSize = sizeof(unsigned long) * isRcrsvPrdcsr_->GetUnitCnt();
+      if (cudaSuccess != cudaMalloc(&dev_vctr, memSize))
+        Logger::Fatal("Failed to alloc dev mem for isRcrsvPrdcsr->vctr");
+
+      if (cudaSuccess != cudaMemcpy(dev_vctr, isRcrsvPrdcsr_->vctr_, memSize,
+                                    cudaMemcpyHostToDevice))
+        Logger::Fatal("Failed to copy isRcrsvPrdcsr->vctr to device");
+
+      if (cudaSuccess != cudaMemcpy(&dev_node->isRcrsvPrdcsr_->vctr_, &dev_vctr,
+                                    sizeof(unsigned long *), 
+                                    cudaMemcpyHostToDevice))
+        Logger::Fatal("Failed to update isRcrsvPrdcsr->vctr");
+    }
   }
 
   //set value of nodes_ to dev_insts_
   dev_node->nodes_ = dev_nodes;
+}
+
+void GraphNode::FreeDevicePointers() {
+  if (rcrsvScsrLst_) {
+    cudaFree(rcrsvScsrLst_->elmnts_);
+    cudaFree(rcrsvScsrLst_);
+  }
+  if (rcrsvPrdcsrLst_) {
+    cudaFree(rcrsvPrdcsrLst_->elmnts_);
+    cudaFree(rcrsvPrdcsrLst_);
+  }
+  if (scsrLst_) {
+    for (int i = 0; i < scsrLst_->size_; i++)
+      cudaFree(scsrLst_->elmnts_[i]);
+    cudaFree(scsrLst_->elmnts_);
+    cudaFree(scsrLst_->keys_);
+    cudaFree(scsrLst_);
+  }
+  if (prdcsrLst_) {
+    for (int i = 0; i < prdcsrLst_->size_; i++)
+      cudaFree(prdcsrLst_->elmnts_[i]);
+    cudaFree(prdcsrLst_->elmnts_);
+    cudaFree(prdcsrLst_);
+  }
+  if (isRcrsvScsr_) {
+    cudaFree(isRcrsvScsr_->vctr_);
+    cudaFree(isRcrsvScsr_);
+  }
+  if (isRcrsvPrdcsr_) {
+    cudaFree(isRcrsvPrdcsr_->vctr_);
+    cudaFree(isRcrsvPrdcsr_);
+  }
 }
 
 __host__ __device__

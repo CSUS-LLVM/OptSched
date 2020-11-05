@@ -29,6 +29,11 @@ public:
   // Calculates the schedule and returns it in the passed argument.
   __host__ __device__
   FUNC_RESULT FindSchedule(InstSchedule *sched, SchedRegion *rgn);
+  // Copy pointers to device and link them to device pointer
+  void CopyPointersToDevice(ListScheduler *dev_lstSchedulr,
+                           DataDepGraph *dev_DDG, MachineModel *dev_machMdl);
+  // Calls cudaFree on all arrays/objects that were allocated with cudaMalloc
+  void FreeDevicePointers();
 protected:
   bool isDynmcPrirty_;
   // Adds the instructions that have just become ready at this cycle to the
@@ -38,7 +43,7 @@ protected:
   // Pick next instruction to be scheduled. Returns NULL if no instructions are
   // ready.
   __host__ __device__
-  virtual SchedInstruction *PickInst() const;
+  SchedInstruction *PickInst() const;
 };
 
 // Force the list scheduler to maintain the source ordering of the instructions
@@ -56,7 +61,7 @@ private:
   bool IsSequentialInstruction(const SchedInstruction *Inst) const;
 
   __host__ __device__
-  bool ChkInstLglty_(SchedInstruction *inst) const override;
+  bool ChkInstLglty_(SchedInstruction *inst) const;
 };
 
 } // namespace opt_sched

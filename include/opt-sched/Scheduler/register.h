@@ -129,8 +129,10 @@ public:
   // for reinitialization in the next region
   __device__
   void ResetLiveIntervals();
-
+  // Copies all array/objects to device and links them to device pointer
   void CopyPointersToDevice(Register *dev_reg);
+  // Calls cudaFree on all arrays/objects that were allocated with cudaMalloc
+  void FreeDevicePointers();
 
 private:
   int16_t type_;
@@ -215,8 +217,10 @@ public:
   // so they can be reinitialized for the next region
   __device__
   void Reset();
-
+  // Copies all array/objects to device and links them to device pointer
   void CopyPointersToDevice(RegisterFile *dev_regFile);
+  // Calls cudaFree on all arrays/objects that were allocated with cudaMalloc
+  void FreeDevicePointers();
 
 private:
   int16_t regType_;

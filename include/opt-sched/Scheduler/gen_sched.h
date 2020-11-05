@@ -115,8 +115,8 @@ public:
   virtual ~ConstrainedScheduler();
 
   // Calculates the schedule and returns it in the passed argument.
-  __host__ __device__
-  virtual FUNC_RESULT FindSchedule(InstSchedule *sched, SchedRegion *rgn) = 0;
+  //__host__ __device__
+  //FUNC_RESULT FindSchedule(InstSchedule *sched, SchedRegion *rgn) = 0;
 
 protected:
   // The data dependence graph to be scheduled.
@@ -147,7 +147,7 @@ protected:
   // cycle. Whenever the scheduler gets to a new cycle, it inserts the
   // corresponding first-ready list of that cycle into the global sorted ready
   // list.
-  LinkedList<SchedInstruction> **frstRdyLstPerCycle_;
+  ArrayList<InstCount> **frstRdyLstPerCycle_;
 
   // An array holding the number of issue slots available for each issue type
   // in the current machine cycle.
@@ -221,7 +221,7 @@ protected:
 
   // Checks the legality of issuing an instruction of a given issue type.
   __host__ __device__
-  virtual bool ChkInstLglty_(SchedInstruction *inst) const;
+  bool ChkInstLglty_(SchedInstruction *inst) const;
 
   // Early check for instruction legality.
   __host__ __device__
@@ -238,8 +238,8 @@ protected:
 
   // A pure virtual function for updating the ready list. Each concrete
   // scheduler should define its own version.
-  __host__ __device__
-  virtual void UpdtRdyLst_(InstCount cycleNum, int slotNum) = 0;
+  //__host__ __device__
+  //virtual void UpdtRdyLst_(InstCount cycleNum, int slotNum) = 0;
 };
 
 } // namespace opt_sched

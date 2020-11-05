@@ -363,8 +363,8 @@ void ACOScheduler::UpdatePheremone(InstSchedule *schedule) {
 // copied from Enumerator
 inline void ACOScheduler::UpdtRdyLst_(InstCount cycleNum, int slotNum) {
   InstCount prevCycleNum = cycleNum - 1;
-  LinkedList<SchedInstruction> *lst1 = NULL;
-  LinkedList<SchedInstruction> *lst2 = frstRdyLstPerCycle_[cycleNum];
+  ArrayList<InstCount> *lst1 = NULL;
+  ArrayList<InstCount> *lst2 = frstRdyLstPerCycle_[cycleNum];
 
   if (slotNum == 0 && prevCycleNum >= 0) {
     // If at the begining of a new cycle other than the very first cycle, then

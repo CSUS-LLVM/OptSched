@@ -220,37 +220,6 @@ ScheduleDAGOptSched::ScheduleDAGOptSched(
   MM = OST->createMachineModel(PathCfgMM.c_str());
   MM->convertMachineModel(static_cast<ScheduleDAGInstrs &>(*this),
                           RegClassInfo);
-/*
-  // Increase heap/stack size to allow large DDGs to be allocated
-  if (cudaSuccess != cudaDeviceSetLimit(cudaLimitStackSize, 65536))
-    printf("Error increasing stack size: %s\n",
-           cudaGetErrorString(cudaGetLastError()));
-
-  if (cudaSuccess != cudaDeviceSetLimit(cudaLimitMallocHeapSize, 2048000000))
-    printf("Error increasing heap size: %s\n",
-           cudaGetErrorString(cudaGetLastError()));
-
-  // Copy MachineModel to device for use during DevListSched.
-  // Allocate device memory
-  if (cudaSuccess != cudaMallocManaged((void**)&dev_MM,
-                                       sizeof(MachineModel)))
-    printf("Error allocating device space for dev_machMdl: %s\n",
-           cudaGetErrorString(cudaGetLastError()));
-  // Copy machMdl_ to device
-  if (cudaSuccess != cudaMemcpy(dev_MM, MM.get(),
-                                sizeof(MachineModel),
-                                cudaMemcpyHostToDevice))
-    printf("Error copying machMdl_ to device: %s\n",
-           cudaGetErrorString(cudaGetLastError()));
-  // Copy over all pointers to device
-  MM.get()->CopyPointersToDevice(dev_MM);
-
-  //Allocate device memory for dev_maxDDG pointer storage
-  if (cudaSuccess != cudaMallocManaged((void**)&dev_maxDDG,
-                                       sizeof(DataDepGraph)))
-    printf("Error allocating device space for dev_maxDDG: %s\n",
-           cudaGetErrorString(cudaGetLastError()));
-*/
   dev_MM = NULL;
 }
 
@@ -287,18 +256,6 @@ void ScheduleDAGOptSched::initSchedulers() {
   SchedPasses.push_back(OptSchedBalanced);
 }
 
-__global__
-void AllocateMaxDDG(MachineModel *dev_machMdl, LATENCY_PRECISION ltncyPcsn,
-		    InstCount maxRegionSize, DataDepGraph **dev_maxDDG, 
-		    InstCount maxEdgeCnt, GraphEdge *dev_edges,
-		    SchedInstruction *dev_insts) {
-  // Create new DDG and save its pointer for later kernels
-  *dev_maxDDG = new DataDepGraph(dev_machMdl, ltncyPcsn);
-  // Allocate DDG and set dev_insts and dev_edges as its insts and edges
-  (*dev_maxDDG)->AllocateMaxDDG(maxRegionSize, maxEdgeCnt, dev_edges, 
-		                dev_insts);
-}
-
 // schedule called for each basic block
 void ScheduleDAGOptSched::schedule() {
   ShouldTrackPressure = true;
@@ -313,25 +270,6 @@ void ScheduleDAGOptSched::schedule() {
   // If two pass scheduling is enabled then
   // first just record the scheduling region.
   if (OptSchedEnabled && TwoPassEnabled && !TwoPassSchedulingStarted) {
-/*    // Find region size
-    InstCount regionSize = 0;
-    InstCount edgeCnt = 0;
-    SetupLLVMDag();
-    for (MachineBasicBlock::iterator I = RegionBegin, E = RegionEnd; 
-         I != E; ++I) {
-      edgeCnt += (InstCount)SUnits[regionSize].Succs.size();
-      //Logger::Info("Inst %d has %d successors", regionSize, SUnits[regionSize].Succs.size());
-      regionSize++;
-    }
-
-    // Keep track of largest amount of edges
-    if (maxEdgeCnt < edgeCnt)
-      maxEdgeCnt = edgeCnt;
-
-    // Keep track of largest region
-    if (maxRegionSize < regionSize)
-      maxRegionSize = regionSize;
-*/
     Regions.push_back(std::make_pair(RegionBegin, RegionEnd));
     LLVM_DEBUG(
         dbgs() << "Recording scheduling region before scheduling with two pass "
@@ -449,81 +387,27 @@ void ScheduleDAGOptSched::schedule() {
   auto *BDDG = static_cast<OptSchedDDGWrapperBasic *>(DDG.get());
   addGraphTransformations(BDDG);
 
+  // Prepare for device scheduling by increasing heap size and copying machMdl
   if (dev_MM == NULL) {
-    // Increase heap/stack size to allow large DDGs to be allocated
-    if (cudaSuccess != cudaDeviceSetLimit(cudaLimitStackSize, 65536))
-      printf("Error increasing stack size: %s\n",
-             cudaGetErrorString(cudaGetLastError()));
-
-    if (cudaSuccess != cudaDeviceSetLimit(cudaLimitMallocHeapSize, 512000000))
-      printf("Error increasing heap size: %s\n",
-             cudaGetErrorString(cudaGetLastError()));
+    // Increase heap size to allow large DDGs to be allocated
+    if (cudaSuccess != cudaDeviceSetLimit(cudaLimitMallocHeapSize, 16000000))
+      Logger::Info("Error increasing heap size: %s",
+                    cudaGetErrorString(cudaGetLastError()));
 
     // Copy MachineModel to device for use during DevListSched.
     // Allocate device memory
     if (cudaSuccess != cudaMallocManaged((void**)&dev_MM,
                                          sizeof(MachineModel)))
-      printf("Error allocating device space for dev_machMdl: %s\n",
-             cudaGetErrorString(cudaGetLastError()));
+      Logger::Fatal("Error allocating device space for dev_machMdl: %s",
+                    cudaGetErrorString(cudaGetLastError()));
     // Copy machMdl_ to device
     if (cudaSuccess != cudaMemcpy(dev_MM, MM.get(),
                                   sizeof(MachineModel),
                                   cudaMemcpyHostToDevice))
-      printf("Error copying machMdl_ to device: %s\n",
-             cudaGetErrorString(cudaGetLastError()));
+      Logger::Fatal("Error copying machMdl_ to device: %s",
+                    cudaGetErrorString(cudaGetLastError()));
     // Copy over all pointers to device
     MM.get()->CopyPointersToDevice(dev_MM);
-/*
-    // Allocate device memory for dev_maxDDG pointer storage
-    if (cudaSuccess != cudaMallocManaged((void**)&dev_maxDDG,
-                                         sizeof(DataDepGraph *)))
-      printf("Error allocating device space for dev_maxDDG: %s\n",
-             cudaGetErrorString(cudaGetLastError()));
-
-    // add nodes and edges for artificial root/leaf
-    maxRegionSize += 2;
-    maxEdgeCnt += maxRegionSize;
-
-    // create blank edges and copy them to device
-    GraphEdge *edges = new GraphEdge[maxEdgeCnt];
-    GraphEdge *dev_edges;
-
-    if (cudaSuccess != cudaMallocManaged((void**)&dev_edges, 
-			                 sizeof(GraphEdge) * maxEdgeCnt))
-      Logger::Fatal("Failed to allocate dev mem for edges: %s", 
-		    cudaGetErrorString(cudaGetLastError()));
-
-    if (cudaSuccess != cudaMemcpy(dev_edges, edges, sizeof(GraphEdge) * maxEdgeCnt,
-			          cudaMemcpyHostToDevice))
-      Logger::Fatal("Failed to copy blank edges to device: %s", 
-		    cudaGetErrorString(cudaGetLastError()));
-
-    delete[] edges;
-
-    // Create blank nodes and copy them to device
-    SchedInstruction *insts = new SchedInstruction[maxRegionSize];
-    SchedInstruction *dev_insts;
-
-    if (cudaSuccess != cudaMallocManaged((void**)&dev_insts,
-                                 sizeof(SchedInstruction) * maxRegionSize))
-      Logger::Fatal("Failed to allocate dev mem for insts: %s",
-                    cudaGetErrorString(cudaGetLastError()));
-
-    if (cudaSuccess != cudaMemcpy(dev_insts, insts, 
-			          sizeof(SchedInstruction) * maxRegionSize,
-                                  cudaMemcpyHostToDevice))
-      Logger::Fatal("Failed to copy blank nodes to device: %s",
-                    cudaGetErrorString(cudaGetLastError()));
-
-    //delete[] insts;
-
-    Logger::Info("Launching AllocateMaxDDG kernel with size %d and %d edges",
-		 maxRegionSize, maxEdgeCnt);
-    AllocateMaxDDG<<<1,1>>>(dev_MM, LatencyPrecision, maxRegionSize,
-		            dev_maxDDG, maxEdgeCnt, dev_edges, dev_insts);
-    cudaDeviceSynchronize();
-    Logger::Info("Post Kernel Error: %s", cudaGetErrorString(cudaGetLastError()));
-*/
   }
   
   // create region
@@ -565,13 +449,12 @@ void ScheduleDAGOptSched::schedule() {
 
   // Deallocate all device memory after completing second pass
   // on the last scheduling region
-  if (RegionNumber == Regions.size() - 1 && SecondPass) {
+/*  if (RegionNumber == Regions.size() - 1) {
     Logger::Info("Calling cudaDeviceReset()");
     cudaDeviceReset();
     Logger::Info("Done calling cudaDeviceReset()");
     dev_MM = NULL;
-    dev_maxDDG = NULL;
-  }
+  }*/
 
   if ((!(Rslt == RES_SUCCESS || Rslt == RES_TIMEOUT) || Sched == NULL)) {
     LLVM_DEBUG(

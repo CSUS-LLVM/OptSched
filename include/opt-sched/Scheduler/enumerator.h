@@ -946,8 +946,8 @@ inline int Enumerator::GetCrntSlotNum_() { return crntSlotNum_; }
 __host__ __device__
 inline void Enumerator::UpdtRdyLst_(InstCount cycleNum, int slotNum) {
   InstCount prevCycleNum = cycleNum - 1;
-  LinkedList<SchedInstruction> *lst1 = NULL;
-  LinkedList<SchedInstruction> *lst2 = frstRdyLstPerCycle_[cycleNum];
+  ArrayList<InstCount> *lst1 = NULL;
+  ArrayList<InstCount> *lst2 = frstRdyLstPerCycle_[cycleNum];
 
   if (prirts_.isDynmc)
     rdyLst_->UpdatePriorities();

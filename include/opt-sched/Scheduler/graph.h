@@ -284,6 +284,8 @@ public:
   // Copy GraphNode arrays/pointers to device
   void CopyPointersToDevice(GraphNode *dev_node, GraphNode **dev_nodes,
 		            InstCount instCnt);
+  // Calls cudaFree on all arrays/objects that were allocated with cudaMalloc
+  void FreeDevicePointers();
 
 private:
   // The node number. Should be unique within a single graph.

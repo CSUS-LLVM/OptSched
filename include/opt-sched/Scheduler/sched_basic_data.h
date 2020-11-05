@@ -542,6 +542,8 @@ public:
   // the device nodes_ array to set nodes_ in GraphNode
   void CopyPointersToDevice(SchedInstruction *dev_inst, GraphNode **dev_nodes, 
 		            InstCount instCnt, RegisterFile *dev_regFiles);
+  // Calls cudaFree on all arrays/objects that were allocated with cudaMalloc
+  void FreeDevicePointers();
 
   friend class SchedRange;
 

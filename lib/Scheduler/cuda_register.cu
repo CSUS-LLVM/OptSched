@@ -258,6 +258,14 @@ void Register::CopyPointersToDevice(Register *dev_reg) {
   }
 }
 
+void Register::FreeDevicePointers() {
+  cudaFree(conflicts_.vctr_);
+  cudaFree(uses_.elmnt);
+  cudaFree(defs_.elmnt);
+  cudaFree(liveIntervalSet_.elmnt);
+  cudaFree(possibleLiveIntervalSet_.elmnt);
+}
+
 __host__ __device__
 Register::Register(int16_t type, int num, int physicalNumber) {
   type_ = type;
@@ -446,7 +454,7 @@ void RegisterFile::CopyPointersToDevice(RegisterFile *dev_regFile) {
   size_t memSize;
   //allocate device memory
   memSize = getCount() * sizeof(Register *);
-  if (cudaSuccess != cudaMalloc((void**)&dev_regs, memSize))
+  if (cudaSuccess != cudaMallocManaged((void**)&dev_regs, memSize))
     printf("Error allocating dev mem for dev_regs: %s\n", 
 		    cudaGetErrorString(cudaGetLastError()));
 
@@ -461,7 +469,7 @@ void RegisterFile::CopyPointersToDevice(RegisterFile *dev_regFile) {
 
   for (int i = 0; i < getCount(); i++) {
     //allocate device memory
-    if (cudaSuccess != cudaMalloc((void**)&dev_reg, sizeof(Register)))
+    if (cudaSuccess != cudaMallocManaged((void**)&dev_reg, sizeof(Register)))
       printf("Error allocating dev mem for dev_reg: %s\n", 
 		      cudaGetErrorString(cudaGetLastError()));
 
@@ -482,4 +490,12 @@ void RegisterFile::CopyPointersToDevice(RegisterFile *dev_regFile) {
 
   //update dev_regFile->Regs pointer
   dev_regFile->Regs = dev_regs;
+}
+
+void RegisterFile::FreeDevicePointers() {
+  for (int i = 0; i < getCount(); i++) {
+    Regs[i]->FreeDevicePointers();
+    cudaFree(Regs[i]);
+  }
+  cudaFree(Regs);
 }

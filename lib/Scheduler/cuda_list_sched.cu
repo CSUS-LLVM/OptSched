@@ -105,6 +105,89 @@ FUNC_RESULT ListScheduler::FindSchedule(InstSchedule *sched, SchedRegion *rgn) {
   return RES_SUCCESS;
 }
 
+void ListScheduler::CopyPointersToDevice(ListScheduler *dev_lstSchedulr,
+                                        DataDepGraph *dev_DDG,
+                                        MachineModel *dev_machMdl) {
+  size_t memSize;
+  dev_lstSchedulr->machMdl_ = dev_machMdl;
+  dev_lstSchedulr->dataDepGraph_ = dev_DDG;
+  // Copy slotsPerTypePerCycle_
+  int *dev_slotsPerTypePerCycle;
+  memSize = sizeof(int) * issuTypeCnt_;
+  if (cudaSuccess != cudaMalloc(&dev_slotsPerTypePerCycle, memSize))
+    Logger::Fatal("Failed to alloc dev mem for slotsPerTypePerCycle");
+
+  if (cudaSuccess != cudaMemcpy(dev_slotsPerTypePerCycle, slotsPerTypePerCycle_,
+			        memSize, cudaMemcpyHostToDevice))
+    Logger::Fatal("Failed to copy slotspertypepercycle to device");
+
+  dev_lstSchedulr->slotsPerTypePerCycle_ = dev_slotsPerTypePerCycle;
+
+  // Copy instCntPerIssuType_
+  InstCount *dev_instCntPerIssuType;
+  memSize = sizeof(InstCount) * issuTypeCnt_;
+  if (cudaSuccess != cudaMalloc(&dev_instCntPerIssuType, memSize))
+    Logger::Fatal("Failed to alloc dev mem for instCntPerIssuType_");
+  
+  if (cudaSuccess != cudaMemcpy(dev_instCntPerIssuType, instCntPerIssuType_,
+			        memSize, cudaMemcpyHostToDevice))
+    Logger::Fatal("Failed to copy instCntPerIssuType_ to device");
+
+  dev_lstSchedulr->instCntPerIssuType_ = dev_instCntPerIssuType;
+
+  // set root/leaf inst
+  dev_lstSchedulr->rootInst_ = dev_DDG->GetRootInst();
+  dev_lstSchedulr->leafInst_ = dev_DDG->GetLeafInst();
+
+  // Copy frstRdyLstPerCycle_, an array of NULL values
+  ArrayList<InstCount> **dev_frstRdyLstPerCycle;
+  memSize = sizeof(ArrayList<InstCount> *) * schedUprBound_;
+  if (cudaSuccess != cudaMalloc(&dev_frstRdyLstPerCycle, memSize))
+    Logger::Fatal("Failed to alloc dev mem for dev_frstRdyLstPerCycle");
+
+  if (cudaSuccess != cudaMemcpy(dev_frstRdyLstPerCycle, frstRdyLstPerCycle_,
+			        memSize, cudaMemcpyHostToDevice))
+    Logger::Fatal("Failed to copy frstRdyLstPerCycle_ to device");
+
+  dev_lstSchedulr->frstRdyLstPerCycle_ = dev_frstRdyLstPerCycle;
+
+  // Copy avlblSlotsInCrntCycle_
+  int16_t *dev_avlblSlotsInCrntCycle;
+  memSize = sizeof(int16_t) * issuTypeCnt_;
+  if (cudaSuccess != cudaMalloc(&dev_avlblSlotsInCrntCycle, memSize))
+    Logger::Fatal("Failed to alloc dev mem for avlblSlotsInCrntCycle_");
+
+  if (cudaSuccess != cudaMemcpy(dev_avlblSlotsInCrntCycle, 
+			        avlblSlotsInCrntCycle_, memSize,
+				cudaMemcpyHostToDevice))
+    Logger::Fatal("Failed to copy avlblSlotsInCrntCycle_ to device");
+
+  dev_lstSchedulr->avlblSlotsInCrntCycle_ = dev_avlblSlotsInCrntCycle;
+
+  // Copy rdyLst_
+  ReadyList *dev_rdyLst;
+  memSize = sizeof(ReadyList);
+  if (cudaSuccess != cudaMallocManaged(&dev_rdyLst, memSize))
+    Logger::Fatal("Failed to alloc dev mem for rdyLst_");
+
+  if (cudaSuccess != cudaMemcpy(dev_rdyLst, rdyLst_, memSize,
+			        cudaMemcpyHostToDevice))
+    Logger::Fatal("Failed to copy rdyLst_ to device");
+
+  rdyLst_->CopyPointersToDevice(dev_rdyLst, dev_DDG);
+
+  dev_lstSchedulr->rdyLst_ = dev_rdyLst;
+}
+
+void ListScheduler::FreeDevicePointers() {
+  cudaFree(slotsPerTypePerCycle_);
+  cudaFree(instCntPerIssuType_);
+  cudaFree(frstRdyLstPerCycle_);
+  cudaFree(avlblSlotsInCrntCycle_);
+  rdyLst_->FreeDevicePointers();
+  cudaFree(rdyLst_);
+}
+
 __host__ __device__
 SequentialListScheduler::SequentialListScheduler(DataDepGraph *dataDepGraph,
                                                  MachineModel *machMdl,
@@ -158,8 +241,8 @@ bool SequentialListScheduler::IsSequentialInstruction(
 __host__ __device__
 void ListScheduler::UpdtRdyLst_(InstCount cycleNum, int slotNum) {
   InstCount prevCycleNum = cycleNum - 1;
-  LinkedList<SchedInstruction> *lst1 = NULL;
-  LinkedList<SchedInstruction> *lst2 = frstRdyLstPerCycle_[cycleNum];
+  ArrayList<InstCount> *lst1 = NULL;
+  ArrayList<InstCount> *lst2 = frstRdyLstPerCycle_[cycleNum];
 
   if (prirts_.isDynmc)
     rdyLst_->UpdatePriorities();

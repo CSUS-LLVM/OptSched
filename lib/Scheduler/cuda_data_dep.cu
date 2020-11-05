@@ -3704,8 +3704,10 @@ int DataDepGraph::GetBscBlkCnt() { return bscBlkCnt_; }
 
 __host__ __device__
 SchedInstruction *DataDepGraph::GetInstByIndx(InstCount instIndx) {
-  //assert(instIndx >= 0 && instIndx < instCnt_);
-  return &insts_[instIndx];
+  if (instIndx >= 0 && instIndx < instCnt_)
+    return &insts_[instIndx];
+  else
+    return NULL;
 }
 
 SchedInstruction *DataDepGraph::GetInstByTplgclOrdr(InstCount ordr) {
@@ -3980,6 +3982,20 @@ void DataDepGraph::CopyPointersToDevice(DataDepGraph *dev_DDG) {
   for (InstCount i = 0; i < instCnt_; i++)
     insts_[i].CopyPointersToDevice(&dev_DDG->insts_[i], dev_DDG->nodes_, 
 		                   instCnt_, dev_regFiles);
+}
+
+void DataDepGraph::FreeDevicePointers() {
+  cudaFree(instCntPerType_);
+  cudaFree(instCntPerIssuType_);
+  cudaFree(frwrdLwrBounds_);
+  cudaFree(bkwrdLwrBounds_);
+  cudaFree(tplgclOrdr_);
+  for (InstCount i = 0; i < machMdl_->GetRegTypeCnt(); i++)
+    RegFiles[i].FreeDevicePointers();
+  cudaFree(RegFiles);
+  for (InstCount i = 0; i < instCnt_; i++)
+    insts_[i].FreeDevicePointers();
+  cudaFree(insts_);
 }
 
 /*

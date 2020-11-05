@@ -1121,38 +1121,29 @@ void SchedInstruction::CopyPointersToDevice(SchedInstruction *dev_inst,
         Logger::Fatal("Failed to update sortedPrdcsrLst_->keys on device");
     }
   }
-/*
-  // Copy defs_ 
-  RegIndxTuple *dev_defs;
-  memSize = MAX_DEFS_PER_INSTR * sizeof(RegIndxTuple);
-  if (cudaSuccess != cudaMalloc(&dev_defs, memSize))
-    Logger::Fatal("Failed to alloc dev mem for dev_defs");
-
-  if (cudaSuccess != cudaMemcpy(dev_defs, defs_, memSize, 
-			        cudaMemcpyHostToDevice))
-    Logger::Fatal("Failed to copy defs_ to device");
-
-  if (cudaSuccess != cudaMemcpy(&dev_inst->defs_, &dev_defs, 
-			        sizeof(RegIndxTuple *), 
-				cudaMemcpyHostToDevice))
-    Logger::Fatal("Failed to update dev_inst->defs");
-
-  // Copy uses_
-  RegIndxTuple *dev_uses;
-  memSize = MAX_USES_PER_INSTR * sizeof(RegIndxTuple);
-  if (cudaSuccess != cudaMalloc(&dev_uses, memSize))
-    Logger::Fatal("Failed to alloc dev mem for dev_uses");
-
-  if (cudaSuccess != cudaMemcpy(dev_uses, uses_, memSize,
-                                cudaMemcpyHostToDevice))
-    Logger::Fatal("Failed to copy usess_ to device");
-
-  if (cudaSuccess != cudaMemcpy(&dev_inst->uses_, &dev_uses,
-                                sizeof(RegIndxTuple *),
-                                cudaMemcpyHostToDevice))
-    Logger::Fatal("Failed to update dev_inst->uses");
-*/
   GraphNode::CopyPointersToDevice((GraphNode *)dev_inst, dev_nodes, instCnt);
+}
+
+void SchedInstruction::FreeDevicePointers() {
+  cudaFree(rdyCyclePerPrdcsr_);
+  cudaFree(prevMinRdyCyclePerPrdcsr_);
+  cudaFree(ltncyPerPrdcsr_);
+  if (crtclPathFrmRcrsvScsr_)
+    cudaFree(crtclPathFrmRcrsvScsr_);
+  if (crtclPathFrmRcrsvPrdcsr_)
+    cudaFree(crtclPathFrmRcrsvPrdcsr_);
+  cudaFree(crntRange_);
+  if (sortedScsrLst_) {
+    cudaFree(sortedScsrLst_->elmnts_);
+    cudaFree(sortedScsrLst_->keys_);
+    cudaFree(sortedScsrLst_);
+  }
+  if (sortedPrdcsrLst_) {
+    cudaFree(sortedPrdcsrLst_->elmnts_);
+    cudaFree(sortedPrdcsrLst_->keys_);
+    cudaFree(sortedPrdcsrLst_);
+  }
+  GraphNode::FreeDevicePointers();
 }
 
 /******************************************************************************

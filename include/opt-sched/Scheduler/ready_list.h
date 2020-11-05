@@ -43,7 +43,7 @@ public:
 
   // Adds a list of instructions to the ready list.
   __host__ __device__
-  void AddList(LinkedList<SchedInstruction> *lst);
+  void AddList(ArrayList<InstCount> *lst);
 
   // An iterator that allows accessing the instructions at the current time
   // in priority order. The first call will return the top priority
@@ -71,8 +71,8 @@ public:
   // not been added to the ready list already, and advance the internal time.
   // TODO(max): Elaborate.
   __host__ __device__
-  void AddLatestSubLists(LinkedList<SchedInstruction> *lst1,
-                         LinkedList<SchedInstruction> *lst2);
+  void AddLatestSubLists(ArrayList<InstCount> *lst1,
+                         ArrayList<InstCount> *lst2);
 
   // Removes the most recently added sublist of instructions.
   // TODO(max): Elaborate.
@@ -102,16 +102,22 @@ public:
   // Cannot use cout on device, invoke this on device instead
   __host__ __device__
   void Dev_Print();
+  // Copy pointers to device and link them to passed device pointer
+  void CopyPointersToDevice(ReadyList *dev_rdyLst, DataDepGraph *dev_DDG);
+  // Calls cudaFree on all arrays/objects that were allocated with cudaMalloc
+  void FreeDevicePointers();
 
 private:
+  // A pointer to the DDG for the region
+  DataDepGraph *dataDepGraph_;
   // An ordered vector of priorities
   SchedPriorities prirts_;
 
   // The priority list containing the actual instructions.
-  PriorityList<SchedInstruction> *prirtyLst_;
+  PriorityArrayList<InstCount> *prirtyLst_;
 
   // TODO(max): Document.
-  LinkedList<SchedInstruction> *latestSubLst_;
+  ArrayList<InstCount> *latestSubLst_;
 
   // Array of pointers to KeyedEntry objects
   KeyedEntry<SchedInstruction, unsigned long> **keyedEntries_;
@@ -144,7 +150,7 @@ private:
   // Adds instructions at the bottom of a given list which have not been added
   // to the ready list already.
   __host__ __device__
-  void AddLatestSubList_(LinkedList<SchedInstruction> *lst);
+  void AddLatestSubList_(ArrayList<InstCount> *lst);
 
   // Calculates a new priority key given an existing key of size keySize by
   // appending bitCnt bits holding the value val, assuming val < maxVal.
