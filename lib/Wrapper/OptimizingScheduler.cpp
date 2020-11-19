@@ -223,6 +223,14 @@ ScheduleDAGOptSched::ScheduleDAGOptSched(
   dev_MM = NULL;
 }
 
+ScheduleDAGOptSched::~ScheduleDAGOptSched() {
+  if (dev_MM) {
+    Logger::Info("Deleting dev_MM");
+    dev_MM->FreeDevicePointers();
+    cudaFree(dev_MM);
+  }
+}
+
 void ScheduleDAGOptSched::SetupLLVMDag() {
   // Initialize the register pressure tracker used by buildSchedGraph.
   RPTracker.init(&MF, RegClassInfo, LIS, BB, LiveRegionEnd,
@@ -390,7 +398,7 @@ void ScheduleDAGOptSched::schedule() {
   // Prepare for device scheduling by increasing heap size and copying machMdl
   if (dev_MM == NULL) {
     // Increase heap size to allow large DDGs to be allocated
-    if (cudaSuccess != cudaDeviceSetLimit(cudaLimitMallocHeapSize, 16000000))
+    if (cudaSuccess != cudaDeviceSetLimit(cudaLimitMallocHeapSize, 512000000))
       Logger::Info("Error increasing heap size: %s",
                     cudaGetErrorString(cudaGetLastError()));
 
@@ -454,8 +462,8 @@ void ScheduleDAGOptSched::schedule() {
     cudaDeviceReset();
     Logger::Info("Done calling cudaDeviceReset()");
     dev_MM = NULL;
-  }*/
-
+  }
+*/
   if ((!(Rslt == RES_SUCCESS || Rslt == RES_TIMEOUT) || Sched == NULL)) {
     LLVM_DEBUG(
         Logger::Info("OptSched run failed: rslt=%d, sched=%p. Falling back.",

@@ -110,6 +110,7 @@ public:
   // TODO(max): Document.
   InstSchedule *AllocNewSched_();
 
+  __host__ __device__
   void UpdateScheduleCost(InstSchedule *sched);
   __host__ __device__
   SPILL_COST_FUNCTION GetSpillCostFunc();
@@ -118,6 +119,8 @@ public:
   void InitSecondPass();
 
   virtual void CopyPointersToDevice(SchedRegion* dev_rgn) = 0;
+  __host__ __device__
+  MachineModel *GetMM() { return machMdl_; }
 
 private:
   // The algorithm to use for calculated lower bounds.

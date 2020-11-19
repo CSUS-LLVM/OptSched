@@ -19,6 +19,8 @@ namespace RandomGen {
 void SetSeed(int32_t iseed);
 // Get a random 32-bit value.
 uint32_t GetRand32();
+__device__
+uint32_t Dev_GetRand32();
 // Get a random 32-bit value within a given range, inclusive.
 uint32_t GetRand32WithinRange(uint32_t min, uint32_t max);
 // Get a random 64-bit value.

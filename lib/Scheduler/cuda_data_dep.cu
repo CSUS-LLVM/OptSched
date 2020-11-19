@@ -3163,13 +3163,16 @@ bool InstSchedule::RemoveLastInst() {
   return true;
 }
 
+__host__ __device__
 void InstSchedule::ResetInstIter() { iterSlotNum_ = 0; }
 
+__host__ __device__
 InstCount InstSchedule::GetFrstInst(InstCount &cycleNum, InstCount &slotNum) {
   iterSlotNum_ = 0;
   return GetNxtInst(cycleNum, slotNum);
 }
 
+__host__ __device__
 InstCount InstSchedule::GetNxtInst(InstCount &cycleNum, InstCount &slotNum) {
   InstCount instNum;
 
@@ -3177,9 +3180,14 @@ InstCount InstSchedule::GetNxtInst(InstCount &cycleNum, InstCount &slotNum) {
     return INVALID_VALUE;
   }
 
+  //debug
+  //Logger::Info("totSlotCnt_ = %d", totSlotCnt_);
+  
   do {
     instNum = instInSlot_[iterSlotNum_];
     iterSlotNum_++;
+    //debug
+    //Logger::Info("iterSlotNum_ = %d", iterSlotNum_);
   } while (instNum == SCHD_STALL);
 
   assert(instNum != SCHD_STALL);
@@ -3187,6 +3195,7 @@ InstCount InstSchedule::GetNxtInst(InstCount &cycleNum, InstCount &slotNum) {
   return instNum;
 }
 
+__host__ __device__
 void InstSchedule::Reset() {
   InstCount i;
 
@@ -3207,6 +3216,7 @@ void InstSchedule::Reset() {
   cost_ = INVALID_VALUE;
 }
 
+__host__ __device__
 void InstSchedule::Copy(InstSchedule *src) {
   Reset();
 
@@ -3245,6 +3255,7 @@ InstSchedule::GetPeakRegPressures(const InstCount *&regPressures) const {
   return machMdl_->GetRegTypeCnt();
 }
 
+__host__ __device__
 InstCount InstSchedule::GetSpillCost(InstCount stepNum) {
   assert(stepNum >= 0 && stepNum < totInstCnt_);
   return spillCosts_[stepNum];
@@ -3499,6 +3510,7 @@ bool InstSchedule::AppendInst(SchedInstruction *inst) {
   return AppendInst(instNum);
 }
 
+__host__ __device__
 void InstSchedule::GetCycleAndSlotNums_(InstCount globSlotNum,
                                         InstCount &cycleNum,
                                         InstCount &slotNum) {

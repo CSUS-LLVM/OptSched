@@ -237,6 +237,8 @@ public:
   ScheduleDAGOptSched(MachineSchedContext *C,
                       std::unique_ptr<MachineSchedStrategy> S);
 
+  ~ScheduleDAGOptSched();
+
   // The fallback LLVM scheduler
   void fallbackScheduler();
 

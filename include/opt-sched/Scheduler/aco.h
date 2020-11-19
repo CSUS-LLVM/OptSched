@@ -10,8 +10,9 @@ Last Update:  Jan. 2020
 #define OPTSCHED_ACO_H
 
 #include "opt-sched/Scheduler/gen_sched.h"
+#include "opt-sched/Scheduler/device_vector.h"
 #include "llvm/ADT/ArrayRef.h"
-#include "llvm/ADT/SmallVector.h"
+//#include "llvm/ADT/SmallVector.h"
 #include <memory>
 #include <cuda_runtime.h>
 
@@ -29,29 +30,47 @@ class ACOScheduler : public ConstrainedScheduler {
 public:
   ACOScheduler(DataDepGraph *dataDepGraph, MachineModel *machineModel,
                InstCount upperBound, SchedPriorities priorities,
-               bool vrfySched);
+               bool vrfySched, SchedRegion **dev_rgn, DataDepGraph **dev_DDG,
+	       DeviceVector<Choice> **dev_ready, MachineModel *dev_MM);
   __host__ __device__
   virtual ~ACOScheduler();
-  __host__ __device__
   FUNC_RESULT FindSchedule(InstSchedule *schedule, SchedRegion *region);
   __host__ __device__
   inline void UpdtRdyLst_(InstCount cycleNum, int slotNum);
   // Set the initial schedule for ACO
   // Default is NULL if none are set.
   void setInitialSched(InstSchedule *Sched);
+  // Copies the objects pointed to by ACOSched to device
+  void CopyPointersToDevice(ACOScheduler *dev_ACOSchedulr,
+		            DataDepGraph *dev_DDG, MachineModel *dev_machMdl,
+			    InstSchedule *dev_InitSched);
+  // Calls cudaFree on all arrays/objects that were allocated with cudaMalloc
+  void FreeDevicePointers();
 
+  // Finds a schedule, if passed a device side schedule, use that instead
+  // of creating a new one
+  __host__ __device__
+  InstSchedule *FindOneSchedule(InstSchedule *dev_schedule = NULL, 
+		                DeviceVector<Choice> *dev_ready = NULL);
 private:
+  __host__ __device__
   pheremone_t &Pheremone(SchedInstruction *from, SchedInstruction *to);
+  __host__ __device__
   pheremone_t &Pheremone(InstCount from, InstCount to);
+  __host__ __device__
   double Score(SchedInstruction *from, Choice choice);
 
+  __host__ __device__
   void PrintPheremone();
 
-  SchedInstruction *SelectInstruction(const llvm::ArrayRef<Choice> &ready,
+  __host__ __device__
+  SchedInstruction *SelectInstruction(DeviceVector<Choice> &ready,
                                       SchedInstruction *lastInst);
+  __host__ __device__
   void UpdatePheremone(InstSchedule *schedule);
-  std::unique_ptr<InstSchedule> FindOneSchedule();
-  llvm::SmallVector<pheremone_t, 0> pheremone_;
+  //__host__ __device__
+  //InstSchedule *FindOneSchedule(InstSchedule *dev_schedule = NULL);
+  DeviceVector<pheremone_t> pheremone_;
   pheremone_t initialValue_;
   bool use_fixed_bias;
   int count_;
@@ -62,9 +81,14 @@ private:
   double local_decay;
   double decay_factor;
   int ants_per_iteration;
+  int noImprovementMax;
   bool print_aco_trace;
-  std::unique_ptr<InstSchedule> InitialSchedule;
+  InstSchedule *InitialSchedule;
   bool VrfySched_;
+  SchedRegion **dev_rgn_;
+  DataDepGraph **dev_DDG_;
+  DeviceVector<Choice> **dev_ready_;
+  MachineModel *dev_MM_;
 };
 
 } // namespace opt_sched

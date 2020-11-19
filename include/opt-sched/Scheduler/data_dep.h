@@ -894,6 +894,7 @@ private:
 
   bool VerifySlots_(MachineModel *machMdl, DataDepGraph *dataDepGraph);
   bool VerifyDataDeps_(DataDepGraph *dataDepGraph);
+  __host__ __device__
   void GetCycleAndSlotNums_(InstCount globSlotNum, InstCount &cycleNum,
                             InstCount &slotNum);
 
@@ -906,6 +907,7 @@ public:
 
   __host__ __device__
   InstCount GetCrntLngth();
+  __host__ __device__
   void Reset();
 
   // Add an instruction sequentially to the current issue slot.
@@ -932,16 +934,21 @@ public:
   InstCount GetExecCost() const;
   __host__ __device__
   void SetSpillCost(InstCount cost);
+  __host__ __device__
   InstCount GetSpillCost() const;
 
+  __host__ __device__
   void ResetInstIter();
+  __host__ __device__
   InstCount GetFrstInst(InstCount &cycleNum, InstCount &slotNum);
+  __host__ __device__
   InstCount GetNxtInst(InstCount &cycleNum, InstCount &slotNum);
 
   __host__ __device__
   bool IsComplete();
 
   // Copy schedule src into the current schedule
+  __host__ __device__
   void Copy(InstSchedule *src);
 
   __host__ __device__
