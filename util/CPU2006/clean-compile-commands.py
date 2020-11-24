@@ -8,29 +8,47 @@ parser.add_argument('files', nargs='+', help='The logs to clean, in place')
 files = parser.parse_args().files
 
 RE_AFTER_FUNCTION = re.compile(r'\*{20,}\nFunction:.*?\*{20,}\n', re.DOTALL)
-RE_BUGGED_COMPILE_COMMAND = re.compile(r'EVENT: \{.*?(/.*?/[cf]lang.*\n)')
+RE_BUGGED_COMPILE_COMMAND = re.compile(
+    r'''
+    EVENT:\ \{.*?   # If we are in an EVENT log
+    (
+        # When we see any of the bugged compilation commands,
+        (/.*?/[cf]lang.*\n) # clang, clang++, flang
+        | (specperl\ /.*\n) # specperl commands
+    )   # then we want to match the command and move it to the end.
+    ''',
+    re.VERBOSE)
 
 for file in files:
     with open(file, 'r') as f:
         text = f.read()
 
+    # Keep the file content we wish to write back as a list of strings.
+    # We will do a join at the end.
     result = []
-    lastpos = 0
 
-    while True:
-        bugged = RE_BUGGED_COMPILE_COMMAND.search(text, lastpos)
+    cur = 0
+    # Iterate over the locations that we will place the bugged commands (after next fn)
+    for next_fn_m in RE_AFTER_FUNCTION.finditer(text):
+        # The strings we will be placing after the fn.
+        after_fn = []
 
-        if bugged:
-            result.append(text[lastpos:bugged.start(1)])
+        # Gather all the bugged compile commands from `cur` to the location of this next_fn_m.
+        while True:
+            bugged = RE_BUGGED_COMPILE_COMMAND.search(text, cur, next_fn_m.start())
 
-            next_function = RE_AFTER_FUNCTION.search(text, bugged.end())
+            if bugged:
+                result.append(text[cur:bugged.start(1)])
+                after_fn.append(bugged.group(1))
+                cur = bugged.end(1)
+            else:
+                result.append(text[cur:next_fn_m.end()])
+                cur = next_fn_m.end()
+                break
+        result += after_fn
 
-            result.append(text[bugged.end(1):next_function.end()])
-            result.append(bugged.group(1))
-            lastpos = next_function.end()
-        else:
-            result.append(text[lastpos:])
-            break
+    # Include any remnant
+    result.append(text[cur:])
 
     resultstr = ''.join(result)
     with open(file, 'w') as f:
