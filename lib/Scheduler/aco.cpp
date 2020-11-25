@@ -208,7 +208,7 @@ std::unique_ptr<InstSchedule> ACOScheduler::FindOneSchedule() {
   rgn_->InitForSchdulng();
 
   SchedInstruction *waitFor = NULL;
-  InstCount waitTime = 0;
+  InstCount waitUntil = 0;
   llvm::SmallVector<Choice, 0> ready;
   while (!IsSchedComplete_()) {
     UpdtRdyLst_(crntCycleNum_, crntSlotNum_);
@@ -259,7 +259,7 @@ std::unique_ptr<InstSchedule> ACOScheduler::FindOneSchedule() {
           Choice c;
           c.inst = fIns;
           c.heuristic = (double)heuristic / maxPriority + 1;
-          c.readyOn = fCycle;
+          c.readyOn = crntCycleNum_ + fCycle;
           ready.push_back(c);
           if (IsDbg && lastInst)
             LastHeu[std::make_pair(lastInst->GetNum(), fIns->GetNum())] =
@@ -271,9 +271,9 @@ std::unique_ptr<InstSchedule> ACOScheduler::FindOneSchedule() {
 
       if (!ready.empty()) {
         Choice Sel = SelectInstruction(ready, lastInst);
-        waitTime = Sel.readyOn;
+        waitUntil = Sel.readyOn;
         inst = Sel.inst;
-        if (waitTime > 0 || !ChkInstLglty_(inst)) {
+        if (waitUntil > crntCycleNum_ || !ChkInstLglty_(inst)) {
           waitFor = inst;
           inst = NULL;
         }
@@ -296,14 +296,11 @@ std::unique_ptr<InstSchedule> ACOScheduler::FindOneSchedule() {
 
     // 2)Schedule a stall if we are still waiting, Schedule the instruction we
     // are waiting for if possible, decrement waiting time
-    if (waitFor) {
-      if (waitTime <= 0) {
-        if (ChkInstLglty_(inst)) {
-          inst = waitFor;
-          waitFor = NULL;
-        }
-      } else
-        waitTime--;
+    if (waitFor && waitUntil <= crntCycleNum_) {
+      if (ChkInstLglty_(inst)) {
+        inst = waitFor;
+        waitFor = NULL;
+      }
     }
 
     // boilerplate, mostly copied from ListScheduler, try not to touch it
