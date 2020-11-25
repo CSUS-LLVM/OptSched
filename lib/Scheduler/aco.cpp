@@ -297,7 +297,7 @@ std::unique_ptr<InstSchedule> ACOScheduler::FindOneSchedule() {
     // 2)Schedule a stall if we are still waiting, Schedule the instruction we
     // are waiting for if possible, decrement waiting time
     if (waitFor && waitUntil <= crntCycleNum_) {
-      if (ChkInstLglty_(inst)) {
+      if (ChkInstLglty_(waitFor)) {
         inst = waitFor;
         waitFor = NULL;
       }
