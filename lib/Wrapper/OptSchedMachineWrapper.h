@@ -9,6 +9,7 @@ contained in those ini files.
 #define OPTSCHED_MACHINE_MODEL_WRAPPER_H
 
 #include "opt-sched/Scheduler/machine_model.h"
+#include "llvm/ADT/SmallVector.h"
 #include "llvm/CodeGen/MachineInstr.h"
 #include "llvm/CodeGen/MachineScheduler.h"
 #include "llvm/CodeGen/RegisterClassInfo.h"
@@ -49,6 +50,8 @@ public:
   // Generate instruction scheduling type for all instructions in the current
   // DAG that do not already have assigned instruction types.
   virtual InstType generateInstrType(const llvm::MachineInstr *instr) = 0;
+  virtual bool generatesAllData() = 0;
+  virtual void generateProcessorData(std::string *mdlName_, int *issueRate_) {}
   virtual ~MachineModelGenerator() = default;
 };
 
@@ -62,6 +65,7 @@ public:
   // Generate instruction scheduling type for all instructions in the current
   // DAG by using LLVM itineraries.
   InstType generateInstrType(const llvm::MachineInstr *instr);
+  bool generatesAllData() { return false;}
   virtual ~CortexA7MMGenerator() = default;
 
 private:
@@ -82,6 +86,19 @@ private:
   bool isMIPipelined(const llvm::MachineInstr *inst, unsigned idx) const;
   // Find the issue type for an instruction.
   IssueType generateIssueType(const llvm::InstrStage *E) const;
+};
+
+class CortexA53MMGenerator : public MachineModelGenerator {
+public:
+  CortexA53MMGenerator(const llvm::ScheduleDAGInstrs *dag, MachineModel *mm) : DAG(dag), MM(mm) {}
+  InstType generateInstrType(const llvm::MachineInstr *instr);
+  bool generatesAllData() { return true; }
+  void generateProcessorData(std::string *mdlName_, int *issueRate_);
+
+private:
+ std::vector<std::string> resourceIdToIssueType;
+  const llvm::ScheduleDAGInstrs *DAG;
+  MachineModel *MM;
 };
 
 } // end namespace opt_sched

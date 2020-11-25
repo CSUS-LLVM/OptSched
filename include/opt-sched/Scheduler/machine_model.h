@@ -74,6 +74,14 @@ struct InstTypeInfo {
   bool blksCycle;
 };
 
+// A description of a issue type/FU.
+struct IssueTypeInfo {
+  // The name of the issue type.
+  string name;
+  // How many slots of this issue type the machine has per cycle.
+  int slotsCount;
+};
+
 // A read-only description of a machine.
 class MachineModel {
 public:
@@ -154,6 +162,8 @@ public:
   }
   // Add a new instruction type.
   void AddInstType(InstTypeInfo &instTypeInfo);
+  // Add a new issue type.
+  void AddIssueType(IssueTypeInfo &issueTypeInfo);
 
 protected:
   // Creates an uninitialized machine model. For use by subclasses.
@@ -165,14 +175,6 @@ protected:
     string name;
     // How many register of this type the machine has.
     int count;
-  };
-
-  // A description of a register type.
-  struct IssueTypeInfo {
-    // The name of the issue type.
-    string name;
-    // How many slots of this issue type the machine has per cycle.
-    int slotsCount;
   };
 
   // The name of the machine model.
