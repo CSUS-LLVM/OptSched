@@ -148,19 +148,32 @@ bool SchedInstruction::UseFileBounds() {
 __host__ __device__
 bool SchedInstruction::InitForSchdulng(InstCount schedLngth,
                                        LinkedList<SchedInstruction> *fxdLst) {
+#ifdef __CUDA_ARCH__
+  dev_crntSchedCycle_[threadIdx.x] = SCHD_UNSCHDULD;
+  dev_lastUseCnt_[threadIdx.x] = 0;
+  dev_ready_[threadIdx.x] = false;
+  dev_minRdyCycle_[threadIdx.x] = INVALID_VALUE;
+  dev_unschduldPrdcsrCnt_[threadIdx.x] = prdcsrCnt_;
+  dev_unschduldScsrCnt_[threadIdx.x] = scsrCnt_;
+  
+  for (InstCount i = 0; i < prdcsrCnt_; i++) {
+    dev_rdyCyclePerPrdcsr_[threadIdx.x][i] = INVALID_VALUE;
+    dev_prevMinRdyCyclePerPrdcsr_[threadIdx.x][i] = INVALID_VALUE;
+  }
+#else
   crntSchedCycle_ = SCHD_UNSCHDULD;
+  lastUseCnt_ = 0;
+  ready_ = false;
+  minRdyCycle_ = INVALID_VALUE;
+  unschduldPrdcsrCnt_ = prdcsrCnt_;
+  unschduldScsrCnt_ = scsrCnt_;
   crntRlxdCycle_ = SCHD_UNSCHDULD;
 
   for (InstCount i = 0; i < prdcsrCnt_; i++) {
     rdyCyclePerPrdcsr_[i] = INVALID_VALUE;
     prevMinRdyCyclePerPrdcsr_[i] = INVALID_VALUE;
   }
-
-  ready_ = false;
-  minRdyCycle_ = INVALID_VALUE;
-  unschduldPrdcsrCnt_ = prdcsrCnt_;
-  unschduldScsrCnt_ = scsrCnt_;
-  lastUseCnt_ = 0;
+#endif
 
   if (schedLngth != INVALID_VALUE) {
     bool fsbl = crntRange_->SetBounds(frwrdLwrBound_, bkwrdLwrBound_,
@@ -389,7 +402,13 @@ __host__ __device__
 int SchedInstruction::GetMaxLtncy() const { return GetMaxEdgeLabel(); }
 
 __host__ __device__
-int16_t SchedInstruction::GetLastUseCnt() { return lastUseCnt_; }
+int16_t SchedInstruction::GetLastUseCnt() { 
+#ifdef __CUDA_ARCH__
+  return dev_lastUseCnt_[threadIdx.x];
+#else
+  return lastUseCnt_;
+#endif
+}
 
 __host__ __device__
 SchedInstruction *SchedInstruction::GetFrstPrdcsr(InstCount *scsrNum,
@@ -605,7 +624,18 @@ __host__ __device__
 bool SchedInstruction::PrdcsrSchduld(InstCount prdcsrNum, InstCount cycle,
                                      InstCount &rdyCycle) {
   assert(prdcsrNum < prdcsrCnt_);
+#ifdef __CUDA_ARCH__
+  dev_rdyCyclePerPrdcsr_[threadIdx.x][prdcsrNum] = cycle + ltncyPerPrdcsr_[prdcsrNum];
+  dev_prevMinRdyCyclePerPrdcsr_[threadIdx.x][prdcsrNum] = dev_minRdyCycle_[threadIdx.x];
 
+  if (dev_rdyCyclePerPrdcsr_[threadIdx.x][prdcsrNum] > dev_minRdyCycle_[threadIdx.x]) {
+    dev_minRdyCycle_[threadIdx.x] = dev_rdyCyclePerPrdcsr_[threadIdx.x][prdcsrNum];
+  }
+
+  rdyCycle = dev_minRdyCycle_[threadIdx.x];
+  dev_unschduldPrdcsrCnt_[threadIdx.x]--;
+  return (dev_unschduldPrdcsrCnt_[threadIdx.x] == 0);
+#else
   rdyCyclePerPrdcsr_[prdcsrNum] = cycle + ltncyPerPrdcsr_[prdcsrNum];
   prevMinRdyCyclePerPrdcsr_[prdcsrNum] = minRdyCycle_;
 
@@ -616,6 +646,7 @@ bool SchedInstruction::PrdcsrSchduld(InstCount prdcsrNum, InstCount cycle,
   rdyCycle = minRdyCycle_;
   unschduldPrdcsrCnt_--;
   return (unschduldPrdcsrCnt_ == 0);
+#endif
 }
 
 __host__ __device__
@@ -633,8 +664,13 @@ bool SchedInstruction::PrdcsrUnSchduld(InstCount prdcsrNum,
 
 __host__ __device__
 bool SchedInstruction::ScsrSchduld() {
+#ifdef __CUDA_ARCH
+  dev_unschduldScsrCnt_[threadIdx.x]--;
+  return dev_unschduldScsrCnt_[threadIdx.x] == 0;
+#else
   unschduldScsrCnt_--;
   return unschduldScsrCnt_ == 0;
+#endif
 }
 
 __host__ __device__
@@ -651,30 +687,60 @@ IssueType SchedInstruction::GetIssueType() const { return issuType_; }
 
 __host__ __device__
 bool SchedInstruction::IsSchduld(InstCount *cycle) const {
+#ifdef __CUDA_ARCH__
+  if (cycle)
+    *cycle = dev_crntSchedCycle_[threadIdx.x];
+  return dev_crntSchedCycle_[threadIdx.x] != SCHD_UNSCHDULD;
+#else
   if (cycle)
     *cycle = crntSchedCycle_;
   return crntSchedCycle_ != SCHD_UNSCHDULD;
+#endif
 }
 
 __host__ __device__
-InstCount SchedInstruction::GetSchedCycle() const { return crntSchedCycle_; }
+InstCount SchedInstruction::GetSchedCycle() const { 
+#ifdef __CUDA_ARCH__
+  return dev_crntSchedCycle_[threadIdx.x];
+#else
+  return crntSchedCycle_;
+#endif
+}
 
 __host__ __device__
-InstCount SchedInstruction::GetSchedSlot() const { return crntSchedSlot_; }
+InstCount SchedInstruction::GetSchedSlot() const { 
+#ifdef __CUDA_ARCH__
+  return dev_crntSchedSlot_[threadIdx.x];
+#else
+  return crntSchedSlot_;
+#endif
+}
 
 __host__ __device__
 InstCount SchedInstruction::GetCrntDeadline() const {
+#ifdef __CUDA_ARCH__
+  return IsSchduld() ? dev_crntSchedCycle_[threadIdx.x] : crntRange_->GetDeadline();
+#else
   return IsSchduld() ? crntSchedCycle_ : crntRange_->GetDeadline();
+#endif
 }
 
 __host__ __device__
 InstCount SchedInstruction::GetCrntReleaseTime() const {
+#ifdef __CUDA_ARCH__
+  return IsSchduld() ? dev_crntSchedCycle_[threadIdx.x] : GetCrntLwrBound(DIR_FRWRD);
+#else
   return IsSchduld() ? crntSchedCycle_ : GetCrntLwrBound(DIR_FRWRD);
+#endif
 }
 
 __host__ __device__
 InstCount SchedInstruction::GetRlxdCycle() const {
+#ifdef __CUDA_ARCH__
+  return IsSchduld() ? dev_crntSchedCycle_[threadIdx.x] : crntRlxdCycle_;
+#else
   return IsSchduld() ? crntSchedCycle_ : crntRlxdCycle_;
+#endif
 }
 
 __host__ __device__
@@ -682,19 +748,43 @@ void SchedInstruction::SetRlxdCycle(InstCount cycle) { crntRlxdCycle_ = cycle; }
 
 __host__ __device__
 void SchedInstruction::Schedule(InstCount cycleNum, InstCount slotNum) {
+#ifdef __CUDA_ARCH__
+  assert(dev_crntSchedCycle_[threadIdx.x] == SCHD_UNSCHDULD);
+  dev_crntSchedCycle_[threadIdx.x] = cycleNum;
+  dev_crntSchedSlot_[threadIdx.x] = slotNum;
+#else
   assert(crntSchedCycle_ == SCHD_UNSCHDULD);
   crntSchedCycle_ = cycleNum;
   crntSchedSlot_ = slotNum;
+#endif
 }
 
 __host__ __device__
-bool SchedInstruction::IsInReadyList() const { return ready_; }
+bool SchedInstruction::IsInReadyList() const { 
+#ifdef __CUDA_ARCH__
+  return dev_ready_[threadIdx.x];
+#else
+  return ready_;
+#endif
+}
 
 __host__ __device__
-void SchedInstruction::PutInReadyList() { ready_ = true; }
+void SchedInstruction::PutInReadyList() { 
+#ifdef __CUDA_ARCH__
+  dev_ready_[threadIdx.x] = true;
+#else
+  ready_ = true;
+#endif
+}
 
 __host__ __device__
-void SchedInstruction::RemoveFromReadyList() { ready_ = false; }
+void SchedInstruction::RemoveFromReadyList() { 
+#ifdef __CUDA_ARCH__
+  dev_ready_[threadIdx.x] = false;
+#else
+  ready_ = false;
+#endif
+}
 
 __host__ __device__
 InstCount SchedInstruction::GetCrntLwrBound(DIRECTION dir) const {
@@ -834,16 +924,27 @@ void SchedInstruction::SetPrdcsrNums_() {
 
 __host__ __device__
 int16_t SchedInstruction::CmputLastUseCnt() {
+#ifdef __CUDA_ARCH__
+  dev_lastUseCnt_[threadIdx.x] = 0;
+#else
   lastUseCnt_ = 0;
+#endif
 
   for (int i = 0; i < useCnt_; i++) {
     Register *reg = RegFiles_[uses_[i].regType_].GetReg(uses_[i].regNum_);
     assert(reg->GetCrntUseCnt() < reg->GetUseCnt());
     if (reg->GetCrntUseCnt() + 1 == reg->GetUseCnt())
+#ifdef __CUDA_ARCH__
+      dev_lastUseCnt_[threadIdx.x]++;
+#else
       lastUseCnt_++;
+#endif
   }
-
+#ifdef __CUDA_ARCH__
+  return dev_lastUseCnt_[threadIdx.x];
+#else
   return lastUseCnt_;
+#endif
 }
 
 __host__ __device__
@@ -1143,7 +1244,65 @@ void SchedInstruction::FreeDevicePointers() {
     cudaFree(sortedPrdcsrLst_->keys_);
     cudaFree(sortedPrdcsrLst_);
   }
+  cudaFree(dev_crntSchedCycle_);
+  cudaFree(dev_crntSchedSlot_);
+  cudaFree(dev_lastUseCnt_);
+  cudaFree(dev_ready_);
+  cudaFree(dev_minRdyCycle_);
+  cudaFree(dev_unschduldPrdcsrCnt_);
+  cudaFree(dev_unschduldScsrCnt_);
+  cudaFree(dev_rdyCyclePerPrdcsr_);
   GraphNode::FreeDevicePointers();
+}
+
+void SchedInstruction::AllocDevArraysForParallelACO(int numThreads) {
+  // Create an array of size numThreads (static 100 right now) for each thread
+  // to hold crntSchedCycle_ indexed by its threadIdx.x
+  size_t memSize = sizeof(InstCount) * numThreads;
+  if (cudaSuccess != cudaMalloc(&dev_crntSchedCycle_, memSize))
+    Logger::Fatal("Failed to alloc dev mem for dev_crntSchedCycle");
+  // allocate an array of lastUseCnt_ of size numThreads
+  memSize = sizeof(int16_t) * numThreads;
+  if (cudaSuccess != cudaMalloc(&dev_lastUseCnt_, memSize))
+    Logger::Fatal("Failed to alloc dev mem for dev_lastUseCnt_");
+  // Allocate an array of crntSchedSlot_ of size numThreads
+  memSize = sizeof(InstCount) * numThreads;
+  if (cudaSuccess != cudaMalloc(&dev_crntSchedSlot_, memSize))
+    Logger::Fatal("Failed to alloc dev mem for dev_crntSchedSlot_");
+  // Allocate an array of ready_ of size numThreads
+  memSize = sizeof(bool) * numThreads;
+  if (cudaSuccess != cudaMalloc(&dev_ready_, memSize))
+    Logger::Fatal("Failed to alloc dev mem for dev_ready_");
+  // Allocate an array of minRdyCycle_ of size numThreads
+  memSize = sizeof(InstCount) * numThreads;
+  if (cudaSuccess != cudaMalloc(&dev_minRdyCycle_, memSize))
+    Logger::Fatal("Failed to alloc dev mem for dev_minRdyCycle_");
+  // Allocate an array of unschduldPrdcsrCnt_ of size numThreads
+  memSize = sizeof(InstCount) * numThreads;
+  if (cudaSuccess != cudaMalloc(&dev_unschduldPrdcsrCnt_, memSize))
+    Logger::Fatal("Failed to alloc dev mem for dev_unschduldPrdcsrCnt_");
+  // Allocate an array of unschduldScsrCnt_ of size numThreads
+  memSize = sizeof(InstCount) * numThreads;
+  if (cudaSuccess != cudaMalloc(&dev_unschduldScsrCnt_, memSize))
+    Logger::Fatal("Failed to alloc dev mem for dev_unschduldScsrCnt_");
+  // Allocate an array of rdyCyclePerPrdcsr_ of size numThreads
+  memSize = sizeof(InstCount *) * numThreads;
+  if (cudaSuccess != cudaMallocManaged(&dev_rdyCyclePerPrdcsr_, memSize))
+    Logger::Fatal("Failed to alloc dev mem for dev_rdyCyclePerPrdcsr_");
+  memSize = sizeof(InstCount) * prdcsrCnt_;
+  for (int i = 0; i < numThreads; i++) {
+    if (cudaSuccess != cudaMalloc(&dev_rdyCyclePerPrdcsr_[i], memSize))
+      Logger::Fatal("Failed to alloc dev mem for dev_rdyCyclePerPrdcsr_[%d]", i);
+  }
+  // Allocate an array of prevMinRdyCyclePerPrdcsr_ of size numThreads
+  memSize = sizeof(InstCount *) * numThreads;
+  if (cudaSuccess != cudaMallocManaged(&dev_prevMinRdyCyclePerPrdcsr_, memSize))
+    Logger::Fatal("Failed to alloc dev mem for dev_prevMinRdyCyclePerPrdcsr_");
+  memSize = sizeof(InstCount) * prdcsrCnt_;
+  for (int i = 0; i < numThreads; i++) {
+    if (cudaSuccess != cudaMalloc(&dev_prevMinRdyCyclePerPrdcsr_[i], memSize))
+      Logger::Fatal("Failed to alloc dev mem for dev_prevMinRdyCyclePerPrdcsr_[%d]", i);
+  }
 }
 
 /******************************************************************************

@@ -544,6 +544,9 @@ public:
 		            InstCount instCnt, RegisterFile *dev_regFiles);
   // Calls cudaFree on all arrays/objects that were allocated with cudaMalloc
   void FreeDevicePointers();
+  // Allocates arrays used for storing individual values for each thread in
+  // parallel ACO on device
+  void AllocDevArraysForParallelACO(int numThreads);
 
   friend class SchedRange;
 
@@ -605,31 +608,55 @@ protected:
    ***************************************************************************/
   // Whether the instruction is currently in the Ready List.
   bool ready_;
+  // pointer to a device array used to store ready_ for each thread
+  // by parallel ACO
+  bool *dev_ready_;
   // Each entry in this array holds the cycle in which this instruction will
   // become partially ready by satisfying the dependence of one predecessor.
   // For a predecessor that has not been scheduled the corresponding entry is
   // set to -1.
   InstCount *rdyCyclePerPrdcsr_;
+  // pointer to a device array used to store rdyCyclePerPrdcsr_ for each thread
+  // by parallel ACO
+  InstCount **dev_rdyCyclePerPrdcsr_;
   // A lower bound on the cycle in which this instruction will be ready. This
   // is the maximum entry in the "readyCyclePerPrdcsr_" array. When all
   // predecessors have been scheduled, this value gives the cycle in which
   // this instruction will actually become ready.
   InstCount minRdyCycle_;
+  // pointer to a device array used to store ready_ for each thread
+  // by parallel ACO
+  InstCount *dev_minRdyCycle_;
   // The previous value of the minRdyCycle_, saved before the scheduling of a
   // predecessor to enable backtracking if this predecessor is unscheduled.
   InstCount *prevMinRdyCyclePerPrdcsr_;
+  // pointer to a device array used to store prevMinRdyCyclePerPrdcsr__ for 
+  // each thread by parallel ACO
+  InstCount **dev_prevMinRdyCyclePerPrdcsr_;
   // An array of predecessor latencies indexed by predecessor number.
   InstCount *ltncyPerPrdcsr_;
   // The number of unscheduled predecessors.
   InstCount unschduldPrdcsrCnt_;
+  // pointer to a device array used to store unschduldPrdcsrCnt__ for each
+  // thread by parallel ACO
+  InstCount *dev_unschduldPrdcsrCnt_;
   // The number of unscheduled successors.
   InstCount unschduldScsrCnt_;
+  // pointer to a device array used to store unschduldScsrCnt__ for each
+  // thread by parallel ACO
+  InstCount *dev_unschduldScsrCnt_;
   /***************************************************************************/
 
   // The cycle in which this instruction is currently scheduled.
   InstCount crntSchedCycle_;
+  // pointer to a device array used to store crntSchedCycle_ for each thread
+  // by parallel ACO
+  InstCount *dev_crntSchedCycle_;
   // The slot in which this instruction is currently scheduled.
   InstCount crntSchedSlot_;
+  // pointer to a device array used to store crntSchedSlot_ for each thread
+  // by parallel ACO
+  InstCount *dev_crntSchedSlot_;
   // TODO(ghassan): Document.
   InstCount crntRlxdCycle_;
 
@@ -682,6 +709,9 @@ protected:
   // The number of live virtual registers for which this instruction is
   // the last use. This value changes dynamically during scheduling
   int16_t lastUseCnt_;
+  // Array of lastUseCnt_ used on device for parallel ACO, each index in array
+  // holds a threads value independently indexed by threadIdx.x
+  int16_t *dev_lastUseCnt_;
   /***************************************************************************/
 
   // Whether this instruction blocks its cycle, i.e. does not allow other

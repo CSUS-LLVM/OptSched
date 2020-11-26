@@ -43,7 +43,7 @@ double RandDouble(double min, double max) {
 ACOScheduler::ACOScheduler(DataDepGraph *dataDepGraph,
                            MachineModel *machineModel, InstCount upperBound,
                            SchedPriorities priorities, bool vrfySched,
-			   SchedRegion **dev_rgn, DataDepGraph **dev_DDG,
+			   SchedRegion **dev_rgn, DataDepGraph *dev_DDG,
 			   DeviceVector<Choice> **dev_ready, 
 			   MachineModel *dev_MM)
     : ConstrainedScheduler(dataDepGraph, machineModel, upperBound) {
@@ -286,12 +286,12 @@ InstSchedule *ACOScheduler::FindOneSchedule(InstSchedule *dev_schedule,
 }
 
 __global__
-void Dev_FindOneSchedule(SchedRegion **dev_rgn, DataDepGraph **dev_DDG,
+void Dev_FindOneSchedule(SchedRegion **dev_rgn, DataDepGraph *dev_DDG,
             ACOScheduler **dev_AcoSchdulr, InstSchedule **dev_schedules,
 	    DeviceVector<Choice> **dev_ready) {
   int x = threadIdx.x + blockIdx.x * 5;
-  dev_rgn[x]->SetDepGraph(dev_DDG[x]);
-  ((BBWithSpill *)dev_rgn[x])->SetRegFiles(dev_DDG[x]->getRegFiles());
+  dev_rgn[x]->SetDepGraph(dev_DDG);
+  ((BBWithSpill *)dev_rgn[x])->SetRegFiles(dev_DDG->getRegFiles());
 
   dev_AcoSchdulr[x]->FindOneSchedule(dev_schedules[x], dev_ready[x]);
 }
@@ -334,7 +334,7 @@ FUNC_RESULT ACOScheduler::FindSchedule(InstSchedule *schedule_out,
   while (true) {
     InstSchedule *iterationBest = nullptr;
     
-    for (int i = 0; i < ants_per_iteration; i++) {
+    //for (int i = 0; i < ants_per_iteration; i++) {
       
       // **** Start Dev_ACO code **** //
       size_t memSize;
@@ -349,7 +349,7 @@ FUNC_RESULT ACOScheduler::FindSchedule(InstSchedule *schedule_out,
                                       cudaMemcpyHostToDevice))
           Logger::Fatal("Failed to copy AcoSchdulr to device");
 
-        CopyPointersToDevice(host_AcoSchdulr[i], dev_DDG_[i], dev_MM_, NULL);
+        CopyPointersToDevice(host_AcoSchdulr[i], dev_DDG_, dev_MM_, NULL);
       }
       ACOScheduler **dev_AcoSchdulr;
       memSize = sizeof(ACOScheduler *) * 100;
@@ -386,7 +386,7 @@ FUNC_RESULT ACOScheduler::FindSchedule(InstSchedule *schedule_out,
                       cudaGetErrorString(cudaGetLastError()));
 
       Logger::Info("Launching Dev_FindOneSchedule()");
-      Dev_FindOneSchedule<<<1,30>>>(dev_rgn_, dev_DDG_, dev_AcoSchdulr, 
+      Dev_FindOneSchedule<<<1,32>>>(dev_rgn_, dev_DDG_, dev_AcoSchdulr, 
 		                   dev_schedules, dev_ready_);
       cudaDeviceSynchronize();
       Logger::Info("Post Kernel Error: %s", cudaGetErrorString(cudaGetLastError()));
@@ -432,7 +432,7 @@ FUNC_RESULT ACOScheduler::FindSchedule(InstSchedule *schedule_out,
       } else {
         delete schedule;
       }
-    }
+    //}
 #if !USE_ACS
     UpdatePheremone(iterationBest);
 #endif

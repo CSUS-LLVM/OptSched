@@ -30,7 +30,7 @@ class ACOScheduler : public ConstrainedScheduler {
 public:
   ACOScheduler(DataDepGraph *dataDepGraph, MachineModel *machineModel,
                InstCount upperBound, SchedPriorities priorities,
-               bool vrfySched, SchedRegion **dev_rgn, DataDepGraph **dev_DDG,
+               bool vrfySched, SchedRegion **dev_rgn, DataDepGraph *dev_DDG,
 	       DeviceVector<Choice> **dev_ready, MachineModel *dev_MM);
   __host__ __device__
   virtual ~ACOScheduler();
@@ -86,7 +86,7 @@ private:
   InstSchedule *InitialSchedule;
   bool VrfySched_;
   SchedRegion **dev_rgn_;
-  DataDepGraph **dev_DDG_;
+  DataDepGraph *dev_DDG_;
   DeviceVector<Choice> **dev_ready_;
   MachineModel *dev_MM_;
 };

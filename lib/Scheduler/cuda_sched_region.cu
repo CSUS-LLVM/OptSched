@@ -1033,6 +1033,7 @@ FUNC_RESULT SchedRegion::runACO(InstSchedule *ReturnSched,
   size_t memSize;
   // Copy DDG to device
   Logger::Info("Copying DDG to device");
+/* 100 DDG implementation **SLOW**
   DataDepGraph **host_DDG = new DataDepGraph *[100];
   for (int i = 0; i < 100; i++) {
     if (cudaSuccess != cudaMallocManaged(&host_DDG[i], sizeof(DataDepGraph)))
@@ -1052,6 +1053,28 @@ FUNC_RESULT SchedRegion::runACO(InstSchedule *ReturnSched,
                                 cudaMemcpyHostToDevice))
     Logger::Fatal("Failed to copy array of dev_DDG's to device");
 
+  // cudaMalloc an array on device for dev_crntSchedCycle, to be used
+  // by each thread to store local value at its threadIdx.x index
+  InstCount *dev_crntSchedCycle;
+  memSize = sizeof(InstCount) * 100;
+  if (cudaSuccess != cudaMalloc(&dev_crntSchedCycle, memSize))
+    Logger::Fatal("failed to alloc dev mem for dev_crntSchedCycle");
+*/
+  // Allocate arrays for parallel ACO execution
+  for (int i = 0; i < dataDepGraph_->GetInstCnt(); i++) {
+    dataDepGraph_->GetInstByIndx(i)->AllocDevArraysForParallelACO(100);
+  }
+
+  // Copy DDG and its objects to device
+  DataDepGraph *dev_DDG;
+  if (cudaSuccess != cudaMallocManaged(&dev_DDG, sizeof(DataDepGraph)))
+      Logger::Fatal("Failed to allocate dev mem for dev_ddg");
+
+  if (cudaSuccess != cudaMemcpy(dev_DDG, dataDepGraph_, sizeof(DataDepGraph),
+                                cudaMemcpyHostToDevice))
+  Logger::Fatal("Failed to copy DDG to device");
+
+  dataDepGraph_->CopyPointersToDevice(dev_DDG);
   // Copy this(BBWithSpill) to device
   BBWithSpill **host_rgn = new BBWithSpill *[100];
   for (int i = 0; i < 100; i++) {
@@ -1131,14 +1154,16 @@ FUNC_RESULT SchedRegion::runACO(InstSchedule *ReturnSched,
     cudaFree(host_ready[i]);
     host_rgn[i]->FreeDevicePointers();
     cudaFree(host_rgn[i]);
-    host_DDG[i]->FreeDevicePointers();
-    cudaFree(dev_DDG[i]);
+    //host_DDG[i]->FreeDevicePointers();
+    //cudaFree(dev_DDG[i]);
   }
   cudaFree(dev_ready);
   delete[] host_ready;
   cudaFree(dev_rgn);
   delete[] host_rgn;
+  dev_DDG->FreeDevicePointers();
   cudaFree(dev_DDG);
-  delete[] host_DDG;
+  //cudaFree(dev_crntSchedCycle);
+  //delete[] host_DDG;
   return Rslt;
 }
