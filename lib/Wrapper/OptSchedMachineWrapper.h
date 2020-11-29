@@ -65,7 +65,7 @@ public:
   // Generate instruction scheduling type for all instructions in the current
   // DAG by using LLVM itineraries.
   InstType generateInstrType(const llvm::MachineInstr *instr);
-  bool generatesAllData() { return false;}
+  bool generatesAllData() { return false; }
   virtual ~CortexA7MMGenerator() = default;
 
 private:
@@ -90,13 +90,14 @@ private:
 
 class CortexA53MMGenerator : public MachineModelGenerator {
 public:
-  CortexA53MMGenerator(const llvm::ScheduleDAGInstrs *dag, MachineModel *mm) : DAG(dag), MM(mm) {}
+  CortexA53MMGenerator(const llvm::ScheduleDAGInstrs *dag, MachineModel *mm)
+      : DAG(dag), MM(mm) {}
   InstType generateInstrType(const llvm::MachineInstr *instr);
   bool generatesAllData() { return true; }
   void generateProcessorData(std::string *mdlName_, int *issueRate_);
 
 private:
- std::vector<std::string> resourceIdToIssueType;
+  std::vector<std::string> resourceIdToIssueType;
   const llvm::ScheduleDAGInstrs *DAG;
   MachineModel *MM;
 };
