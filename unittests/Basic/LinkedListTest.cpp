@@ -276,8 +276,8 @@ TEST(LinkedListFixed, CanAddToMaxCapacityAfterRemove) {
   numbers.erase(numIt);
 
   while (list.GetElmntCnt() < 20) {
-    list.InsrtElmnt(&numbers[3]);
-    numbers.push_back(numbers[3]);
+    list.InsrtElmnt(&numbers2[3]);
+    numbers.push_back(numbers2[3]);
   }
 
   ASSERT_EQ(numbers.size(), list.GetElmntCnt());
