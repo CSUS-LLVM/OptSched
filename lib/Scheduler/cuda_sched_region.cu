@@ -1062,7 +1062,7 @@ FUNC_RESULT SchedRegion::runACO(InstSchedule *ReturnSched,
 */
   // Allocate arrays for parallel ACO execution
   for (int i = 0; i < dataDepGraph_->GetInstCnt(); i++) {
-    dataDepGraph_->GetInstByIndx(i)->AllocDevArraysForParallelACO(100);
+    dataDepGraph_->GetInstByIndx(i)->AllocDevArraysForParallelACO(NUMTHREADS);
   }
 
   // Copy DDG and its objects to device
@@ -1076,8 +1076,8 @@ FUNC_RESULT SchedRegion::runACO(InstSchedule *ReturnSched,
 
   dataDepGraph_->CopyPointersToDevice(dev_DDG);
   // Copy this(BBWithSpill) to device
-  BBWithSpill **host_rgn = new BBWithSpill *[100];
-  for (int i = 0; i < 100; i++) {
+  BBWithSpill **host_rgn = new BBWithSpill *[NUMTHREADS];
+  for (int i = 0; i < NUMTHREADS; i++) {
     // Allocate device mem
     if (cudaSuccess != cudaMallocManaged((void**)&host_rgn[i], sizeof(BBWithSpill)))
       Logger::Fatal("Error allocating dev mem for dev_rgn: %s", 
@@ -1099,7 +1099,7 @@ FUNC_RESULT SchedRegion::runACO(InstSchedule *ReturnSched,
     CopyPointersToDevice(host_rgn[i]);
   }
   BBWithSpill **dev_rgn;
-  memSize = sizeof(BBWithSpill *) * 100;
+  memSize = sizeof(BBWithSpill *) * NUMTHREADS;
   if (cudaSuccess != cudaMalloc(&dev_rgn, memSize))
     Logger::Fatal("Failed to alloc dev mem for array of dev_rgn's");
   if (cudaSuccess != cudaMemcpy(dev_rgn, host_rgn, memSize,
@@ -1107,12 +1107,12 @@ FUNC_RESULT SchedRegion::runACO(InstSchedule *ReturnSched,
     Logger::Fatal("Failed to copy array of dev_rgn's to device");
 
   // Create and copy an array of DeviceVector<Choice>* for use during scheduling
-  DeviceVector<Choice> **host_ready = new DeviceVector<Choice> *[100];
+  DeviceVector<Choice> **host_ready = new DeviceVector<Choice> *[NUMTHREADS];
   Choice *dev_elmnts;
   DeviceVector<Choice> *ready = 
           new DeviceVector<Choice>(dataDepGraph_->GetInstCnt());
   //memSize = sizeof(DeviceVector<Choice>);
-  for (int i = 0; i < 100; i++) {
+  for (int i = 0; i < NUMTHREADS; i++) {
     memSize = sizeof(DeviceVector<Choice>);
     if (cudaSuccess != cudaMallocManaged(&host_ready[i], memSize))
       Logger::Fatal("Failed to alloc dev mem for dev_ready %d", i);
@@ -1135,7 +1135,7 @@ FUNC_RESULT SchedRegion::runACO(InstSchedule *ReturnSched,
 
   // copy array of device pointers to device
   DeviceVector<Choice> **dev_ready;
-  memSize = sizeof(DeviceVector<Choice> *) * 100;
+  memSize = sizeof(DeviceVector<Choice> *) * NUMTHREADS;
   if (cudaSuccess != cudaMalloc(&dev_ready, memSize))
     Logger::Fatal("Failed to alloc dev mem for array of dev_ready's");
   if (cudaSuccess != cudaMemcpy(dev_ready, host_ready, memSize,
@@ -1146,16 +1146,31 @@ FUNC_RESULT SchedRegion::runACO(InstSchedule *ReturnSched,
       dataDepGraph_, machMdl_, abslutSchedUprBound_, hurstcPrirts_, vrfySched_,
       (SchedRegion **)dev_rgn, dev_DDG, dev_ready, dev_machMdl_);
   AcoSchdulr->setInitialSched(InitSched);
-  FUNC_RESULT Rslt = AcoSchdulr->FindSchedule(ReturnSched, this);
+
+  // Alloc dev arrays for parallel ACO
+  AcoSchdulr->AllocDevArraysForParallelACO();
+  // Copy ACOScheduler to device
+  ACOScheduler *dev_AcoSchdulr;
+  memSize = sizeof(ACOScheduler);
+  if (cudaSuccess != cudaMallocManaged(&dev_AcoSchdulr, memSize))
+    Logger::Fatal("Failed to alloc dev mem for ACOSchdulr");
+
+  if (cudaSuccess != cudaMemcpy(dev_AcoSchdulr, AcoSchdulr, memSize,
+                                cudaMemcpyHostToDevice))
+    Logger::Fatal("Failed to copy AcoSchdulr to device");
+
+  AcoSchdulr->CopyPointersToDevice(dev_AcoSchdulr);
+
+  FUNC_RESULT Rslt = AcoSchdulr->FindSchedule(ReturnSched, this, dev_AcoSchdulr);
+  dev_AcoSchdulr->FreeDevicePointers();
+  cudaFree(dev_AcoSchdulr);
   delete AcoSchdulr;
 
-  for (int i = 0; i < 100; i++) {
+  for (int i = 0; i < NUMTHREADS; i++) {
     cudaFree(host_ready[i]->elmnts_);
     cudaFree(host_ready[i]);
     host_rgn[i]->FreeDevicePointers();
     cudaFree(host_rgn[i]);
-    //host_DDG[i]->FreeDevicePointers();
-    //cudaFree(dev_DDG[i]);
   }
   cudaFree(dev_ready);
   delete[] host_ready;
@@ -1163,7 +1178,5 @@ FUNC_RESULT SchedRegion::runACO(InstSchedule *ReturnSched,
   delete[] host_rgn;
   dev_DDG->FreeDevicePointers();
   cudaFree(dev_DDG);
-  //cudaFree(dev_crntSchedCycle);
-  //delete[] host_DDG;
   return Rslt;
 }

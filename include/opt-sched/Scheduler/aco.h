@@ -20,6 +20,7 @@ namespace llvm {
 namespace opt_sched {
 
 typedef double pheremone_t;
+#define NUMTHREADS 32
 
 struct Choice {
   SchedInstruction *inst;
@@ -34,19 +35,22 @@ public:
 	       DeviceVector<Choice> **dev_ready, MachineModel *dev_MM);
   __host__ __device__
   virtual ~ACOScheduler();
-  FUNC_RESULT FindSchedule(InstSchedule *schedule, SchedRegion *region);
+  FUNC_RESULT FindSchedule(InstSchedule *schedule, SchedRegion *region, 
+		           ACOScheduler *dev_AcoSchdulr = NULL);
   __host__ __device__
   inline void UpdtRdyLst_(InstCount cycleNum, int slotNum);
   // Set the initial schedule for ACO
   // Default is NULL if none are set.
   void setInitialSched(InstSchedule *Sched);
   // Copies the objects pointed to by ACOSched to device
-  void CopyPointersToDevice(ACOScheduler *dev_ACOSchedulr,
-		            DataDepGraph *dev_DDG, MachineModel *dev_machMdl,
-			    InstSchedule *dev_InitSched);
+  void CopyPointersToDevice(ACOScheduler *dev_ACOSchedur);
+  // Copies the current pheremone values to device pheremone array
+  void CopyPheremonesToDevice(ACOScheduler *dev_AcoSchdulr);
   // Calls cudaFree on all arrays/objects that were allocated with cudaMalloc
   void FreeDevicePointers();
-
+  // Allocates device arrays of size NUMTHREADS of dynamic variables to allow
+  // each thread to have its own value
+  void AllocDevArraysForParallelACO();
   // Finds a schedule, if passed a device side schedule, use that instead
   // of creating a new one
   __host__ __device__
@@ -71,6 +75,8 @@ private:
   //__host__ __device__
   //InstSchedule *FindOneSchedule(InstSchedule *dev_schedule = NULL);
   DeviceVector<pheremone_t> pheremone_;
+  // True if pheremone_.elmnts_ alloced on device
+  bool dev_pheremone_elmnts_alloced_;
   pheremone_t initialValue_;
   bool use_fixed_bias;
   int count_;
@@ -85,7 +91,6 @@ private:
   bool print_aco_trace;
   InstSchedule *InitialSchedule;
   bool VrfySched_;
-  SchedRegion **dev_rgn_;
   DataDepGraph *dev_DDG_;
   DeviceVector<Choice> **dev_ready_;
   MachineModel *dev_MM_;

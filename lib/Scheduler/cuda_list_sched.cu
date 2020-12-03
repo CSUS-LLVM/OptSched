@@ -139,10 +139,10 @@ void ListScheduler::CopyPointersToDevice(ListScheduler *dev_lstSchedulr,
   dev_lstSchedulr->rootInst_ = dev_DDG->GetRootInst();
   dev_lstSchedulr->leafInst_ = dev_DDG->GetLeafInst();
 
-  // Copy frstRdyLstPerCycle_, an array of NULL values
+  // Copy frstRdyLstPerCycle_, an array of ArrayLists
   ArrayList<InstCount> **dev_frstRdyLstPerCycle;
   memSize = sizeof(ArrayList<InstCount> *) * schedUprBound_;
-  if (cudaSuccess != cudaMalloc(&dev_frstRdyLstPerCycle, memSize))
+  if (cudaSuccess != cudaMallocManaged(&dev_frstRdyLstPerCycle, memSize))
     Logger::Fatal("Failed to alloc dev mem for dev_frstRdyLstPerCycle");
 
   if (cudaSuccess != cudaMemcpy(dev_frstRdyLstPerCycle, frstRdyLstPerCycle_,
@@ -150,6 +150,31 @@ void ListScheduler::CopyPointersToDevice(ListScheduler *dev_lstSchedulr,
     Logger::Fatal("Failed to copy frstRdyLstPerCycle_ to device");
 
   dev_lstSchedulr->frstRdyLstPerCycle_ = dev_frstRdyLstPerCycle;
+
+  // Copy each ArrayList to device
+  for (int i = 0; i < schedUprBound_; i++) {
+    if (frstRdyLstPerCycle_[i]) {
+    memSize = sizeof(ArrayList<InstCount>);
+    if (cudaSuccess != cudaMallocManaged(&dev_lstSchedulr->frstRdyLstPerCycle_[i], memSize))
+      Logger::Fatal("Failed to alloc dev mem for dev_frstRdyListPerCycle[%d]",
+		    i);
+
+    if (cudaSuccess != cudaMemcpy(dev_lstSchedulr->frstRdyLstPerCycle_[i], 
+			          frstRdyLstPerCycle_[i], memSize,
+				  cudaMemcpyHostToDevice))
+      Logger::Fatal("Failed to copy frstRdyLstPerCycle_[%d]", i);
+    
+    memSize = sizeof(InstCount) * dataDepGraph_->GetInstCnt();
+    if (cudaSuccess != cudaMalloc(&dev_lstSchedulr->frstRdyLstPerCycle_[i]->elmnts_, memSize))
+      Logger::Fatal("Failed alloc dev mem for frstRdyLstPerCycle[%d]->elmnts",
+		     i);
+
+    if (cudaSuccess != cudaMemcpy(dev_lstSchedulr->frstRdyLstPerCycle_[i]->elmnts_,
+			          frstRdyLstPerCycle_[i]->elmnts_, memSize,
+				  cudaMemcpyHostToDevice))
+      Logger::Fatal("Failed to copy dev_frstRdyLstPerCycle[%d]->elmnts_", i);
+    }
+  }
 
   // Copy avlblSlotsInCrntCycle_
   int16_t *dev_avlblSlotsInCrntCycle;
@@ -182,6 +207,10 @@ void ListScheduler::CopyPointersToDevice(ListScheduler *dev_lstSchedulr,
 void ListScheduler::FreeDevicePointers() {
   cudaFree(slotsPerTypePerCycle_);
   cudaFree(instCntPerIssuType_);
+  for (int i = 0; i < schedUprBound_; i++) {
+    cudaFree(frstRdyLstPerCycle_[i]->elmnts_);
+    cudaFree(frstRdyLstPerCycle_[i]);
+  }
   cudaFree(frstRdyLstPerCycle_);
   cudaFree(avlblSlotsInCrntCycle_);
   rdyLst_->FreeDevicePointers();
@@ -242,7 +271,11 @@ __host__ __device__
 void ListScheduler::UpdtRdyLst_(InstCount cycleNum, int slotNum) {
   InstCount prevCycleNum = cycleNum - 1;
   ArrayList<InstCount> *lst1 = NULL;
+#ifdef __CUDA_ARCH__
+  ArrayList<InstCount> *lst2 = dev_frstRdyLstPerCycle_[threadIdx.x][cycleNum];
+#else
   ArrayList<InstCount> *lst2 = frstRdyLstPerCycle_[cycleNum];
+#endif
 
   if (prirts_.isDynmc)
     rdyLst_->UpdatePriorities();
@@ -252,8 +285,11 @@ void ListScheduler::UpdtRdyLst_(InstCount cycleNum, int slotNum) {
     // then we also have to include the instructions that might have become
     // ready in the previous cycle due to a zero latency of the instruction
     // scheduled in the very last slot of that cycle [GOS 9.8.02].
+#ifdef __CUDA_ARCH__
+    lst1 = dev_frstRdyLstPerCycle_[threadIdx.x][prevCycleNum];
+#else
     lst1 = frstRdyLstPerCycle_[prevCycleNum];
-
+#endif
     if (lst1 != NULL) {
       rdyLst_->AddList(lst1);
       lst1->Reset();
