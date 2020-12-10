@@ -18,16 +18,12 @@ static void PrintInstruction(SchedInstruction *inst);
 #endif
 void PrintSchedule(InstSchedule *schedule);
 
-__host__ __device__
 double RandDouble(double min, double max) {
-#ifdef __CUDA_ARCH__
-  double rand = (double)RandomGen::Dev_GetRand32() / INT32_MAX;
-  //printf("Thread %d generated %f\n", threadIdx.x, rand);
-#else
   double rand = (double)RandomGen::GetRand32() / INT32_MAX;
-#endif
   return (rand * (max - min)) + min;
 }
+
+#define GLOBALTID blockIdx.x * blockDim.x + threadIdx.x
 
 #define USE_ACS 0
 //#define NUMTHREADS 32
@@ -45,9 +41,9 @@ double RandDouble(double min, double max) {
 ACOScheduler::ACOScheduler(DataDepGraph *dataDepGraph,
                            MachineModel *machineModel, InstCount upperBound,
                            SchedPriorities priorities, bool vrfySched,
-			   SchedRegion **dev_rgn, DataDepGraph *dev_DDG,
+			   SchedRegion *dev_rgn, DataDepGraph *dev_DDG,
 			   DeviceVector<Choice> **dev_ready, 
-			   MachineModel *dev_MM)
+			   MachineModel *dev_MM, curandState_t *dev_states)
     : ConstrainedScheduler(dataDepGraph, machineModel, upperBound) {
   VrfySched_ = vrfySched;
   prirts_ = priorities;
@@ -58,6 +54,7 @@ ACOScheduler::ACOScheduler(DataDepGraph *dataDepGraph,
   dev_DDG_ = dev_DDG;
   dev_ready_ = dev_ready;
   dev_MM_ = dev_MM;
+  dev_states_ = dev_states;
   dev_pheremone_elmnts_alloced_ = false;
 
   use_fixed_bias = schedIni.GetBool("ACO_USE_FIXED_BIAS");
@@ -156,25 +153,22 @@ ACOScheduler::SelectInstruction(DeviceVector<Choice> &ready,
       printf("array_size: %d\n", POPULATION_SIZE);
       printf("r:\t%d\n", r_pos);
       printf("s:\t%d\n", s_pos);
-      //        std::cerr<<"t:\t"<<t_pos<<"\n";
-
-      //std::cerr << "Score r" << Score(lastInst, r) << "\n";
-      //std::cerr << "Score s" << Score(lastInst, s) << "\n";
-      //         std::cerr<<"Score t"<<Score(lastInst, t)<<"\n";
     }
     if (Score(lastInst, r) >=
-        Score(lastInst, s)) //&& Score(lastInst, r) >= Score(lastInst, t))
+        Score(lastInst, s))
       return r.inst;
-    //     else if (Score(lastInst, s) >= Score(lastInst, r) && Score(lastInst,
-    //     s) >= Score(lastInst, t))
-    //         return s.inst;
     else
       return s.inst;
   }
   pheremone_t sum = 0;
   for (auto choice : ready)
     sum += Score(lastInst, choice);
+#ifdef __CUDA_ARCH__
+  pheremone_t point = sum * (pheremone_t)(curand_uniform(&dev_states_[GLOBALTID]));
+  //printf("thread %d generated point = %f\n",GLOBALTID, point);
+#else
   pheremone_t point = RandDouble(0, sum);
+#endif
   for (auto choice : ready) {
     point -= Score(lastInst, choice);
     if (point <= 0)
@@ -188,9 +182,6 @@ ACOScheduler::SelectInstruction(DeviceVector<Choice> &ready,
 __host__ __device__
 InstSchedule *ACOScheduler::FindOneSchedule(InstSchedule *dev_schedule, 
 		                            DeviceVector<Choice> *dev_ready) {
-//#ifdef __CUDA_ARCH__
-  //rgn_ = dev_rgn_[threadIdx.x];
-//#endif
   SchedInstruction *lastInst = NULL;
   InstSchedule *schedule;
   if (!dev_schedule)
@@ -198,7 +189,7 @@ InstSchedule *ACOScheduler::FindOneSchedule(InstSchedule *dev_schedule,
   else
     schedule = dev_schedule;
 #ifdef __CUDA_ARCH__
-  InstCount maxPriority = dev_rdyLst_[threadIdx.x]->MaxPriority();
+  InstCount maxPriority = dev_rdyLst_[GLOBALTID]->MaxPriority();
 #else
   InstCount maxPriority = rdyLst_->MaxPriority();
 #endif
@@ -206,7 +197,7 @@ InstSchedule *ACOScheduler::FindOneSchedule(InstSchedule *dev_schedule,
     maxPriority = 1; // divide by 0 is bad
   Initialize_();
 #ifdef __CUDA_ARCH__
-  ((BBWithSpill *)dev_rgn_[threadIdx.x])->Dev_InitForSchdulng();
+  ((BBWithSpill *)dev_rgn_)->Dev_InitForSchdulng();
 #else
   rgn_->InitForSchdulng();
 #endif
@@ -220,15 +211,15 @@ InstSchedule *ACOScheduler::FindOneSchedule(InstSchedule *dev_schedule,
     // convert the ready list from a custom priority queue to a std::vector,
     // much nicer for this particular scheduler
 #ifdef __CUDA_ARCH__
-    UpdtRdyLst_(dev_crntCycleNum_[threadIdx.x], dev_crntSlotNum_[threadIdx.x]);
+    UpdtRdyLst_(dev_crntCycleNum_[GLOBALTID], dev_crntSlotNum_[GLOBALTID]);
 #else
     UpdtRdyLst_(crntCycleNum_, crntSlotNum_);
 #endif
    
     unsigned long heuristic;
 #ifdef __CUDA_ARCH__
-    ready->reserve(dev_rdyLst_[threadIdx.x]->GetInstCnt());
-    SchedInstruction *inst = dev_rdyLst_[threadIdx.x]->GetNextPriorityInst(heuristic);
+    ready->reserve(dev_rdyLst_[GLOBALTID]->GetInstCnt());
+    SchedInstruction *inst = dev_rdyLst_[GLOBALTID]->GetNextPriorityInst(heuristic);
 #else
     ready->reserve(rdyLst_->GetInstCnt());
     SchedInstruction *inst = rdyLst_->GetNextPriorityInst(heuristic);
@@ -241,9 +232,9 @@ InstSchedule *ACOScheduler::FindOneSchedule(InstSchedule *dev_schedule,
         ready->push_back(c);
       }
 #ifdef __CUDA_ARCH__
-      inst = dev_rdyLst_[threadIdx.x]->GetNextPriorityInst(heuristic);
+      inst = dev_rdyLst_[GLOBALTID]->GetNextPriorityInst(heuristic);
     }
-    dev_rdyLst_[threadIdx.x]->ResetIterator();
+    dev_rdyLst_[GLOBALTID]->ResetIterator();
 #else
       inst = rdyLst_->GetNextPriorityInst(heuristic);
     }
@@ -278,28 +269,28 @@ InstSchedule *ACOScheduler::FindOneSchedule(InstSchedule *dev_schedule,
     } else {
       instNum = inst->GetNum();
 #ifdef __CUDA_ARCH__
-      SchdulInst_(inst, dev_crntCycleNum_[threadIdx.x]);
-      inst->Schedule(dev_crntCycleNum_[threadIdx.x], 
-		     dev_crntSlotNum_[threadIdx.x]);
-      ((BBWithSpill *)dev_rgn_[threadIdx.x])->Dev_SchdulInst(inst, 
-	                                    dev_crntCycleNum_[threadIdx.x], 
-					    dev_crntSlotNum_[threadIdx.x], 
+      SchdulInst_(inst, dev_crntCycleNum_[GLOBALTID]);
+      inst->Schedule(dev_crntCycleNum_[GLOBALTID], 
+		     dev_crntSlotNum_[GLOBALTID]);
+      ((BBWithSpill *)dev_rgn_)->Dev_SchdulInst(inst, 
+	                                    dev_crntCycleNum_[GLOBALTID],
+					    dev_crntSlotNum_[GLOBALTID],
 					    false);
       DoRsrvSlots_(inst);
       // this is annoying
-      SchedInstruction *blah = dev_rdyLst_[threadIdx.x]->GetNextPriorityInst();
+      SchedInstruction *blah = dev_rdyLst_[GLOBALTID]->GetNextPriorityInst();
       while (blah != NULL && blah != inst) {
-        blah = dev_rdyLst_[threadIdx.x]->GetNextPriorityInst();
+        blah = dev_rdyLst_[GLOBALTID]->GetNextPriorityInst();
       }
       if (blah == inst)
-        dev_rdyLst_[threadIdx.x]->RemoveNextPriorityInst();
+        dev_rdyLst_[GLOBALTID]->RemoveNextPriorityInst();
       UpdtSlotAvlblty_(inst);
     }
     /* Logger::Info("Chose instruction %d (for some reason)", instNum); */
     schedule->AppendInst(instNum);
     if (MovToNxtSlot_(inst))
       InitNewCycle_();
-    dev_rdyLst_[threadIdx.x]->ResetIterator();
+    dev_rdyLst_[GLOBALTID]->ResetIterator();
 #else
       SchdulInst_(inst, crntCycleNum_);
       inst->Schedule(crntCycleNum_, crntSlotNum_);
@@ -323,7 +314,7 @@ InstSchedule *ACOScheduler::FindOneSchedule(InstSchedule *dev_schedule,
     ready->clear();
   }
 #ifdef __CUDA_ARCH__
-  dev_rgn_[threadIdx.x]->UpdateScheduleCost(schedule);
+  dev_rgn_->UpdateScheduleCost(schedule);
 #else
   rgn_->UpdateScheduleCost(schedule);
 #endif
@@ -331,14 +322,16 @@ InstSchedule *ACOScheduler::FindOneSchedule(InstSchedule *dev_schedule,
 }
 
 __global__
-void Dev_FindOneSchedule(SchedRegion **dev_rgn, DataDepGraph *dev_DDG,
+void Dev_FindOneSchedule(SchedRegion *dev_rgn, DataDepGraph *dev_DDG,
             ACOScheduler *dev_AcoSchdulr, InstSchedule **dev_schedules,
 	    DeviceVector<Choice> **dev_ready) {
-  int x = threadIdx.x;
-  dev_rgn[x]->SetDepGraph(dev_DDG);
-  ((BBWithSpill *)dev_rgn[x])->SetRegFiles(dev_DDG->getRegFiles());
+  if (GLOBALTID == 0) {
+    dev_rgn->SetDepGraph(dev_DDG);
+    ((BBWithSpill *)dev_rgn)->SetRegFiles(dev_DDG->getRegFiles());
+  }
 
-  dev_AcoSchdulr->FindOneSchedule(dev_schedules[x], dev_ready[x]);
+  dev_AcoSchdulr->FindOneSchedule(dev_schedules[GLOBALTID], 
+		                  dev_ready[GLOBALTID]);
 }
 
 FUNC_RESULT ACOScheduler::FindSchedule(InstSchedule *schedule_out,
@@ -413,8 +406,8 @@ FUNC_RESULT ACOScheduler::FindSchedule(InstSchedule *schedule_out,
                       cudaGetErrorString(cudaGetLastError()));
 
       Logger::Info("Launching Dev_FindOneSchedule()");
-      Dev_FindOneSchedule<<<1,NUMTHREADS>>>(dev_rgn_, dev_DDG_, dev_AcoSchdulr, 
-		                   dev_schedules, dev_ready_);
+      Dev_FindOneSchedule<<<NUMBLOCKS,NUMTHREADSPERBLOCK>>>(dev_rgn_, dev_DDG_,
+		                     dev_AcoSchdulr, dev_schedules, dev_ready_);
       cudaDeviceSynchronize();
       Logger::Info("Post Kernel Error: %s", cudaGetErrorString(cudaGetLastError()));
 
@@ -544,7 +537,7 @@ inline void ACOScheduler::UpdtRdyLst_(InstCount cycleNum, int slotNum) {
   InstCount prevCycleNum = cycleNum - 1;
   ArrayList<InstCount> *lst1 = NULL;
   #ifdef __CUDA_ARCH__
-  ArrayList<InstCount> *lst2 = dev_frstRdyLstPerCycle_[threadIdx.x][cycleNum];
+  ArrayList<InstCount> *lst2 = dev_frstRdyLstPerCycle_[GLOBALTID][cycleNum];
 #else
   ArrayList<InstCount> *lst2 = frstRdyLstPerCycle_[cycleNum];
 #endif
@@ -555,17 +548,17 @@ inline void ACOScheduler::UpdtRdyLst_(InstCount cycleNum, int slotNum) {
     // the previous cycle due to a zero latency of the instruction scheduled in
     // the very last slot of that cycle [GOS 9.8.02].
 #ifdef __CUDA_ARCH__
-    lst1 = dev_frstRdyLstPerCycle_[threadIdx.x][prevCycleNum];
+    lst1 = dev_frstRdyLstPerCycle_[GLOBALTID][prevCycleNum];
 
     if (lst1 != NULL) {
-      dev_rdyLst_[threadIdx.x]->AddList(lst1);
+      dev_rdyLst_[GLOBALTID]->AddList(lst1);
       lst1->Reset();
       //CleanupCycle_(prevCycleNum);
     }
   }
 
   if (lst2 != NULL) {
-    dev_rdyLst_[threadIdx.x]->AddList(lst2);
+    dev_rdyLst_[GLOBALTID]->AddList(lst2);
     lst2->Reset();
   }
 #else
@@ -726,19 +719,6 @@ void ACOScheduler::CopyPheremonesToDevice(ACOScheduler *dev_AcoSchdulr) {
 void ACOScheduler::CopyPointersToDevice(ACOScheduler *dev_ACOSchedulr) {
   //dev_ACOSchedulr->InitialSchedule = dev_InitSched;
   size_t memSize;
-/* 
-  // Copy pheremone_->elmnts_ to device
-  pheremone_t *dev_elmnts;
-  memSize = sizeof(pheremone_t) * pheremone_.alloc_;
-  if (cudaSuccess != cudaMalloc(&dev_elmnts, memSize))
-    Logger::Fatal("Failed to alloc dev mem for pheremone_->elmnts_");
-  
-  if (cudaSuccess != cudaMemcpy(dev_elmnts, pheremone_.elmnts_, memSize,
-			        cudaMemcpyHostToDevice))
-    Logger::Fatal("Failed to copy pheremone_->elmnts to device");
-
-  dev_ACOSchedulr->pheremone_.elmnts_ = dev_elmnts;
-*/
   dev_ACOSchedulr->machMdl_ = dev_MM_;
   dev_ACOSchedulr->dataDepGraph_ = dev_DDG_;
   // Copy slotsPerTypePerCycle_
@@ -846,7 +826,6 @@ void ACOScheduler::FreeDevicePointers() {
   cudaFree(dev_rsrvSlots_);
   cudaFree(dev_rsrvSlotCnt_);
   cudaFree(dev_frstRdyLstPerCycle_);
-  cudaFree(avlblSlotsInCrntCycle_);
   cudaFree(dev_rdyLst_);
   cudaFree(pheremone_.elmnts_);
 }

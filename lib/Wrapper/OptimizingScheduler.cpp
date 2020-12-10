@@ -423,7 +423,7 @@ void ScheduleDAGOptSched::schedule() {
       OST.get(), static_cast<DataDepGraph *>(DDG.get()), RegionNumber, HistTableHashBits,
       LowerBoundAlgorithm, HeuristicPriorities, EnumPriorities, VerifySchedule,
       PruningStrategy, SchedForRPOnly, EnumStalls, SCW, SCF, HeurSchedType,
-      dev_MM, dev_maxDDG);
+      dev_MM);
 
   bool IsEasy = false;
   InstCount NormBestCost = 0;

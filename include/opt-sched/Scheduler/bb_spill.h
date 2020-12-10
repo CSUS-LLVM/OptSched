@@ -32,6 +32,9 @@ private:
   LengthCostEnumerator *enumrtr_;
 
   InstCount crntSpillCost_;
+  // pointer to a device array used to store crntSpillCost_ for
+  // each thread by parallel ACO
+  InstCount *dev_crntSpillCost_;
   InstCount optmlSpillCost_;
 
   // The target machine
@@ -49,16 +52,23 @@ private:
   // A bit vector indexed by register number indicating whether that
   // register is live
   WeightedBitVector *liveRegs_;
+  // pointer to a device array used to store liveRegs_ for
+  // each thread by parallel ACO
+  WeightedBitVector **dev_liveRegs_;
 
   // A bit vector indexed by physical register number indicating whether
   // that physical register is live
   WeightedBitVector *livePhysRegs_;
+  // pointer to a device array used to store livePhysRegs_ for
+  // each thread by parallel ACO
+  WeightedBitVector **dev_livePhysRegs_;
 
   // Sum of lengths of live ranges. This vector is indexed by register type,
   // and each type will have its sum of live interval lengths computed.
   int *sumOfLiveIntervalLengths_;
-  //keeps track of array size
-  int sumOfLiveIntervalLengths_size_;
+  // pointer to a device array used to store sumOfLiveIntervalLengths_ for
+  // each thread by parallel ACO
+  int **dev_sumOfLiveIntervalLengths_;
 
   InstCount staticSlilLowerBound_ = 0;
 
@@ -66,21 +76,55 @@ private:
   // the other cost functions. It is first set when the static lower bound is
   // calculated.
   InstCount dynamicSlilLowerBound_ = 0;
+  // pointer to a device array used to store dynamicSlilLowerBound_ for
+  // each thread by parallel ACO
+  InstCount *dev_dynamicSlilLowerBound_;
 
   int entryInstCnt_;
   int exitInstCnt_;
   int schduldEntryInstCnt_;
+  // pointer to a device array used to store schduldEntryInstCnt_ for
+  // each thread by parallel ACO
+  int *dev_schduldEntryInstCnt_;
   int schduldExitInstCnt_;
+  // pointer to a device array used to store schduldExitInstCnt_ for
+  // each thread by parallel ACO
+  int *dev_schduldExitInstCnt_;
   int schduldInstCnt_;
+  // pointer to a device array used to store schduldInstCnt_ for
+  // each thread by parallel ACO
+  int *dev_schduldInstCnt_;
 
   InstCount *spillCosts_;
+  // pointer to a device array used to store spillCosts_ for
+  // each thread by parallel ACO
+  InstCount **dev_spillCosts_;
   // Current register pressure for each register type.
   unsigned *regPressures_;
+  // pointer to a device array used to store regPressures_ for
+  // each thread by parallel ACO
+  unsigned **dev_regPressures_;
   InstCount *peakRegPressures_;
+  // pointer to a device array used to store peakRegPressures_ for
+  // each thread by parallel ACO
+  InstCount **dev_peakRegPressures_;
+
   InstCount crntStepNum_;
+  // pointer to a device array used to store crntStepNum_ for
+  // each thread by parallel ACO
+  InstCount *dev_crntStepNum_;
   InstCount peakSpillCost_;
+  // pointer to a device array used to store peakSpillCost_ for
+  // each thread by parallel ACO
+  InstCount *dev_peakSpillCost_;
   InstCount totSpillCost_;
+  // pointer to a device array used to store totSpillCost_ for
+  // each thread by parallel ACO
+  InstCount *dev_totSpillCost_;
   InstCount slilSpillCost_;
+  // pointer to a device array used to store slilSpillCost_ for
+  // each thread by parallel ACO
+  InstCount *dev_slilSpillCost_;
   bool trackLiveRangeLngths_;
 
   // Virtual Functions:
@@ -128,7 +172,7 @@ public:
               bool vrfySched, Pruning PruningStrategy, bool SchedForRPOnly,
               bool enblStallEnum, int SCW, SPILL_COST_FUNCTION spillCostFunc,
               SchedulerType HeurSchedType,
-	      MachineModel *dev_machMdl, DataDepGraph **dev_maxDDG);
+	      MachineModel *dev_machMdl);
   ~BBWithSpill();
 
   int CmputCostLwrBound();
@@ -154,9 +198,9 @@ public:
   void Dev_InitForSchdulng();
   __device__
   void SetRegFiles(RegisterFile *regFiles) {regFiles_ = regFiles; }
-
-  void CopyPointersToDevice(SchedRegion *dev_rgn);
-  void FreeDevicePointers();
+  void AllocDevArraysForParallelACO(int numThreads);
+  void CopyPointersToDevice(SchedRegion *dev_rgn, int numThreads);
+  void FreeDevicePointers(int numThreads);
   //updates spill info using the results from device
   //list scheduling
   void UpdateSpillInfoFromDevice(BBWithSpill *dev_rgn);
@@ -172,7 +216,7 @@ protected:
   }
 
   inline virtual const int GetSLIL_size_() const {
-    return sumOfLiveIntervalLengths_size_;
+    return regTypeCnt_;
   }
 };
 

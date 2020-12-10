@@ -35,9 +35,8 @@ BBWithSpill::BBWithSpill(const OptSchedTarget *OST_, DataDepGraph *dataDepGraph,
                          Pruning PruningStrategy, bool SchedForRPOnly,
                          bool enblStallEnum, int SCW,
                          SPILL_COST_FUNCTION spillCostFunc,
-                         SchedulerType HeurSchedType, MachineModel *dev_machMdl,
-			 DataDepGraph **dev_maxDDG)
-    : SchedRegion(OST_->MM, dev_machMdl, dataDepGraph, dev_maxDDG, rgnNum, sigHashSize, lbAlg,
+                         SchedulerType HeurSchedType, MachineModel *dev_machMdl)
+    : SchedRegion(OST_->MM, dev_machMdl, dataDepGraph, rgnNum, sigHashSize, lbAlg,
                   hurstcPrirts, enumPrirts, vrfySched, PruningStrategy,
                   HeurSchedType, spillCostFunc),
       OST(OST_) {
@@ -62,11 +61,10 @@ BBWithSpill::BBWithSpill(const OptSchedTarget *OST_, DataDepGraph *dataDepGraph,
   spillCosts_ = new InstCount[dataDepGraph_->GetInstCnt()];
   peakRegPressures_ = new InstCount[regTypeCnt_];
   regPressures_ = new unsigned[regTypeCnt_];
-  sumOfLiveIntervalLengths_size_ = regTypeCnt_;
-  sumOfLiveIntervalLengths_ = new int[sumOfLiveIntervalLengths_size_];
+  sumOfLiveIntervalLengths_ = new int[regTypeCnt_];
 
   //initialize all values to 0
-  for (int i = 0; i < sumOfLiveIntervalLengths_size_; i++)
+  for (int i = 0; i < regTypeCnt_; i++)
     sumOfLiveIntervalLengths_[i] = 0;
 
   entryInstCnt_ = 0;
@@ -343,9 +341,9 @@ __device__
 void BBWithSpill::Dev_InitForSchdulng() {
   InitForCostCmputtn_();
 
-  schduldEntryInstCnt_ = 0;
-  schduldExitInstCnt_ = 0;
-  schduldInstCnt_ = 0;
+  dev_schduldEntryInstCnt_[GLOBALTID] = 0;
+  dev_schduldExitInstCnt_[GLOBALTID] = 0;
+  dev_schduldInstCnt_[GLOBALTID] = 0;
 }
 
 /*****************************************************************************/
@@ -353,7 +351,38 @@ void BBWithSpill::Dev_InitForSchdulng() {
 __host__ __device__
 void BBWithSpill::InitForCostCmputtn_() {
   int i;
+#ifdef __CUDA_ARCH__
+  dev_crntCycleNum_[GLOBALTID] = 0;
+  dev_crntSlotNum_[GLOBALTID] = 0;
+  dev_crntSpillCost_[GLOBALTID] = 0;
+  dev_crntStepNum_[GLOBALTID] = -1;
+  dev_peakSpillCost_[GLOBALTID] = 0;
+  dev_totSpillCost_[GLOBALTID] = 0;
 
+  for (i = 0; i < regTypeCnt_; i++) {
+    regFiles_[i].ResetCrntUseCnts();
+    regFiles_[i].ResetCrntLngths();
+  }
+
+  for (i = 0; i < regTypeCnt_; i++) {
+    dev_liveRegs_[GLOBALTID][i].Dev_Reset();
+
+    if (regFiles_[i].GetPhysRegCnt() > 0) {
+      dev_livePhysRegs_[GLOBALTID][i].Dev_Reset();
+    }
+
+    dev_peakRegPressures_[GLOBALTID][i] = 0;
+    dev_regPressures_[GLOBALTID][i] = 0;
+  }
+
+  for (i = 0; i < dataDepGraph_->GetInstCnt(); i++)
+    dev_spillCosts_[GLOBALTID][i] = 0;
+
+  for (int i = 0; i < regTypeCnt_; i++)
+    dev_sumOfLiveIntervalLengths_[GLOBALTID][i] = 0;
+
+  dev_dynamicSlilLowerBound_[GLOBALTID] = staticSlilLowerBound_;
+#else
   crntCycleNum_ = 0;
   crntSlotNum_ = 0;
   crntSpillCost_ = 0;
@@ -367,22 +396,12 @@ void BBWithSpill::InitForCostCmputtn_() {
   }
 
   for (i = 0; i < regTypeCnt_; i++) {
-#ifdef __CUDA_ARCH__
-    liveRegs_[i].Dev_Reset();
-#else
     liveRegs_[i].Reset();
-#endif
 
     if (regFiles_[i].GetPhysRegCnt() > 0) {
-#ifdef __CUDA_ARCH__
-      livePhysRegs_[i].Dev_Reset();
-#else
       livePhysRegs_[i].Reset();
-#endif
     }
 
-    //    if (chkCnflcts_)
-    //      regFiles_[i].ResetConflicts();
     peakRegPressures_[i] = 0;
     regPressures_[i] = 0;
   }
@@ -390,10 +409,11 @@ void BBWithSpill::InitForCostCmputtn_() {
   for (i = 0; i < dataDepGraph_->GetInstCnt(); i++)
     spillCosts_[i] = 0;
 
-  for (int i = 0; i < sumOfLiveIntervalLengths_size_; i++)
+  for (int i = 0; i < regTypeCnt_; i++)
     sumOfLiveIntervalLengths_[i] = 0;
 
   dynamicSlilLowerBound_ = staticSlilLowerBound_;
+#endif
 }
 /*****************************************************************************/
 
@@ -463,16 +483,40 @@ InstCount BBWithSpill::Dev_CmputCost_(InstSchedule *sched, COST_COMP_MODE compMo
   assert(sched->IsComplete());
   InstCount cost = sched->GetCrntLngth() * schedCostFactor_;
   execCost = cost;
-  cost += crntSpillCost_ * SCW_;
-  sched->SetSpillCosts(spillCosts_);
-  sched->SetPeakRegPressures(peakRegPressures_);
-  sched->SetSpillCost(crntSpillCost_);
+  cost += dev_crntSpillCost_[GLOBALTID] * SCW_;
+  sched->SetSpillCosts(dev_spillCosts_[GLOBALTID]);
+  sched->SetPeakRegPressures(dev_peakRegPressures_[GLOBALTID]);
+  sched->SetSpillCost(dev_crntSpillCost_[GLOBALTID]);
   return cost;
 }
 /*****************************************************************************/
 
 __host__ __device__
 void BBWithSpill::CmputCrntSpillCost_() {
+#ifdef __CUDA_ARCH__
+  switch (GetSpillCostFunc()) {
+  case SCF_PERP:
+  case SCF_PRP:
+  case SCF_PEAK_PER_TYPE:
+  case SCF_TARGET:
+    dev_crntSpillCost_[GLOBALTID] = dev_peakSpillCost_[GLOBALTID];
+    break;
+  case SCF_SUM:
+    dev_crntSpillCost_[GLOBALTID] = dev_totSpillCost_[GLOBALTID];
+    break;
+  case SCF_PEAK_PLUS_AVG:
+    dev_crntSpillCost_[GLOBALTID] =
+        dev_peakSpillCost_[GLOBALTID] + 
+	dev_totSpillCost_[GLOBALTID] / dataDepGraph_->GetInstCnt();
+    break;
+  case SCF_SLIL:
+    dev_crntSpillCost_[GLOBALTID] = dev_slilSpillCost_[GLOBALTID];
+    break;
+  default:
+    dev_crntSpillCost_[GLOBALTID] = dev_peakSpillCost_[GLOBALTID];
+    break;
+  }
+#else
   switch (GetSpillCostFunc()) {
   case SCF_PERP:
   case SCF_PRP:
@@ -494,6 +538,7 @@ void BBWithSpill::CmputCrntSpillCost_() {
     crntSpillCost_ = peakSpillCost_;
     break;
   }
+#endif
 }
 /*****************************************************************************/
 //note: Logger::info/fatal cannot be called on device. using __CUDA_ARCH__ 
@@ -511,7 +556,7 @@ void BBWithSpill::UpdateSpillInfoForSchdul_(SchedInstruction *inst,
 
   defCnt = inst->GetDefs(defs);
   useCnt = inst->GetUses(uses);
-
+#ifdef __CUDA_ARCH__
 #ifdef IS_DEBUG_REG_PRESSURE
   Logger::Info("Updating reg pressure after scheduling Inst %d",
                inst->GetNum());
@@ -525,22 +570,198 @@ void BBWithSpill::UpdateSpillInfoForSchdul_(SchedInstruction *inst,
     physRegNum = use->GetPhysicalNumber();
 
     if (use->IsLive() == false) {
-#ifdef __CUDA_ARCH__
-      printf("Reg %d of type %d is used without being defined\n", regNum, 
-	     regType);
-#else
-      Logger::Fatal("Reg %d of type %d is used without being defined", regNum,
-                    regType);
-#endif
+      printf("Reg %d of type %d is used without being defined\n", regNum,
+             regType);
     }
 
 #ifdef IS_DEBUG_REG_PRESSURE
-#ifdef __CUDA_ARCH__
-    printf("Inst %d uses reg %d of type %d and %d uses\n", inst->GetNum(), regNum, regType, use->GetUseCnt());
+    printf("Inst %d uses reg %d of type %d and %d uses\n", inst->GetNum(), 
+		                        regNum, regType, use->GetUseCnt());
+#endif
+
+    use->AddCrntUse();
+
+    if (use->IsLive() == false) {
+      // (Chris): The SLIL calculation below the def and use for-loops doesn't
+      // consider the last use of a register. Thus, an additional increment must
+      // happen here.
+      if (GetSpillCostFunc() == SCF_SLIL) {
+        dev_sumOfLiveIntervalLengths_[GLOBALTID][regType]++;
+        if (!use->IsInInterval(inst) && !use->IsInPossibleInterval(inst)) {
+          ++dev_dynamicSlilLowerBound_[GLOBALTID];
+        }
+      }
+
+      dev_liveRegs_[GLOBALTID][regType].SetBit(regNum, false, use->GetWght());
+
+#ifdef IS_DEBUG_REG_PRESSURE
+      printf("Reg type %d now has %d live regs\n", regType,
+             dev_liveRegs_[GLOBALTID][regType].GetOneCnt());
+#endif
+
+      if (regFiles_[regType].GetPhysRegCnt() > 0 && physRegNum >= 0)
+        dev_livePhysRegs_[GLOBALTID][regType].SetBit(physRegNum, false, use->GetWght());
+    }
+  }
+
+  // Update Live regs after defs
+  for (int i = 0; i < defCnt; i++) {
+    def = dataDepGraph_->getRegByTuple(&defs[i]);
+    regType = def->GetType();
+    regNum = def->GetNum();
+    physRegNum = def->GetPhysicalNumber();
+
+#ifdef IS_DEBUG_REG_PRESSURE
+    printf("Inst %d defines reg %d of type %d and %d uses\n",inst->GetNum(),
+           regNum, regType, def->GetUseCnt());
+#endif
+
+    if (trackCnflcts && dev_liveRegs_[GLOBALTID][regType].GetOneCnt() > 0)
+      regFiles_[regType].AddConflictsWithLiveRegs(
+          regNum, dev_liveRegs_[GLOBALTID][regType].GetOneCnt());
+
+    dev_liveRegs_[GLOBALTID][regType].SetBit(regNum, true, def->GetWght());
+
+#ifdef IS_DEBUG_REG_PRESSURE
+    printf("Reg type %d now has %d live regs\n", regType,
+           dev_liveRegs_[GLOBALTID][regType].GetOneCnt());
+#endif
+
+    if (regFiles_[regType].GetPhysRegCnt() > 0 && physRegNum >= 0)
+      dev_livePhysRegs_[GLOBALTID][regType].SetBit(physRegNum, true, def->GetWght());
+    def->ResetCrntUseCnt();
+  }
+
+  newSpillCost = 0;
+
+#ifdef IS_DEBUG_SLIL_CORRECT
+  if (OPTSCHED_gPrintSpills) {
+    printf("Printing live range lengths for instruction BEFORE calculation.\n");
+    for (int j = 0; j < regTypeCnt_; j++) {
+      printf("SLIL for regType %d %s is currently %d\n", j,
+             dev_sumOfLiveIntervalLengths_[GLOBALTID][j]);
+    }
+    printf("Now computing spill cost for instruction.\n");
+  }
+#endif
+
+  for (int16_t i = 0; i < regTypeCnt_; i++) {
+    liveRegs = dev_liveRegs_[GLOBALTID][i].GetWghtedCnt();
+    // Set current RP for register type "i"
+    dev_regPressures_[GLOBALTID][i] = liveRegs;
+    // Update peak RP for register type "i"
+    if (liveRegs > dev_peakRegPressures_[GLOBALTID][i])
+      dev_peakRegPressures_[GLOBALTID][i] = liveRegs;
+
+    // (Chris): Compute sum of live range lengths at this point
+    if (GetSpillCostFunc() == SCF_SLIL) {
+      dev_sumOfLiveIntervalLengths_[GLOBALTID][i] += 
+	               dev_liveRegs_[GLOBALTID][i].GetOneCnt();
+      for (int j = 0; j < dev_liveRegs_[GLOBALTID][i].GetSize(); ++j) {
+        if (dev_liveRegs_[GLOBALTID][i].GetBit(j)) {
+          const Register *reg = regFiles_[i].GetReg(j);
+          if (!reg->IsInInterval(inst) && !reg->IsInPossibleInterval(inst)) {
+            ++dev_dynamicSlilLowerBound_[GLOBALTID];
+          }
+        }
+      }
+    }
+
+    // FIXME: Can this be taken out of this loop?
+    if (GetSpillCostFunc() == SCF_SLIL) {
+      accumulator = 0;
+      for (int x = 0; x < regTypeCnt_; x++)
+        accumulator += dev_sumOfLiveIntervalLengths_[GLOBALTID][x];
+      dev_slilSpillCost_[GLOBALTID] = accumulator;
+    }
+  }
+
+  if (GetSpillCostFunc() == SCF_TARGET) {
+    //Cannot simply call on device due to polymorphism/virtual methods, 
+    //replacing with GenericTarget method for now since I am testing for CPU
+    //TODO: Add ability to calculate GCNTarget getCost when compiling for
+    //AMD GPU
+    //newSpillCost = OST->getCost(regPressures_);
+
+    accumulator = 0;
+    for (int x = 0; x < regTypeCnt_; x++)
+      accumulator += dev_regPressures_[GLOBALTID][x];
+    newSpillCost = accumulator;
+  } else if (GetSpillCostFunc() == SCF_SLIL) {
+    accumulator = 0;
+    for (int x = 0; x < regTypeCnt_; x++)
+      accumulator += dev_sumOfLiveIntervalLengths_[GLOBALTID][x];
+    dev_slilSpillCost_[GLOBALTID] = accumulator;
+  } else if (GetSpillCostFunc() == SCF_PRP) {
+    accumulator = 0;
+    for (int x = 0; x < regTypeCnt_; x++)
+      accumulator += dev_regPressures_[GLOBALTID][x];
+    newSpillCost = accumulator;
+  } else if (GetSpillCostFunc() == SCF_PEAK_PER_TYPE) {
+    for (int i = 0; i < regTypeCnt_; i++)
+      if (0 < dev_peakRegPressures_[GLOBALTID][i] - machMdl_->GetPhysRegCnt(i))
+        newSpillCost += dev_peakRegPressures_[GLOBALTID][i] - 
+		                   machMdl_->GetPhysRegCnt(i);
+  } else {
+    for (int i = 0; i < regTypeCnt_; i++) {
+      if (0 < (int)(dev_regPressures_[GLOBALTID][i] - 
+		    machMdl_->GetPhysRegCnt(i))) {
+        newSpillCost += dev_regPressures_[GLOBALTID][i] - 
+		        machMdl_->GetPhysRegCnt(i);
+      }
+    }
+  }
+
+#ifdef IS_DEBUG_SLIL_CORRECT
+  if (OPTSCHED_gPrintSpills) {
+    printf("Printing live range lengths for instruction AFTER calculation.\n");
+    for (int j = 0; j < regTypeCnt_; j++) {
+      printf("SLIL for regType %d is currently %d\n", j,
+             dev_sumOfLiveIntervalLengths_[GLOBALTID][j]);
+    }
+  }
+#endif
+
+  dev_crntStepNum_[GLOBALTID]++;
+  dev_spillCosts_[GLOBALTID][dev_crntStepNum_[GLOBALTID]] = newSpillCost;
+
+#ifdef IS_DEBUG_REG_PRESSURE
+  printf("Spill cost at step  %d = %d\n", dev_crntStepNum_[GLOBALTID], newSpillCost);
+#endif
+
+  dev_totSpillCost_[GLOBALTID] += newSpillCost;
+
+  if (dev_peakSpillCost_[GLOBALTID] < newSpillCost)
+    dev_peakSpillCost_[GLOBALTID] = newSpillCost;
+
+  CmputCrntSpillCost_();
+
+  dev_schduldInstCnt_[GLOBALTID]++;
+  if (inst->MustBeInBBEntry())
+    dev_schduldEntryInstCnt_[GLOBALTID]++;
+  if (inst->MustBeInBBExit())
+    dev_schduldExitInstCnt_[GLOBALTID]++;
 #else
+#ifdef IS_DEBUG_REG_PRESSURE
+  Logger::Info("Updating reg pressure after scheduling Inst %d",
+               inst->GetNum());
+#endif
+
+  // Update Live regs after uses
+  for (int i = 0; i < useCnt; i++) {
+    use = dataDepGraph_->getRegByTuple(&uses[i]);
+    regType = use->GetType();
+    regNum = use->GetNum();
+    physRegNum = use->GetPhysicalNumber();
+
+    if (use->IsLive() == false) {
+      Logger::Fatal("Reg %d of type %d is used without being defined", regNum,
+                    regType);
+    }
+
+#ifdef IS_DEBUG_REG_PRESSURE
     Logger::Info("Inst %d uses reg %d of type %d and %d uses", inst->GetNum(),
                  regNum, regType, use->GetUseCnt());
-#endif
 #endif
 
     use->AddCrntUse();
@@ -559,13 +780,8 @@ void BBWithSpill::UpdateSpillInfoForSchdul_(SchedInstruction *inst,
       liveRegs_[regType].SetBit(regNum, false, use->GetWght());
 
 #ifdef IS_DEBUG_REG_PRESSURE
-#ifdef __CUDA_ARCH__
-      printf("Reg type %d now has %d live regs\n", regType, 
-	     liveRegs_[regType].GetOneCnt());
-#else
       Logger::Info("Reg type %d now has %d live regs", regType,
                    liveRegs_[regType].GetOneCnt());
-#endif
 #endif
 
       if (regFiles_[regType].GetPhysRegCnt() > 0 && physRegNum >= 0)
@@ -581,16 +797,9 @@ void BBWithSpill::UpdateSpillInfoForSchdul_(SchedInstruction *inst,
     physRegNum = def->GetPhysicalNumber();
 
 #ifdef IS_DEBUG_REG_PRESSURE
-#ifdef __CUDA_ARCH__
-    printf("Inst %d defines reg %d of type %d and %d uses\n",inst->GetNum(), 
-	   regNum, regType, def->GetUseCnt());
-#else
     Logger::Info("Inst %d defines reg %d of type %d and %d uses",
                  inst->GetNum(), regNum, regType, def->GetUseCnt());
 #endif
-#endif
-
-    // if (def->GetUseCnt() > 0) {
 
     if (trackCnflcts && liveRegs_[regType].GetOneCnt() > 0)
       regFiles_[regType].AddConflictsWithLiveRegs(
@@ -599,45 +808,26 @@ void BBWithSpill::UpdateSpillInfoForSchdul_(SchedInstruction *inst,
     liveRegs_[regType].SetBit(regNum, true, def->GetWght());
 
 #ifdef IS_DEBUG_REG_PRESSURE
-#ifdef __CUDA_ARCH__
-    printf("Reg type %d now has %d live regs\n", regType,
-           liveRegs_[regType].GetOneCnt());
-#else
     Logger::Info("Reg type %d now has %d live regs", regType,
                  liveRegs_[regType].GetOneCnt());
-#endif
 #endif
 
     if (regFiles_[regType].GetPhysRegCnt() > 0 && physRegNum >= 0)
       livePhysRegs_[regType].SetBit(physRegNum, true, def->GetWght());
     def->ResetCrntUseCnt();
-    //}
   }
 
   newSpillCost = 0;
 
 #ifdef IS_DEBUG_SLIL_CORRECT
   if (OPTSCHED_gPrintSpills) {
-#ifdef __CUDA_ARCH__
-    printf("Printing live range lengths for instruction BEFORE calculation.\n");
-#else
     Logger::Info(
         "Printing live range lengths for instruction BEFORE calculation.");
-#endif
-    for (int j = 0; j < sumOfLiveIntervalLengths_size_; j++) {
-#ifdef __CUDA_ARCH__
-      printf("SLIL for regType %d %s is currently %d\n", j,
-	     sumOfLiveIntervalLengths_[j]);
-#else
+    for (int j = 0; j < regTypeCnt_; j++) {
       Logger::Info("SLIL for regType %d %s is currently %d", j,
                    sumOfLiveIntervalLengths_[j]);
-#endif
     }
-#ifdef __CUDA_ARCH__
-    printf("Now computing spill cost for instruction.\n");
-#else
     Logger::Info("Now computing spill cost for instruction.");
-#endif
   }
 #endif
 
@@ -664,11 +854,6 @@ void BBWithSpill::UpdateSpillInfoForSchdul_(SchedInstruction *inst,
 
     // FIXME: Can this be taken out of this loop?
     if (GetSpillCostFunc() == SCF_SLIL) {
-/* cannot use std:: in device code, replaced with simple loop
-      slilSpillCost_ = std::accumulate(sumOfLiveIntervalLengths_,
-                                       &sumOfLiveIntervalLengths_[regTypeCnt_], 
-          		               0);
-*/
       accumulator = 0;
       for (int x = 0; x < regTypeCnt_; x++)
         accumulator += sumOfLiveIntervalLengths_[x];
@@ -688,20 +873,11 @@ void BBWithSpill::UpdateSpillInfoForSchdul_(SchedInstruction *inst,
       accumulator += regPressures_[x];
     newSpillCost = accumulator;
   } else if (GetSpillCostFunc() == SCF_SLIL) {
-/*  cannot use std:: in device code, replaced with simple loop
-    slilSpillCost_ = std::accumulate(sumOfLiveIntervalLengths_,
-                                     &sumOfLiveIntervalLengths_[regTypeCnt_], 
-    				     0);
-*/
     accumulator = 0;
     for (int x = 0; x < regTypeCnt_; x++)
       accumulator += sumOfLiveIntervalLengths_[x];
     slilSpillCost_ = accumulator;
   } else if (GetSpillCostFunc() == SCF_PRP) {
-/*  cannot use std:: in device code, replaced with simple loop
-    newSpillCost =
-        std::accumulate(regPressures_, &regPressures_[regTypeCnt_], 0);
-*/
     accumulator = 0;
     for (int x = 0; x < regTypeCnt_; x++)
       accumulator += regPressures_[x];
@@ -712,14 +888,6 @@ void BBWithSpill::UpdateSpillInfoForSchdul_(SchedInstruction *inst,
         newSpillCost += peakRegPressures_[i] - machMdl_->GetPhysRegCnt(i);
 
   } else {
-    // Default is PERP (Some SCF like SUM rely on PERP being the default here)
-/*  cannot use std:: in device code, replaced with simple loop
-    int i = 0;
-    std::for_each(
-        regPressures_, &regPressures_[regTypeCnt_], [&](InstCount RP) {
-          newSpillCost += std::max(0, RP - machMdl_->GetPhysRegCnt(i++));
-        });
-*/
     for (int i = 0; i < regTypeCnt_; i++) {
       if (0 < (int)(regPressures_[i] - machMdl_->GetPhysRegCnt(i))) {
         newSpillCost += regPressures_[i] - machMdl_->GetPhysRegCnt(i);
@@ -729,20 +897,11 @@ void BBWithSpill::UpdateSpillInfoForSchdul_(SchedInstruction *inst,
 
 #ifdef IS_DEBUG_SLIL_CORRECT
   if (OPTSCHED_gPrintSpills) {
-#ifdef __CUDA_ARCH__
-    printf("Printing live range lengths for instruction AFTER calculation.\n");
-#else
     Logger::Info(
         "Printing live range lengths for instruction AFTER calculation.");
-#endif
-    for (int j = 0; j < sumOfLiveIntervalLengths_size_; j++) {
-#ifdef __CUDA_ARCH__
-      printf("SLIL for regType %d is currently %d\n", j,
-	     sumOfLiveIntervalLengths_[j]);
-#else
+    for (int j = 0; j < regTypeCnt_; j++) {
       Logger::Info("SLIL for regType %d is currently %d", j,
                    sumOfLiveIntervalLengths_[j]);
-#endif
     }
   }
 #endif
@@ -751,16 +910,11 @@ void BBWithSpill::UpdateSpillInfoForSchdul_(SchedInstruction *inst,
   spillCosts_[crntStepNum_] = newSpillCost;
 
 #ifdef IS_DEBUG_REG_PRESSURE
-#ifdef __CUDA_ARCH__
-  printf("Spill cost at step  %d = %d\n", crntStepNum_, newSpillCost);
-#else
   Logger::Info("Spill cost at step  %d = %d", crntStepNum_, newSpillCost);
-#endif
 #endif
 
   totSpillCost_ += newSpillCost;
 
-  //peakSpillCost_ = std::max(peakSpillCost_, newSpillCost);
   if (peakSpillCost_ < newSpillCost)
     peakSpillCost_ = newSpillCost;
 
@@ -771,6 +925,7 @@ void BBWithSpill::UpdateSpillInfoForSchdul_(SchedInstruction *inst,
     schduldEntryInstCnt_++;
   if (inst->MustBeInBBExit())
     schduldExitInstCnt_++;
+#endif
 }
 /*****************************************************************************/
 
@@ -896,10 +1051,11 @@ void BBWithSpill::SchdulInst(SchedInstruction *inst, InstCount cycleNum,
   UpdateSpillInfoForSchdul_(inst, trackCnflcts);
 }
 
+__device__
 void BBWithSpill::Dev_SchdulInst(SchedInstruction *inst, InstCount cycleNum,
                              InstCount slotNum, bool trackCnflcts) {
-  crntCycleNum_ = cycleNum;
-  crntSlotNum_ = slotNum;
+  dev_crntCycleNum_[GLOBALTID] = cycleNum;
+  dev_crntSlotNum_[GLOBALTID] = slotNum;
   if (inst == NULL)
     return;
   assert(inst != NULL);
@@ -1247,12 +1403,52 @@ void BBWithSpill::CmputCnflcts_(InstSchedule *sched) {
   sched->SetConflictCount(cnflctCnt);
 }
 
-void BBWithSpill::CopyPointersToDevice(SchedRegion* dev_rgn) {
+void BBWithSpill::AllocDevArraysForParallelACO(int numThreads) {
+  // alloc dev array for crntCycleNum_
+  size_t memSize = sizeof(InstCount) * numThreads;
+  cudaMalloc(&dev_crntCycleNum_, memSize);
+  cudaMalloc(&dev_crntSlotNum_, memSize);
+  cudaMalloc(&dev_crntSpillCost_, memSize);
+  cudaMalloc(&dev_crntStepNum_, memSize);
+  cudaMalloc(&dev_peakSpillCost_, memSize);
+  cudaMalloc(&dev_totSpillCost_, memSize);
+  cudaMalloc(&dev_slilSpillCost_, memSize);
+  cudaMalloc(&dev_dynamicSlilLowerBound_, memSize);
+  memSize = sizeof(int) * numThreads;
+  cudaMalloc(&dev_schduldEntryInstCnt_, memSize);
+  cudaMalloc(&dev_schduldExitInstCnt_, memSize);
+  cudaMalloc(&dev_schduldInstCnt_, memSize);
+  memSize = sizeof(WeightedBitVector *) * numThreads;
+  cudaMallocManaged(&dev_liveRegs_, memSize);
+  cudaMallocManaged(&dev_livePhysRegs_, memSize);
+  memSize = sizeof(InstCount *) * numThreads;
+  cudaMallocManaged(&dev_peakRegPressures_, memSize);
+  memSize = sizeof(InstCount) * regTypeCnt_;
+  for (int i = 0; i < numThreads; i++)
+    cudaMalloc(&dev_peakRegPressures_[i], memSize);
+  memSize = sizeof(unsigned *) * numThreads;
+  cudaMallocManaged(&dev_regPressures_, memSize);
+  memSize = sizeof(unsigned) * regTypeCnt_;
+  for (int i = 0; i < numThreads; i++)
+    cudaMalloc(&dev_regPressures_[i], memSize);
+  memSize = sizeof(InstCount *) * numThreads;
+  cudaMallocManaged(&dev_spillCosts_, memSize);
+  memSize = sizeof(InstCount) * dataDepGraph_->GetInstCnt();
+  for (int i = 0; i < numThreads; i++)
+    cudaMalloc(&dev_spillCosts_[i], memSize);
+  memSize = sizeof(int *) * numThreads;
+  cudaMallocManaged(&dev_sumOfLiveIntervalLengths_, memSize);
+  memSize = sizeof(int) * regTypeCnt_;
+  for (int i = 0; i < numThreads; i++)
+    cudaMalloc(&dev_sumOfLiveIntervalLengths_[i], memSize);
+}
+
+void BBWithSpill::CopyPointersToDevice(SchedRegion* dev_rgn, int numThreads) {
   //copy peakRegPressures_ to device
-  InstCount *dev_peakRegPressures = NULL;
+  //InstCount *dev_peakRegPressures = NULL;
   size_t memSize;
   //allocate device mem
-  memSize = regTypeCnt_ * sizeof(InstCount);
+ /* memSize = regTypeCnt_ * sizeof(InstCount);
   if (cudaSuccess != cudaMallocManaged(&dev_peakRegPressures, memSize))
     Logger::Fatal("Error allocating dev mem for dev_peakRegPressures: %s\n", 
 	          cudaGetErrorString(cudaGetLastError()));
@@ -1269,8 +1465,9 @@ void BBWithSpill::CopyPointersToDevice(SchedRegion* dev_rgn) {
 				cudaMemcpyHostToDevice))
     Logger::Fatal("Error updating dev_rgn->peakRegPressures_: %s\n", 
 		  cudaGetErrorString(cudaGetLastError()));
-
+*/
   //copy spillCosts_ to device
+  /*
   InstCount *dev_spillCosts = NULL;
   memSize = dataDepGraph_->GetInstCnt() * sizeof(InstCount);
   //allocate dev mem
@@ -1290,108 +1487,96 @@ void BBWithSpill::CopyPointersToDevice(SchedRegion* dev_rgn) {
 				cudaMemcpyHostToDevice))
     Logger::Fatal("Error updating dev_rgn->spillCosts_: %s\n", 
 		  cudaGetErrorString(cudaGetLastError()));
-
+*/
   //copy liveRegs to device
-  WeightedBitVector *dev_liveRegs = NULL;
-  memSize = regTypeCnt_ * sizeof(WeightedBitVector);
-  //allocate dev mem
-  if (cudaSuccess != cudaMallocManaged((void**)&dev_liveRegs, memSize))
-    Logger::Fatal("Error allocating dev mem for dev_liveRegs: %s\n", 
-		  cudaGetErrorString(cudaGetLastError()));
-
-  //copy array
-  if (cudaSuccess != cudaMemcpy(dev_liveRegs, liveRegs_, memSize, 
-			        cudaMemcpyHostToDevice))
-    Logger::Fatal("Error copying liveRegs_ to device: %s\n", 
-		  cudaGetErrorString(cudaGetLastError()));
-
-  //update device pointer
-  if (cudaSuccess != cudaMemcpy(&(((BBWithSpill *)dev_rgn)->liveRegs_), 
-			        &dev_liveRegs, sizeof(WeightedBitVector *), 
-				cudaMemcpyHostToDevice))
-    Logger::Fatal("Error updating dev_rng->liveRegs_ on device: %s\n", 
-		  cudaGetErrorString(cudaGetLastError()));
-
-  //Copy pointers in each liveRegs_[i] to device
+  WeightedBitVector *dev_liveRegs;
   unsigned int *vctr = NULL;
   unsigned int *dev_vctr = NULL;
   int unitCnt;
-  for (int i = 0; i < regTypeCnt_; i++) {
-    vctr = liveRegs_[i].GetVctrCpy();
-    unitCnt = liveRegs_[i].GetUnitCnt();
-
-    if (unitCnt > 0) {
-      memSize = unitCnt * sizeof(unsigned int);
-      //allocate device mem
-      if (cudaSuccess != cudaMalloc((void**)&dev_vctr, memSize))
-        Logger::Fatal("Error allocating dev mem for dev_vctr: %s\n", 
-	              cudaGetErrorString(cudaGetLastError()));
-
-      //copy vctr to device
-      if (cudaSuccess != cudaMemcpy(dev_vctr, vctr, memSize, 
-			            cudaMemcpyHostToDevice))
-        Logger::Fatal("Error copying vctr to device: %s\n", 
-	              cudaGetErrorString(cudaGetLastError()));
-
-      //update device pointer
-      if (cudaSuccess != cudaMemcpy(&(dev_liveRegs[i].vctr_), &dev_vctr, 
-			            sizeof(unsigned int *), 
-				    cudaMemcpyHostToDevice))
-        Logger::Fatal("Error updating dev_liveRegs[%d].vctr_: %s\n", i, 
-		      cudaGetErrorString(cudaGetLastError()));
-    }
-    //delete vctr copy
-    delete[] vctr;
-  }
-
-  //copy liveRegs to device
-  WeightedBitVector *dev_livePhysRegs = NULL;
-  memSize = regTypeCnt_ * sizeof(WeightedBitVector);
-  //allocate dev mem
-  if (cudaSuccess != cudaMallocManaged((void**)&dev_livePhysRegs, memSize))
-    Logger::Fatal("Error allocating dev mem for dev_livePhysRegs: %s\n", 
-		  cudaGetErrorString(cudaGetLastError()));
-
-  //copy array
-  if (cudaSuccess != cudaMemcpy(dev_livePhysRegs, livePhysRegs_, memSize, 
-			        cudaMemcpyHostToDevice))
-    Logger::Fatal("Error copying livePhysRegs_ to device: %s\n", 
-		  cudaGetErrorString(cudaGetLastError()));
-
-  //update device pointer
-  if (cudaSuccess != cudaMemcpy(&(((BBWithSpill *)dev_rgn)->livePhysRegs_), 
-			        &dev_livePhysRegs, sizeof(WeightedBitVector *),
-				cudaMemcpyHostToDevice))
-    Logger::Fatal("Error updating dev_rng->livePhysRegs_ on device: %s\n", 
-		  cudaGetErrorString(cudaGetLastError()));
-
-  //Copy pointers in each livePhysRegs_[i] to device
-  for (int i = 0; i < regTypeCnt_; i++) {
-    vctr = livePhysRegs_[i].GetVctrCpy();
-    unitCnt = livePhysRegs_[i].GetUnitCnt();
-    memSize = unitCnt * sizeof(unsigned int);
-    //allocate device mem
-    if (cudaSuccess != cudaMalloc((void**)&dev_vctr, memSize))
-      Logger::Fatal("Error allocating dev mem for dev_vctr: %s\n", 
+  for (int j = 0; j < numThreads; j++) {
+    memSize = regTypeCnt_ * sizeof(WeightedBitVector);
+    //allocate dev mem
+    if (cudaSuccess != cudaMallocManaged((void**)&dev_liveRegs, memSize))
+      Logger::Fatal("Error allocating dev mem for dev_liveRegs: %s\n", 
 		    cudaGetErrorString(cudaGetLastError()));
 
-    //copy vctr to device
-    if (cudaSuccess != cudaMemcpy(dev_vctr, vctr, memSize, 
+    //copy array
+    if (cudaSuccess != cudaMemcpy(dev_liveRegs, liveRegs_, memSize, 
 			          cudaMemcpyHostToDevice))
-      Logger::Fatal("Error copying vctr to device: %s\n", 
+      Logger::Fatal("Error copying liveRegs_ to device: %s\n", 
 		    cudaGetErrorString(cudaGetLastError()));
 
+    //Copy pointers in each liveRegs_[i] to device
+    for (int i = 0; i < regTypeCnt_; i++) {
+      vctr = liveRegs_[i].GetVctrCpy();
+      unitCnt = liveRegs_[i].GetUnitCnt();
+
+      if (unitCnt > 0) {
+        memSize = unitCnt * sizeof(unsigned int);
+        //allocate device mem
+        if (cudaSuccess != cudaMalloc((void**)&dev_vctr, memSize))
+          Logger::Fatal("Error allocating dev mem for dev_vctr: %s\n", 
+	                cudaGetErrorString(cudaGetLastError()));
+
+        //copy vctr to device
+        if (cudaSuccess != cudaMemcpy(dev_vctr, vctr, memSize, 
+	 	 	              cudaMemcpyHostToDevice))
+          Logger::Fatal("Error copying vctr to device: %s\n", 
+	                cudaGetErrorString(cudaGetLastError()));
+
+        //update device pointer
+	dev_liveRegs[i].vctr_ = dev_vctr;
+      }
+      //delete vctr copy
+      delete[] vctr;
+    }
     //update device pointer
-    if (cudaSuccess != cudaMemcpy(&(dev_livePhysRegs[i].vctr_), &dev_vctr, 
-			          sizeof(unsigned int *), 
-				  cudaMemcpyHostToDevice))
-      Logger::Fatal("Error updating dev_livePhysRegs[%d].vctr_: %s\n", i, 
-		    cudaGetErrorString(cudaGetLastError()));
-
-    //Delete vctr copy
-    delete[] vctr;
+    ((BBWithSpill *)dev_rgn)->dev_liveRegs_[j] = dev_liveRegs;
   }
 
+  //copy livePhysRegs to device
+  WeightedBitVector *dev_livePhysRegs = NULL;
+  for (int j = 0; j < numThreads; j++) {
+    memSize = regTypeCnt_ * sizeof(WeightedBitVector);
+    //allocate dev mem
+    if (cudaSuccess != cudaMallocManaged((void**)&dev_livePhysRegs, memSize))
+      Logger::Fatal("Error allocating dev mem for dev_livePhysRegs: %s\n",
+                    cudaGetErrorString(cudaGetLastError()));
+
+    //copy array
+    if (cudaSuccess != cudaMemcpy(dev_livePhysRegs, livePhysRegs_, memSize,
+                                  cudaMemcpyHostToDevice))
+      Logger::Fatal("Error copying livePhysRegs_ to device: %s\n",
+                    cudaGetErrorString(cudaGetLastError()));
+
+    //Copy pointers in each livePhysRegs_[i] to device
+    for (int i = 0; i < regTypeCnt_; i++) {
+      vctr = livePhysRegs_[i].GetVctrCpy();
+      unitCnt = livePhysRegs_[i].GetUnitCnt();
+
+      if (unitCnt > 0) {
+        memSize = unitCnt * sizeof(unsigned int);
+        //allocate device mem
+        if (cudaSuccess != cudaMalloc((void**)&dev_vctr, memSize))
+          Logger::Fatal("Error allocating dev mem for dev_vctr: %s\n",
+                        cudaGetErrorString(cudaGetLastError()));
+
+        //copy vctr to device         
+        if (cudaSuccess != cudaMemcpy(dev_vctr, vctr, memSize,
+                                      cudaMemcpyHostToDevice))
+          Logger::Fatal("Error copying vctr to device: %s\n",
+                        cudaGetErrorString(cudaGetLastError()));
+        
+        //update device pointer       
+        dev_livePhysRegs[i].vctr_ = dev_vctr;
+      }
+      //delete vctr copy
+      delete[] vctr;
+    }
+    //update device pointer
+    ((BBWithSpill *)dev_rgn)->dev_livePhysRegs_[j] = dev_livePhysRegs;
+  }
+/*
   //copy sumOfLiveIntervalLengths to device
   int *dev_SLIL = NULL;
   memSize = regTypeCnt_ * sizeof(int);
@@ -1432,32 +1617,46 @@ void BBWithSpill::CopyPointersToDevice(SchedRegion* dev_rgn) {
 				cudaMemcpyHostToDevice))
     Logger::Fatal("Error updating dev_rgn->regPressures_: %s\n", 
 		  cudaGetErrorString(cudaGetLastError()));
+*/
 }
 
 void BBWithSpill::UpdateSpillInfoFromDevice(BBWithSpill *dev_rgn) {
-  //debug
-  printf("Updating BBWithSpill Spill Info\n");
-  
-  //dev_rgn = (BBWithSpill *)dev_rgn;  
-
   peakRegPressures_ = dev_rgn->peakRegPressures_;
   spillCosts_ = dev_rgn->spillCosts_;
   sumOfLiveIntervalLengths_ = dev_rgn->sumOfLiveIntervalLengths_;
   regPressures_ = dev_rgn->regPressures_;
-
-  //debug
-  printf("Done updating BBWithSpill Spill info\n");
 }
 
-void BBWithSpill::FreeDevicePointers() {
-  cudaFree(peakRegPressures_);
-  cudaFree(spillCosts_);
-  cudaFree(regPressures_);
-  cudaFree(sumOfLiveIntervalLengths_);
-  for (int i = 0; i < regTypeCnt_; i++) {
-    cudaFree(liveRegs_[i].vctr_);
-    cudaFree(livePhysRegs_[i].vctr_);
-  } 
-  cudaFree(liveRegs_);
-  cudaFree(livePhysRegs_);
+void BBWithSpill::FreeDevicePointers(int numThreads) {
+  for (int i = 0; i < numThreads; i++) {
+    cudaFree(dev_peakRegPressures_[i]);
+    cudaFree(dev_regPressures_[i]);
+    cudaFree(dev_spillCosts_[i]);
+    cudaFree(dev_sumOfLiveIntervalLengths_[i]);
+    for (int j = 0; j < regTypeCnt_; j++) {
+      cudaFree(dev_livePhysRegs_[i][j].vctr_);
+      cudaFree(dev_liveRegs_[i][j].vctr_);
+    }
+    cudaFree(dev_livePhysRegs_[i]);
+    cudaFree(dev_liveRegs_[i]);
+  }
+  cudaFree(dev_livePhysRegs_);
+  cudaFree(dev_liveRegs_);
+  cudaFree(dev_crntCycleNum_);
+  cudaFree(dev_crntSlotNum_);
+  cudaFree(dev_crntSpillCost_);
+  cudaFree(dev_crntStepNum_);
+  cudaFree(dev_peakSpillCost_);
+  cudaFree(dev_totSpillCost_);
+  cudaFree(dev_slilSpillCost_);
+  cudaFree(dev_dynamicSlilLowerBound_);
+  cudaFree(dev_schduldEntryInstCnt_);
+  cudaFree(dev_schduldExitInstCnt_);
+  cudaFree(dev_schduldInstCnt_);
+  cudaFree(dev_liveRegs_);
+  cudaFree(dev_livePhysRegs_);
+  cudaFree(dev_peakRegPressures_);
+  cudaFree(dev_regPressures_);
+  cudaFree(dev_spillCosts_);
+  cudaFree(dev_sumOfLiveIntervalLengths_);
 }

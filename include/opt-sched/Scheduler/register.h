@@ -32,13 +32,7 @@ public:
   __host__ __device__
   Register(int16_t type = 0, int num = 0, int physicalNumber = INVALID_VALUE);
 
-//#ifdef __CUDA_ARCH__
-  // use DeviceSet class on host and device instead of SmallPtrSet which
-  // does not work on device
   using InstSetType = DevicePtrSet<InstCount>;
-//#else
-  //using InstSetType = DevicePtrSet<InstCount>;
-//#endif
 
   __host__ __device__
   int16_t GetType() const;
@@ -129,6 +123,8 @@ public:
   // for reinitialization in the next region
   __device__
   void ResetLiveIntervals();
+  // Allocates a device array that holds values for each parallel thread
+  void AllocDevArrayForParallelACO(int numThreads);
   // Copies all array/objects to device and links them to device pointer
   void CopyPointersToDevice(Register *dev_reg);
   // Calls cudaFree on all arrays/objects that were allocated with cudaMalloc
@@ -140,6 +136,8 @@ private:
   int defCnt_;
   int useCnt_;
   int crntUseCnt_;
+  // Device array which holds a separate crntUseCnt_ for each thread
+  int *dev_crntUseCnt_;
   int crntLngth_;
   int physicalNumber_;
   BitVector conflicts_;

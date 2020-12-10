@@ -3,6 +3,8 @@
 
 using namespace llvm::opt_sched;
 
+#define GLOBALTID blockIdx.x * blockDim.x + threadIdx.x
+
 __host__ __device__
 int16_t Register::GetType() const { return type_; }
 
@@ -29,8 +31,13 @@ void Register::SetPhysicalNumber(int physicalNumber) {
 
 __host__ __device__
 bool Register::IsLive() const {
+#ifdef __CUDA_ARCH__
+  assert(dev_crntUseCnt_[GLOBALTID] <= useCnt_);
+  return dev_crntUseCnt_[GLOBALTID] < useCnt_;
+#else
   assert(crntUseCnt_ <= useCnt_);
   return crntUseCnt_ < useCnt_;
+#endif
 }
 
 bool Register::IsLiveIn() const { return liveIn_; }
@@ -43,7 +50,13 @@ void Register::SetIsLiveIn(bool liveIn) { liveIn_ = liveIn; }
 void Register::SetIsLiveOut(bool liveOut) { liveOut_ = liveOut; }
 
 __host__ __device__
-void Register::ResetCrntUseCnt() { crntUseCnt_ = 0; }
+void Register::ResetCrntUseCnt() { 
+#ifdef __CUDA_ARCH__
+  dev_crntUseCnt_[GLOBALTID] = 0;
+#else
+  crntUseCnt_ = 0;
+#endif
+}
 
 void Register::AddUse(const SchedInstruction *inst) {
   uses_.insert(inst->GetNum());
@@ -70,8 +83,6 @@ size_t Register::GetSizeOfDefList() const { return defs_.size(); }
 
 __device__
 void Register::ResetDefsAndUses() {
-  // Only called on device, but will not compile without
-  // macro since SmallPtrSet doesnt have a Reset() method
   defs_.Reset();
   defCnt_ = 0;
   uses_.Reset();
@@ -82,7 +93,13 @@ __device__ __host__
 int Register::GetCrntUseCnt() const { return crntUseCnt_; }
 
 __host__ __device__
-void Register::AddCrntUse() { crntUseCnt_++; }
+void Register::AddCrntUse() {
+#ifdef __CUDA_ARCH__
+  dev_crntUseCnt_[GLOBALTID]++;
+#else
+  crntUseCnt_++;
+#endif
+}
 
 void Register::DelCrntUse() { crntUseCnt_--; }
 
@@ -125,20 +142,12 @@ int Register::GetConflictCnt() const { return conflicts_.GetOneCnt(); }
 bool Register::IsSpillCandidate() const { return isSpillCnddt_; }
 
 bool Register::AddToInterval(const SchedInstruction *inst) {
-//#ifdef __CUDA_ARCH__
   return liveIntervalSet_.insert(inst->GetNum());
-//#else
-  //return liveIntervalSet_.insert(inst->GetNum()).second;
-//#endif
 }
 
 __host__ __device__
 bool Register::IsInInterval(const SchedInstruction *inst) const {
-//#ifdef __CUDA_ARCH__
   return liveIntervalSet_.contains(inst->GetNum());
-//#else
-  //return liveIntervalSet_.count(inst->GetNum()) != 0;
-//#endif
 }
 
 const Register::InstSetType &Register::GetLiveInterval() const {
@@ -146,20 +155,12 @@ const Register::InstSetType &Register::GetLiveInterval() const {
 }
 
 bool Register::AddToPossibleInterval(const SchedInstruction *inst) {
-//#ifdef __CUDA_ARCH__
   return possibleLiveIntervalSet_.insert(inst->GetNum());
-//#else
-  //return possibleLiveIntervalSet_.insert(inst->GetNum()).second;
-//#endif
 }
 
 __host__ __device__
 bool Register::IsInPossibleInterval(const SchedInstruction *inst) const {
-//#ifdef __CUDA_ARCH__
   return possibleLiveIntervalSet_.contains(inst->GetNum());
-//#else
-  //return possibleLiveIntervalSet_.count(inst->GetNum()) != 0;
-//#endif
 }
 
 const Register::InstSetType &Register::GetPossibleLiveInterval() const {
@@ -168,12 +169,15 @@ const Register::InstSetType &Register::GetPossibleLiveInterval() const {
 
 __device__
 void Register::ResetLiveIntervals() {
-  // Only called on device, but will not compile without
-  // macro since SmallPtrSet doesnt have a Reset() method
-//#ifdef __CUDA_ARCH__
   liveIntervalSet_.Reset();
   possibleLiveIntervalSet_.Reset();
-//#endif
+}
+
+void Register::AllocDevArrayForParallelACO(int numThreads) {
+  // Allocate dev array for crntUseCnt_
+  size_t memSize = sizeof(int) * numThreads;
+  if (cudaSuccess != cudaMalloc(&dev_crntUseCnt_, memSize))
+    Logger::Fatal("Failed to alloc dev array dev_crntUseCnt_");
 }
 
 void Register::CopyPointersToDevice(Register *dev_reg) {
@@ -264,6 +268,7 @@ void Register::FreeDevicePointers() {
   cudaFree(defs_.elmnt);
   cudaFree(liveIntervalSet_.elmnt);
   cudaFree(possibleLiveIntervalSet_.elmnt);
+  cudaFree(dev_crntUseCnt_);
 }
 
 __host__ __device__

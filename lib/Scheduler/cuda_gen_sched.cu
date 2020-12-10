@@ -8,6 +8,8 @@
 
 using namespace llvm::opt_sched;
 
+#define GLOBALTID blockIdx.x * blockDim.x + threadIdx.x
+
 __host__ __device__
 InstScheduler::InstScheduler(DataDepGraph *dataDepGraph, MachineModel *machMdl,
                              InstCount schedUprBound) {	
@@ -55,14 +57,14 @@ __host__ __device__
 void ConstrainedScheduler::ResetRsrvSlots_() {
   assert(includesUnpipelined_);
 #ifdef __CUDA_ARCH__
-  assert(dev_rsrvSlots_[threadIdx.x] != NULL);
+  assert(dev_rsrvSlots_[GLOBALTID] != NULL);
 
   for (int i = 0; i < issuRate_; i++) {
-    dev_rsrvSlots_[threadIdx.x][i].strtCycle = INVALID_VALUE;
-    dev_rsrvSlots_[threadIdx.x][i].endCycle = INVALID_VALUE;
+    dev_rsrvSlots_[GLOBALTID][i].strtCycle = INVALID_VALUE;
+    dev_rsrvSlots_[GLOBALTID][i].endCycle = INVALID_VALUE;
   }
 
-  dev_rsrvSlotCnt_[threadIdx.x] = 0;
+  dev_rsrvSlotCnt_[GLOBALTID] = 0;
 #else
   assert(rsrvSlots_ != NULL);
 
@@ -134,13 +136,13 @@ bool ConstrainedScheduler::Initialize_(InstCount trgtSchedLngth,
   }
 
 #ifdef __CUDA_ARCH__
-  dev_frstRdyLstPerCycle_[threadIdx.x][0]->InsrtElmnt(rootInst_->GetNum());
+  dev_frstRdyLstPerCycle_[GLOBALTID][0]->InsrtElmnt(rootInst_->GetNum());
   ResetRsrvSlots_();
-  dev_rsrvSlotCnt_[threadIdx.x] = 0;
-  dev_schduldInstCnt_[threadIdx.x] = 0;
-  dev_crntSlotNum_[threadIdx.x] = 0;
-  dev_crntRealSlotNum_[threadIdx.x] = 0;
-  dev_crntCycleNum_[threadIdx.x] = 0;
+  dev_rsrvSlotCnt_[GLOBALTID] = 0;
+  dev_schduldInstCnt_[GLOBALTID] = 0;
+  dev_crntSlotNum_[GLOBALTID] = 0;
+  dev_crntRealSlotNum_[GLOBALTID] = 0;
+  dev_crntCycleNum_[GLOBALTID] = 0;
 #else
   frstRdyLstPerCycle_[0]->InsrtElmnt(rootInst_->GetNum());
 
@@ -159,7 +161,7 @@ bool ConstrainedScheduler::Initialize_(InstCount trgtSchedLngth,
   InitNewCycle_();
 
 #ifdef __CUDA_ARCH__
-  ((BBWithSpill *)dev_rgn_[threadIdx.x])->Dev_InitForSchdulng();
+  ((BBWithSpill *)dev_rgn_)->Dev_InitForSchdulng();
 #else
   rgn_->InitForSchdulng();
 #endif
@@ -176,7 +178,7 @@ void ConstrainedScheduler::SchdulInst_(SchedInstruction *inst, InstCount) {
        crntScsr != NULL; crntScsr = inst->GetNxtScsr(&prdcsrNum)) {
     bool wasLastPrdcsr =
 #ifdef __CUDA_ARCH__
-        crntScsr->PrdcsrSchduld(prdcsrNum, dev_crntCycleNum_[threadIdx.x], scsrRdyCycle);
+        crntScsr->PrdcsrSchduld(prdcsrNum, dev_crntCycleNum_[GLOBALTID], scsrRdyCycle);
 #else
         crntScsr->PrdcsrSchduld(prdcsrNum, crntCycleNum_, scsrRdyCycle);
 #endif
@@ -195,7 +197,7 @@ void ConstrainedScheduler::SchdulInst_(SchedInstruction *inst, InstCount) {
       // Add this succesor to the first-ready list of the future cycle
       // in which we now know it will become ready
 #ifdef __CUDA_ARCH__
-      dev_frstRdyLstPerCycle_[threadIdx.x][scsrRdyCycle]->
+      dev_frstRdyLstPerCycle_[GLOBALTID][scsrRdyCycle]->
 	                    InsrtElmnt(crntScsr->GetNum());
 #else
       frstRdyLstPerCycle_[scsrRdyCycle]->InsrtElmnt(crntScsr->GetNum());
@@ -205,13 +207,13 @@ void ConstrainedScheduler::SchdulInst_(SchedInstruction *inst, InstCount) {
 
   if (inst->BlocksCycle()) {
 #ifdef __CUDA_ARCH__
-    dev_isCrntCycleBlkd_[threadIdx.x] = true;
+    dev_isCrntCycleBlkd_[GLOBALTID] = true;
 #else
     isCrntCycleBlkd_ = true;
 #endif
   }
 #ifdef __CUDA_ARCH__
-  dev_schduldInstCnt_[threadIdx.x]++;
+  dev_schduldInstCnt_[GLOBALTID]++;
 #else
   schduldInstCnt_++;
 #endif
@@ -252,11 +254,11 @@ void ConstrainedScheduler::DoRsrvSlots_(SchedInstruction *inst) {
 
   if (!inst->IsPipelined()) {
 #ifdef __CUDA_ARCH__
-    rsrvSlots_[dev_crntSlotNum_[threadIdx.x]].strtCycle = 
-	    dev_crntCycleNum_[threadIdx.x];
-    rsrvSlots_[dev_crntSlotNum_[threadIdx.x]].endCycle = 
-	    dev_crntCycleNum_[threadIdx.x] + inst->GetMaxLtncy() - 1;
-    dev_rsrvSlotCnt_[threadIdx.x]++;
+    rsrvSlots_[dev_crntSlotNum_[GLOBALTID]].strtCycle = 
+	    dev_crntCycleNum_[GLOBALTID];
+    rsrvSlots_[dev_crntSlotNum_[GLOBALTID]].endCycle = 
+	    dev_crntCycleNum_[GLOBALTID] + inst->GetMaxLtncy() - 1;
+    dev_rsrvSlotCnt_[GLOBALTID]++;
 #else
     if (rsrvSlots_ == NULL)
       AllocRsrvSlots_();
@@ -283,7 +285,7 @@ void ConstrainedScheduler::UndoRsrvSlots_(SchedInstruction *inst) {
 __host__ __device__
 bool InstScheduler::IsSchedComplete_() {
 #ifdef __CUDA_ARCH__
-  return dev_schduldInstCnt_[threadIdx.x] == totInstCnt_;
+  return dev_schduldInstCnt_[GLOBALTID] == totInstCnt_;
 #else
   return schduldInstCnt_ == totInstCnt_;
 #endif
@@ -292,12 +294,12 @@ bool InstScheduler::IsSchedComplete_() {
 __host__ __device__
 void ConstrainedScheduler::InitNewCycle_() {
 #ifdef __CUDA_ARCH__
-  assert(dev_crntSlotNum_[threadIdx.x] == 0 && 
-         dev_crntRealSlotNum_[threadIdx.x] == 0);
+  assert(dev_crntSlotNum_[GLOBALTID] == 0 && 
+         dev_crntRealSlotNum_[GLOBALTID] == 0);
   for (int i = 0; i < issuTypeCnt_; i++) {
-    dev_avlblSlotsInCrntCycle_[threadIdx.x][i] = slotsPerTypePerCycle_[i];
+    dev_avlblSlotsInCrntCycle_[GLOBALTID][i] = slotsPerTypePerCycle_[i];
   }
-  dev_isCrntCycleBlkd_[threadIdx.x] = false;
+  dev_isCrntCycleBlkd_[GLOBALTID] = false;
 #else
   assert(crntSlotNum_ == 0 && crntRealSlotNum_ == 0);
   for (int i = 0; i < issuTypeCnt_; i++) {
@@ -311,15 +313,15 @@ __host__ __device__
 bool ConstrainedScheduler::MovToNxtSlot_(SchedInstruction *inst) {
 #ifdef __CUDA_ARCH__
   // If we are currently in the last slot of the current cycle.
-  if (dev_crntSlotNum_[threadIdx.x] == (issuRate_ - 1)) {
-    dev_crntCycleNum_[threadIdx.x]++;
-    dev_crntSlotNum_[threadIdx.x] = 0;
-    dev_crntRealSlotNum_[threadIdx.x] = 0;
+  if (dev_crntSlotNum_[GLOBALTID] == (issuRate_ - 1)) {
+    dev_crntCycleNum_[GLOBALTID]++;
+    dev_crntSlotNum_[GLOBALTID] = 0;
+    dev_crntRealSlotNum_[GLOBALTID] = 0;
     return true;
   } else {
-    dev_crntSlotNum_[threadIdx.x]++;
+    dev_crntSlotNum_[GLOBALTID]++;
     if (inst && machMdl_->IsRealInst(inst->GetInstType()))
-      dev_crntRealSlotNum_[threadIdx.x]++;
+      dev_crntRealSlotNum_[GLOBALTID]++;
     return false;
   }
 #else
@@ -341,15 +343,15 @@ bool ConstrainedScheduler::MovToNxtSlot_(SchedInstruction *inst) {
 __host__ __device__
 bool ConstrainedScheduler::MovToPrevSlot_(int prevRealSlotNum) {
 #ifdef __CUDA_ARCH__
-  dev_crntRealSlotNum_[threadIdx.x] = prevRealSlotNum;
+  dev_crntRealSlotNum_[GLOBALTID] = prevRealSlotNum;
 
   // If we are currently in the last slot of the current cycle.
-  if (dev_crntSlotNum_[threadIdx.x] == 0) {
-    dev_crntCycleNum_[threadIdx.x]--;
-    dev_crntSlotNum_[threadIdx.x] = issuRate_ - 1;
+  if (dev_crntSlotNum_[GLOBALTID] == 0) {
+    dev_crntCycleNum_[GLOBALTID]--;
+    dev_crntSlotNum_[GLOBALTID] = issuRate_ - 1;
     return true;
   } else {
-    dev_crntSlotNum_[threadIdx.x]--;
+    dev_crntSlotNum_[GLOBALTID]--;
     // if (inst && machMdl_->IsRealInst(inst->GetInstType()))
     // crntRealSlotNum_--;
     return false;
@@ -411,24 +413,24 @@ bool ConstrainedScheduler::ChkInstLglty_(SchedInstruction *inst) const {
     //return false;
 #ifdef __CUDA_ARCH__
    // Account for instructions that block the whole cycle.
-  if (dev_isCrntCycleBlkd_[threadIdx.x])
+  if (dev_isCrntCycleBlkd_[GLOBALTID])
     return false;
   // Logger::Info("Cycle not blocked");
-  if (inst->BlocksCycle() && dev_crntSlotNum_[threadIdx.x] != 0)
+  if (inst->BlocksCycle() && dev_crntSlotNum_[GLOBALTID] != 0)
     return false;
   // Logger::Info("Does not block cycle");
-  if (includesUnpipelined_ && dev_rsrvSlots_[threadIdx.x] &&
-      dev_rsrvSlots_[threadIdx.x][dev_crntSlotNum_[threadIdx.x]].strtCycle != INVALID_VALUE &&
-      dev_crntCycleNum_[threadIdx.x] <= 
-      dev_rsrvSlots_[threadIdx.x][dev_crntSlotNum_[threadIdx.x]].endCycle) {
+  if (includesUnpipelined_ && dev_rsrvSlots_[GLOBALTID] &&
+      dev_rsrvSlots_[GLOBALTID][dev_crntSlotNum_[GLOBALTID]].strtCycle != INVALID_VALUE &&
+      dev_crntCycleNum_[GLOBALTID] <= 
+      dev_rsrvSlots_[GLOBALTID][dev_crntSlotNum_[GLOBALTID]].endCycle) {
     return false;
   }
 
   IssueType issuType = inst->GetIssueType();
   assert(issuType < issuTypeCnt_);
-  assert(dev_avlblSlotsInCrntCycle_[threadIdx.x][issuType] >= 0);
+  assert(dev_avlblSlotsInCrntCycle_[GLOBALTID][issuType] >= 0);
   // Logger::Info("avlblSlots = %d", avlblSlotsInCrntCycle_[issuType]);
-  return (dev_avlblSlotsInCrntCycle_[threadIdx.x][issuType] > 0);
+  return (dev_avlblSlotsInCrntCycle_[GLOBALTID][issuType] > 0);
 #else
   // Account for instructions that block the whole cycle.
   if (isCrntCycleBlkd_)
@@ -467,8 +469,8 @@ void ConstrainedScheduler::UpdtSlotAvlblty_(SchedInstruction *inst) {
   IssueType issuType = inst->GetIssueType();
   assert(issuType < issuTypeCnt_);
 #ifdef __CUDA_ARCH__
-  assert(dev_avlblSlotsInCrntCycle_[threadIdx.x][issuType] > 0);
-  dev_avlblSlotsInCrntCycle_[threadIdx.x][issuType]--;
+  assert(dev_avlblSlotsInCrntCycle_[GLOBALTID][issuType] > 0);
+  dev_avlblSlotsInCrntCycle_[GLOBALTID][issuType]--;
 #else
   assert(avlblSlotsInCrntCycle_[issuType] > 0);
   avlblSlotsInCrntCycle_[issuType]--;

@@ -46,11 +46,10 @@ class SchedRegion {
 public:
   // TODO(max): Document.
   SchedRegion(MachineModel *machMdl, MachineModel *dev_machMdl, 
-	      DataDepGraph *dataDepGraph, DataDepGraph **dev_maxDDG, 
-	      long rgnNum, int16_t sigHashSize, LB_ALG lbAlg, 
-	      SchedPriorities hurstcPrirts, SchedPriorities enumPrirts, 
-	      bool vrfySched, Pruning PruningStrategy, 
-	      SchedulerType HeurSchedType, 
+	      DataDepGraph *dataDepGraph, long rgnNum, int16_t sigHashSize, 
+	      LB_ALG lbAlg, SchedPriorities hurstcPrirts, 
+	      SchedPriorities enumPrirts, bool vrfySched, 
+	      Pruning PruningStrategy, SchedulerType HeurSchedType, 
 	      SPILL_COST_FUNCTION spillCostFunc = SCF_PERP);
   // Destroys the region. Must be overriden by child classes.
   virtual ~SchedRegion() {}
@@ -118,7 +117,7 @@ public:
   // Initialie variables for the second pass of the two-pass-optsched
   void InitSecondPass();
 
-  virtual void CopyPointersToDevice(SchedRegion* dev_rgn) = 0;
+  virtual void CopyPointersToDevice(SchedRegion* dev_rgn, int numThreads) = 0;
   __host__ __device__
   MachineModel *GetMM() { return machMdl_; }
 
@@ -168,8 +167,6 @@ private:
 protected:
   // The dependence graph of this region.
   DataDepGraph *dataDepGraph_;
-  // Pointer to device maxDDG
-  DataDepGraph **dev_maxDDG;
   // The machine model used by this region.
   MachineModel *machMdl_;
   // Pointer to machMdl_ on the device
@@ -191,8 +188,14 @@ protected:
 
   // TODO(max): Document.
   InstCount crntCycleNum_;
+  // pointer to a device array used to store crntCycleNum_ for
+  // each thread by parallel ACO
+  InstCount *dev_crntCycleNum_;
   // TODO(max): Document.
   InstCount crntSlotNum_;
+  // pointer to a device array used to store crntSlotNum_ for
+  // each thread by parallel ACO
+  InstCount *dev_crntSlotNum_;
 
   // protected accessors:
   SchedulerType GetHeuristicSchedulerType() const { return HeurSchedType_; }

@@ -193,7 +193,7 @@ protected:
   SchedRegion *rgn_;
   // pointer to a device array used to store rgn_ for
   // each thread by parallel ACO
-  SchedRegion **dev_rgn_;
+  SchedRegion *dev_rgn_;
 
   SchedPriorities prirts_;
 

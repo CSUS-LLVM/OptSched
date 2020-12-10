@@ -12,15 +12,18 @@ Last Update:  Jan. 2020
 #include "opt-sched/Scheduler/gen_sched.h"
 #include "opt-sched/Scheduler/device_vector.h"
 #include "llvm/ADT/ArrayRef.h"
-//#include "llvm/ADT/SmallVector.h"
 #include <memory>
 #include <cuda_runtime.h>
+#include <curand_kernel.h>
 
 namespace llvm {
 namespace opt_sched {
 
 typedef double pheremone_t;
-#define NUMTHREADS 32
+
+#define NUMBLOCKS 20
+#define NUMTHREADSPERBLOCK 128
+#define NUMTHREADS NUMBLOCKS * NUMTHREADSPERBLOCK
 
 struct Choice {
   SchedInstruction *inst;
@@ -31,8 +34,9 @@ class ACOScheduler : public ConstrainedScheduler {
 public:
   ACOScheduler(DataDepGraph *dataDepGraph, MachineModel *machineModel,
                InstCount upperBound, SchedPriorities priorities,
-               bool vrfySched, SchedRegion **dev_rgn, DataDepGraph *dev_DDG,
-	       DeviceVector<Choice> **dev_ready, MachineModel *dev_MM);
+               bool vrfySched, SchedRegion *dev_rgn, DataDepGraph *dev_DDG,
+	       DeviceVector<Choice> **dev_ready, MachineModel *dev_MM, 
+	       curandState_t *dev_states);
   __host__ __device__
   virtual ~ACOScheduler();
   FUNC_RESULT FindSchedule(InstSchedule *schedule, SchedRegion *region, 
@@ -94,6 +98,8 @@ private:
   DataDepGraph *dev_DDG_;
   DeviceVector<Choice> **dev_ready_;
   MachineModel *dev_MM_;
+  // Holds state for each thread for RNG
+  curandState_t *dev_states_;
 };
 
 } // namespace opt_sched

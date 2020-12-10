@@ -5,6 +5,7 @@
 // and device and contains methods to copy to device
 
 #define END -1
+#define GLOBALTID blockIdx.x * blockDim.x + threadIdx.x 
 
 // Base ArrayList class, replaces LinkedList
 template <typename T>
@@ -76,6 +77,7 @@ class ArrayList {
     int maxSize_;
     int size_;
     int crnt_;
+    int *dev_crnt_;
     T *elmnts_;
 };
 
@@ -125,6 +127,7 @@ class ArrayList<int> {
       maxSize_ = maxSize;
       size_ = 0;
       crnt_ = 0;
+      dev_crnt_ = NULL;
       elmnts_ = new int[maxSize_];
     }
 
@@ -149,17 +152,58 @@ class ArrayList<int> {
     // Returns first element, resets iterator
     __host__ __device__
     int GetFrstElmnt() {
+#ifdef __CUDA_ARCH__
+      if (dev_crnt_) {
+        dev_crnt_[GLOBALTID] = 0;
+
+        if (dev_crnt_[GLOBALTID] < size_)
+          return elmnts_[dev_crnt_[GLOBALTID]];
+        else
+          return END;
+      } else {
+        crnt_ = 0;
+  
+        if (crnt_ < size_)
+          return elmnts_[crnt_];
+        else
+          return END;
+      }
+#else
       crnt_ = 0;
   
       if (crnt_ < size_)
         return elmnts_[crnt_];
       else
         return END;
+#endif
     }
 
     // Returns next element in the array
     __host__ __device__
     int GetNxtElmnt() {
+#ifdef __CUDA_ARCH__
+      if (dev_crnt_) {
+        if (dev_crnt_[GLOBALTID] != size_)
+          dev_crnt_[GLOBALTID]++;
+        else
+          return END;
+
+        if (dev_crnt_[GLOBALTID] < size_ && dev_crnt_[GLOBALTID] >= 0)
+          return elmnts_[dev_crnt_[GLOBALTID]];
+        else
+          return END;
+      } else {
+        if (crnt_ != size_)
+          crnt_++;
+        else
+          return END;
+
+        if (crnt_ < size_ && crnt_ >= 0)
+          return elmnts_[crnt_];
+        else
+          return END;
+      }
+#else
       if (crnt_ != size_)
         crnt_++;
       else
@@ -169,10 +213,38 @@ class ArrayList<int> {
         return elmnts_[crnt_];
       else
         return END;
+#endif
     }
 
     __host__ __device__
     int GetNxtElmnt(int &indx) {
+#ifdef __CUDA_ARCH__
+      if (dev_crnt_) {
+        if (dev_crnt_[GLOBALTID] != size_)
+          dev_crnt_[GLOBALTID]++;
+        else
+          return END;
+
+        indx = dev_crnt_[GLOBALTID];
+
+        if (dev_crnt_[GLOBALTID] < size_ && dev_crnt_[GLOBALTID] >= 0)
+          return elmnts_[dev_crnt_[GLOBALTID]];
+        else
+          return END;
+      } else {
+        if (crnt_ != size_)
+          crnt_++;
+        else
+          return END;
+
+        indx = crnt_;
+
+        if (crnt_ < size_ && crnt_ >= 0)
+          return elmnts_[crnt_];
+        else
+          return END;
+      }
+#else
       if (crnt_ != size_)
         crnt_++;
       else
@@ -184,11 +256,35 @@ class ArrayList<int> {
         return elmnts_[crnt_];
       else
         return END;
+#endif
     }
 
     // Returns previous element in the array
     __host__ __device__
     int GetPrevElmnt() {
+#ifdef __CUDA_ARCH__
+      if (dev_crnt_) {
+        if (dev_crnt_[GLOBALTID] != 0)
+          dev_crnt_[GLOBALTID]--;
+        else
+          return END;
+
+        if (dev_crnt_[GLOBALTID] >= 0 && dev_crnt_[GLOBALTID] < size_)
+          return elmnts_[dev_crnt_[GLOBALTID]];
+        else
+          return END;
+      } else {
+        if (crnt_ != 0)
+          crnt_--;
+        else
+          return END;
+
+        if (crnt_ >= 0 && crnt_ < size_)
+          return elmnts_[crnt_];
+        else
+          return END;
+      }
+#else
       if (crnt_ != 0)
         crnt_--;
       else
@@ -198,17 +294,36 @@ class ArrayList<int> {
         return elmnts_[crnt_];
       else
         return END;
+#endif
     }
 
     // Returns last element in array
     __host__ __device__
     int GetLastElmnt() {
+#ifdef __CUDA_ARCH__
+      if (dev_crnt_) {
+        if (size_ > 0)
+          dev_crnt_[GLOBALTID] = size_ - 1;
+        else
+          return END;
+
+        return elmnts_[dev_crnt_[GLOBALTID]];
+      } else {
+        if (size_ > 0)
+          crnt_ = size_ - 1;
+        else
+          return END;
+
+        return elmnts_[crnt_];
+      }
+#else
       if (size_ > 0)
         crnt_ = size_ - 1;
       else 
 	return END;
 
       return elmnts_[crnt_];
+#endif
     }
 
     // Removes last element in array
@@ -225,7 +340,14 @@ class ArrayList<int> {
 
     __host__ __device__
     void ResetIterator() {
+#ifdef __CUDA_ARCH__
+      if (dev_crnt_)
+        dev_crnt_[GLOBALTID] = -1;
+      else
+        crnt_ = -1;
+#else
       crnt_ = -1;
+#endif
     }
 
     __host__ __device__
@@ -260,6 +382,7 @@ class ArrayList<int> {
     int maxSize_;
     int size_;
     int crnt_;
+    int *dev_crnt_;
     int *elmnts_;
 };
 
@@ -269,6 +392,7 @@ ArrayList<T>::ArrayList(int maxSize) {
   maxSize_ = maxSize;
   size_ = 0;
   crnt_ = 0;
+  dev_crnt_ = NULL;
   elmnts_ = new T[maxSize_];
 }
 
@@ -294,17 +418,58 @@ int ArrayList<T>::GetElmntCnt() {
 template <typename T>
 __host__ __device__
 T ArrayList<T>::GetFrstElmnt() {
+#ifdef __CUDA_ARCH__
+  if (dev_crnt_) {
+    dev_crnt_[GLOBALTID] = 0;
+
+    if (dev_crnt_[GLOBALTID] < size_)
+      return elmnts_[dev_crnt_[GLOBALTID]];
+    else
+      return NULL;
+  } else {
+    crnt_ = 0;
+
+    if (crnt_ < size_)
+      return elmnts_[crnt_];
+    else
+      return NULL;
+  }
+#else
   crnt_ = 0;
   
   if (crnt_ < size_)
     return elmnts_[crnt_];
   else
     return NULL;
+#endif
 }
 
 template <typename T>
 __host__ __device__
 T ArrayList<T>::GetNxtElmnt() {
+#ifdef __CUDA_ARCH__
+  if (dev_crnt_) {
+    if (dev_crnt_[GLOBALTID] != size_)
+      dev_crnt_[GLOBALTID]++;
+    else
+      return NULL;
+
+    if (dev_crnt_[GLOBALTID] < size_ && dev_crnt_[GLOBALTID] >= 0)
+      return elmnts_[dev_crnt_[GLOBALTID]];
+    else
+      return NULL;
+  } else {
+    if (crnt_ != size_)
+      crnt_++;
+    else
+      return NULL;
+
+    if (crnt_ < size_ && crnt_ >= 0)
+      return elmnts_[crnt_];
+    else
+      return NULL;
+  }
+#else
   if (crnt_ != size_)
     crnt_++;
   else
@@ -314,11 +479,39 @@ T ArrayList<T>::GetNxtElmnt() {
     return elmnts_[crnt_];
   else
     return NULL;
+#endif
 }
 
 template <typename T>
 __host__ __device__
 T ArrayList<T>::GetNxtElmnt(int &indx) {
+#ifdef __CUDA_ARCH__
+  if (dev_crnt_) {
+    if (dev_crnt_[GLOBALTID] != size_)
+      dev_crnt_[GLOBALTID]++;
+    else
+      return NULL;
+
+    indx = dev_crnt_[GLOBALTID];
+
+    if (dev_crnt_[GLOBALTID] < size_ && dev_crnt_[GLOBALTID] >= 0)
+      return elmnts_[dev_crnt_[GLOBALTID]];
+    else
+      return NULL;
+  } else {
+    if (crnt_ != size_)
+      crnt_++;
+    else
+      return NULL;
+
+    indx = crnt_;
+
+    if (crnt_ < size_ && crnt_ >= 0)
+      return elmnts_[crnt_];
+    else
+      return NULL;
+  }
+#else
   if (crnt_ != size_)
     crnt_++;
   else
@@ -330,11 +523,35 @@ T ArrayList<T>::GetNxtElmnt(int &indx) {
     return elmnts_[crnt_];
   else
     return NULL;
+#endif
 }
 
 template <typename T>
 __host__ __device__
 T ArrayList<T>::GetPrevElmnt() {
+#ifdef __CUDA_ARCH__
+  if (dev_crnt_) {
+    if (dev_crnt_[GLOBALTID] != 0)
+      dev_crnt_[GLOBALTID]--;
+    else
+      return NULL;
+
+    if (dev_crnt_[GLOBALTID] >= 0 && dev_crnt_[GLOBALTID] < size_)
+      return elmnts_[dev_crnt_[GLOBALTID]];
+    else
+      return NULL;
+  } else {
+    if (crnt_ != 0)
+      crnt_--;
+    else
+      return NULL;
+
+    if (crnt_ >= 0 && crnt_ < size_)
+      return elmnts_[crnt_];
+    else
+      return NULL;
+  }
+#else
   if (crnt_ != 0)
     crnt_--;
   else
@@ -344,17 +561,36 @@ T ArrayList<T>::GetPrevElmnt() {
     return elmnts_[crnt_];
   else
     return NULL;
+#endif
 }
 
 template <typename T>
 __host__ __device__
 T ArrayList<T>::GetLastElmnt() {
+#ifdef __CUDA_ARCH__
+  if (dev_crnt_) {
+    if (size_ > 0)
+      dev_crnt_[GLOBALTID] = size_ - 1;
+    else
+      return NULL;
+
+    return elmnts_[dev_crnt_[GLOBALTID]];
+  } else {
+    if (size_ > 0)
+      crnt_ = size_ - 1;
+    else
+      return NULL;
+
+    return elmnts_[crnt_];
+  }
+#else
   if (size_ > 0)
     crnt_ = size_ - 1;
   else
     return NULL;
   
   return elmnts_[crnt_];
+#endif
 }
 
 template <typename T>
@@ -373,7 +609,14 @@ void ArrayList<T>::Reset() {
 template <typename T>
 __host__ __device__
 void ArrayList<T>::ResetIterator() {
+#ifdef __CUDA_ARCH__
+  if (dev_crnt_)
+    dev_crnt_[GLOBALTID] = -1;
+  else
+    crnt_ = -1;
+#else
   crnt_ = -1;
+#endif
 }
 
 template <typename T>

@@ -290,6 +290,7 @@ public:
 private:
   // The node number. Should be unique within a single graph.
   UDT_GNODES num_;
+/*
   // A list of the immediate successors of this node.
   PriorityArrayList<GraphEdge *> *scsrLst_;
   // A list of the immediate predecessors of this node.
@@ -299,6 +300,7 @@ private:
   ArrayList<InstCount> *rcrsvScsrLst_;
   // A list of all recursively predecessors of this node.
   ArrayList<InstCount> *rcrsvPrdcsrLst_;
+*/  
   // A bitset indicating whether each of the other nodes in the graph is a
   // recursive successor of this node.
   BitVector *isRcrsvScsr_;
@@ -319,6 +321,15 @@ private:
   GNODE_COLOR color_;
 
 protected:
+  // A list of the immediate successors of this node.
+  PriorityArrayList<GraphEdge *> *scsrLst_;
+  // A list of the immediate predecessors of this node.
+  ArrayList<GraphEdge *> *prdcsrLst_;
+
+  // A list of all recursively successors of this node.
+  ArrayList<InstCount> *rcrsvScsrLst_;
+  // A list of all recursively predecessors of this node.
+  ArrayList<InstCount> *rcrsvPrdcsrLst_;
   // A pointer to the full array of instructions. Needed in order to save
   // succs/preds and GraphEdge pointers as instNums instead. This allows for
   // much faster copying to the Device
