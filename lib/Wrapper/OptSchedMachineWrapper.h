@@ -97,7 +97,7 @@ public:
   void generateProcessorData(std::string *mdlName_, int *issueRate_);
 
 private:
-  std::vector<std::string> resourceIdToIssueType;
+  std::vector<std::string> ResourceIdToIssueType;
   const llvm::ScheduleDAGInstrs *DAG;
   MachineModel *MM;
 };

@@ -163,7 +163,7 @@ public:
   // Add a new instruction type.
   void AddInstType(InstTypeInfo &instTypeInfo);
   // Add a new issue type.
-  void AddIssueType(IssueTypeInfo &issueTypeInfo);
+  void addIssueType(IssueTypeInfo &IssueTypeInfo);
 
 protected:
   // Creates an uninitialized machine model. For use by subclasses.
