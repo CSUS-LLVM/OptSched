@@ -59,6 +59,7 @@ ACOScheduler::ACOScheduler(DataDepGraph *dataDepGraph,
   decay_factor = schedIni.GetFloat("ACO_DECAY_FACTOR");
   ants_per_iteration = schedIni.GetInt("ACO_ANT_PER_ITERATION");
   print_aco_trace = schedIni.GetBool("ACO_TRACE");
+  IsTwoPassEn = schedIni.GetBool("USE_TWO_PASS");
 
   // pheromone Graph Debugging start
   std::string TgtRgns = schedIni.GetString("ACO_DBG_REGIONS");
@@ -125,11 +126,13 @@ bool ACOScheduler::shouldReplaceSchedule(InstSchedule *OldSched,
     return true;
   else if (!NewSched)
     return false;
-  else if (!rgn_->IsSecondPass())
+  else if (!IsTwoPassEn)
     return NewSched->GetCost() < OldSched->GetCost();
+  else if (!rgn_->IsSecondPass())
+    return NewSched->GetNormSpillCost() < OldSched->GetNormSpillCost();
   else
-    return (NewSched->GetSpillCost() <= OldSched->GetSpillCost()) &&
-           (NewSched->GetCost() < OldSched->GetCost());
+    return (NewSched->GetNormSpillCost() <= OldSched->GetNormSpillCost()) &&
+           (NewSched->GetExecCost() < OldSched->GetExecCost());
 }
 
 Choice ACOScheduler::SelectInstruction(const llvm::ArrayRef<Choice> &ready,

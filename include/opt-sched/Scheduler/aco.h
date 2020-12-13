@@ -86,6 +86,7 @@ private:
   std::unique_ptr<InstSchedule> InitialSchedule;
   bool VrfySched_;
   bool IsPostBB;
+  bool IsTwoPassEn;
   pheromone_t ScRelMax;
 };
 

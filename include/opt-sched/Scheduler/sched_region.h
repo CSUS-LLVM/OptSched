@@ -185,7 +185,7 @@ protected:
   InstCount ExecCostLwrBound_ = 0;
 
   // The STATIC absolute lower bound for register pressure/spill cost
-  // THIS LOWER BOUND IS NOT DYNAMIC.  It is used to ge the static normalized
+  // THIS LOWER BOUND IS NOT DYNAMIC.  It is used to get the static normalized
   // cost of a schedule
   InstCount RpCostLwrBound_ = 0;
 
