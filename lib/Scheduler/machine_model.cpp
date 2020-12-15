@@ -205,6 +205,10 @@ void MachineModel::AddInstType(InstTypeInfo &instTypeInfo) {
   instTypes_.push_back(std::move(instTypeInfo));
 }
 
+void MachineModel::addIssueType(IssueTypeInfo &IssueTypeInfo) {
+  issueTypes_.push_back(std::move(IssueTypeInfo));
+}
+
 InstType MachineModel::getDefaultInstType() const {
   return GetInstTypeByName("Default");
 }

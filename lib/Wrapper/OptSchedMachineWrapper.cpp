@@ -48,16 +48,25 @@ createCortexA7MMGenerator(const llvm::ScheduleDAGInstrs *dag,
   return make_unique<CortexA7MMGenerator>(dag, mm);
 }
 
+std::unique_ptr<MachineModelGenerator>
+createCortexA53MMGenerator(const llvm::ScheduleDAGInstrs *dag,
+                           MachineModel *mm) {
+  return make_unique<CortexA53MMGenerator>(dag, mm);
+}
+
 } // end anonymous namespace
 
 OptSchedMachineModel::OptSchedMachineModel(const char *configFile)
     : MachineModel(configFile), shouldGenerateMM(false), MMGen(nullptr) {}
 
 void OptSchedMachineModel::convertMachineModel(
-    const ScheduleDAGInstrs &dag, const RegisterClassInfo *regClassInfo) {
-  const TargetMachine &target = dag.TM;
+    const ScheduleDAGInstrs &Dag, const RegisterClassInfo *RegClassInfo) {
+  const TargetMachine &Target = Dag.TM;
+  const TargetSchedModel *LLVMSchedModel = Dag.getSchedModel();
+  const TargetSubtargetInfo *SubtargetInfo = LLVMSchedModel->getSubtargetInfo();
+  std::string ExactCPU = SubtargetInfo->getCPU().str();
 
-  mdlName_ = target.getTarget().getName();
+  mdlName_ = Target.getTarget().getName();
 
   LLVM_DEBUG(dbgs() << "Machine model: " << mdlName_.c_str() << '\n');
 
@@ -67,10 +76,13 @@ void OptSchedMachineModel::convertMachineModel(
 
   if (shouldGenerateMM) {
     if (mdlName_ == "ARM-Cortex-A7")
-      MMGen = createCortexA7MMGenerator(&dag, this);
+      MMGen = createCortexA7MMGenerator(&Dag, this);
+    else if (ExactCPU == "cortex-a53")
+      MMGen = createCortexA53MMGenerator(&Dag, this);
     else
-      Logger::Error("Could not find machine model generator for target \"%s\"",
-                    mdlName_.c_str());
+      llvm::report_fatal_error(
+          "Could not find machine model generator for target " + mdlName_,
+          false);
   }
 
   InstTypeInfo instType;
@@ -108,11 +120,11 @@ void OptSchedMachineModel::convertMachineModel(
     VGPR32.count = 24;
     registerTypes_.push_back(VGPR32);
   } else {
-    const auto *TRI = dag.TRI;
+    const auto *TRI = Dag.TRI;
     for (unsigned pSet = 0; pSet < TRI->getNumRegPressureSets(); ++pSet) {
       RegTypeInfo regType;
       regType.name = TRI->getRegPressureSetName(pSet);
-      int pressureLimit = regClassInfo->getRegPressureSetLimit(pSet);
+      int pressureLimit = RegClassInfo->getRegPressureSetLimit(pSet);
       // set registers with 0 limit to 1 to support flags and special cases
       if (pressureLimit > 0)
         regType.count = pressureLimit;
@@ -121,6 +133,10 @@ void OptSchedMachineModel::convertMachineModel(
       registerTypes_.push_back(regType);
     }
   }
+
+  // initialize other MM non-instruction specific info if appropriate
+  if (shouldGenerateMM && MMGen->generatesAllData())
+    MMGen->generateProcessorData(&mdlName_, &issueRate_);
 }
 
 CortexA7MMGenerator::CortexA7MMGenerator(const llvm::ScheduleDAGInstrs *dag,
@@ -199,6 +215,84 @@ InstType CortexA7MMGenerator::generateInstrType(const MachineInstr *instr) {
 
     // Add the new instruction type
     MM->AddInstType(InstTypeI);
-    return MM->GetInstTypeByName(InstTypeI.name);
+    return MM->GetInstTypeByName(instrName);
+  }
+}
+
+void CortexA53MMGenerator::generateProcessorData(std::string *mdlName_,
+                                                 int *issueRate_) {
+  const TargetSchedModel *LLVMSchedModel = DAG->getSchedModel();
+  const TargetSubtargetInfo *SubtargetInfo = LLVMSchedModel->getSubtargetInfo();
+  std::string ExactCPU = SubtargetInfo->getCPU().str();
+
+  *mdlName_ = ExactCPU;
+  *issueRate_ = LLVMSchedModel->getIssueWidth();
+
+  unsigned FUTypesCount = LLVMSchedModel->getNumProcResourceKinds();
+  ResourceIdToIssueType.resize(FUTypesCount);
+  for (unsigned FUIdx = 1; FUIdx < FUTypesCount; FUIdx++) {
+    const MCProcResourceDesc *FUResource =
+        LLVMSchedModel->getProcResource(FUIdx);
+    ResourceIdToIssueType[FUIdx] = FUResource->Name;
+    IssueTypeInfo ITI{FUResource->Name, static_cast<int>(FUResource->NumUnits)};
+    MM->addIssueType(ITI);
+  }
+}
+
+InstType
+CortexA53MMGenerator::generateInstrType(const llvm::MachineInstr *instr) {
+  // Search in the machine model for an instType with this OpCode
+  const std::string InstrName = DAG->TII->getName(instr->getOpcode());
+  const InstType InstrType = MM->GetInstTypeByName(InstrName);
+
+  // If the machine model does not have instType with this OpCode name,
+  // generate a type for the instruction.
+  if (InstrType != INVALID_INST_TYPE)
+    return InstrType;
+  else {
+    const TargetSchedModel *LLVMSchedModel = DAG->getSchedModel();
+    const MCSchedClassDesc *MCDesc = LLVMSchedModel->resolveSchedClass(instr);
+
+    InstTypeInfo InstTypeI;
+    InstTypeI.name = InstrName;
+    // Most of the A53's instructions only use one FU (one uses 3 FUs and some
+    // use 0 FUs) we use the default issue type for instructions which use no FU
+    // If we were to see the 3 FU instruction then we assign it its first issue
+    // type (but I think the 3 FU inst is a type of branch isntruction that we
+    // never see)
+    const MCWriteProcResEntry *ResEntry =
+        LLVMSchedModel->getWriteProcResBegin(MCDesc);
+    if (ResEntry != LLVMSchedModel->getWriteProcResEnd(MCDesc)) {
+      std::string IssueTypeName =
+          ResourceIdToIssueType[ResEntry->ProcResourceIdx];
+      InstTypeI.issuType = MM->GetIssueTypeByName(IssueTypeName.c_str());
+      InstTypeI.pipelined = (ResEntry->Cycles == 1);
+    } else {
+      InstTypeI.issuType = MM->getDefaultIssueType();
+      InstTypeI.pipelined = true;
+    }
+    InstTypeI.ltncy = 1; // This field is never used
+    InstTypeI.isCntxtDep = false;
+    InstTypeI.sprtd = true;
+    InstTypeI.blksCycle = false;
+
+    Logger::Info(
+        "Adding new instruction type.\n"
+        "Name: %s\n"
+        "Is Context Dependent: %s\n"
+        "IssueType: %s (%d)\n"
+        "Latency: %d\n"
+        "Is Pipelined: %s\n"
+        "Supported: %s\n"
+        "Blocks Cycle: %s\n",
+        InstTypeI.name.c_str(), InstTypeI.isCntxtDep ? "True" : "False",
+        MM->GetIssueTypeNameByCode(InstTypeI.issuType), InstTypeI.issuType,
+        InstTypeI.ltncy, InstTypeI.pipelined ? "True" : "False",
+        InstTypeI.sprtd ? "True" : "False",
+        InstTypeI.blksCycle ? "True" : "False");
+
+    // Add the new instruction type
+    MM->AddInstType(InstTypeI);
+    return MM->GetInstTypeByName(InstrName);
   }
 }
