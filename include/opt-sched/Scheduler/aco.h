@@ -21,7 +21,7 @@ namespace opt_sched {
 
 typedef double pheremone_t;
 
-#define NUMBLOCKS 20
+#define NUMBLOCKS 1
 #define NUMTHREADSPERBLOCK 128
 #define NUMTHREADS NUMBLOCKS * NUMTHREADSPERBLOCK
 
@@ -100,6 +100,7 @@ private:
   MachineModel *dev_MM_;
   // Holds state for each thread for RNG
   curandState_t *dev_states_;
+  int returnLastInstCnt_;
 };
 
 } // namespace opt_sched

@@ -1023,18 +1023,21 @@ FUNC_RESULT SchedRegion::runACO(InstSchedule *ReturnSched,
   // **** Start Dev_ACO code **** //
   size_t memSize;
   // Copy DDG to device
-  Logger::Info("Copying DDG to device");
+  Logger::Info("Allocating SchedInstruction Arrays for Parallel ACO");
   // Allocate arrays for parallel ACO execution
   for (int i = 0; i < dataDepGraph_->GetInstCnt(); i++) {
     dataDepGraph_->GetInstByIndx(i)->AllocDevArraysForParallelACO(NUMTHREADS);
   }
+  Logger::Info("Allocating Register Arrays for Parallel ACO");
   RegisterFile *regFiles = dataDepGraph_->getRegFiles();
   for (int i = 0; i < dataDepGraph_->GetRegTypeCnt(); i++) {
     for (int j = 0; j < regFiles[i].GetRegCnt(); j++)
       regFiles[i].GetReg(j)->AllocDevArrayForParallelACO(NUMTHREADS);
   }
+  Logger::Info("Allocating BBWithSpill Arrays for Parallel ACO");
   ((BBWithSpill*)this)->AllocDevArraysForParallelACO(NUMTHREADS);
 
+  Logger::Info("Copying DDG and its Instruction to device");
   // Copy DDG and its objects to device
   DataDepGraph *dev_DDG;
   if (cudaSuccess != cudaMallocManaged(&dev_DDG, sizeof(DataDepGraph)))
@@ -1046,6 +1049,7 @@ FUNC_RESULT SchedRegion::runACO(InstSchedule *ReturnSched,
 
   dataDepGraph_->CopyPointersToDevice(dev_DDG);
   
+  Logger::Info("Copying BBWithSpill to Device");
   // Copy this(BBWithSpill) to device
   BBWithSpill *dev_rgn;
   memSize = sizeof(BBWithSpill);
@@ -1064,6 +1068,7 @@ FUNC_RESULT SchedRegion::runACO(InstSchedule *ReturnSched,
 
   CopyPointersToDevice(dev_rgn, NUMTHREADS);
 
+  Logger::Info("Creating and Copying ready arrays to device");
   // Create and copy an array of DeviceVector<Choice>* for use during scheduling
   DeviceVector<Choice> **host_ready = new DeviceVector<Choice> *[NUMTHREADS];
   Choice *dev_elmnts;
@@ -1100,6 +1105,7 @@ FUNC_RESULT SchedRegion::runACO(InstSchedule *ReturnSched,
                                 cudaMemcpyHostToDevice))
     Logger::Fatal("Failed to copy array of dev_ready's to device");
 
+  Logger::Info("Initializing states for cuRand");
   // Allocate dev_states for curand RNG and run curand_init() to initialize
   curandState_t *dev_states;
   memSize = sizeof(curandState_t) * NUMTHREADS;
@@ -1109,14 +1115,17 @@ FUNC_RESULT SchedRegion::runACO(InstSchedule *ReturnSched,
   InitCurand<<<NUMBLOCKS, NUMTHREADSPERBLOCK>>>(dev_states, 
 		                                unsigned(time(NULL)));
 
+  Logger::Info("Creating ACOScheduler");
   ACOScheduler *AcoSchdulr = new ACOScheduler(
       dataDepGraph_, machMdl_, abslutSchedUprBound_, hurstcPrirts_, vrfySched_,
       (SchedRegion *)dev_rgn, dev_DDG, dev_ready, dev_machMdl_, dev_states);
   AcoSchdulr->setInitialSched(InitSched);
 
   // Alloc dev arrays for parallel ACO
+  Logger::Info("Allocating ACOScheduler Arrays for Parallel ACO");
   AcoSchdulr->AllocDevArraysForParallelACO();
   // Copy ACOScheduler to device
+  Logger::Info("Copying ACOScheduler to device");
   ACOScheduler *dev_AcoSchdulr;
   memSize = sizeof(ACOScheduler);
   if (cudaSuccess != cudaMallocManaged(&dev_AcoSchdulr, memSize))
@@ -1128,6 +1137,7 @@ FUNC_RESULT SchedRegion::runACO(InstSchedule *ReturnSched,
 
   AcoSchdulr->CopyPointersToDevice(dev_AcoSchdulr);
 
+  Logger::Info("Launching scheduling");
   FUNC_RESULT Rslt = AcoSchdulr->FindSchedule(ReturnSched, this, dev_AcoSchdulr);
   dev_AcoSchdulr->FreeDevicePointers();
   cudaFree(dev_AcoSchdulr);

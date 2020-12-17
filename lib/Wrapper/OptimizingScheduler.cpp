@@ -228,6 +228,10 @@ ScheduleDAGOptSched::~ScheduleDAGOptSched() {
     Logger::Info("Deleting dev_MM");
     dev_MM->FreeDevicePointers();
     cudaFree(dev_MM);
+    // Required for mem leak testing on device
+    //cudaDeviceReset();
+    //Logger::Fatal("End of a device scheduled region");
+    //exit(1);
   }
 }
 

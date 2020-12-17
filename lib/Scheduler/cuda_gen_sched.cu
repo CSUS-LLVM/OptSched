@@ -87,10 +87,14 @@ ConstrainedScheduler::ConstrainedScheduler(DataDepGraph *dataDepGraph,
   // Allocate the array of first-ready lists - one list per cycle.
   assert(schedUprBound_ > 0);
   frstRdyLstPerCycle_ = new ArrayList<InstCount> *[schedUprBound_];
+  frstRdyLstPerCycle_[0] = new ArrayList<InstCount>(dataDepGraph_->GetInstCnt());
 
-  for (InstCount i = 0; i < schedUprBound_; i++) {
-    frstRdyLstPerCycle_[i] = new ArrayList<InstCount>(dataDepGraph_->GetInstCnt());
+  for (InstCount i = 1; i < schedUprBound_; i++) {
+    frstRdyLstPerCycle_[i] = NULL;
   }
+
+  dev_prevFrstRdyLstPerCycle_ = NULL;
+  dev_frstRdyLstPerCycle_ = NULL;
 
   rdyLst_ = NULL;
   crntSched_ = NULL;
@@ -109,15 +113,9 @@ ConstrainedScheduler::ConstrainedScheduler(DataDepGraph *dataDepGraph,
 
 __host__ __device__
 ConstrainedScheduler::~ConstrainedScheduler() {
-/*
   if (crntCycleNum_ < schedUprBound_ &&
       frstRdyLstPerCycle_[crntCycleNum_] != NULL) {
     delete frstRdyLstPerCycle_[crntCycleNum_];
-  }
-*/
-  for (InstCount i = 0; i < schedUprBound_; i++) {
-    if (frstRdyLstPerCycle_[i])
-      delete frstRdyLstPerCycle_[i];
   }
   delete[] frstRdyLstPerCycle_;
   delete[] avlblSlotsInCrntCycle_;
@@ -136,6 +134,13 @@ bool ConstrainedScheduler::Initialize_(InstCount trgtSchedLngth,
   }
 
 #ifdef __CUDA_ARCH__
+  if (dev_prevFrstRdyLstPerCycle_)
+    dev_prevFrstRdyLstPerCycle_[GLOBALTID]->Reset();
+  if (dev_frstRdyLstPerCycle_) {
+    for (int i = 0; i < dataDepGraph_->GetMaxLtncy(); i++)
+      dev_frstRdyLstPerCycle_[GLOBALTID][i]->Reset();
+  }
+
   dev_frstRdyLstPerCycle_[GLOBALTID][0]->InsrtElmnt(rootInst_->GetNum());
   ResetRsrvSlots_();
   dev_rsrvSlotCnt_[GLOBALTID] = 0;
@@ -171,50 +176,58 @@ bool ConstrainedScheduler::Initialize_(InstCount trgtSchedLngth,
 
 __host__ __device__
 void ConstrainedScheduler::SchdulInst_(SchedInstruction *inst, InstCount) {
+#ifdef __CUDA_ARCH__  // Device version
+  InstCount prdcsrNum, scsrRdyCycle, scsrRdyListNum;
+
+  // Notify each successor of this instruction that it has been scheduled.
+  for (SchedInstruction *crntScsr = inst->GetFrstScsr(&prdcsrNum);
+       crntScsr != NULL; crntScsr = inst->GetNxtScsr(&prdcsrNum)) {
+    bool wasLastPrdcsr =
+        crntScsr->PrdcsrSchduld(prdcsrNum, dev_crntCycleNum_[GLOBALTID], scsrRdyCycle);
+
+    if (wasLastPrdcsr) {
+      // If all other predecessors of this successor have been scheduled then
+      // we now know in which cycle this successor will become ready.
+      assert(scsrRdyCycle < schedUprBound_);
+      // Add this succesor to the first-ready list of the future cycle
+      // in which we now know it will become ready
+      scsrRdyListNum = scsrRdyCycle - dev_crntCycleNum_[GLOBALTID];
+      dev_frstRdyLstPerCycle_[GLOBALTID][scsrRdyListNum]->
+	                                          InsrtElmnt(crntScsr->GetNum());
+    }
+  }
+
+  if (inst->BlocksCycle()) {
+    dev_isCrntCycleBlkd_[GLOBALTID] = true;
+  }
+  dev_schduldInstCnt_[GLOBALTID]++;
+#else  // Host version
   InstCount prdcsrNum, scsrRdyCycle;
 
   // Notify each successor of this instruction that it has been scheduled.
   for (SchedInstruction *crntScsr = inst->GetFrstScsr(&prdcsrNum);
        crntScsr != NULL; crntScsr = inst->GetNxtScsr(&prdcsrNum)) {
     bool wasLastPrdcsr =
-#ifdef __CUDA_ARCH__
-        crntScsr->PrdcsrSchduld(prdcsrNum, dev_crntCycleNum_[GLOBALTID], scsrRdyCycle);
-#else
         crntScsr->PrdcsrSchduld(prdcsrNum, crntCycleNum_, scsrRdyCycle);
-#endif
 
     if (wasLastPrdcsr) {
       // If all other predecessors of this successor have been scheduled then
       // we now know in which cycle this successor will become ready.
       assert(scsrRdyCycle < schedUprBound_);
-/*
       // If the first-ready list of that cycle has not been created yet.
       if (frstRdyLstPerCycle_[scsrRdyCycle] == NULL) {
-        frstRdyLstPerCycle_[scsrRdyCycle] = 
-		new ArrayList<InstCount>(dataDepGraph_->GetInstCnt());
+        frstRdyLstPerCycle_[scsrRdyCycle] =
+                new ArrayList<InstCount>(dataDepGraph_->GetInstCnt());
       }
-*/
       // Add this succesor to the first-ready list of the future cycle
       // in which we now know it will become ready
-#ifdef __CUDA_ARCH__
-      dev_frstRdyLstPerCycle_[GLOBALTID][scsrRdyCycle]->
-	                    InsrtElmnt(crntScsr->GetNum());
-#else
       frstRdyLstPerCycle_[scsrRdyCycle]->InsrtElmnt(crntScsr->GetNum());
-#endif
     }
   }
 
   if (inst->BlocksCycle()) {
-#ifdef __CUDA_ARCH__
-    dev_isCrntCycleBlkd_[GLOBALTID] = true;
-#else
     isCrntCycleBlkd_ = true;
-#endif
   }
-#ifdef __CUDA_ARCH__
-  dev_schduldInstCnt_[GLOBALTID]++;
-#else
   schduldInstCnt_++;
 #endif
 }
@@ -375,14 +388,21 @@ bool ConstrainedScheduler::MovToPrevSlot_(int prevRealSlotNum) {
 
 __host__ __device__
 void ConstrainedScheduler::CleanupCycle_(InstCount cycleNum) {
-/*  if (frstRdyLstPerCycle_[cycleNum] != NULL) {
 #ifdef __CUDA_ARCH__
-    //free(frstRdyLstPerCycle_[cycleNum]);
+/*  //prevFrstRdyLstPerCycle_->Reset();
+  // crnt becomes prev
+  ArrayList<InstCount> *temp = dev_prevFrstRdyLstPerCycle_[GLOBALTID];
+  dev_prevFrstRdyLstPerCycle_[GLOBALTID] = 
+	  dev_crntFrstRdyLstPerCycle_[GLOBALTID];
+
+  dev_crntFrstRdyLstPerCycle_[GLOBALTID] = temp;
+  */
 #else
+  if (frstRdyLstPerCycle_[cycleNum] != NULL) {
     delete frstRdyLstPerCycle_[cycleNum];
-#endif
     frstRdyLstPerCycle_[cycleNum] = NULL;
-  }*/
+  }
+#endif
 }
 
 __host__ __device__

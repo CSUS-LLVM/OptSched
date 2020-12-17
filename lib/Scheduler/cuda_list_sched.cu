@@ -272,7 +272,7 @@ void ListScheduler::UpdtRdyLst_(InstCount cycleNum, int slotNum) {
   InstCount prevCycleNum = cycleNum - 1;
   ArrayList<InstCount> *lst1 = NULL;
 #ifdef __CUDA_ARCH__
-  ArrayList<InstCount> *lst2 = dev_frstRdyLstPerCycle_[threadIdx.x][cycleNum];
+  ArrayList<InstCount> *lst2 = NULL;//dev_frstRdyLstPerCycle_[threadIdx.x][cycleNum];
 #else
   ArrayList<InstCount> *lst2 = frstRdyLstPerCycle_[cycleNum];
 #endif
@@ -286,7 +286,7 @@ void ListScheduler::UpdtRdyLst_(InstCount cycleNum, int slotNum) {
     // ready in the previous cycle due to a zero latency of the instruction
     // scheduled in the very last slot of that cycle [GOS 9.8.02].
 #ifdef __CUDA_ARCH__
-    lst1 = dev_frstRdyLstPerCycle_[threadIdx.x][prevCycleNum];
+    lst1 = NULL;//dev_frstRdyLstPerCycle_[threadIdx.x][prevCycleNum];
 #else
     lst1 = frstRdyLstPerCycle_[prevCycleNum];
 #endif

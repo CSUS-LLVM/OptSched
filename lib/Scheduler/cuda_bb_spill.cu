@@ -1444,50 +1444,7 @@ void BBWithSpill::AllocDevArraysForParallelACO(int numThreads) {
 }
 
 void BBWithSpill::CopyPointersToDevice(SchedRegion* dev_rgn, int numThreads) {
-  //copy peakRegPressures_ to device
-  //InstCount *dev_peakRegPressures = NULL;
   size_t memSize;
-  //allocate device mem
- /* memSize = regTypeCnt_ * sizeof(InstCount);
-  if (cudaSuccess != cudaMallocManaged(&dev_peakRegPressures, memSize))
-    Logger::Fatal("Error allocating dev mem for dev_peakRegPressures: %s\n", 
-	          cudaGetErrorString(cudaGetLastError()));
-
-  //copy array to device
-  if (cudaSuccess != cudaMemcpy(dev_peakRegPressures, peakRegPressures_, 
-			        memSize, cudaMemcpyHostToDevice))
-    Logger::Fatal("Error copying peakRegPressures to device: %s\n", 
-		  cudaGetErrorString(cudaGetLastError()));
-
-  //update device pointer
-  if (cudaSuccess != cudaMemcpy(&(((BBWithSpill *)dev_rgn)->peakRegPressures_),
-			        &dev_peakRegPressures, sizeof(InstCount *), 
-				cudaMemcpyHostToDevice))
-    Logger::Fatal("Error updating dev_rgn->peakRegPressures_: %s\n", 
-		  cudaGetErrorString(cudaGetLastError()));
-*/
-  //copy spillCosts_ to device
-  /*
-  InstCount *dev_spillCosts = NULL;
-  memSize = dataDepGraph_->GetInstCnt() * sizeof(InstCount);
-  //allocate dev mem
-  if (cudaSuccess != cudaMallocManaged((void**)&dev_spillCosts, memSize))
-    Logger::Fatal("Error allocating dev mem for dev_spillCosts: %s\n", 
-		  cudaGetErrorString(cudaGetLastError()));
-
-  //copy array to device
-  if (cudaSuccess != cudaMemcpy(dev_spillCosts, spillCosts_, memSize, 
-			        cudaMemcpyHostToDevice))
-    Logger::Fatal("Error copying spillCosts_ to device: %s\n", 
-		  cudaGetErrorString(cudaGetLastError()));
-
-  //update device pointer
-  if (cudaSuccess != cudaMemcpy(&(((BBWithSpill *)dev_rgn)->spillCosts_), 
-			        &dev_spillCosts, sizeof(InstCount *), 
-				cudaMemcpyHostToDevice))
-    Logger::Fatal("Error updating dev_rgn->spillCosts_: %s\n", 
-		  cudaGetErrorString(cudaGetLastError()));
-*/
   //copy liveRegs to device
   WeightedBitVector *dev_liveRegs;
   unsigned int *vctr = NULL;
@@ -1576,48 +1533,6 @@ void BBWithSpill::CopyPointersToDevice(SchedRegion* dev_rgn, int numThreads) {
     //update device pointer
     ((BBWithSpill *)dev_rgn)->dev_livePhysRegs_[j] = dev_livePhysRegs;
   }
-/*
-  //copy sumOfLiveIntervalLengths to device
-  int *dev_SLIL = NULL;
-  memSize = regTypeCnt_ * sizeof(int);
-  //allocate device memory
-  if (cudaSuccess != cudaMallocManaged((void**)&dev_SLIL, memSize))
-    Logger::Fatal("Error allocating dev mem for dev_SLIL: %s\n", 
-		  cudaGetErrorString(cudaGetLastError()));
-
-  //copy sumOfLiveIntervalLengths to device
-  if (cudaSuccess != cudaMemcpy(dev_SLIL, sumOfLiveIntervalLengths_, memSize, 
-			        cudaMemcpyHostToDevice))
-    Logger::Fatal("Error copying SLIL to device: %s\n", 
-		  cudaGetErrorString(cudaGetLastError()));
-
-  //update device pointer dev_rgn->sumOfLiveIntervalLengths
-  if (cudaSuccess != cudaMemcpy(&(((BBWithSpill *)dev_rgn)->sumOfLiveIntervalLengths_), 
-			        &dev_SLIL, sizeof(int *), cudaMemcpyHostToDevice))
-    Logger::Fatal("Error updating dev_rgn->SLIL: %s\n", 
-		  cudaGetErrorString(cudaGetLastError()));
-
-  //copy regPressures_ to device
-  unsigned *dev_regPressures = NULL;
-  memSize = regTypeCnt_ * sizeof(unsigned);
-  //allocate device memry
-  if (cudaSuccess != cudaMallocManaged((void**)&dev_regPressures, memSize))
-    Logger::Fatal("Error allocating dev mem for dev_regPressures: %s\n", 
-		  cudaGetErrorString(cudaGetLastError()));
-
-  //copy regPressures_ to device
-  if (cudaSuccess != cudaMemcpy(dev_regPressures, regPressures_, memSize, 
-			        cudaMemcpyHostToDevice))
-    Logger::Fatal("Error copying regPressures_ to device: %s\n", 
-		  cudaGetErrorString(cudaGetLastError()));
-
-  //update device pointer dev_rgn->sumOfLiveIntervalLengths
-  if (cudaSuccess != cudaMemcpy(&(((BBWithSpill *)dev_rgn)->regPressures_), 
-			        &dev_regPressures, sizeof(unsigned *), 
-				cudaMemcpyHostToDevice))
-    Logger::Fatal("Error updating dev_rgn->regPressures_: %s\n", 
-		  cudaGetErrorString(cudaGetLastError()));
-*/
 }
 
 void BBWithSpill::UpdateSpillInfoFromDevice(BBWithSpill *dev_rgn) {

@@ -166,8 +166,19 @@ protected:
   // corresponding first-ready list of that cycle into the global sorted ready
   // list.
   ArrayList<InstCount> **frstRdyLstPerCycle_;
+  // old device impl
   // pointer to a device array used to store frstRdyLstPerCycle_ for 
   // each thread by parallel ACO
+  //ArrayList<InstCount> ***dev_frstRdyLstPerCycle_;
+  // New implementation of frstRdyLstPerCycle_ on device
+  // Only MAX LATENCY + 1 Array lists need to be allocated per schedule, 
+  // since creating and deleting objects on device should be avoided, we use the
+  // minimum number of array lists and reset them instead of deleting them.
+  // this represents frstRdyLstPerCycle_[prevCycle], and holds one for each
+  // thread on device
+  ArrayList<InstCount> **dev_prevFrstRdyLstPerCycle_;
+  // This holds crntCycle to crntCycle+maxLatency frstRdyLists for each thread
+  // on device
   ArrayList<InstCount> ***dev_frstRdyLstPerCycle_;
 
   // An array holding the number of issue slots available for each issue type

@@ -142,9 +142,14 @@ ACOScheduler::SelectInstruction(DeviceVector<Choice> &ready,
 #endif
   if (use_tournament) {
     int POPULATION_SIZE = ready.size();
+#ifdef __CUDA_ARCH__
+    int r_pos = (int)(curand_uniform(&dev_states_[GLOBALTID]) * POPULATION_SIZE);
+    int s_pos = (int)(curand_uniform(&dev_states_[GLOBALTID]) * POPULATION_SIZE);
+#else
     int r_pos = (int)(RandDouble(0, 1) * POPULATION_SIZE);
     int s_pos = (int)(RandDouble(0, 1) * POPULATION_SIZE);
     //    int t_pos = (int) (RandDouble(0, 1) *POPULATION_SIZE);
+#endif
     Choice r = ready[r_pos];
     Choice s = ready[s_pos];
     //    Choice t = ready[t_pos];
@@ -165,7 +170,6 @@ ACOScheduler::SelectInstruction(DeviceVector<Choice> &ready,
     sum += Score(lastInst, choice);
 #ifdef __CUDA_ARCH__
   pheremone_t point = sum * (pheremone_t)(curand_uniform(&dev_states_[GLOBALTID]));
-  //printf("thread %d generated point = %f\n",GLOBALTID, point);
 #else
   pheremone_t point = RandDouble(0, sum);
 #endif
@@ -174,7 +178,11 @@ ACOScheduler::SelectInstruction(DeviceVector<Choice> &ready,
     if (point <= 0)
       return choice.inst;
   }
+#ifdef __CUDA_ARCH__
+  atomicAdd(&returnLastInstCnt_, 1);
+#else
   printf("returning last instruction\n");
+#endif
   assert(point < 0.001); // floats should not be this inaccurate
   return ready.back().inst;
 }
@@ -182,26 +190,19 @@ ACOScheduler::SelectInstruction(DeviceVector<Choice> &ready,
 __host__ __device__
 InstSchedule *ACOScheduler::FindOneSchedule(InstSchedule *dev_schedule, 
 		                            DeviceVector<Choice> *dev_ready) {
+#ifdef __CUDA_ARCH__ // device version of function
   SchedInstruction *lastInst = NULL;
   InstSchedule *schedule;
   if (!dev_schedule)
     schedule = new InstSchedule(machMdl_, dataDepGraph_, true);
   else
     schedule = dev_schedule;
-#ifdef __CUDA_ARCH__
+
   InstCount maxPriority = dev_rdyLst_[GLOBALTID]->MaxPriority();
-#else
-  InstCount maxPriority = rdyLst_->MaxPriority();
-#endif
   if (maxPriority == 0)
     maxPriority = 1; // divide by 0 is bad
   Initialize_();
-#ifdef __CUDA_ARCH__
   ((BBWithSpill *)dev_rgn_)->Dev_InitForSchdulng();
-#else
-  rgn_->InitForSchdulng();
-#endif
-
   DeviceVector<Choice> *ready;
   if (dev_ready)
     ready = dev_ready;
@@ -210,20 +211,10 @@ InstSchedule *ACOScheduler::FindOneSchedule(InstSchedule *dev_schedule,
   while (!IsSchedComplete_()) {
     // convert the ready list from a custom priority queue to a std::vector,
     // much nicer for this particular scheduler
-#ifdef __CUDA_ARCH__
     UpdtRdyLst_(dev_crntCycleNum_[GLOBALTID], dev_crntSlotNum_[GLOBALTID]);
-#else
-    UpdtRdyLst_(crntCycleNum_, crntSlotNum_);
-#endif
-   
     unsigned long heuristic;
-#ifdef __CUDA_ARCH__
     ready->reserve(dev_rdyLst_[GLOBALTID]->GetInstCnt());
     SchedInstruction *inst = dev_rdyLst_[GLOBALTID]->GetNextPriorityInst(heuristic);
-#else
-    ready->reserve(rdyLst_->GetInstCnt());
-    SchedInstruction *inst = rdyLst_->GetNextPriorityInst(heuristic);
-#endif
     while (inst != NULL) {
       if (ChkInstLglty_(inst)) {
         Choice c;
@@ -231,25 +222,108 @@ InstSchedule *ACOScheduler::FindOneSchedule(InstSchedule *dev_schedule,
         c.heuristic = (double)heuristic / maxPriority;
         ready->push_back(c);
       }
-#ifdef __CUDA_ARCH__
       inst = dev_rdyLst_[GLOBALTID]->GetNextPriorityInst(heuristic);
     }
     dev_rdyLst_[GLOBALTID]->ResetIterator();
-#else
+    inst = NULL;
+    if (!ready->empty())
+      inst = SelectInstruction(*ready, lastInst);
+      if (returnLastInstCnt_ > 0) {
+	if (GLOBALTID == 0) {
+	  printf("%d threads returned last instruction\n", returnLastInstCnt_);
+          returnLastInstCnt_ = 0;
+	}
+      }
+    if (inst != NULL) {
+#ifdef USE_ACS
+      // local pheremone decay
+      pheremone_t *pheremone = &Pheremone(lastInst, inst);
+      *pheremone = (1 - local_decay) * *pheremone + local_decay * initialValue_;
+#endif
+      lastInst = inst;
+    }
+
+    // boilerplate, mostly copied from ListScheduler, try not to touch it
+    InstCount instNum;
+    if (inst == NULL) {
+      instNum = SCHD_STALL;
+    } else {
+      instNum = inst->GetNum();
+      SchdulInst_(inst, dev_crntCycleNum_[GLOBALTID]);
+      inst->Schedule(dev_crntCycleNum_[GLOBALTID],
+                     dev_crntSlotNum_[GLOBALTID]);
+      ((BBWithSpill *)dev_rgn_)->Dev_SchdulInst(inst,
+                                            dev_crntCycleNum_[GLOBALTID],
+                                            dev_crntSlotNum_[GLOBALTID],
+                                            false);
+      DoRsrvSlots_(inst);
+      // this is annoying
+      SchedInstruction *blah = dev_rdyLst_[GLOBALTID]->GetNextPriorityInst();
+      while (blah != NULL && blah != inst) {
+        blah = dev_rdyLst_[GLOBALTID]->GetNextPriorityInst();
+      }
+      if (blah == inst)
+        dev_rdyLst_[GLOBALTID]->RemoveNextPriorityInst();
+      UpdtSlotAvlblty_(inst);
+    }
+    /* Logger::Info("Chose instruction %d (for some reason)", instNum); */
+    schedule->AppendInst(instNum);
+    if (MovToNxtSlot_(inst))
+      InitNewCycle_();
+    dev_rdyLst_[GLOBALTID]->ResetIterator();
+    ready->clear();
+    // Juggle frstRdyLists on device, prev falls out of scope, frstRdyList[0]
+    // becomes prev, 1 becomes 0 etc
+    int maxLatency = dataDepGraph_->GetMaxLtncy();
+    ArrayList<InstCount> * temp;
+    dev_prevFrstRdyLstPerCycle_[GLOBALTID]->Reset();
+    temp = dev_prevFrstRdyLstPerCycle_[GLOBALTID];
+    dev_prevFrstRdyLstPerCycle_[GLOBALTID] = 
+	            dev_frstRdyLstPerCycle_[GLOBALTID][0];
+    for (int i = 0; i < maxLatency; i++) {
+      dev_frstRdyLstPerCycle_[GLOBALTID][i] = 
+	      dev_frstRdyLstPerCycle_[GLOBALTID][i + 1];
+    }
+    dev_frstRdyLstPerCycle_[GLOBALTID][maxLatency] = temp;
+  }
+  dev_rgn_->UpdateScheduleCost(schedule);
+  return schedule;
+
+#else  // Host version of function
+  SchedInstruction *lastInst = NULL;
+  InstSchedule *schedule;
+  if (!dev_schedule)
+    schedule = new InstSchedule(machMdl_, dataDepGraph_, true);
+  else
+    schedule = dev_schedule;
+
+  InstCount maxPriority = rdyLst_->MaxPriority();
+  if (maxPriority == 0)
+    maxPriority = 1; // divide by 0 is bad
+  Initialize_();
+  rgn_->InitForSchdulng();
+  DeviceVector<Choice> *ready;
+  if (dev_ready)
+    ready = dev_ready;
+  else
+    ready = new DeviceVector<Choice>(dataDepGraph_->GetInstCnt());
+  while (!IsSchedComplete_()) {
+    // convert the ready list from a custom priority queue to a std::vector,
+    // much nicer for this particular scheduler
+    UpdtRdyLst_(crntCycleNum_, crntSlotNum_);
+    unsigned long heuristic;
+    ready->reserve(rdyLst_->GetInstCnt());
+    SchedInstruction *inst = rdyLst_->GetNextPriorityInst(heuristic);
+    while (inst != NULL) {
+      if (ChkInstLglty_(inst)) {
+        Choice c;
+        c.inst = inst;
+        c.heuristic = (double)heuristic / maxPriority;
+        ready->push_back(c);
+      }
       inst = rdyLst_->GetNextPriorityInst(heuristic);
     }
     rdyLst_->ResetIterator();
-#endif
-    // print out the ready list for debugging
-    /*
-     std::stringstream stream;
-     stream << "Ready list: ";
-    for (auto choice : ready) {
-      stream << choice.inst->GetNum() << ", ";
-    }
-    Logger::Info(stream.str().c_str());
-    */
-
     inst = NULL;
     if (!ready->empty())
       inst = SelectInstruction(*ready, lastInst);
@@ -268,30 +342,6 @@ InstSchedule *ACOScheduler::FindOneSchedule(InstSchedule *dev_schedule,
       instNum = SCHD_STALL;
     } else {
       instNum = inst->GetNum();
-#ifdef __CUDA_ARCH__
-      SchdulInst_(inst, dev_crntCycleNum_[GLOBALTID]);
-      inst->Schedule(dev_crntCycleNum_[GLOBALTID], 
-		     dev_crntSlotNum_[GLOBALTID]);
-      ((BBWithSpill *)dev_rgn_)->Dev_SchdulInst(inst, 
-	                                    dev_crntCycleNum_[GLOBALTID],
-					    dev_crntSlotNum_[GLOBALTID],
-					    false);
-      DoRsrvSlots_(inst);
-      // this is annoying
-      SchedInstruction *blah = dev_rdyLst_[GLOBALTID]->GetNextPriorityInst();
-      while (blah != NULL && blah != inst) {
-        blah = dev_rdyLst_[GLOBALTID]->GetNextPriorityInst();
-      }
-      if (blah == inst)
-        dev_rdyLst_[GLOBALTID]->RemoveNextPriorityInst();
-      UpdtSlotAvlblty_(inst);
-    }
-    /* Logger::Info("Chose instruction %d (for some reason)", instNum); */
-    schedule->AppendInst(instNum);
-    if (MovToNxtSlot_(inst))
-      InitNewCycle_();
-    dev_rdyLst_[GLOBALTID]->ResetIterator();
-#else
       SchdulInst_(inst, crntCycleNum_);
       inst->Schedule(crntCycleNum_, crntSlotNum_);
       rgn_->SchdulInst(inst, crntCycleNum_, crntSlotNum_, false);
@@ -310,15 +360,11 @@ InstSchedule *ACOScheduler::FindOneSchedule(InstSchedule *dev_schedule,
     if (MovToNxtSlot_(inst))
       InitNewCycle_();
     rdyLst_->ResetIterator();
-#endif
     ready->clear();
   }
-#ifdef __CUDA_ARCH__
-  dev_rgn_->UpdateScheduleCost(schedule);
-#else
   rgn_->UpdateScheduleCost(schedule);
-#endif
   return schedule;
+#endif
 }
 
 __global__
@@ -376,9 +422,11 @@ FUNC_RESULT ACOScheduler::FindSchedule(InstSchedule *schedule_out,
     //for (int i = 0; i < ants_per_iteration; i++) {
       
       // **** Start Dev_ACO code **** //
-      size_t memSize; 
+      size_t memSize;
+      Logger::Info("Updating Pheremones"); 
       CopyPheremonesToDevice(dev_AcoSchdulr);
       // Copy Schedule to device
+      Logger::Info("Creating and copying schedules to device");
       InstSchedule **dev_schedules;
       InstSchedule **host_schedules = new InstSchedule *[NUMTHREADS];
       InstSchedule **schedules = new InstSchedule *[NUMTHREADS];
@@ -534,40 +582,45 @@ void ACOScheduler::UpdatePheremone(InstSchedule *schedule) {
 
 // copied from Enumerator
 inline void ACOScheduler::UpdtRdyLst_(InstCount cycleNum, int slotNum) {
+#ifdef __CUDA_ARCH__ // Device version
   InstCount prevCycleNum = cycleNum - 1;
   ArrayList<InstCount> *lst1 = NULL;
-  #ifdef __CUDA_ARCH__
-  ArrayList<InstCount> *lst2 = dev_frstRdyLstPerCycle_[GLOBALTID][cycleNum];
-#else
-  ArrayList<InstCount> *lst2 = frstRdyLstPerCycle_[cycleNum];
-#endif
+  ArrayList<InstCount> *lst2 = dev_frstRdyLstPerCycle_[GLOBALTID][0];
 
   if (slotNum == 0 && prevCycleNum >= 0) {
     // If at the begining of a new cycle other than the very first cycle, then
     // we also have to include the instructions that might have become ready in
     // the previous cycle due to a zero latency of the instruction scheduled in
     // the very last slot of that cycle [GOS 9.8.02].
-#ifdef __CUDA_ARCH__
-    lst1 = dev_frstRdyLstPerCycle_[GLOBALTID][prevCycleNum];
+    lst1 = dev_prevFrstRdyLstPerCycle_[GLOBALTID];
 
-    if (lst1 != NULL) {
+    if (lst1->size_ > 0) {
       dev_rdyLst_[GLOBALTID]->AddList(lst1);
       lst1->Reset();
       //CleanupCycle_(prevCycleNum);
     }
   }
 
-  if (lst2 != NULL) {
+  if (lst2->size_ > 0) {
     dev_rdyLst_[GLOBALTID]->AddList(lst2);
     lst2->Reset();
   }
-#else
+#else  // Host version
+  InstCount prevCycleNum = cycleNum - 1;
+  ArrayList<InstCount> *lst1 = NULL;
+  ArrayList<InstCount> *lst2 = frstRdyLstPerCycle_[cycleNum];
+
+  if (slotNum == 0 && prevCycleNum >= 0) {
+    // If at the begining of a new cycle other than the very first cycle, then
+    // we also have to include the instructions that might have become ready in
+    // the previous cycle due to a zero latency of the instruction scheduled in
+    // the very last slot of that cycle [GOS 9.8.02].
     lst1 = frstRdyLstPerCycle_[prevCycleNum];
 
     if (lst1 != NULL) {
       rdyLst_->AddList(lst1);
       lst1->Reset();
-      //CleanupCycle_(prevCycleNum);
+      CleanupCycle_(prevCycleNum);
     }
   }
 
@@ -677,10 +730,18 @@ void ACOScheduler::AllocDevArraysForParallelACO() {
     if (cudaSuccess != cudaMalloc(&(dev_avlblSlotsInCrntCycle_[i]), memSize))
       Logger::Fatal("Fail alloc dev mem for dev_avlblSlotsInCrntCycle_[%d]",i);
   }
-  // Alloc dev array for frstRdyLstPerCycle_
+  // Alloc dev arrays for frstRdyLstPerCycle_
   memSize = sizeof(ArrayList<InstCount> **) * NUMTHREADS;
   if (cudaSuccess != cudaMallocManaged(&dev_frstRdyLstPerCycle_, memSize))
-    Logger::Fatal("Failed to alloc dev mem for dev_rfstRdyLstPerCycle_");
+    Logger::Fatal("Failed to alloc dev mem for dev_frstRdyLstPerCycle");
+  memSize = sizeof(ArrayList<InstCount> *) * NUMTHREADS;
+  if (cudaSuccess != cudaMallocManaged(&dev_prevFrstRdyLstPerCycle_, memSize))
+    Logger::Fatal("Failed to alloc dev mem for dev_prevFstRdyLstPerCycle_");
+  memSize = sizeof(ArrayList<InstCount> *) * (dataDepGraph_->GetMaxLtncy() + 1);
+  for (int i = 0; i < NUMTHREADS; i++) {
+    if (cudaSuccess != cudaMallocManaged(&dev_frstRdyLstPerCycle_[i], memSize))
+      Logger::Fatal("Failed to alloc dev mem for dev_frstRdyLstPerCycle %d", i);
+  }
   // Alloc dev arrays for rsrvSlots_
   memSize = sizeof(ReserveSlot *) * NUMTHREADS;
   if (cudaSuccess != cudaMallocManaged(&dev_rsrvSlots_, memSize))
@@ -749,44 +810,45 @@ void ACOScheduler::CopyPointersToDevice(ACOScheduler *dev_ACOSchedulr) {
   dev_ACOSchedulr->rootInst_ = dev_DDG_->GetRootInst();
   dev_ACOSchedulr->leafInst_ = dev_DDG_->GetLeafInst();
 
-  // Copy frstRdyLstPerCycle_, an array of ArrayLists
-  ArrayList<InstCount> **dev_frstRdyLstPerCycle;
-  for (int x = 0; x < NUMTHREADS; x++) {
-  memSize = sizeof(ArrayList<InstCount> *) * schedUprBound_;
-  if (cudaSuccess != cudaMallocManaged(&dev_frstRdyLstPerCycle, memSize))
-    Logger::Fatal("Failed to alloc dev mem for dev_frstRdyLstPerCycle");
+  // Copy frstRdyLstPerCycle_[0], an ArrayList, to dev_(prev/crnt)FrstRdyLst_
+  Logger::Info("Copying ACO frstRdyLstPerCycle_ Array lists");
+  for (int i = 0; i < NUMTHREADS; i++) {
+    // Copy each ArrayList to device
+    memSize = sizeof(ArrayList<InstCount>);
+    if (cudaSuccess != cudaMallocManaged(&dev_prevFrstRdyLstPerCycle_[i], memSize))
+      Logger::Fatal("Failed to alloc dev mem for dev_prevFrstRdyListPerCycle[%d]",
+                    i);
 
-  if (cudaSuccess != cudaMemcpy(dev_frstRdyLstPerCycle, frstRdyLstPerCycle_,
-			        memSize, cudaMemcpyHostToDevice))
-    Logger::Fatal("Failed to copy frstRdyLstPerCycle_ to device");
+    if (cudaSuccess != cudaMemcpy(dev_prevFrstRdyLstPerCycle_[i],
+                                  frstRdyLstPerCycle_[0], memSize,
+                                  cudaMemcpyHostToDevice))
+      Logger::Fatal("Failed to copy dev_prevFrstRdyLstPerCycle_[%d]", i);
 
-  // Copy each ArrayList to device
-  for (int i = 0; i < schedUprBound_; i++) {
-      if (frstRdyLstPerCycle_[i]) {
-        memSize = sizeof(ArrayList<InstCount>);
-        if (cudaSuccess != cudaMallocManaged(&dev_frstRdyLstPerCycle[i], memSize))
-          Logger::Fatal("Failed to alloc dev mem for dev_frstRdyListPerCycle[%d]",
-                        i);
+    memSize = sizeof(InstCount) * dataDepGraph_->GetInstCnt();
+    if (cudaSuccess != cudaMalloc(&dev_prevFrstRdyLstPerCycle_[i]->elmnts_, 
+			          memSize))
+      Logger::Fatal("Failed alloc for dev_prevFrstRdyLstPerCycle[%d]->elmnts",
+                    i);
 
-        if (cudaSuccess != cudaMemcpy(dev_frstRdyLstPerCycle[i],
-                                      frstRdyLstPerCycle_[i], memSize,
-                                      cudaMemcpyHostToDevice))
-          Logger::Fatal("Failed to copy frstRdyLstPerCycle_[%d]", i);
-
-        memSize = sizeof(InstCount) * dataDepGraph_->GetInstCnt();
-        if (cudaSuccess != cudaMalloc(&dev_frstRdyLstPerCycle[i]->elmnts_, memSize))
-          Logger::Fatal("Failed alloc dev mem for frstRdyLstPerCycle[%d]->elmnts",
-                         i);
-      
-        if (cudaSuccess != cudaMemcpy(dev_frstRdyLstPerCycle[i]->elmnts_,
-                                      frstRdyLstPerCycle_[i]->elmnts_, memSize,
-                                      cudaMemcpyHostToDevice))
-          Logger::Fatal("Failed to copy dev_frstRdyLstPerCycle[%d]->elmnts_", i);
-      }
+    for (int j = 0; j < dataDepGraph_->GetMaxLtncy() + 1; j++) {
+      memSize = sizeof(ArrayList<InstCount>);
+      if (cudaSuccess != cudaMallocManaged(&dev_frstRdyLstPerCycle_[i][j], 
+			                   memSize))
+      Logger::Fatal("Failed alloc dev mem for dev_frstRdyListPerCycle[%d][%d]",
+                    i, j);
+      if (cudaSuccess != cudaMemcpy(dev_frstRdyLstPerCycle_[i][j],
+                                  frstRdyLstPerCycle_[0], memSize,
+                                  cudaMemcpyHostToDevice))
+        Logger::Fatal("Failed to copy dev_frstRdyLstPerCycle_[%d][%d]", i, j);
+      memSize = sizeof(InstCount) * dataDepGraph_->GetInstCnt();
+      if (cudaSuccess != cudaMalloc(&dev_frstRdyLstPerCycle_[i][j]->elmnts_, 
+			            memSize))
+        Logger::Fatal("Failed alloc dev_frstRdyLstPerCycle[%d][%d]->elmnts",
+                      i, j);
     }
-    dev_ACOSchedulr->dev_frstRdyLstPerCycle_[x] = dev_frstRdyLstPerCycle;
   }
   // Copy rdyLst_
+  Logger::Info("Copying ACO rdyLsts_");
   ReadyList *dev_rdyLst;
   memSize = sizeof(ReadyList);
   for (int i = 0; i < NUMTHREADS; i++) {
@@ -812,7 +874,9 @@ void ACOScheduler::FreeDevicePointers() {
   cudaFree(slotsPerTypePerCycle_);
   cudaFree(instCntPerIssuType_);
   for (int i = 0; i < NUMTHREADS; i++){
-    for (int j = 0; j < schedUprBound_; j++) {
+    cudaFree(dev_prevFrstRdyLstPerCycle_[i]->elmnts_);
+    cudaFree(dev_prevFrstRdyLstPerCycle_[i]);
+    for (int j = 0; j < dataDepGraph_->GetMaxLtncy() + 1; j++) {
       cudaFree(dev_frstRdyLstPerCycle_[i][j]->elmnts_);
       cudaFree(dev_frstRdyLstPerCycle_[i][j]);
     }
@@ -825,6 +889,7 @@ void ACOScheduler::FreeDevicePointers() {
   cudaFree(dev_avlblSlotsInCrntCycle_);
   cudaFree(dev_rsrvSlots_);
   cudaFree(dev_rsrvSlotCnt_);
+  cudaFree(dev_prevFrstRdyLstPerCycle_);
   cudaFree(dev_frstRdyLstPerCycle_);
   cudaFree(dev_rdyLst_);
   cudaFree(pheremone_.elmnts_);
