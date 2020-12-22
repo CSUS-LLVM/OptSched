@@ -21,7 +21,7 @@ namespace opt_sched {
 
 typedef double pheremone_t;
 
-#define NUMBLOCKS 1
+#define NUMBLOCKS 20
 #define NUMTHREADSPERBLOCK 128
 #define NUMTHREADS NUMBLOCKS * NUMTHREADSPERBLOCK
 

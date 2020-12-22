@@ -1,9 +1,8 @@
 #include "opt-sched/Scheduler/register.h"
+#include "opt-sched/Scheduler/dev_defines.h"
 #include "llvm/ADT/STLExtras.h"
 
 using namespace llvm::opt_sched;
-
-#define GLOBALTID blockIdx.x * blockDim.x + threadIdx.x
 
 __host__ __device__
 int16_t Register::GetType() const { return type_; }
@@ -176,8 +175,7 @@ void Register::ResetLiveIntervals() {
 void Register::AllocDevArrayForParallelACO(int numThreads) {
   // Allocate dev array for crntUseCnt_
   size_t memSize = sizeof(int) * numThreads;
-  if (cudaSuccess != cudaMalloc(&dev_crntUseCnt_, memSize))
-    Logger::Fatal("Failed to alloc dev array dev_crntUseCnt_");
+  gpuErrchk(cudaMalloc(&dev_crntUseCnt_, memSize));
 }
 
 void Register::CopyPointersToDevice(Register *dev_reg) {
@@ -186,79 +184,49 @@ void Register::CopyPointersToDevice(Register *dev_reg) {
   unsigned long *dev_vctr;
   if (conflicts_.GetUnitCnt() > 0) {
     memSize = sizeof(unsigned long) * conflicts_.GetUnitCnt();
-    if (cudaSuccess != cudaMalloc(&dev_vctr, memSize))
-      Logger::Fatal("Failed to alloc dev mem for conflicts_->vctr");
-
-    if (cudaSuccess != cudaMemcpy(dev_vctr, conflicts_.vctr_, memSize,
-                                  cudaMemcpyHostToDevice))
-      Logger::Fatal("Failed to copy conflicts_.vctr to device");
-
-    if (cudaSuccess != cudaMemcpy(&dev_reg->conflicts_.vctr_, &dev_vctr,
-                                  sizeof(unsigned long *),
-                                  cudaMemcpyHostToDevice))
-      Logger::Fatal("Failed to update conflicts_->vctr");
+    gpuErrchk(cudaMalloc(&dev_vctr, memSize));
+    gpuErrchk(cudaMemcpy(dev_vctr, conflicts_.vctr_, memSize,
+                         cudaMemcpyHostToDevice));
+    gpuErrchk(cudaMemcpy(&dev_reg->conflicts_.vctr_, &dev_vctr,
+                         sizeof(unsigned long *), cudaMemcpyHostToDevice));
   }
-
   // Copy uses_.elmnt array
   InstCount *dev_elmnt;
   if (uses_.alloc_ > 0) {
     memSize = sizeof(InstCount) * uses_.alloc_;
-    if (cudaSuccess != cudaMalloc(&dev_elmnt, memSize))
-      Logger::Fatal("Failed to alloc dev mem for dev_uses.elmnt");
-
-    if (cudaSuccess != cudaMemcpy(dev_elmnt, uses_.elmnt, memSize,
-			          cudaMemcpyHostToDevice))
-      Logger::Fatal("Failed to copy uses_.elmnt to dev");
-
-    if (cudaSuccess != cudaMemcpy(&dev_reg->uses_.elmnt, &dev_elmnt,
-			          sizeof(InstCount *), cudaMemcpyHostToDevice))
-      Logger::Fatal("Failed to update dev pointers for uses.elmnt");
+    gpuErrchk(cudaMalloc(&dev_elmnt, memSize));
+    gpuErrchk(cudaMemcpy(dev_elmnt, uses_.elmnt, memSize,
+			 cudaMemcpyHostToDevice));
+    gpuErrchk(cudaMemcpy(&dev_reg->uses_.elmnt, &dev_elmnt,
+			 sizeof(InstCount *), cudaMemcpyHostToDevice));
   }
-
   // Copy defs_.elmnt array
   if (defs_.alloc_ > 0) {
     memSize = sizeof(InstCount) * defs_.alloc_;
-    if (cudaSuccess != cudaMalloc(&dev_elmnt, memSize))
-      Logger::Fatal("Failed to alloc dev mem for dev_defs.elmnt");
-
-    if (cudaSuccess != cudaMemcpy(dev_elmnt, defs_.elmnt, memSize,
-                                  cudaMemcpyHostToDevice))
-      Logger::Fatal("Failed to copy defs_.elmnt to dev");
-
-    if (cudaSuccess != cudaMemcpy(&dev_reg->defs_.elmnt, &dev_elmnt,
-                                  sizeof(InstCount *), cudaMemcpyHostToDevice))
-      Logger::Fatal("Failed to update dev pointers for defs.elmnt");
+    gpuErrchk(cudaMalloc(&dev_elmnt, memSize));
+    gpuErrchk(cudaMemcpy(dev_elmnt, defs_.elmnt, memSize,
+                         cudaMemcpyHostToDevice));
+    gpuErrchk(cudaMemcpy(&dev_reg->defs_.elmnt, &dev_elmnt,
+                         sizeof(InstCount *), cudaMemcpyHostToDevice));
   }
-
   // Copy liveIntervalSet_.elmnt array
   if (liveIntervalSet_.alloc_ > 0) {
     memSize = sizeof(InstCount) * liveIntervalSet_.alloc_;
-    if (cudaSuccess != cudaMalloc(&dev_elmnt, memSize))
-      Logger::Fatal("Failed to alloc dev mem for dev_liveIntervalSet.elmnt");
-
-    if (cudaSuccess != cudaMemcpy(dev_elmnt, liveIntervalSet_.elmnt, memSize,
-                                  cudaMemcpyHostToDevice))
-      Logger::Fatal("Failed to copy liveIntervalSet_.elmnt to dev");
-
-    if (cudaSuccess != cudaMemcpy(&dev_reg->liveIntervalSet_.elmnt, &dev_elmnt,
-                                  sizeof(InstCount *), cudaMemcpyHostToDevice))
-      Logger::Fatal("Failed to update dev pointers for liveIntervalSet.elmnt");
+    gpuErrchk(cudaMalloc(&dev_elmnt, memSize));
+    gpuErrchk(cudaMemcpy(dev_elmnt, liveIntervalSet_.elmnt, memSize,
+                         cudaMemcpyHostToDevice));
+    gpuErrchk(cudaMemcpy(&dev_reg->liveIntervalSet_.elmnt, &dev_elmnt,
+                         sizeof(InstCount *), cudaMemcpyHostToDevice));
   }
 
   // Copy possibleLiveIntervalSet_.elmnt array
   if (possibleLiveIntervalSet_.alloc_ > 0) {
     memSize = sizeof(InstCount) * possibleLiveIntervalSet_.alloc_;
-    if (cudaSuccess != cudaMalloc(&dev_elmnt, memSize))
-      Logger::Fatal("Failed to alloc dev mem for possibleLiveIntervalSet.elmnt");
-
-    if (cudaSuccess != cudaMemcpy(dev_elmnt, possibleLiveIntervalSet_.elmnt, 
-			          memSize, cudaMemcpyHostToDevice))
-      Logger::Fatal("Failed to copy possibleLiveIntervalSet_.elmnt to dev");
-
-    if (cudaSuccess != cudaMemcpy(&dev_reg->possibleLiveIntervalSet_.elmnt, 
-			          &dev_elmnt, sizeof(InstCount *), 
-				  cudaMemcpyHostToDevice))
-      Logger::Fatal("Failed to updt dev ptr for possibleLiveIntervalSet.elmnt");
+    gpuErrchk(cudaMalloc(&dev_elmnt, memSize));
+    gpuErrchk(cudaMemcpy(dev_elmnt, possibleLiveIntervalSet_.elmnt, memSize,
+			 cudaMemcpyHostToDevice));
+    gpuErrchk(cudaMemcpy(&dev_reg->possibleLiveIntervalSet_.elmnt, &dev_elmnt,
+			 sizeof(InstCount *), cudaMemcpyHostToDevice));
   }
 }
 
@@ -459,40 +427,22 @@ void RegisterFile::CopyPointersToDevice(RegisterFile *dev_regFile) {
   size_t memSize;
   //allocate device memory
   memSize = getCount() * sizeof(Register *);
-  if (cudaSuccess != cudaMallocManaged((void**)&dev_regs, memSize))
-    printf("Error allocating dev mem for dev_regs: %s\n", 
-		    cudaGetErrorString(cudaGetLastError()));
-
+  gpuErrchk(cudaMallocManaged((void**)&dev_regs, memSize));
   //copy array of host pointers to device
-  if (cudaSuccess != cudaMemcpy(dev_regs, Regs, memSize, 
-			        cudaMemcpyHostToDevice))
-    printf("Error copying Regs to device: %s\n", 
-		    cudaGetErrorString(cudaGetLastError()));
-
+  gpuErrchk(cudaMemcpy(dev_regs, Regs, memSize, cudaMemcpyHostToDevice));
   //copy each register to device and update its pointer in dev_regs
   Register *dev_reg = NULL;
-
   for (int i = 0; i < getCount(); i++) {
     //allocate device memory
-    if (cudaSuccess != cudaMallocManaged((void**)&dev_reg, sizeof(Register)))
-      printf("Error allocating dev mem for dev_reg: %s\n", 
-		      cudaGetErrorString(cudaGetLastError()));
-
+    gpuErrchk(cudaMallocManaged((void**)&dev_reg, sizeof(Register)));
     //copy register to device
-    if (cudaSuccess != cudaMemcpy(dev_reg, Regs[i], sizeof(Register), 
-			          cudaMemcpyHostToDevice))
-      printf("Error copying Regs[%d] to device: %s\n", i, 
-		      cudaGetErrorString(cudaGetLastError()));
-
+    gpuErrchk(cudaMemcpy(dev_reg, Regs[i], sizeof(Register), 
+			 cudaMemcpyHostToDevice));
     Regs[i]->CopyPointersToDevice(dev_reg);
-
     //update dev_regs pointer
-    if (cudaSuccess != cudaMemcpy(&dev_regs[i], &dev_reg, sizeof(Register *), 
-			          cudaMemcpyHostToDevice))
-      printf("Error updating dev_regs[%d] on device: %s\n", i, 
-		      cudaGetErrorString(cudaGetLastError()));
+    gpuErrchk(cudaMemcpy(&dev_regs[i], &dev_reg, sizeof(Register *), 
+			 cudaMemcpyHostToDevice));
   }
-
   //update dev_regFile->Regs pointer
   dev_regFile->Regs = dev_regs;
 }

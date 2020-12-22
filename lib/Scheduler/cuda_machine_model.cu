@@ -4,6 +4,7 @@
 // for setiosflags(), setprecision().
 #include "opt-sched/Scheduler/buffers.h"
 #include "opt-sched/Scheduler/logger.h"
+#include "opt-sched/Scheduler/dev_defines.h"
 #include <cassert>
 #include <iomanip>
 
@@ -284,71 +285,36 @@ int16_t MachineModel::GetRegTypeCnt() const {
 
 void MachineModel::CopyPointersToDevice(MachineModel *dev_machMdl) {
   //Copy over the vectors into arrays on device
-  InstTypeInfo *dev_instTypes = NULL;
-  
+  InstTypeInfo *dev_instTypes = NULL; 
   //allocate device memory
-  if (cudaSuccess != cudaMalloc((void**)&dev_instTypes, 
-			        instTypes_size_ * sizeof(InstTypeInfo)))
-    printf("Error allocating device mem for dev_instTypes: %s\n",
-	   cudaGetErrorString(cudaGetLastError()));
-  
+  size_t memSize = instTypes_size_ * sizeof(InstTypeInfo);
+  gpuErrchk(cudaMalloc((void**)&dev_instTypes, memSize));
   //copy instTypes_ to device
-  if (cudaSuccess != cudaMemcpy(dev_instTypes, instTypes_, 
-			        instTypes_size_ * sizeof(InstTypeInfo),
-				cudaMemcpyHostToDevice))
-    printf("Error copying instTypes_ to device: %s\n",
-	   cudaGetErrorString(cudaGetLastError()));
-
+  gpuErrchk(cudaMemcpy(dev_instTypes, instTypes_, memSize,
+		       cudaMemcpyHostToDevice));
   //update pointer dev_machMdl->instTypes_ to device pointer
-  if (cudaSuccess != cudaMemcpy(&(dev_machMdl->instTypes_), &dev_instTypes, 
-			        sizeof(InstTypeInfo *), 
-				cudaMemcpyHostToDevice))
-    printf("Error updating dev_machMdl->instTypes_: %s\n",
-	   cudaGetErrorString(cudaGetLastError()));
-
+  gpuErrchk(cudaMemcpy(&(dev_machMdl->instTypes_), &dev_instTypes, 
+		       sizeof(InstTypeInfo *), cudaMemcpyHostToDevice));
   RegTypeInfo *dev_registerTypes = NULL;
-
   //allocate device memory
-  if (cudaSuccess != cudaMalloc((void**)&dev_registerTypes, 
-			        registerTypes_size_ * sizeof(RegTypeInfo)))
-    printf("Error allocating device mem for dev_registerTypes: %s\n", 
-		    cudaGetErrorString(cudaGetLastError()));
-
+  memSize = registerTypes_size_ * sizeof(RegTypeInfo);
+  gpuErrchk(cudaMalloc((void**)&dev_registerTypes, memSize));
   //copy registerTypes_ to device
-  if (cudaSuccess != cudaMemcpy(dev_registerTypes, registerTypes_, 
-			        registerTypes_size_ * sizeof(RegTypeInfo), 
-				cudaMemcpyHostToDevice))
-    printf("Error copying registerTypes_ to device: %s\n", 
-		    cudaGetErrorString(cudaGetLastError()));
-
+  gpuErrchk(cudaMemcpy(dev_registerTypes, registerTypes_, memSize, 
+	               cudaMemcpyHostToDevice));
   //update device pointer dev_machMdl->registerTypes_
-  if (cudaSuccess != cudaMemcpy(&dev_machMdl->registerTypes_, 
-			        &dev_registerTypes, sizeof(RegTypeInfo *), 
-				cudaMemcpyHostToDevice))
-    printf("Error updating registerTypes_ pointer on device: %s\n", 
-		    cudaGetErrorString(cudaGetLastError()));
-
+  gpuErrchk(cudaMemcpy(&dev_machMdl->registerTypes_, &dev_registerTypes, 
+		       sizeof(RegTypeInfo *), cudaMemcpyHostToDevice));
   IssueTypeInfo *dev_issueTypes = NULL;
-
   //allocate device memory
-  if (cudaSuccess != cudaMalloc((void**)&dev_issueTypes, 
-			        issueTypes_size_ * sizeof(IssueTypeInfo)))
-    printf("Error allocating device mem for dev_issueTypes: %s\n", 
-		    cudaGetErrorString(cudaGetLastError()));
-
+  memSize = issueTypes_size_ * sizeof(IssueTypeInfo);
+  gpuErrchk(cudaMalloc((void**)&dev_issueTypes, memSize));
   //copy issueTypes_ to device
-  if (cudaSuccess != cudaMemcpy(dev_issueTypes, issueTypes_, 
-			        issueTypes_size_ * sizeof(IssueTypeInfo), 
-				cudaMemcpyHostToDevice))
-    printf("Error copying issueTypes_ to device: %s\n", 
-		    cudaGetErrorString(cudaGetLastError()));
-
+  gpuErrchk(cudaMemcpy(dev_issueTypes, issueTypes_, memSize,
+		       cudaMemcpyHostToDevice));
   //update device pointer dev_machMdl->issueTypes_
-  if (cudaSuccess != cudaMemcpy(&(dev_machMdl->issueTypes_), &dev_issueTypes, 
-			        sizeof(IssueTypeInfo *), 
-				cudaMemcpyHostToDevice))
-    printf("Error updating issueTypes_ pointer on device: %s\n", 
-		    cudaGetErrorString(cudaGetLastError()));
+  gpuErrchk(cudaMemcpy(&(dev_machMdl->issueTypes_), &dev_issueTypes, 
+		       sizeof(IssueTypeInfo *), cudaMemcpyHostToDevice));
 }
 
 void MachineModel::FreeDevicePointers() {

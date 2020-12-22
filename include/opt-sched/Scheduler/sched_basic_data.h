@@ -543,7 +543,7 @@ public:
   void CopyPointersToDevice(SchedInstruction *dev_inst, GraphNode **dev_nodes, 
 		            InstCount instCnt, RegisterFile *dev_regFiles);
   // Calls cudaFree on all arrays/objects that were allocated with cudaMalloc
-  void FreeDevicePointers();
+  void FreeDevicePointers(int numThreads);
   // Allocates arrays used for storing individual values for each thread in
   // parallel ACO on device
   void AllocDevArraysForParallelACO(int numThreads);

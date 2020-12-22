@@ -11,6 +11,7 @@
 #include "opt-sched/Scheduler/relaxed_sched.h"
 #include "opt-sched/Scheduler/stats.h"
 #include "opt-sched/Scheduler/utilities.h"
+#include "opt-sched/Scheduler/dev_defines.h"
 #include <algorithm>
 #include <cstdio>
 #include <iostream>
@@ -1453,34 +1454,20 @@ void BBWithSpill::CopyPointersToDevice(SchedRegion* dev_rgn, int numThreads) {
   for (int j = 0; j < numThreads; j++) {
     memSize = regTypeCnt_ * sizeof(WeightedBitVector);
     //allocate dev mem
-    if (cudaSuccess != cudaMallocManaged((void**)&dev_liveRegs, memSize))
-      Logger::Fatal("Error allocating dev mem for dev_liveRegs: %s\n", 
-		    cudaGetErrorString(cudaGetLastError()));
-
+    gpuErrchk(cudaMallocManaged((void**)&dev_liveRegs, memSize));
     //copy array
-    if (cudaSuccess != cudaMemcpy(dev_liveRegs, liveRegs_, memSize, 
-			          cudaMemcpyHostToDevice))
-      Logger::Fatal("Error copying liveRegs_ to device: %s\n", 
-		    cudaGetErrorString(cudaGetLastError()));
-
+    gpuErrchk(cudaMemcpy(dev_liveRegs, liveRegs_, memSize, 
+			 cudaMemcpyHostToDevice));
     //Copy pointers in each liveRegs_[i] to device
     for (int i = 0; i < regTypeCnt_; i++) {
       vctr = liveRegs_[i].GetVctrCpy();
       unitCnt = liveRegs_[i].GetUnitCnt();
-
       if (unitCnt > 0) {
         memSize = unitCnt * sizeof(unsigned int);
         //allocate device mem
-        if (cudaSuccess != cudaMalloc((void**)&dev_vctr, memSize))
-          Logger::Fatal("Error allocating dev mem for dev_vctr: %s\n", 
-	                cudaGetErrorString(cudaGetLastError()));
-
+        gpuErrchk(cudaMalloc((void**)&dev_vctr, memSize));
         //copy vctr to device
-        if (cudaSuccess != cudaMemcpy(dev_vctr, vctr, memSize, 
-	 	 	              cudaMemcpyHostToDevice))
-          Logger::Fatal("Error copying vctr to device: %s\n", 
-	                cudaGetErrorString(cudaGetLastError()));
-
+        gpuErrchk(cudaMemcpy(dev_vctr, vctr, memSize, cudaMemcpyHostToDevice));
         //update device pointer
 	dev_liveRegs[i].vctr_ = dev_vctr;
       }
@@ -1490,41 +1477,26 @@ void BBWithSpill::CopyPointersToDevice(SchedRegion* dev_rgn, int numThreads) {
     //update device pointer
     ((BBWithSpill *)dev_rgn)->dev_liveRegs_[j] = dev_liveRegs;
   }
-
   //copy livePhysRegs to device
   WeightedBitVector *dev_livePhysRegs = NULL;
   for (int j = 0; j < numThreads; j++) {
     memSize = regTypeCnt_ * sizeof(WeightedBitVector);
     //allocate dev mem
-    if (cudaSuccess != cudaMallocManaged((void**)&dev_livePhysRegs, memSize))
-      Logger::Fatal("Error allocating dev mem for dev_livePhysRegs: %s\n",
-                    cudaGetErrorString(cudaGetLastError()));
-
+    gpuErrchk(cudaMallocManaged((void**)&dev_livePhysRegs, memSize));
     //copy array
-    if (cudaSuccess != cudaMemcpy(dev_livePhysRegs, livePhysRegs_, memSize,
-                                  cudaMemcpyHostToDevice))
-      Logger::Fatal("Error copying livePhysRegs_ to device: %s\n",
-                    cudaGetErrorString(cudaGetLastError()));
-
+    gpuErrchk(cudaMemcpy(dev_livePhysRegs, livePhysRegs_, memSize,
+                         cudaMemcpyHostToDevice));
     //Copy pointers in each livePhysRegs_[i] to device
     for (int i = 0; i < regTypeCnt_; i++) {
       vctr = livePhysRegs_[i].GetVctrCpy();
       unitCnt = livePhysRegs_[i].GetUnitCnt();
-
       if (unitCnt > 0) {
         memSize = unitCnt * sizeof(unsigned int);
         //allocate device mem
-        if (cudaSuccess != cudaMalloc((void**)&dev_vctr, memSize))
-          Logger::Fatal("Error allocating dev mem for dev_vctr: %s\n",
-                        cudaGetErrorString(cudaGetLastError()));
-
+        gpuErrchk(cudaMalloc((void**)&dev_vctr, memSize));
         //copy vctr to device         
-        if (cudaSuccess != cudaMemcpy(dev_vctr, vctr, memSize,
-                                      cudaMemcpyHostToDevice))
-          Logger::Fatal("Error copying vctr to device: %s\n",
-                        cudaGetErrorString(cudaGetLastError()));
-        
-        //update device pointer       
+        gpuErrchk(cudaMemcpy(dev_vctr, vctr, memSize, cudaMemcpyHostToDevice));
+        //update device pointer
         dev_livePhysRegs[i].vctr_ = dev_vctr;
       }
       //delete vctr copy

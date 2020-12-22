@@ -11,6 +11,7 @@
 #include "opt-sched/Scheduler/register.h"
 #include "opt-sched/Scheduler/relaxed_sched.h"
 #include "opt-sched/Scheduler/stats.h"
+#include "opt-sched/Scheduler/dev_defines.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/Debug.h"
 #include <cuda_runtime.h>
@@ -3538,64 +3539,33 @@ void InstSchedule::CopyPointersToDevice(MachineModel *dev_machMdl) {
   // Copy instInSlot_ to device
   InstCount *dev_instInSlot = NULL;
   size_t memSize = totSlotCnt_ * sizeof(InstCount);
-  if (cudaSuccess != cudaMalloc((void**)&dev_instInSlot, memSize))
-    printf("Error allocating dev_mem for dev_instInSlot: %s\n", 
-		    cudaGetErrorString(cudaGetLastError()));
-
-  if (cudaSuccess != cudaMemcpy(dev_instInSlot, instInSlot_, memSize, 
-			        cudaMemcpyHostToDevice))
-    printf("Error copying instInSlot_ to device: %s\n", 
-		    cudaGetErrorString(cudaGetLastError()));
-
+  gpuErrchk(cudaMalloc((void**)&dev_instInSlot, memSize));
+  gpuErrchk(cudaMemcpy(dev_instInSlot, instInSlot_, memSize, 
+		       cudaMemcpyHostToDevice));
   delete[] instInSlot_;
-
   instInSlot_ = dev_instInSlot;
-
   //copy slotForInst_ to device
   InstCount *dev_slotForInst = NULL;
   memSize = totInstCnt_ * sizeof(InstCount);
-  if (cudaSuccess != cudaMalloc((void**)&dev_slotForInst, memSize))
-    printf("Error allocating dev_mem for dev_slotForInst: %s\n",
-                    cudaGetErrorString(cudaGetLastError()));
-
-  if (cudaSuccess != cudaMemcpy(dev_slotForInst, slotForInst_, memSize, 
-			        cudaMemcpyHostToDevice))
-    printf("Error copying slotForInst_ to device: %s\n", 
-		    cudaGetErrorString(cudaGetLastError()));
-
+  gpuErrchk(cudaMalloc((void**)&dev_slotForInst, memSize));
+  gpuErrchk(cudaMemcpy(dev_slotForInst, slotForInst_, memSize, 
+		       cudaMemcpyHostToDevice));
   delete[] slotForInst_;
-
   slotForInst_ = dev_slotForInst;
-
   //copy spillCosts_ to device
   InstCount *dev_spillCosts = NULL;
-  if (cudaSuccess != cudaMalloc((void**)&dev_spillCosts, memSize))
-    printf("Error allocating dev_mem for dev_spillCosts: %s\n",
-                    cudaGetErrorString(cudaGetLastError()));
-
-  if (cudaSuccess != cudaMemcpy(dev_spillCosts, spillCosts_, memSize, 
-			        cudaMemcpyHostToDevice))
-    printf("Error copying spillCosts_ to device: %s\n", 
-		    cudaGetErrorString(cudaGetLastError()));
-
+  gpuErrchk(cudaMalloc((void**)&dev_spillCosts, memSize));
+  gpuErrchk(cudaMemcpy(dev_spillCosts, spillCosts_, memSize, 
+		       cudaMemcpyHostToDevice));
   delete[] spillCosts_;
-
   spillCosts_ = dev_spillCosts;
-
   //copy peakRegPressures_ to device
   InstCount *dev_peakRegPressures = NULL;
   memSize = machMdl_->GetRegTypeCnt() * sizeof(InstCount);
-  if (cudaSuccess != cudaMalloc((void**)&dev_peakRegPressures, memSize))
-    printf("Error allocating dev_mem for dev_peakRegPressures: %s\n",
-                    cudaGetErrorString(cudaGetLastError()));
-
-  if (cudaSuccess != cudaMemcpy(dev_peakRegPressures, peakRegPressures_, 
-			        memSize, cudaMemcpyHostToDevice))
-    printf("Error copying peakRegPressures_ to device: %s\n", 
-		    cudaGetErrorString(cudaGetLastError()));
-
+  gpuErrchk(cudaMalloc((void**)&dev_peakRegPressures, memSize));
+  gpuErrchk(cudaMemcpy(dev_peakRegPressures, peakRegPressures_, memSize, 
+		       cudaMemcpyHostToDevice));
   delete[] peakRegPressures_;
-
   peakRegPressures_ = dev_peakRegPressures;
   machMdl_ = dev_machMdl;
 }
@@ -3604,48 +3574,32 @@ void InstSchedule::CopyPointersToHost(MachineModel *machMdl) {
   size_t memSize;
   //update machMdl_ pointer to host machMdl
   machMdl_ = machMdl;
+  // Copy instInSlot to host
   InstCount *host_instInSlot = new InstCount[totSlotCnt_];
   memSize = totSlotCnt_ * sizeof(InstCount);
-  if (cudaSuccess != cudaMemcpy(host_instInSlot, instInSlot_, memSize, 
-			        cudaMemcpyDeviceToHost))
-    printf("Error copying instInSlot_ to host: %s\n", 
-		    cudaGetErrorString(cudaGetLastError()));
-
+  gpuErrchk(cudaMemcpy(host_instInSlot, instInSlot_, memSize,
+		       cudaMemcpyDeviceToHost));
   cudaFree(instInSlot_);
-
   instInSlot_ = host_instInSlot;
-
+  // Copy slotForInst_ to host
   InstCount *host_slotForInst = new InstCount[totInstCnt_];
   memSize = totInstCnt_ * sizeof(InstCount);
-  if (cudaSuccess != cudaMemcpy(host_slotForInst, slotForInst_, memSize, 
-			        cudaMemcpyDeviceToHost))
-    printf("Error copying slotForInst_ to host: %s\n", 
-		    cudaGetErrorString(cudaGetLastError()));
-
+  gpuErrchk(cudaMemcpy(host_slotForInst, slotForInst_, memSize, 
+		       cudaMemcpyDeviceToHost));
   cudaFree(slotForInst_);
-
   slotForInst_ = host_slotForInst;
-
+  // Copy spillCosts to host
   InstCount *host_spillCosts = new InstCount[totInstCnt_];
-
-  if (cudaSuccess != cudaMemcpy(host_spillCosts, spillCosts_, memSize, 
-			        cudaMemcpyDeviceToHost))
-    printf("Error copying spillCosts_ to host: %s\n", 
-		    cudaGetErrorString(cudaGetLastError()));
-
+  gpuErrchk(cudaMemcpy(host_spillCosts, spillCosts_, memSize, 
+		       cudaMemcpyDeviceToHost));
   cudaFree(spillCosts_);
-
   spillCosts_ = host_spillCosts;
-
+  // Copy peakRegPressures to host
   InstCount *host_peakRegPressures = new InstCount[machMdl_->GetRegTypeCnt()];
   memSize = machMdl_->GetRegTypeCnt() * sizeof(InstCount);
-  if (cudaSuccess != cudaMemcpy(host_peakRegPressures, peakRegPressures_, 
-			        memSize, cudaMemcpyDeviceToHost))
-    printf("Error copying peakRegPressures_ to host: %s\n", 
-		    cudaGetErrorString(cudaGetLastError()));
-
+  gpuErrchk(cudaMemcpy(host_peakRegPressures, peakRegPressures_, memSize,
+		       cudaMemcpyDeviceToHost));
   cudaFree(peakRegPressures_);
-
   peakRegPressures_ = host_peakRegPressures;
 }
 
@@ -3840,155 +3794,95 @@ void DataDepGraph::CopyPointersToDevice(DataDepGraph *dev_DDG) {
   // Copy instCntPerType_ to device
   InstCount *dev_instCntPerType;
   memSize = sizeof(InstCount) * instTypeCnt_;
-  if (cudaSuccess != cudaMalloc(&dev_instCntPerType, memSize))
-    Logger::Fatal("Failed to allocate dev mem for instCntPerType");
-
-  if (cudaSuccess != cudaMemcpy(dev_instCntPerType, instCntPerType_, memSize,
-			        cudaMemcpyHostToDevice))
-    Logger::Fatal("Failed to copy instCntPerType to device");
-
-  if (cudaSuccess != cudaMemcpy(&dev_DDG->instCntPerType_, &dev_instCntPerType,
-			        sizeof(InstCount *), cudaMemcpyHostToDevice))
-    Logger::Fatal("Failed to update dev_DDG->InstCntPerType");
-
+  gpuErrchk(cudaMalloc(&dev_instCntPerType, memSize));
+  gpuErrchk(cudaMemcpy(dev_instCntPerType, instCntPerType_, memSize,
+		       cudaMemcpyHostToDevice));
+  gpuErrchk(cudaMemcpy(&dev_DDG->instCntPerType_, &dev_instCntPerType,
+		       sizeof(InstCount *), cudaMemcpyHostToDevice));
   // Copy instCntPerIssuType_
   InstCount *dev_instCntPerIssuType;
   memSize = sizeof(InstCount) * issuTypeCnt_;
-  if (cudaSuccess != cudaMalloc(&dev_instCntPerIssuType, memSize))
-    Logger::Fatal("Failed to allocate dev mem for instCntPerIssuType");
-
-  if (cudaSuccess != cudaMemcpy(dev_instCntPerIssuType, instCntPerIssuType_, memSize,
-                                cudaMemcpyHostToDevice))
-    Logger::Fatal("Failed to copy instCntPerIssuType to device");
-
-  if (cudaSuccess != cudaMemcpy(&dev_DDG->instCntPerIssuType_, &dev_instCntPerIssuType,
-                                sizeof(InstCount *), cudaMemcpyHostToDevice))
-    Logger::Fatal("Failed to update dev_DDG->InstCntPerIssuType");
-
+  gpuErrchk(cudaMalloc(&dev_instCntPerIssuType, memSize));
+  gpuErrchk(cudaMemcpy(dev_instCntPerIssuType, instCntPerIssuType_, memSize,
+                       cudaMemcpyHostToDevice));
+  gpuErrchk(cudaMemcpy(&dev_DDG->instCntPerIssuType_, &dev_instCntPerIssuType,
+                       sizeof(InstCount *), cudaMemcpyHostToDevice));
   // Copy frwrdLwrBounds_ to device
   InstCount *dev_frwrdLwrBounds;
   memSize = sizeof(InstCount) * instCnt_;
-  if (cudaSuccess != cudaMalloc(&dev_frwrdLwrBounds, memSize))
-    Logger::Fatal("Failed to allocate dev mem for dev_frwrdLwrBounds");
-
-  if (cudaSuccess != cudaMemcpy(dev_frwrdLwrBounds, frwrdLwrBounds_, memSize,
-                                cudaMemcpyHostToDevice))
-    Logger::Fatal("Failed to copy frwrdLwrBounds to device");
-
-  if (cudaSuccess != cudaMemcpy(&dev_DDG->frwrdLwrBounds_, &dev_frwrdLwrBounds,
-                                sizeof(InstCount *), cudaMemcpyHostToDevice))
-    Logger::Fatal("Failed to update dev_DDG->frwrdLwrBounds");
-
+  gpuErrchk(cudaMalloc(&dev_frwrdLwrBounds, memSize));
+  gpuErrchk(cudaMemcpy(dev_frwrdLwrBounds, frwrdLwrBounds_, memSize,
+                       cudaMemcpyHostToDevice));
+  gpuErrchk(cudaMemcpy(&dev_DDG->frwrdLwrBounds_, &dev_frwrdLwrBounds,
+                       sizeof(InstCount *), cudaMemcpyHostToDevice));
   // Copy bkwardLwrBounds_ to device
   InstCount *dev_bkwrdLwrBounds;
   memSize = sizeof(InstCount) * instCnt_;
-  if (cudaSuccess != cudaMalloc(&dev_bkwrdLwrBounds, memSize))
-    Logger::Fatal("Failed to allocate dev mem for dev_bkwrdLwrBounds");
-
-  if (cudaSuccess != cudaMemcpy(dev_bkwrdLwrBounds, bkwrdLwrBounds_, memSize,
-                                cudaMemcpyHostToDevice))
-    Logger::Fatal("Failed to copy bkwrdLwrBounds to device");
-
-  if (cudaSuccess != cudaMemcpy(&dev_DDG->bkwrdLwrBounds_, &dev_bkwrdLwrBounds,
-                                sizeof(InstCount *), cudaMemcpyHostToDevice))
-    Logger::Fatal("Failed to update dev_DDG->bkwrdLwrBounds");
-
+  gpuErrchk(cudaMalloc(&dev_bkwrdLwrBounds, memSize));
+  gpuErrchk(cudaMemcpy(dev_bkwrdLwrBounds, bkwrdLwrBounds_, memSize,
+                       cudaMemcpyHostToDevice));
+  gpuErrchk(cudaMemcpy(&dev_DDG->bkwrdLwrBounds_, &dev_bkwrdLwrBounds,
+                       sizeof(InstCount *), cudaMemcpyHostToDevice));
   // Copy insts_ to device
   SchedInstruction *dev_insts;
   memSize = sizeof(SchedInstruction) * instCnt_;
-  if (cudaSuccess != cudaMallocManaged(&dev_insts, memSize))
-    Logger::Fatal("Failed to allocate dev mem for insts");
-
-  if (cudaSuccess != cudaMemcpy(dev_insts, insts_, memSize,
-			        cudaMemcpyHostToDevice))
-    Logger::Fatal("Failed to copy insts to device");
-
-  if (cudaSuccess != cudaMemcpy(&dev_DDG->insts_, &dev_insts,
-			        sizeof(SchedInstruction *), 
-				cudaMemcpyHostToDevice))
-    Logger::Fatal("Failed to update dev_DDG->insts");
-
+  gpuErrchk(cudaMallocManaged(&dev_insts, memSize));
+  gpuErrchk(cudaMemcpy(dev_insts, insts_, memSize,
+	               cudaMemcpyHostToDevice));
+  gpuErrchk(cudaMemcpy(&dev_DDG->insts_, &dev_insts, 
+		       sizeof(SchedInstruction *), 
+		       cudaMemcpyHostToDevice));
   // update values of root_ and leaf_ on device
   SchedInstruction *dev_root = &dev_insts[root_->GetNum()];
   memSize = sizeof(SchedInstruction *);
-  if (cudaSuccess != cudaMemcpy(&dev_DDG->root_, &dev_root, memSize,
-			        cudaMemcpyHostToDevice))
-    Logger::Fatal("Failed to update root_ on device");
-
+  gpuErrchk(cudaMemcpy(&dev_DDG->root_, &dev_root, memSize,
+	               cudaMemcpyHostToDevice));
   SchedInstruction *dev_leaf = &dev_insts[leaf_->GetNum()];
-  if (cudaSuccess != cudaMemcpy(&dev_DDG->leaf_, &dev_leaf, memSize,
-			        cudaMemcpyHostToDevice))
-    Logger::Fatal("Failed to update leaf_ on device");
-
+  gpuErrchk(cudaMemcpy(&dev_DDG->leaf_, &dev_leaf, memSize,
+	               cudaMemcpyHostToDevice));
   // Copy nodes_ to device
   SchedInstruction **dev_nodes;
   memSize = sizeof(SchedInstruction *) * instCnt_;
-  if (cudaSuccess != cudaMalloc(&dev_nodes, memSize))
-    Logger::Fatal("Failed to alloc dev mem for nodes_");
-
-  if (cudaSuccess != cudaMemcpy(dev_nodes, nodes_, memSize,
-			       cudaMemcpyHostToDevice))
-    Logger::Fatal("Failed to copy nodes to device");
-
-  if (cudaSuccess != cudaMemcpy(&dev_DDG->nodes_, &dev_nodes,
-			        sizeof(SchedInstruction **),
-				cudaMemcpyHostToDevice))
-    Logger::Fatal("Failed to update dev_DDG->nodes_");
-
+  gpuErrchk(cudaMalloc(&dev_nodes, memSize));
+  gpuErrchk(cudaMemcpy(dev_nodes, nodes_, memSize, cudaMemcpyHostToDevice));
+  gpuErrchk(cudaMemcpy(&dev_DDG->nodes_, &dev_nodes,
+		       sizeof(SchedInstruction **),
+	  	       cudaMemcpyHostToDevice));
   // update nodes_ values on device
   SchedInstruction *dev_inst;
   memSize = sizeof(SchedInstruction *);
   for (InstCount i = 0; i < instCnt_; i++) {
     dev_inst = &dev_insts[i];
-    if (cudaSuccess != cudaMemcpy(&dev_DDG->nodes_[i], &dev_inst, memSize,
-			          cudaMemcpyHostToDevice))
-      Logger::Fatal("Failed to update nodes_[%d] on device", i);
+    gpuErrchk(cudaMemcpy(&dev_DDG->nodes_[i], &dev_inst, memSize,
+			 cudaMemcpyHostToDevice));
   }
-
   // Copy tplgclOrdr_ to device
   SchedInstruction **dev_tplgclOrdr;
   memSize = sizeof(SchedInstruction *) * instCnt_;
-  if (cudaSuccess != cudaMalloc(&dev_tplgclOrdr, memSize))
-    Logger::Fatal("Failed to alloc dev mem for tplgclOrdr_");
-
-  if (cudaSuccess != cudaMemcpy(dev_tplgclOrdr, tplgclOrdr_, memSize,
-                               cudaMemcpyHostToDevice))
-    Logger::Fatal("Failed to copy tplgclOrdr_ to device");
-
-  if (cudaSuccess != cudaMemcpy(&dev_DDG->tplgclOrdr_, &dev_tplgclOrdr,
-                                sizeof(SchedInstruction **),
-                                cudaMemcpyHostToDevice))
-    Logger::Fatal("Failed to update dev_DDG->tplgclOrdr_");
-
+  gpuErrchk(cudaMalloc(&dev_tplgclOrdr, memSize));
+  gpuErrchk(cudaMemcpy(dev_tplgclOrdr, tplgclOrdr_, memSize,
+                       cudaMemcpyHostToDevice));
+  gpuErrchk(cudaMemcpy(&dev_DDG->tplgclOrdr_, &dev_tplgclOrdr,
+                       sizeof(SchedInstruction **),
+                       cudaMemcpyHostToDevice));
   // update tplgclOrdr values on device
   memSize = sizeof(SchedInstruction *);
   for (InstCount i = 0; i < instCnt_; i++) {
     dev_inst = &dev_insts[tplgclOrdr_[i]->GetNum()];
-    if (cudaSuccess != cudaMemcpy(&dev_DDG->tplgclOrdr_[i], &dev_inst, memSize,
-                                  cudaMemcpyHostToDevice))
-      Logger::Fatal("Failed to update tplgclOrdr_[%d] on device", i);
+    gpuErrchk(cudaMemcpy(&dev_DDG->tplgclOrdr_[i], &dev_inst, memSize,
+                         cudaMemcpyHostToDevice));
   }
-
   // Copy RegFiles
   RegisterFile *dev_regFiles;
   memSize = sizeof(RegisterFile) * machMdl_->GetRegTypeCnt();
-  if (cudaSuccess != cudaMallocManaged(&dev_regFiles, memSize))
-    Logger::Fatal("Failed to alloc dev mem for dev_regFiles");
-
-  if (cudaSuccess != cudaMemcpy(dev_regFiles, RegFiles, memSize,
-			        cudaMemcpyHostToDevice))
-    Logger::Fatal("Failed to copy regFiles to device");
-
-  if (cudaSuccess != cudaMemcpy(&dev_DDG->RegFiles, &dev_regFiles,
-			        sizeof(RegisterFile *), 
-				cudaMemcpyHostToDevice))
-    Logger::Fatal("Failed to update dev_DDG->RegFiles");
-  //dev_DDG->RegFiles = dev_regFiles;
-
+  gpuErrchk(cudaMallocManaged(&dev_regFiles, memSize));
+  gpuErrchk(cudaMemcpy(dev_regFiles, RegFiles, memSize,
+		       cudaMemcpyHostToDevice));
+  gpuErrchk(cudaMemcpy(&dev_DDG->RegFiles, &dev_regFiles, 
+		       sizeof(RegisterFile *), cudaMemcpyHostToDevice));
   // Also copy each RegFile's pointers
   for (InstCount i = 0; i < machMdl_->GetRegTypeCnt(); i++)
     RegFiles[i].CopyPointersToDevice(&dev_DDG->RegFiles[i]);
-
   // Copy SchedInstruction/GraphNode pointers and link them to device inst
   // and update RegFiles poitner to dev_regFiles
   for (InstCount i = 0; i < instCnt_; i++)
@@ -3996,7 +3890,7 @@ void DataDepGraph::CopyPointersToDevice(DataDepGraph *dev_DDG) {
 		                   instCnt_, dev_regFiles);
 }
 
-void DataDepGraph::FreeDevicePointers() {
+void DataDepGraph::FreeDevicePointers(int numThreads) {
   cudaFree(instCntPerType_);
   cudaFree(instCntPerIssuType_);
   cudaFree(frwrdLwrBounds_);
@@ -4006,8 +3900,9 @@ void DataDepGraph::FreeDevicePointers() {
     RegFiles[i].FreeDevicePointers();
   cudaFree(RegFiles);
   for (InstCount i = 0; i < instCnt_; i++)
-    insts_[i].FreeDevicePointers();
+    insts_[i].FreeDevicePointers(numThreads);
   cudaFree(insts_);
+  cudaFree(nodes_);
 }
 
 /*

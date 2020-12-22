@@ -225,13 +225,8 @@ ScheduleDAGOptSched::ScheduleDAGOptSched(
 
 ScheduleDAGOptSched::~ScheduleDAGOptSched() {
   if (dev_MM) {
-    Logger::Info("Deleting dev_MM");
     dev_MM->FreeDevicePointers();
     cudaFree(dev_MM);
-    // Required for mem leak testing on device
-    //cudaDeviceReset();
-    //Logger::Fatal("End of a device scheduled region");
-    //exit(1);
   }
 }
 
@@ -402,9 +397,9 @@ void ScheduleDAGOptSched::schedule() {
   // Prepare for device scheduling by increasing heap size and copying machMdl
   if (dev_MM == NULL) {
     // Increase heap size to allow large DDGs to be allocated
-    if (cudaSuccess != cudaDeviceSetLimit(cudaLimitMallocHeapSize, 512000000))
-      Logger::Info("Error increasing heap size: %s",
-                    cudaGetErrorString(cudaGetLastError()));
+    //if (cudaSuccess != cudaDeviceSetLimit(cudaLimitMallocHeapSize, 512000000))
+      //Logger::Info("Error increasing heap size: %s",
+        //            cudaGetErrorString(cudaGetLastError()));
 
     // Copy MachineModel to device for use during DevListSched.
     // Allocate device memory
@@ -459,15 +454,6 @@ void ScheduleDAGOptSched::schedule() {
                                      NormHurstcCost, HurstcSchedLngth, Sched,
                                      FilterByPerp, blocksToKeep(schedIni));
 
-  // Deallocate all device memory after completing second pass
-  // on the last scheduling region
-/*  if (RegionNumber == Regions.size() - 1) {
-    Logger::Info("Calling cudaDeviceReset()");
-    cudaDeviceReset();
-    Logger::Info("Done calling cudaDeviceReset()");
-    dev_MM = NULL;
-  }
-*/
   if ((!(Rslt == RES_SUCCESS || Rslt == RES_TIMEOUT) || Sched == NULL)) {
     LLVM_DEBUG(
         Logger::Info("OptSched run failed: rslt=%d, sched=%p. Falling back.",

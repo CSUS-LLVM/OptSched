@@ -14,12 +14,11 @@
 #include "opt-sched/Scheduler/sched_region.h"
 #include "opt-sched/Scheduler/stats.h"
 #include "opt-sched/Scheduler/utilities.h"
+#include "opt-sched/Scheduler/dev_defines.h"
 
 extern bool OPTSCHED_gPrintSpills;
 
 using namespace llvm::opt_sched;
-
-#define GLOBALTID blockIdx.x * blockDim.x + threadIdx.x
 
 SchedRegion::SchedRegion(MachineModel *machMdl, MachineModel *dev_machMdl, 
 		         DataDepGraph *dataDepGraph, long rgnNum, 
@@ -256,97 +255,60 @@ FUNC_RESULT SchedRegion::FindOptimalSchedule(
       // Copy DDG to device
       Logger::Info("Copying DDG to device");
       DataDepGraph *dev_DDG;
-      if (cudaSuccess != cudaMallocManaged(&dev_DDG, sizeof(DataDepGraph)))
-        Logger::Fatal("Failed to allocate dev mem for dev_ddg");
-
-      if (cudaSuccess != cudaMemcpy(dev_DDG, dataDepGraph_, sizeof(DataDepGraph),
-                                    cudaMemcpyHostToDevice))
-      Logger::Fatal("Failed to copy DDG to device");
-
+      memSize = sizeof(DataDepGraph);
+      gpuErrchk(cudaMallocManaged(&dev_DDG, memSize));
+      gpuErrchk(cudaMemcpy(dev_DDG, dataDepGraph_, memSize, 
+			   cudaMemcpyHostToDevice));
       dataDepGraph_->CopyPointersToDevice(dev_DDG);
-
       // Copy this(BBWithSpill) to device
       BBWithSpill *dev_rgn = NULL;
-
       // Allocate device mem
-      if (cudaSuccess != cudaMallocManaged((void**)&dev_rgn, sizeof(BBWithSpill)))
-        Logger::Fatal("Error allocating dev mem for dev_rgn: %s", 
-	              cudaGetErrorString(cudaGetLastError()));
-
+      memSize = sizeof(BBWithSpill);
+      gpuErrchk(cudaMallocManaged((void**)&dev_rgn, memSize));
       // Copy this to device
-      if (cudaSuccess != cudaMemcpy(dev_rgn, this, sizeof(BBWithSpill), 
-			            cudaMemcpyHostToDevice))
-        Logger::Fatal("Error copying this to device: %s", 
-	              cudaGetErrorString(cudaGetLastError()));
-
+      gpuErrchk(cudaMemcpy(dev_rgn, this, memSize, cudaMemcpyHostToDevice));
       // Update dev_rgn->machMdl_ to dev_machMdl
-      if (cudaSuccess != cudaMemcpy(&(dev_rgn->machMdl_), &dev_machMdl_, 
-			            sizeof(MachineModel *), 
-	  			    cudaMemcpyHostToDevice))
-        Logger::Fatal("Error updating dev_rgn->machMdl_ on device: %s", 
-                      cudaGetErrorString(cudaGetLastError()));
-
+      gpuErrchk(cudaMemcpy(&(dev_rgn->machMdl_), &dev_machMdl_,
+			   sizeof(MachineModel *),cudaMemcpyHostToDevice));
       CopyPointersToDevice(dev_rgn, 1);
-
       // Create and copy lstSched
       lstSched = new InstSchedule(machMdl_, dataDepGraph_, vrfySched_);
-
       InstSchedule *dev_lstSched = NULL;
-
       // Move lstSched arrays to device
       lstSched->CopyPointersToDevice(dev_machMdl_);
-
       // Allocate dev mem for dev_lstSched
-      if (cudaSuccess != cudaMalloc((void**)&dev_lstSched, sizeof(InstSchedule)))
-        Logger::Fatal("Error allocating dev mem for dev_lstSched: %s",
-                      cudaGetErrorString(cudaGetLastError()));
-
+      memSize = sizeof(InstSchedule);
+      gpuErrchk(cudaMalloc((void**)&dev_lstSched, memSize));
       // Copy lstSched to device
-      if (cudaSuccess != cudaMemcpy(dev_lstSched, lstSched, sizeof(InstSchedule),
-	  		            cudaMemcpyHostToDevice))
-        Logger::Fatal("Error copying lstSched to device: %s",
-                      cudaGetErrorString(cudaGetLastError()));
-
+      gpuErrchk(cudaMemcpy(dev_lstSched, lstSched, memSize,
+	  	cudaMemcpyHostToDevice));
       // Create and copy list scheduler to device
       ListScheduler *lstSchdulr, *dev_lstSchdulr;
-
       lstSchdulr = new ListScheduler(dataDepGraph_, machMdl_, 
 		                     abslutSchedUprBound_, 
 				     GetHeuristicPriorities());
-
       memSize = sizeof(ListScheduler);
-      if (cudaSuccess != cudaMallocManaged(&dev_lstSchdulr, memSize))
-        Logger::Fatal("Failed to alloc dev mem for dev_listSchedulr");
-
-      if (cudaSuccess != cudaMemcpy(dev_lstSchdulr, lstSchdulr, memSize,
-			            cudaMemcpyHostToDevice))
-        Logger::Fatal("Failed to copy lstSchedulr to device");
-
+      gpuErrchk(cudaMallocManaged(&dev_lstSchdulr, memSize));
+      gpuErrchk(cudaMemcpy(dev_lstSchdulr, lstSchdulr, memSize,
+			   cudaMemcpyHostToDevice));
       lstSchdulr->CopyPointersToDevice(dev_lstSchdulr, dev_DDG, dev_machMdl_);
-
       delete lstSchdulr;
-
       // Launch device list sched kernel
       Logger::Info("Launching device list scheduling kernel");
       DevListSched<<<1,1>>>(dev_rgn, dev_DDG, dev_lstSchdulr, dev_lstSched);
       cudaDeviceSynchronize(); 
       Logger::Info("Post Kernel Error: %s", cudaGetErrorString(cudaGetLastError()));
-
       // Copy ListSchedule to Host
-      if (cudaSuccess != cudaMemcpy(lstSched, dev_lstSched, sizeof(InstSchedule),
-       			            cudaMemcpyDeviceToHost))
-       Logger::Fatal("Error copying lstSched to host: %s",
-                     cudaGetErrorString(cudaGetLastError())); 
-
+      memSize = sizeof(InstSchedule);
+      gpuErrchk(cudaMemcpy(lstSched, dev_lstSched, memSize,
+			   cudaMemcpyDeviceToHost)); 
       lstSched->CopyPointersToHost(machMdl_);
-
-      dev_DDG->FreeDevicePointers();
+      //dev_DDG->FreeDevicePointers();
       cudaFree(dev_DDG);
       dev_lstSchdulr->FreeDevicePointers();
       cudaFree(dev_lstSchdulr);
       dev_rgn->FreeDevicePointers(1);
       cudaFree(dev_rgn);
-    
       heuristicScheduleLength = lstSched->GetCrntLngth();
       hurstcExecCost = lstSched->GetExecCost();  
       hurstcCost_ = lstSched->GetCost();
@@ -1019,12 +981,11 @@ void InitCurand(curandState_t *dev_states, unsigned long seed) {
 FUNC_RESULT SchedRegion::runACO(InstSchedule *ReturnSched,
                                 InstSchedule *InitSched) {
   InitForSchdulng();
-
   // **** Start Dev_ACO code **** //
+  // Allocate and Copy data to device for parallel ACO
   size_t memSize;
-  // Copy DDG to device
-  Logger::Info("Allocating SchedInstruction Arrays for Parallel ACO");
   // Allocate arrays for parallel ACO execution
+  Logger::Info("Allocating SchedInstruction Arrays for Parallel ACO");
   for (int i = 0; i < dataDepGraph_->GetInstCnt(); i++) {
     dataDepGraph_->GetInstByIndx(i)->AllocDevArraysForParallelACO(NUMTHREADS);
   }
@@ -1036,40 +997,26 @@ FUNC_RESULT SchedRegion::runACO(InstSchedule *ReturnSched,
   }
   Logger::Info("Allocating BBWithSpill Arrays for Parallel ACO");
   ((BBWithSpill*)this)->AllocDevArraysForParallelACO(NUMTHREADS);
-
-  Logger::Info("Copying DDG and its Instruction to device");
   // Copy DDG and its objects to device
+  Logger::Info("Copying DDG and its Instruction to device");
   DataDepGraph *dev_DDG;
-  if (cudaSuccess != cudaMallocManaged(&dev_DDG, sizeof(DataDepGraph)))
-      Logger::Fatal("Failed to allocate dev mem for dev_ddg");
-
-  if (cudaSuccess != cudaMemcpy(dev_DDG, dataDepGraph_, sizeof(DataDepGraph),
-                                cudaMemcpyHostToDevice))
-  Logger::Fatal("Failed to copy DDG to device");
-
+  memSize = sizeof(DataDepGraph);
+  gpuErrchk(cudaMallocManaged(&dev_DDG, memSize));
+  gpuErrchk(cudaMemcpy(dev_DDG, dataDepGraph_, memSize,
+		       cudaMemcpyHostToDevice));
   dataDepGraph_->CopyPointersToDevice(dev_DDG);
-  
-  Logger::Info("Copying BBWithSpill to Device");
   // Copy this(BBWithSpill) to device
+  Logger::Info("Copying BBWithSpill to Device");
   BBWithSpill *dev_rgn;
   memSize = sizeof(BBWithSpill);
   // Allocate device mem
-  if (cudaSuccess != cudaMallocManaged((void**)&dev_rgn, memSize))
-    Logger::Fatal("Error allocating dev mem for dev_rgn: %s", 
-                  cudaGetErrorString(cudaGetLastError()));
-
+  gpuErrchk(cudaMallocManaged((void**)&dev_rgn, memSize));
   // Copy this to device
-  if (cudaSuccess != cudaMemcpy(dev_rgn, this, memSize, 
-    	  	                cudaMemcpyHostToDevice))
-    Logger::Fatal("Error copying this to device: %s", 
-                  cudaGetErrorString(cudaGetLastError()));
-
+  gpuErrchk(cudaMemcpy(dev_rgn, this, memSize, cudaMemcpyHostToDevice));
   dev_rgn->machMdl_ = dev_machMdl_;
-
   CopyPointersToDevice(dev_rgn, NUMTHREADS);
-
-  Logger::Info("Creating and Copying ready arrays to device");
   // Create and copy an array of DeviceVector<Choice>* for use during scheduling
+  Logger::Info("Creating and Copying ready arrays to device");
   DeviceVector<Choice> **host_ready = new DeviceVector<Choice> *[NUMTHREADS];
   Choice *dev_elmnts;
   DeviceVector<Choice> *ready = 
@@ -1077,50 +1024,35 @@ FUNC_RESULT SchedRegion::runACO(InstSchedule *ReturnSched,
   //memSize = sizeof(DeviceVector<Choice>);
   for (int i = 0; i < NUMTHREADS; i++) {
     memSize = sizeof(DeviceVector<Choice>);
-    if (cudaSuccess != cudaMallocManaged(&host_ready[i], memSize))
-      Logger::Fatal("Failed to alloc dev mem for dev_ready %d", i);
-
-    if (cudaSuccess != cudaMemcpy(host_ready[i], ready, memSize, 
-                                  cudaMemcpyHostToDevice))
-      Logger::Fatal("Failed to coopy ready %d to device", i);
+    gpuErrchk(cudaMallocManaged(&host_ready[i], memSize));
+    gpuErrchk(cudaMemcpy(host_ready[i], ready, memSize, 
+			 cudaMemcpyHostToDevice));
     //copy ready->elmnts_ and link to dev_ready'
     memSize = sizeof(Choice) * dataDepGraph_->GetInstCnt();
-    if (cudaSuccess != cudaMalloc(&dev_elmnts, memSize))
-      Logger::Fatal("Failed to alloc dev mem for dev_elmnts");
-
-    if (cudaSuccess != cudaMemcpy(dev_elmnts, ready->elmnts_, memSize,
-                                  cudaMemcpyHostToDevice))
-      Logger::Fatal("Failed to copy ready->elmnts_ to device");
-
+    gpuErrchk(cudaMalloc(&dev_elmnts, memSize));
+    gpuErrchk(cudaMemcpy(dev_elmnts, ready->elmnts_, memSize,
+                         cudaMemcpyHostToDevice));
     host_ready[i]->elmnts_ = dev_elmnts;
   }
   delete ready;
-
   // copy array of device pointers to device
   DeviceVector<Choice> **dev_ready;
   memSize = sizeof(DeviceVector<Choice> *) * NUMTHREADS;
-  if (cudaSuccess != cudaMalloc(&dev_ready, memSize))
-    Logger::Fatal("Failed to alloc dev mem for array of dev_ready's");
-  if (cudaSuccess != cudaMemcpy(dev_ready, host_ready, memSize,
-                                cudaMemcpyHostToDevice))
-    Logger::Fatal("Failed to copy array of dev_ready's to device");
-
-  Logger::Info("Initializing states for cuRand");
+  gpuErrchk(cudaMalloc(&dev_ready, memSize));
+  gpuErrchk(cudaMemcpy(dev_ready, host_ready, memSize, cudaMemcpyHostToDevice));
   // Allocate dev_states for curand RNG and run curand_init() to initialize
+  Logger::Info("Initializing states for cuRand");
   curandState_t *dev_states;
   memSize = sizeof(curandState_t) * NUMTHREADS;
-  if (cudaSuccess != cudaMalloc(&dev_states, memSize))
-    Logger::Fatal("Failed to alloc dev mem for curand states");
-
+  gpuErrchk(cudaMalloc(&dev_states, memSize));
   InitCurand<<<NUMBLOCKS, NUMTHREADSPERBLOCK>>>(dev_states, 
 		                                unsigned(time(NULL)));
-
+  //cudaDeviceSynchronize();
   Logger::Info("Creating ACOScheduler");
   ACOScheduler *AcoSchdulr = new ACOScheduler(
       dataDepGraph_, machMdl_, abslutSchedUprBound_, hurstcPrirts_, vrfySched_,
       (SchedRegion *)dev_rgn, dev_DDG, dev_ready, dev_machMdl_, dev_states);
   AcoSchdulr->setInitialSched(InitSched);
-
   // Alloc dev arrays for parallel ACO
   Logger::Info("Allocating ACOScheduler Arrays for Parallel ACO");
   AcoSchdulr->AllocDevArraysForParallelACO();
@@ -1128,16 +1060,11 @@ FUNC_RESULT SchedRegion::runACO(InstSchedule *ReturnSched,
   Logger::Info("Copying ACOScheduler to device");
   ACOScheduler *dev_AcoSchdulr;
   memSize = sizeof(ACOScheduler);
-  if (cudaSuccess != cudaMallocManaged(&dev_AcoSchdulr, memSize))
-    Logger::Fatal("Failed to alloc dev mem for ACOSchdulr");
-
-  if (cudaSuccess != cudaMemcpy(dev_AcoSchdulr, AcoSchdulr, memSize,
-                                cudaMemcpyHostToDevice))
-    Logger::Fatal("Failed to copy AcoSchdulr to device");
-
+  gpuErrchk(cudaMallocManaged(&dev_AcoSchdulr, memSize));
+  gpuErrchk(cudaMemcpy(dev_AcoSchdulr, AcoSchdulr, memSize,
+                       cudaMemcpyHostToDevice));
   AcoSchdulr->CopyPointersToDevice(dev_AcoSchdulr);
 
-  Logger::Info("Launching scheduling");
   FUNC_RESULT Rslt = AcoSchdulr->FindSchedule(ReturnSched, this, dev_AcoSchdulr);
   dev_AcoSchdulr->FreeDevicePointers();
   cudaFree(dev_AcoSchdulr);
@@ -1151,8 +1078,13 @@ FUNC_RESULT SchedRegion::runACO(InstSchedule *ReturnSched,
   delete[] host_ready;
   dev_rgn->FreeDevicePointers(NUMTHREADS);
   cudaFree(dev_rgn);
-  dev_DDG->FreeDevicePointers();
+  dev_DDG->FreeDevicePointers(NUMTHREADS);
   cudaFree(dev_DDG);
   cudaFree(dev_states);
+  // Ocasionally BBWithSpill deletes an empty pointer, which causes the next
+  // kernel to report an invalid argument error after execution even
+  // though the non issue error happens here. This call is to clear errors
+  // from BBWithSpill deletion
+  cudaGetLastError();
   return Rslt;
 }

@@ -5,10 +5,9 @@
 #include "opt-sched/Scheduler/ready_list.h"
 #include "opt-sched/Scheduler/sched_region.h"
 #include "opt-sched/Scheduler/bb_spill.h"
+#include "opt-sched/Scheduler/dev_defines.h"
 
 using namespace llvm::opt_sched;
-
-#define GLOBALTID blockIdx.x * blockDim.x + threadIdx.x
 
 __host__ __device__
 InstScheduler::InstScheduler(DataDepGraph *dataDepGraph, MachineModel *machMdl,
@@ -389,14 +388,15 @@ bool ConstrainedScheduler::MovToPrevSlot_(int prevRealSlotNum) {
 __host__ __device__
 void ConstrainedScheduler::CleanupCycle_(InstCount cycleNum) {
 #ifdef __CUDA_ARCH__
-/*  //prevFrstRdyLstPerCycle_->Reset();
+/*
+  //prevFrstRdyLstPerCycle_->Reset();
   // crnt becomes prev
   ArrayList<InstCount> *temp = dev_prevFrstRdyLstPerCycle_[GLOBALTID];
   dev_prevFrstRdyLstPerCycle_[GLOBALTID] = 
 	  dev_crntFrstRdyLstPerCycle_[GLOBALTID];
 
   dev_crntFrstRdyLstPerCycle_[GLOBALTID] = temp;
-  */
+*/
 #else
   if (frstRdyLstPerCycle_[cycleNum] != NULL) {
     delete frstRdyLstPerCycle_[cycleNum];
