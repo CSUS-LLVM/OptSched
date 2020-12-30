@@ -1131,8 +1131,8 @@ void SchedInstruction::CopyPointersToDevice(SchedInstruction *dev_inst,
 }
 
 void SchedInstruction::FreeDevicePointers(int numThreads) {
-  cudaFree(rdyCyclePerPrdcsr_);
-  cudaFree(prevMinRdyCyclePerPrdcsr_);
+  //cudaFree(rdyCyclePerPrdcsr_);
+  //cudaFree(prevMinRdyCyclePerPrdcsr_);
   cudaFree(ltncyPerPrdcsr_);
   if (crtclPathFrmRcrsvScsr_)
     cudaFree(crtclPathFrmRcrsvScsr_);
@@ -1162,11 +1162,9 @@ void SchedInstruction::FreeDevicePointers(int numThreads) {
   cudaFree(dev_minRdyCycle_);
   cudaFree(dev_unschduldPrdcsrCnt_);
   cudaFree(dev_unschduldScsrCnt_);
-  for (int i = 0; i < numThreads; i++) {
-    cudaFree(dev_rdyCyclePerPrdcsr_[i]);
-    cudaFree(dev_prevMinRdyCyclePerPrdcsr_[i]);
-  }
+  cudaFree(dev_rdyCyclePerPrdcsr_[0]);
   cudaFree(dev_rdyCyclePerPrdcsr_);
+  cudaFree(dev_prevMinRdyCyclePerPrdcsr_[0]);
   cudaFree(dev_prevMinRdyCyclePerPrdcsr_);
   if (rcrsvScsrLst_)
     cudaFree(rcrsvScsrLst_->dev_crnt_);
@@ -1203,16 +1201,22 @@ void SchedInstruction::AllocDevArraysForParallelACO(int numThreads) {
   // Allocate an array of rdyCyclePerPrdcsr_ of size numThreads
   memSize = sizeof(InstCount *) * numThreads;
   gpuErrchk(cudaMallocManaged(&dev_rdyCyclePerPrdcsr_, memSize));
-  memSize = sizeof(InstCount) * prdcsrCnt_;
+  // Trying new approach, malloc one huge array and set every multiple
+  // of prdscrCnt_ as another index in the array of arrays
+  memSize = sizeof(InstCount) * prdcsrCnt_ * numThreads;
+  InstCount *temp_arr;
+  gpuErrchk(cudaMalloc(&temp_arr, memSize));
   for (int i = 0; i < numThreads; i++) {
-    gpuErrchk(cudaMalloc(&dev_rdyCyclePerPrdcsr_[i], memSize));
+    dev_rdyCyclePerPrdcsr_[i] = &temp_arr[i * prdcsrCnt_];
   }
   // Allocate an array of prevMinRdyCyclePerPrdcsr_ of size numThreads
   memSize = sizeof(InstCount *) * numThreads;
   gpuErrchk(cudaMallocManaged(&dev_prevMinRdyCyclePerPrdcsr_, memSize));
-  memSize = sizeof(InstCount) * prdcsrCnt_;
+  // use same one malloc approach as above
+  memSize = sizeof(InstCount) * prdcsrCnt_ * numThreads;
+  gpuErrchk(cudaMalloc(&temp_arr, memSize));
   for (int i = 0; i < numThreads; i++) {
-    gpuErrchk(cudaMalloc(&dev_prevMinRdyCyclePerPrdcsr_[i], memSize));
+    dev_prevMinRdyCyclePerPrdcsr_[i] = &temp_arr[i * prdcsrCnt_];
   }
   // Alloc arrays of iterators for each array list
   // Alloc array of iterators for sortedScsrLst_

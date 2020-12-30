@@ -92,8 +92,9 @@ ConstrainedScheduler::ConstrainedScheduler(DataDepGraph *dataDepGraph,
     frstRdyLstPerCycle_[i] = NULL;
   }
 
-  dev_prevFrstRdyLstPerCycle_ = NULL;
-  dev_frstRdyLstPerCycle_ = NULL;
+  //dev_prevFrstRdyLstPerCycle_ = NULL;
+  //dev_frstRdyLstPerCycle_ = NULL;
+  dev_instsWithPrdcsrsSchduld_ = NULL;
 
   rdyLst_ = NULL;
   crntSched_ = NULL;
@@ -133,14 +134,18 @@ bool ConstrainedScheduler::Initialize_(InstCount trgtSchedLngth,
   }
 
 #ifdef __CUDA_ARCH__
+/*
   if (dev_prevFrstRdyLstPerCycle_)
     dev_prevFrstRdyLstPerCycle_[GLOBALTID]->Reset();
   if (dev_frstRdyLstPerCycle_) {
     for (int i = 0; i < dataDepGraph_->GetMaxLtncy(); i++)
       dev_frstRdyLstPerCycle_[GLOBALTID][i]->Reset();
   }
-
   dev_frstRdyLstPerCycle_[GLOBALTID][0]->InsrtElmnt(rootInst_->GetNum());
+*/
+  dev_instsWithPrdcsrsSchduld_[GLOBALTID]->
+	                   InsrtElmnt(rootInst_->GetNum(), 0, true);
+
   ResetRsrvSlots_();
   dev_rsrvSlotCnt_[GLOBALTID] = 0;
   dev_schduldInstCnt_[GLOBALTID] = 0;
@@ -176,7 +181,7 @@ bool ConstrainedScheduler::Initialize_(InstCount trgtSchedLngth,
 __host__ __device__
 void ConstrainedScheduler::SchdulInst_(SchedInstruction *inst, InstCount) {
 #ifdef __CUDA_ARCH__  // Device version
-  InstCount prdcsrNum, scsrRdyCycle, scsrRdyListNum;
+  InstCount prdcsrNum, scsrRdyCycle;//, scsrRdyListNum;
 
   // Notify each successor of this instruction that it has been scheduled.
   for (SchedInstruction *crntScsr = inst->GetFrstScsr(&prdcsrNum);
@@ -188,11 +193,15 @@ void ConstrainedScheduler::SchdulInst_(SchedInstruction *inst, InstCount) {
       // If all other predecessors of this successor have been scheduled then
       // we now know in which cycle this successor will become ready.
       assert(scsrRdyCycle < schedUprBound_);
+/*
       // Add this succesor to the first-ready list of the future cycle
       // in which we now know it will become ready
       scsrRdyListNum = scsrRdyCycle - dev_crntCycleNum_[GLOBALTID];
       dev_frstRdyLstPerCycle_[GLOBALTID][scsrRdyListNum]->
 	                                          InsrtElmnt(crntScsr->GetNum());
+*/
+      dev_instsWithPrdcsrsSchduld_[GLOBALTID]->
+                     InsrtElmnt(crntScsr->GetNum(), scsrRdyCycle, true);
     }
   }
 

@@ -199,7 +199,7 @@ void ListScheduler::CopyPointersToDevice(ListScheduler *dev_lstSchedulr,
 			        cudaMemcpyHostToDevice))
     Logger::Fatal("Failed to copy rdyLst_ to device");
 
-  rdyLst_->CopyPointersToDevice(dev_rdyLst, dev_DDG);
+  rdyLst_->CopyPointersToDevice(dev_rdyLst, dev_DDG, 1);
 
   dev_lstSchedulr->rdyLst_ = dev_rdyLst;
 }
@@ -213,7 +213,7 @@ void ListScheduler::FreeDevicePointers() {
   }
   cudaFree(frstRdyLstPerCycle_);
   cudaFree(avlblSlotsInCrntCycle_);
-  rdyLst_->FreeDevicePointers();
+  rdyLst_->FreeDevicePointers(1);
   cudaFree(rdyLst_);
 }
 

@@ -103,9 +103,13 @@ public:
   __host__ __device__
   void Dev_Print();
   // Copy pointers to device and link them to passed device pointer
-  void CopyPointersToDevice(ReadyList *dev_rdyLst, DataDepGraph *dev_DDG);
+  void CopyPointersToDevice(ReadyList *dev_rdyLst, DataDepGraph *dev_DDG,
+		            int numThreads);
+  // Allocates arrays to hold independent values for each device thread during
+  // parallel ACO
+  void AllocDevArraysForParallelACO(int numThreads);
   // Calls cudaFree on all arrays/objects that were allocated with cudaMalloc
-  void FreeDevicePointers();
+  void FreeDevicePointers(int numThreads);
 
 private:
   // A pointer to the DDG for the region
@@ -115,6 +119,9 @@ private:
 
   // The priority list containing the actual instructions.
   PriorityArrayList<InstCount> *prirtyLst_;
+  // An array of PArrayLists of size numThreads_ to allow each thread
+  // to have an independent PAL
+  PriorityArrayList<InstCount> *dev_prirtyLst_;
 
   // TODO(max): Document.
   ArrayList<InstCount> *latestSubLst_;
@@ -134,6 +141,9 @@ private:
   InstCount maxInptSchedOrder_;
 
   unsigned long maxPriority_;
+  // An array of size numThreads to allow an independent maxPriority for each
+  // thread
+  unsigned long *dev_maxPriority_;
 
   // The number of bits for each part of the priority key.
   int16_t useCntBits_;

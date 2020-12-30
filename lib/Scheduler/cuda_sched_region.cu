@@ -1084,7 +1084,7 @@ FUNC_RESULT SchedRegion::runACO(InstSchedule *ReturnSched,
   // Ocasionally BBWithSpill deletes an empty pointer, which causes the next
   // kernel to report an invalid argument error after execution even
   // though the non issue error happens here. This call is to clear errors
-  // from BBWithSpill deletion
+  // from BBWithSpill deletion.
   cudaGetLastError();
   return Rslt;
 }

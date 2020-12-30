@@ -130,7 +130,7 @@ protected:
   ReadyList *rdyLst_;
   // pointer to a device array used to store rdyLst_ for
   // each thread by parallel ACO
-  ReadyList **dev_rdyLst_;
+  ReadyList *dev_rdyLst_;
 
   // The number of the current cycle to be used in cycle-by-cycle scheduling.
   InstCount crntCycleNum_;
@@ -166,10 +166,7 @@ protected:
   // corresponding first-ready list of that cycle into the global sorted ready
   // list.
   ArrayList<InstCount> **frstRdyLstPerCycle_;
-  // old device impl
-  // pointer to a device array used to store frstRdyLstPerCycle_ for 
-  // each thread by parallel ACO
-  //ArrayList<InstCount> ***dev_frstRdyLstPerCycle_;
+/* old device implementation
   // New implementation of frstRdyLstPerCycle_ on device
   // Only MAX LATENCY + 1 Array lists need to be allocated per schedule, 
   // since creating and deleting objects on device should be avoided, we use the
@@ -180,6 +177,10 @@ protected:
   // This holds crntCycle to crntCycle+maxLatency frstRdyLists for each thread
   // on device
   ArrayList<InstCount> ***dev_frstRdyLstPerCycle_;
+*/
+  // On the device, use one PriorityArrayList with the instruction's rdyCycle
+  // as the key instead of maxLtncy+2 ArrayLists for each thread
+  PriorityArrayList<InstCount, InstCount> **dev_instsWithPrdcsrsSchduld_;
 
   // An array holding the number of issue slots available for each issue type
   // in the current machine cycle.

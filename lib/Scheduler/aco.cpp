@@ -196,7 +196,7 @@ InstSchedule *ACOScheduler::FindOneSchedule(InstSchedule *dev_schedule,
   else
     schedule = dev_schedule;
 
-  InstCount maxPriority = dev_rdyLst_[GLOBALTID]->MaxPriority();
+  InstCount maxPriority = dev_rdyLst_->MaxPriority();
   if (maxPriority == 0)
     maxPriority = 1; // divide by 0 is bad
   Initialize_();
@@ -211,8 +211,8 @@ InstSchedule *ACOScheduler::FindOneSchedule(InstSchedule *dev_schedule,
     // much nicer for this particular scheduler
     UpdtRdyLst_(dev_crntCycleNum_[GLOBALTID], dev_crntSlotNum_[GLOBALTID]);
     unsigned long heuristic;
-    ready->reserve(dev_rdyLst_[GLOBALTID]->GetInstCnt());
-    SchedInstruction *inst = dev_rdyLst_[GLOBALTID]->GetNextPriorityInst(heuristic);
+    ready->reserve(dev_rdyLst_->GetInstCnt());
+    SchedInstruction *inst = dev_rdyLst_->GetNextPriorityInst(heuristic);
     while (inst != NULL) {
       if (ChkInstLglty_(inst)) {
         Choice c;
@@ -220,9 +220,9 @@ InstSchedule *ACOScheduler::FindOneSchedule(InstSchedule *dev_schedule,
         c.heuristic = (double)heuristic / maxPriority;
         ready->push_back(c);
       }
-      inst = dev_rdyLst_[GLOBALTID]->GetNextPriorityInst(heuristic);
+      inst = dev_rdyLst_->GetNextPriorityInst(heuristic);
     }
-    dev_rdyLst_[GLOBALTID]->ResetIterator();
+    dev_rdyLst_->ResetIterator();
     inst = NULL;
     if (!ready->empty())
       inst = SelectInstruction(*ready, lastInst);
@@ -258,33 +258,20 @@ InstSchedule *ACOScheduler::FindOneSchedule(InstSchedule *dev_schedule,
                                             false);
       DoRsrvSlots_(inst);
       // this is annoying
-      SchedInstruction *blah = dev_rdyLst_[GLOBALTID]->GetNextPriorityInst();
+      SchedInstruction *blah = dev_rdyLst_->GetNextPriorityInst();
       while (blah != NULL && blah != inst) {
-        blah = dev_rdyLst_[GLOBALTID]->GetNextPriorityInst();
+        blah = dev_rdyLst_->GetNextPriorityInst();
       }
       if (blah == inst)
-        dev_rdyLst_[GLOBALTID]->RemoveNextPriorityInst();
+        dev_rdyLst_->RemoveNextPriorityInst();
       UpdtSlotAvlblty_(inst);
     }
     /* Logger::Info("Chose instruction %d (for some reason)", instNum); */
     schedule->AppendInst(instNum);
     if (MovToNxtSlot_(inst))
       InitNewCycle_();
-    dev_rdyLst_[GLOBALTID]->ResetIterator();
+    dev_rdyLst_->ResetIterator();
     ready->clear();
-    // Juggle frstRdyLists on device, prev falls out of scope, frstRdyList[0]
-    // becomes prev, 1 becomes 0 etc
-    int maxLatency = dataDepGraph_->GetMaxLtncy();
-    ArrayList<InstCount> * temp;
-    dev_prevFrstRdyLstPerCycle_[GLOBALTID]->Reset();
-    temp = dev_prevFrstRdyLstPerCycle_[GLOBALTID];
-    dev_prevFrstRdyLstPerCycle_[GLOBALTID] = 
-	            dev_frstRdyLstPerCycle_[GLOBALTID][0];
-    for (int i = 0; i < maxLatency; i++) {
-      dev_frstRdyLstPerCycle_[GLOBALTID][i] = 
-	      dev_frstRdyLstPerCycle_[GLOBALTID][i + 1];
-    }
-    dev_frstRdyLstPerCycle_[GLOBALTID][maxLatency] = temp;
   }
   dev_rgn_->UpdateScheduleCost(schedule);
   return schedule;
@@ -571,26 +558,17 @@ void ACOScheduler::UpdatePheremone(InstSchedule *schedule) {
 inline void ACOScheduler::UpdtRdyLst_(InstCount cycleNum, int slotNum) {
 #ifdef __CUDA_ARCH__ // Device version
   InstCount prevCycleNum = cycleNum - 1;
-  ArrayList<InstCount> *lst1 = NULL;
-  ArrayList<InstCount> *lst2 = dev_frstRdyLstPerCycle_[GLOBALTID][0];
-
-  if (slotNum == 0 && prevCycleNum >= 0) {
-    // If at the begining of a new cycle other than the very first cycle, then
-    // we also have to include the instructions that might have become ready in
-    // the previous cycle due to a zero latency of the instruction scheduled in
-    // the very last slot of that cycle [GOS 9.8.02].
-    lst1 = dev_prevFrstRdyLstPerCycle_[GLOBALTID];
-
-    if (lst1->size_ > 0) {
-      dev_rdyLst_[GLOBALTID]->AddList(lst1);
-      lst1->Reset();
-      //CleanupCycle_(prevCycleNum);
-    }
-  }
-
-  if (lst2->size_ > 0) {
-    dev_rdyLst_[GLOBALTID]->AddList(lst2);
-    lst2->Reset();
+  int lstSize = dev_instsWithPrdcsrsSchduld_[GLOBALTID]->size_;
+  PriorityArrayList<InstCount, InstCount> *lst = 
+	                         dev_instsWithPrdcsrsSchduld_[GLOBALTID];
+  SchedInstruction *inst;
+  // PriorityArrayList holds keys in decreasing order, so insts with earliest
+  // rdyCycle are last on the list
+  while (lstSize > 0 && lst->keys_[lstSize - 1] <= cycleNum) {
+    inst = dataDepGraph_->GetInstByIndx(lst->elmnts_[lstSize - 1]);
+    dev_rdyLst_->AddInst(inst);
+    lst->RmvLastElmnt();
+    lstSize--;
   }
 #else  // Host version
   InstCount prevCycleNum = cycleNum - 1;
@@ -699,8 +677,7 @@ void ACOScheduler::AllocDevArraysForParallelACO() {
   memSize = sizeof(bool) * NUMTHREADS;
   gpuErrchk(cudaMalloc(&dev_isCrntCycleBlkd_, memSize));
   // Alloc dev array for rdyLst_
-  memSize = sizeof(ReadyList *) * NUMTHREADS;
-  gpuErrchk(cudaMallocManaged(&dev_rdyLst_, memSize));
+  rdyLst_->AllocDevArraysForParallelACO(NUMTHREADS);
   // Alloc dev array for avlblSlotsInCrntCycle_
   memSize = sizeof(int16_t *) * NUMTHREADS;
   gpuErrchk(cudaMallocManaged(&dev_avlblSlotsInCrntCycle_, memSize));
@@ -709,15 +686,9 @@ void ACOScheduler::AllocDevArraysForParallelACO() {
   for (int i = 0; i < NUMTHREADS; i++) {
     gpuErrchk(cudaMalloc(&dev_avlblSlotsInCrntCycle_[i], memSize));
   }
-  // Alloc dev arrays for frstRdyLstPerCycle_
-  memSize = sizeof(ArrayList<InstCount> **) * NUMTHREADS;
-  gpuErrchk(cudaMallocManaged(&dev_frstRdyLstPerCycle_, memSize));
-  memSize = sizeof(ArrayList<InstCount> *) * NUMTHREADS;
-  gpuErrchk(cudaMallocManaged(&dev_prevFrstRdyLstPerCycle_, memSize));
-  memSize = sizeof(ArrayList<InstCount> *) * (dataDepGraph_->GetMaxLtncy() + 1);
-  for (int i = 0; i < NUMTHREADS; i++) {
-    gpuErrchk(cudaMallocManaged(&dev_frstRdyLstPerCycle_[i], memSize));
-  }
+  // Alloc dev arrays for dev_instsWithPrdcsrsSchduld_
+  memSize = sizeof(PriorityArrayList<InstCount, InstCount> *) * NUMTHREADS;
+  gpuErrchk(cudaMallocManaged(&dev_instsWithPrdcsrsSchduld_, memSize));
   // Alloc dev arrays for rsrvSlots_
   memSize = sizeof(ReserveSlot *) * NUMTHREADS;
   gpuErrchk(cudaMallocManaged(&dev_rsrvSlots_, memSize));
@@ -769,36 +740,32 @@ void ACOScheduler::CopyPointersToDevice(ACOScheduler *dev_ACOSchedulr) {
   // set root/leaf inst
   dev_ACOSchedulr->rootInst_ = dev_DDG_->GetRootInst();
   dev_ACOSchedulr->leafInst_ = dev_DDG_->GetLeafInst();
-  // Copy frstRdyLstPerCycle_[0], an ArrayList, to dev_(prev/crnt)FrstRdyLst_
-  Logger::Info("Copying ACO frstRdyLstPerCycle_ Array lists");
+  // Create temp PriorityArrayList to copy to dev_instsWithPrdcsrsSchduld_
+  Logger::Info("Copying ACO dev_instsWithPrdscsrsSchduld_");
+  PriorityArrayList<InstCount, InstCount> *temp;
+  temp = new 
+	PriorityArrayList<InstCount, InstCount>(dataDepGraph_->GetInstCnt());
+  // Allocate and Copy PriorityArrayList for each thread
   for (int i = 0; i < NUMTHREADS; i++) {
-    // Copy each ArrayList to device
-    memSize = sizeof(ArrayList<InstCount>);
-    gpuErrchk(cudaMallocManaged(&dev_prevFrstRdyLstPerCycle_[i], memSize));
-    gpuErrchk(cudaMemcpy(dev_prevFrstRdyLstPerCycle_[i], frstRdyLstPerCycle_[0],
-			 memSize, cudaMemcpyHostToDevice));
+    memSize = sizeof(PriorityArrayList<InstCount, InstCount>);
+    gpuErrchk(cudaMallocManaged(&dev_instsWithPrdcsrsSchduld_[i], memSize));
+    gpuErrchk(cudaMemcpy(dev_instsWithPrdcsrsSchduld_[i], temp, memSize,
+			cudaMemcpyHostToDevice));
+    // Allocate dev mem for elmnts_ and keys_
     memSize = sizeof(InstCount) * dataDepGraph_->GetInstCnt();
-    gpuErrchk(cudaMalloc(&dev_prevFrstRdyLstPerCycle_[i]->elmnts_, memSize));
-    for (int j = 0; j < dataDepGraph_->GetMaxLtncy() + 1; j++) {
-      memSize = sizeof(ArrayList<InstCount>);
-      gpuErrchk(cudaMallocManaged(&dev_frstRdyLstPerCycle_[i][j], memSize));
-      gpuErrchk(cudaMemcpy(dev_frstRdyLstPerCycle_[i][j], 
-			   frstRdyLstPerCycle_[0], memSize,
-                           cudaMemcpyHostToDevice));
-      memSize = sizeof(InstCount) * dataDepGraph_->GetInstCnt();
-      gpuErrchk(cudaMalloc(&dev_frstRdyLstPerCycle_[i][j]->elmnts_, memSize));
-    }
+    gpuErrchk(cudaMalloc(&dev_instsWithPrdcsrsSchduld_[i]->elmnts_, memSize));
+    gpuErrchk(cudaMalloc(&dev_instsWithPrdcsrsSchduld_[i]->keys_, memSize));
   }
+  delete temp;
   // Copy rdyLst_
-  Logger::Info("Copying ACO rdyLsts_");
-  ReadyList *dev_rdyLst;
+  Logger::Info("Copying ACO rdyLst_");
   memSize = sizeof(ReadyList);
-  for (int i = 0; i < NUMTHREADS; i++) {
-    gpuErrchk(cudaMallocManaged(&dev_rdyLst, memSize));
-    gpuErrchk(cudaMemcpy(dev_rdyLst, rdyLst_, memSize, cudaMemcpyHostToDevice));
-    rdyLst_->CopyPointersToDevice(dev_rdyLst, dev_DDG_);
-    dev_ACOSchedulr->dev_rdyLst_[i] = dev_rdyLst;
-  }
+  gpuErrchk(cudaMallocManaged(&dev_ACOSchedulr->dev_rdyLst_, memSize));
+  gpuErrchk(cudaMemcpy(dev_ACOSchedulr->dev_rdyLst_, rdyLst_, memSize,
+		       cudaMemcpyHostToDevice));
+  rdyLst_->CopyPointersToDevice(dev_ACOSchedulr->dev_rdyLst_, dev_DDG_,
+		                NUMTHREADS);
+
 }
 
 void ACOScheduler::FreeDevicePointers() {
@@ -810,23 +777,17 @@ void ACOScheduler::FreeDevicePointers() {
   cudaFree(slotsPerTypePerCycle_);
   cudaFree(instCntPerIssuType_);
   for (int i = 0; i < NUMTHREADS; i++){
-    cudaFree(dev_prevFrstRdyLstPerCycle_[i]->elmnts_);
-    cudaFree(dev_prevFrstRdyLstPerCycle_[i]);
-    for (int j = 0; j < dataDepGraph_->GetMaxLtncy() + 1; j++) {
-      cudaFree(dev_frstRdyLstPerCycle_[i][j]->elmnts_);
-      cudaFree(dev_frstRdyLstPerCycle_[i][j]);
-    }
-    cudaFree(dev_frstRdyLstPerCycle_[i]);
-    dev_rdyLst_[i]->FreeDevicePointers();
-    cudaFree(dev_rdyLst_[i]);
+    cudaFree(dev_instsWithPrdcsrsSchduld_[i]->elmnts_);
+    cudaFree(dev_instsWithPrdcsrsSchduld_[i]->keys_);
+    cudaFree(dev_instsWithPrdcsrsSchduld_[i]);
     cudaFree(dev_avlblSlotsInCrntCycle_[i]);
     cudaFree(dev_rsrvSlots_[i]);
   }
+  dev_rdyLst_->FreeDevicePointers(NUMTHREADS);
   cudaFree(dev_avlblSlotsInCrntCycle_);
   cudaFree(dev_rsrvSlots_);
   cudaFree(dev_rsrvSlotCnt_);
-  cudaFree(dev_prevFrstRdyLstPerCycle_);
-  cudaFree(dev_frstRdyLstPerCycle_);
+  cudaFree(dev_instsWithPrdcsrsSchduld_);
   cudaFree(dev_rdyLst_);
   cudaFree(pheremone_.elmnts_);
 }

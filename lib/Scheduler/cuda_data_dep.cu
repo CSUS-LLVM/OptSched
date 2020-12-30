@@ -3885,6 +3885,7 @@ void DataDepGraph::CopyPointersToDevice(DataDepGraph *dev_DDG) {
     RegFiles[i].CopyPointersToDevice(&dev_DDG->RegFiles[i]);
   // Copy SchedInstruction/GraphNode pointers and link them to device inst
   // and update RegFiles poitner to dev_regFiles
+  Logger::Info("Copying SchedInstructions to device");
   for (InstCount i = 0; i < instCnt_; i++)
     insts_[i].CopyPointersToDevice(&dev_DDG->insts_[i], dev_DDG->nodes_, 
 		                   instCnt_, dev_regFiles);
