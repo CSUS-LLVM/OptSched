@@ -205,13 +205,13 @@ std::unique_ptr<InstSchedule> ACOScheduler::FindOneSchedule() {
   std::unique_ptr<InstSchedule> schedule =
       llvm::make_unique<InstSchedule>(machMdl_, dataDepGraph_, true);
   InstCount maxPriority = rdyLst_->MaxPriority();
-  if (maxPriority == 0)
-    maxPriority = 1; // divide by 0 is bad
+  maxPriority |= !maxPriority; // divide by 0 is bad(increase to 1 if 0)
   Initialize_();
   rgn_->InitForSchdulng();
 
   SchedInstruction *waitFor = NULL;
   InstCount waitUntil = 0;
+  double maxPriorityInv = 1 / maxPriority;
   llvm::SmallVector<Choice, 0> ready;
   while (!IsSchedComplete_()) {
     UpdtRdyLst_(crntCycleNum_, crntSlotNum_);
@@ -233,7 +233,7 @@ std::unique_ptr<InstSchedule> ACOScheduler::FindOneSchedule() {
         if (ACO_SCHED_STALLS || ChkInstLglty_(rInst)) {
           Choice c;
           c.inst = rInst;
-          c.heuristic = (double)heuristic / maxPriority + 1;
+          c.heuristic = (double)heuristic * maxPriorityInv + 1;
           c.readyOn = 0;
           ready.push_back(c);
           if (IsDbg && lastInst)
@@ -261,7 +261,7 @@ std::unique_ptr<InstSchedule> ACOScheduler::FindOneSchedule() {
           unsigned long heuristic = rdyLst_->CmputKey_(fIns, false, changed);
           Choice c;
           c.inst = fIns;
-          c.heuristic = (double)heuristic / maxPriority + 1;
+          c.heuristic = (double)heuristic * maxPriorityInv + 1;
           c.readyOn = crntCycleNum_ + fCycle;
           ready.push_back(c);
           if (IsDbg && lastInst)
