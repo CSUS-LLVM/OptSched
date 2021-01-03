@@ -7,9 +7,10 @@ class Analyzer:
         ('logs', 'The logs to analyze')
     ]
 
+    # Documentation for any options
     OPTIONS = {}
 
-    def __init__(self):
+    def __init__(self, **options):
         subclass = type(self).__name__
         assert (type(self).run is not Analyzer.run
                 or type(self).run_bench is not Analyzer.run_bench), \
@@ -17,6 +18,7 @@ class Analyzer:
 
         self.stats = [{'benchmark': 'Total'}]
         self.__current_benchmark = None
+        self.options = options
 
     @property
     def current_benchmark(self):
@@ -53,7 +55,7 @@ class Analyzer:
         else:
             result.update(kwargs)
 
-    def print_report(self, out, options):
+    def print_report(self, out):
         out = csv.DictWriter(out, fieldnames=self.stats[0].keys())
         out.writeheader()
         out.writerows(self.stats)

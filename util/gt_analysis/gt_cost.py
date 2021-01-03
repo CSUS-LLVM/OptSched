@@ -44,4 +44,4 @@ class RpGtCost(analyze.Analyzer):
 
 
 if __name__ == '__main__':
-    analyze.main(RpGtCost())
+    analyze.main(RpGtCost)
