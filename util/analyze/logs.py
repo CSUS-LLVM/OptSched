@@ -24,7 +24,7 @@ class Logs:
 
         return self
 
-    def blocks(self):
+    def all_blocks(self):
         '''
         Iterates over the blocks in every benchmark
         '''
@@ -66,6 +66,9 @@ class Benchmark:
 
     def __iter__(self):
         return iter(self.blocks)
+
+    def all_blocks(self):
+        return self
 
     def __repr__(self):
         return f'<Benchmark({self.info}, {len(self.blocks)} blocks)>'

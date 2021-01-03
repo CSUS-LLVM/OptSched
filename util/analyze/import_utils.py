@@ -149,3 +149,10 @@ def _parse_events(block_log, start=0, end=None):
     except json.JSONDecodeError:
         print(events, file=sys.stderr)
         raise
+
+    result = dict()
+
+    for log in parsed:
+        result.setdefault(log['event_id'], []).append(log)
+
+    return result
