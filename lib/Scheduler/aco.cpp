@@ -60,6 +60,7 @@ ACOScheduler::ACOScheduler(DataDepGraph *dataDepGraph,
   ants_per_iteration = schedIni.GetInt("ACO_ANT_PER_ITERATION");
   print_aco_trace = schedIni.GetBool("ACO_TRACE");
   IsTwoPassEn = schedIni.GetBool("USE_TWO_PASS");
+  DCFOption = ParseDCFOpt(schedIni.GetString("ACO_DUAL_COST_FN_ENABLE"));
 
   // pheromone Graph Debugging start
   std::string TgtRgns = schedIni.GetString("ACO_DBG_REGIONS");
@@ -117,16 +118,37 @@ double ACOScheduler::Score(SchedInstruction *from, Choice choice) {
 }
 
 bool ACOScheduler::shouldReplaceSchedule(InstSchedule *OldSched,
-                                         InstSchedule *NewSched) {
+                                         InstSchedule *NewSched,
+                                         bool IsGlobal) {
   // return true if the old schedule is null (eg:there is no old schedule)
   // return false if the new schedule is is NULL
-  // if it is the 1st pass return the cost comparison
-  // if it is the 2nd pass return true if the RP cost and ILP cost is less
   if (!OldSched)
     return true;
   else if (!NewSched)
     return false;
-  else if (!IsTwoPassEn)
+
+  // if we are using the dual cost function algorithm use the DCF code
+  // DCF has 4 different behaviors:
+  // OFF - Does Nothing
+  // GLOBAL_ONLY - Only applies to comparisons of the globally best schedule
+  // GLOBAL_AND_TIGHTEN - If a schedule has a lower DCFCost it wins
+  // GLOBAL_AND_ITERATION - Rejects any schedule with a worse DCFCost
+  if ((DCFOption != DCF_OPT::GLOBAL_ONLY && IsGlobal) &&
+      DCFOption != DCF_OPT::OFF) {
+    InstCount NewDCFCost = NewSched->GetExtraSpillCost(DCFCostFn);
+    InstCount OldDCFCost = OldSched->GetExtraSpillCost(DCFCostFn);
+    if (NewDCFCost < OldDCFCost)
+      return true;
+    else if ((DCFOption != DCF_OPT::GLOBAL_ONLY && IsGlobal) ||
+             DCFOption == DCF_OPT::GLOBAL_AND_ITERATION) {
+      if (NewDCFCost > OldDCFCost)
+        return false;
+    }
+  }
+
+  // if it is the 1st pass return the cost comparison
+  // if it is the 2nd pass return true if the RP cost and ILP cost is less
+  if (!IsTwoPassEn)
     return NewSched->GetCost() < OldSched->GetCost();
   else if (!rgn_->IsSecondPass())
     return NewSched->GetNormSpillCost() < OldSched->GetNormSpillCost();
@@ -134,6 +156,21 @@ bool ACOScheduler::shouldReplaceSchedule(InstSchedule *OldSched,
     return (NewSched->GetNormSpillCost() <= OldSched->GetNormSpillCost()) &&
            (NewSched->GetExecCost() < OldSched->GetExecCost());
 }
+
+DCF_OPT ACOScheduler::ParseDCFOpt(std::string opt) {
+  if (opt == "OFF")
+    return DCF_OPT::OFF;
+  else if (opt == "GLOBAL_ONLY")
+    return DCF_OPT::GLOBAL_ONLY;
+  else if (opt == "GLOBAL_AND_TIGHTEN")
+    return DCF_OPT::GLOBAL_AND_TIGHTEN;
+  else if (opt == "GLOBAL_AND_ITERATION")
+    return DCF_OPT::GLOBAL_AND_ITERATION;
+
+  llvm::report_fatal_error("Unrecognized Dual Cost Function Option: " + opt,
+                           false);
+}
+
 
 Choice ACOScheduler::SelectInstruction(const llvm::ArrayRef<Choice> &ready,
                                        SchedInstruction *lastInst) {
@@ -348,6 +385,12 @@ FUNC_RESULT ACOScheduler::FindSchedule(InstSchedule *schedule_out,
   fixed_bias = schedIni.GetInt(IsFirst ? "ACO_FIXED_BIAS" : "ACO2P_FIXED_BIAS");
   noImprovementMax = schedIni.GetInt(IsFirst ? "ACO_STOP_ITERATIONS"
                                              : "ACO2P_STOP_ITERATIONS");
+  std::string DcfFnString = schedIni.GetString(IsFirst ? "ACO_DUAL_COST_FN"
+                                                       : "ACO2P_DUAL_COST_FN");
+  if (DcfFnString!="NONE")
+	  DCFCostFn = ParseSCFName(DcfFnString);
+  else
+      DCFOption = DCF_OPT::OFF;
 
   // compute the relative maximum score inverse
   ScRelMax = rgn_->GetHeuristicCost();
@@ -387,7 +430,7 @@ FUNC_RESULT ACOScheduler::FindSchedule(InstSchedule *schedule_out,
       std::unique_ptr<InstSchedule> schedule = FindOneSchedule();
       if (print_aco_trace)
         PrintSchedule(schedule.get());
-      if (shouldReplaceSchedule(iterationBest.get(), schedule.get())) {
+      if (shouldReplaceSchedule(iterationBest.get(), schedule.get(), false)) {
         iterationBest = std::move(schedule);
         if (IsDbg)
           IterAntEdges = CrntAntEdges;
@@ -397,7 +440,7 @@ FUNC_RESULT ACOScheduler::FindSchedule(InstSchedule *schedule_out,
     /* PrintSchedule(iterationBest); */
     /* std::cout << iterationBest->GetCost() << std::endl; */
     // TODO DRY
-    if (shouldReplaceSchedule(bestSchedule.get(), iterationBest.get())) {
+    if (shouldReplaceSchedule(bestSchedule.get(), iterationBest.get(), true)) {
       bestSchedule = std::move(iterationBest);
       Logger::Info("ACO found schedule with spill cost %d",
                    bestSchedule->GetCost());

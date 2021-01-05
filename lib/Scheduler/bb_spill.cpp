@@ -322,8 +322,18 @@ InstCount BBWithSpill::CmputRPCostLwrBound() {
   RpCostLwrBound_ = spillCostLwrBound * SCW_;
   return RpCostLwrBound_;
 }
-
 /*****************************************************************************/
+
+void BBWithSpill::addRecordedCost(SPILL_COST_FUNCTION Scf) {
+  recordedCostFunctions.insert(Scf);
+}
+/*****************************************************************************/
+
+void BBWithSpill::storeExtraCost(InstSchedule *sched, SPILL_COST_FUNCTION Scf) {
+	sched->SetExtraSpillCost(Scf, CmputCostForFunction(Scf));
+}
+/*****************************************************************************/
+
 
 void BBWithSpill::InitForSchdulng() {
   InitForCostCmputtn_();
@@ -402,6 +412,10 @@ InstCount BBWithSpill::CmputCost_(InstSchedule *sched, COST_COMP_MODE compMode,
   sched->SetSpillCosts(spillCosts_);
   sched->SetPeakRegPressures(peakRegPressures_);
   sched->SetSpillCost(crntSpillCost_);
+
+  for(auto it = recordedCostFunctions.begin(); it != recordedCostFunctions.end(); ++it)
+    storeExtraCost(sched, *it);
+
   return cost;
 }
 /*****************************************************************************/
@@ -549,38 +563,12 @@ void BBWithSpill::UpdateSpillInfoForSchdul_(SchedInstruction *inst,
         }
       }
     }
-
-    // FIXME: Can this be taken out of this loop?
-    if (GetSpillCostFunc() == SCF_SLIL) {
-      slilSpillCost_ = std::accumulate(sumOfLiveIntervalLengths_.begin(),
-                                       sumOfLiveIntervalLengths_.end(), 0);
-    }
   }
 
-  if (GetSpillCostFunc() == SCF_TARGET) {
-    newSpillCost = OST->getCost(regPressures_);
-
-  } else if (GetSpillCostFunc() == SCF_SLIL) {
-    slilSpillCost_ = std::accumulate(sumOfLiveIntervalLengths_.begin(),
-                                     sumOfLiveIntervalLengths_.end(), 0);
-
-  } else if (GetSpillCostFunc() == SCF_PRP) {
-    newSpillCost =
-        std::accumulate(regPressures_.begin(), regPressures_.end(), 0);
-
-  } else if (GetSpillCostFunc() == SCF_PEAK_PER_TYPE) {
-    for (int i = 0; i < regTypeCnt_; i++)
-      newSpillCost +=
-          std::max(0, peakRegPressures_[i] - machMdl_->GetPhysRegCnt(i));
-
-  } else {
-    // Default is PERP (Some SCF like SUM rely on PERP being the default here)
-    int i = 0;
-    std::for_each(
-        regPressures_.begin(), regPressures_.end(), [&](InstCount RP) {
-          newSpillCost += std::max(0, RP - machMdl_->GetPhysRegCnt(i++));
-        });
-  }
+  if(GetSpillCostFunc()==SCF_SLIL)
+    slilSpillCost_ = CmputCostForFunction(GetSpillCostFunc());
+  else
+    newSpillCost = CmputCostForFunction(GetSpillCostFunc());
 
 #ifdef IS_DEBUG_SLIL_CORRECT
   if (OPTSCHED_gPrintSpills) {
@@ -857,6 +845,46 @@ FUNC_RESULT BBWithSpill::Enumerate_(Milliseconds startTime,
   return rslt;
 }
 /*****************************************************************************/
+
+//can only compute SLIL if SLIL was the spillCostFunc
+InstCount BBWithSpill::CmputCostForFunction(SPILL_COST_FUNCTION SpillCF) {
+  //assert that if we are asking for SLIL that the CF is SLIL
+  assert(SpillCF!=SCF_SLIL|GetSpillCostFunc()==SCF_SLIL);
+
+  //return the requested cost
+  switch(SpillCF)
+  {
+    case SCF_TARGET:
+    return OST->getCost(regPressures_);
+
+    case SCF_SLIL:
+    return std::accumulate(sumOfLiveIntervalLengths_.begin(),
+                           sumOfLiveIntervalLengths_.end(), 0);
+
+    case SCF_PRP:
+    return std::accumulate(regPressures_.begin(), regPressures_.end(), 0);
+
+    case SCF_PEAK_PER_TYPE:
+    {
+      InstCount SC=0;
+      for (int i = 0; i < regTypeCnt_; i++)
+        SC += std::max(0, peakRegPressures_[i] - machMdl_->GetPhysRegCnt(i));
+      return SC;
+    }
+    default:
+    {
+      // Default is PERP (Some SCF like SUM rely on PERP being the default here)
+      int i = 0;
+      InstCount SC=0;
+      std::for_each(
+          regPressures_.begin(), regPressures_.end(), [&](InstCount RP) {
+            SC += std::max(0, RP - machMdl_->GetPhysRegCnt(i++));
+          });
+      return SC;
+    }
+  }
+}
+
 
 InstCount BBWithSpill::UpdtOptmlSched(InstSchedule *crntSched,
                                       LengthCostEnumerator *) {

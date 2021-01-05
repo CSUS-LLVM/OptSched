@@ -429,6 +429,14 @@ void ScheduleDAGOptSched::schedule() {
     CurrentLengthTimeout = LengthTimeout * SUnits.size();
   }
 
+  // add extra recorded costs
+  if (schedIni.GetBool("ACO_ENABLED") &&
+      std::string(schedIni.GetString("ACO_DUAL_COST_FN_ENABLE")) != "OFF") {
+    std::string costFn = schedIni.GetString(!SecondPass ? "ACO_DUAL_COST_FN" : "ACO2P_DUAL_COST_FN");
+    if (costFn != "NONE")
+      region->addRecordedCost(ParseSCFName(costFn));
+  }
+
   // Used for two-pass-optsched to alter upper bound value.
   if (SecondPass)
     region->InitSecondPass();
@@ -704,25 +712,7 @@ SchedPriorities ScheduleDAGOptSched::parseHeuristic(const std::string &Str) {
 SPILL_COST_FUNCTION ScheduleDAGOptSched::parseSpillCostFunc() const {
   std::string name =
       SchedulerOptions::getInstance().GetString("SPILL_COST_FUNCTION");
-  // PERP used to be called PEAK.
-  if (name == "PERP" || name == "PEAK") {
-    return SCF_PERP;
-  } else if (name == "PRP") {
-    return SCF_PRP;
-  } else if (name == "PEAK_PER_TYPE") {
-    return SCF_PEAK_PER_TYPE;
-  } else if (name == "SUM") {
-    return SCF_SUM;
-  } else if (name == "PEAK_PLUS_AVG") {
-    return SCF_PEAK_PLUS_AVG;
-  } else if (name == "SLIL") {
-    return SCF_SLIL;
-  } else if (name == "OCC" || name == "TARGET") {
-    return SCF_TARGET;
-  }
-
-  llvm::report_fatal_error(
-      "Unrecognized option for SPILL_COST_FUNCTION setting: " + name, false);
+  return ParseSCFName(name);
 }
 
 bool ScheduleDAGOptSched::shouldPrintSpills() const {

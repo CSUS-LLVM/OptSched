@@ -12,6 +12,7 @@ Last Update:  Apr. 2011
 #include "opt-sched/Scheduler/OptSchedTarget.h"
 #include "opt-sched/Scheduler/defines.h"
 #include "opt-sched/Scheduler/sched_region.h"
+#include "llvm/ADT/SmallSet.h"
 #include "llvm/ADT/SmallVector.h"
 #include <map>
 #include <set>
@@ -73,6 +74,7 @@ private:
   InstCount *spillCosts_;
   // Current register pressure for each register type.
   SmallVector<unsigned, 8> regPressures_;
+  SmallSet<SPILL_COST_FUNCTION, 8> recordedCostFunctions;
   InstCount *peakRegPressures_;
   InstCount crntStepNum_;
   InstCount peakSpillCost_;
@@ -106,6 +108,9 @@ private:
   void UpdateSpillInfoForSchdul_(SchedInstruction *inst, bool trackCnflcts);
   void UpdateSpillInfoForUnSchdul_(SchedInstruction *inst);
   void SetupPhysRegs_();
+  //can only compute SLIL if SLIL was the spillCostFunc
+  //This function must only be called after the regPressures_ is computed
+  InstCount CmputCostForFunction(SPILL_COST_FUNCTION SpillCF);
   void CmputCrntSpillCost_();
   bool ChkSchedule_(InstSchedule *bestSched, InstSchedule *lstSched);
   void CmputCnflcts_(InstSchedule *sched);
@@ -122,6 +127,11 @@ public:
   InstCount CmputCostLwrBound();
   InstCount CmputExecCostLwrBound();
   InstCount CmputRPCostLwrBound();
+
+  // calling addRecordedCost will cause this region to record the current spill
+  // cost of the schedule using Scf whenever the spill cost updates
+  void addRecordedCost(SPILL_COST_FUNCTION Scf);
+  void storeExtraCost(InstSchedule *sched, SPILL_COST_FUNCTION Scf);
 
   InstCount UpdtOptmlSched(InstSchedule *crntSched,
                            LengthCostEnumerator *enumrtr);

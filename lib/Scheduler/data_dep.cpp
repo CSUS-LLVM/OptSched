@@ -2758,6 +2758,10 @@ void InstSchedule::Copy(InstSchedule *src) {
   cost_ = src->cost_;
   execCost_ = src->execCost_;
   spillCost_ = src->spillCost_;
+  NormSpillCost = src->NormSpillCost;
+
+  for (int i = 0; i < MAX_SCHED_PRIRTS; ++i)
+    storedSC[i] = src->storedSC[i];
 }
 
 void InstSchedule::SetSpillCosts(InstCount spillCosts[]) {
@@ -3060,6 +3064,14 @@ InstCount InstSchedule::GetSpillCost() const { return spillCost_; }
 void InstSchedule::SetNormSpillCost(InstCount cost) { NormSpillCost = cost; }
 
 InstCount InstSchedule::GetNormSpillCost() const { return NormSpillCost; }
+
+void InstSchedule::SetExtraSpillCost(SPILL_COST_FUNCTION Fn, InstCount cost) {
+  storedSC[Fn] = cost;
+}
+
+InstCount InstSchedule::GetExtraSpillCost(SPILL_COST_FUNCTION Fn) const {
+  return storedSC[Fn];
+}
 
 /*******************************************************************************
  * Previously inlined functions
