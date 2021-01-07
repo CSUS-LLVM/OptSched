@@ -85,34 +85,6 @@ static bool isBbEnabled(Config &schedIni, Milliseconds rgnTimeout) {
 }
 
 __global__
-void CreateDDG(SchedRegion *dev_rgn, DataDepGraph **dev_maxDDG,
-               NodeData *dev_nodeData, RegFileData *dev_regFileData,
-               InstCount instCnt, bool cmputTrnstvClsr,
-	       MachineModel *dev_machMdl, LATENCY_PRECISION ltncyPcsn) {
-  *dev_maxDDG = new DataDepGraph(dev_machMdl, ltncyPcsn);
-
-  (*dev_maxDDG)->ReconstructOnDevice(instCnt, dev_nodeData, dev_regFileData);
-
-  dev_rgn->SetDepGraph(*dev_maxDDG);
-  (*dev_maxDDG)->SetupForSchdulng(cmputTrnstvClsr);
-  ((BBWithSpill *)dev_rgn)->SetRegFiles((*dev_maxDDG)->getRegFiles());
-}
-
-__global__
-void InitializeDDG(SchedRegion *dev_rgn, DataDepGraph **dev_maxDDG, 
-		   NodeData *dev_nodeData, RegFileData *dev_regFileData,
-                   InstCount instCnt, bool cmputTrnstvClsr) {
-
-  (*dev_maxDDG)->InitializeOnDevice(instCnt, dev_nodeData, dev_regFileData);
-  // Update dev_rgn->dataDepGraph_ to device DDG
-  if (blockIdx.x == 0) {
-    dev_rgn->SetDepGraph(*dev_maxDDG);
-    (*dev_maxDDG)->SetupForSchdulng(cmputTrnstvClsr);
-    ((BBWithSpill *)dev_rgn)->SetRegFiles((*dev_maxDDG)->getRegFiles());
-  }
-}
-
-__global__
 void DevListSched(SchedRegion *dev_rgn, DataDepGraph *dev_DDG, 
 		  ListScheduler *dev_lstSchdulr, InstSchedule *dev_lstSched) {
 
@@ -251,6 +223,7 @@ FUNC_RESULT SchedRegion::FindOptimalSchedule(
     Milliseconds hurstcStart = Utilities::GetProcessorTime();
     //if true run DevListSched
     if (false) {
+/*
       size_t memSize;
       // Copy DDG to device
       Logger::Info("Copying DDG to device");
@@ -312,7 +285,8 @@ FUNC_RESULT SchedRegion::FindOptimalSchedule(
       heuristicScheduleLength = lstSched->GetCrntLngth();
       hurstcExecCost = lstSched->GetExecCost();  
       hurstcCost_ = lstSched->GetCost();
-      /****End Device Code****/
+      ****End Device Code****
+*/
     }
 
     hurstcTime = Utilities::GetProcessorTime() - hurstcStart;
@@ -322,7 +296,7 @@ FUNC_RESULT SchedRegion::FindOptimalSchedule(
 
     // If true, run list scheduling on the host
     if (true) {
-      Logger::Info("Running host list scheduling to check for correctness");
+      //Logger::Info("Running host list scheduling to check for correctness");
 
       InstSchedule *host_lstSched = new InstSchedule(machMdl_, dataDepGraph_, vrfySched_);
 
@@ -347,6 +321,7 @@ FUNC_RESULT SchedRegion::FindOptimalSchedule(
       
       // if true compare dev and lstsched, if false set hostlstsched as lstsched
       if (false) {
+/*
         bool match = true;
     
         for (InstCount i = 0; i < dataDepGraph_->GetInstCnt(); i++) {
@@ -369,6 +344,7 @@ FUNC_RESULT SchedRegion::FindOptimalSchedule(
           lstSched->Print();
           Logger::Info("******** Host and Device Schedule mismatch ********");
 	}
+*/
       } else {
         lstSched = host_lstSched;
         heuristicScheduleLength = lstSched->GetCrntLngth();
@@ -981,110 +957,117 @@ void InitCurand(curandState_t *dev_states, unsigned long seed) {
 FUNC_RESULT SchedRegion::runACO(InstSchedule *ReturnSched,
                                 InstSchedule *InitSched) {
   InitForSchdulng();
-  // **** Start Dev_ACO code **** //
-  // Allocate and Copy data to device for parallel ACO
-  size_t memSize;
-  // Allocate arrays for parallel ACO execution
-  Logger::Info("Allocating SchedInstruction Arrays for Parallel ACO");
-  for (int i = 0; i < dataDepGraph_->GetInstCnt(); i++) {
-    dataDepGraph_->GetInstByIndx(i)->AllocDevArraysForParallelACO(NUMTHREADS);
-  }
-  Logger::Info("Allocating Register Arrays for Parallel ACO");
-  RegisterFile *regFiles = dataDepGraph_->getRegFiles();
-  for (int i = 0; i < dataDepGraph_->GetRegTypeCnt(); i++) {
-    for (int j = 0; j < regFiles[i].GetRegCnt(); j++)
-      regFiles[i].GetReg(j)->AllocDevArrayForParallelACO(NUMTHREADS);
-  }
-  Logger::Info("Allocating BBWithSpill Arrays for Parallel ACO");
-  ((BBWithSpill*)this)->AllocDevArraysForParallelACO(NUMTHREADS);
-  // Copy DDG and its objects to device
-  Logger::Info("Copying DDG and its Instruction to device");
-  DataDepGraph *dev_DDG;
-  memSize = sizeof(DataDepGraph);
-  gpuErrchk(cudaMallocManaged(&dev_DDG, memSize));
-  gpuErrchk(cudaMemcpy(dev_DDG, dataDepGraph_, memSize,
-		       cudaMemcpyHostToDevice));
-  dataDepGraph_->CopyPointersToDevice(dev_DDG);
-  // Copy this(BBWithSpill) to device
-  Logger::Info("Copying BBWithSpill to Device");
-  BBWithSpill *dev_rgn;
-  memSize = sizeof(BBWithSpill);
-  // Allocate device mem
-  gpuErrchk(cudaMallocManaged((void**)&dev_rgn, memSize));
-  // Copy this to device
-  gpuErrchk(cudaMemcpy(dev_rgn, this, memSize, cudaMemcpyHostToDevice));
-  dev_rgn->machMdl_ = dev_machMdl_;
-  CopyPointersToDevice(dev_rgn, NUMTHREADS);
-  // Create and copy an array of DeviceVector<Choice>* for use during scheduling
-  Logger::Info("Creating and Copying ready arrays to device");
-  DeviceVector<Choice> **host_ready = new DeviceVector<Choice> *[NUMTHREADS];
-  Choice *dev_elmnts;
-  DeviceVector<Choice> *ready = 
-          new DeviceVector<Choice>(dataDepGraph_->GetInstCnt());
-  //memSize = sizeof(DeviceVector<Choice>);
-  for (int i = 0; i < NUMTHREADS; i++) {
-    memSize = sizeof(DeviceVector<Choice>);
-    gpuErrchk(cudaMallocManaged(&host_ready[i], memSize));
-    gpuErrchk(cudaMemcpy(host_ready[i], ready, memSize, 
-			 cudaMemcpyHostToDevice));
-    //copy ready->elmnts_ and link to dev_ready'
-    memSize = sizeof(Choice) * dataDepGraph_->GetInstCnt();
-    gpuErrchk(cudaMalloc(&dev_elmnts, memSize));
-    gpuErrchk(cudaMemcpy(dev_elmnts, ready->elmnts_, memSize,
+  FUNC_RESULT Rslt;
+  if (DEV_ACO) {
+    // Allocate and Copy data to device for parallel ACO
+    size_t memSize;
+    // Allocate arrays for parallel ACO execution
+    Logger::Info("Allocating SchedInstruction Arrays for Parallel ACO");
+    for (int i = 0; i < dataDepGraph_->GetInstCnt(); i++) {
+      dataDepGraph_->GetInstByIndx(i)->AllocDevArraysForParallelACO(NUMTHREADS);
+    }
+    Logger::Info("Allocating Register Arrays for Parallel ACO");
+    RegisterFile *regFiles = dataDepGraph_->getRegFiles();
+    for (int i = 0; i < dataDepGraph_->GetRegTypeCnt(); i++) {
+      for (int j = 0; j < regFiles[i].GetRegCnt(); j++)
+        regFiles[i].GetReg(j)->AllocDevArrayForParallelACO(NUMTHREADS);
+    }
+    Logger::Info("Allocating BBWithSpill Arrays for Parallel ACO");
+    ((BBWithSpill*)this)->AllocDevArraysForParallelACO(NUMTHREADS);
+    // Copy DDG and its objects to device
+    Logger::Info("Copying DDG and its Instruction to device");
+    DataDepGraph *dev_DDG;
+    memSize = sizeof(DataDepGraph);
+    gpuErrchk(cudaMallocManaged(&dev_DDG, memSize));
+    gpuErrchk(cudaMemcpy(dev_DDG, dataDepGraph_, memSize,
                          cudaMemcpyHostToDevice));
-    host_ready[i]->elmnts_ = dev_elmnts;
-  }
-  delete ready;
-  // copy array of device pointers to device
-  DeviceVector<Choice> **dev_ready;
-  memSize = sizeof(DeviceVector<Choice> *) * NUMTHREADS;
-  gpuErrchk(cudaMalloc(&dev_ready, memSize));
-  gpuErrchk(cudaMemcpy(dev_ready, host_ready, memSize, cudaMemcpyHostToDevice));
-  // Allocate dev_states for curand RNG and run curand_init() to initialize
-  Logger::Info("Initializing states for cuRand");
-  curandState_t *dev_states;
-  memSize = sizeof(curandState_t) * NUMTHREADS;
-  gpuErrchk(cudaMalloc(&dev_states, memSize));
-  InitCurand<<<NUMBLOCKS, NUMTHREADSPERBLOCK>>>(dev_states, 
-		                                unsigned(time(NULL)));
-  //cudaDeviceSynchronize();
-  Logger::Info("Creating ACOScheduler");
-  ACOScheduler *AcoSchdulr = new ACOScheduler(
-      dataDepGraph_, machMdl_, abslutSchedUprBound_, hurstcPrirts_, vrfySched_,
-      (SchedRegion *)dev_rgn, dev_DDG, dev_ready, dev_machMdl_, dev_states);
-  AcoSchdulr->setInitialSched(InitSched);
-  // Alloc dev arrays for parallel ACO
-  Logger::Info("Allocating ACOScheduler Arrays for Parallel ACO");
-  AcoSchdulr->AllocDevArraysForParallelACO();
-  // Copy ACOScheduler to device
-  Logger::Info("Copying ACOScheduler to device");
-  ACOScheduler *dev_AcoSchdulr;
-  memSize = sizeof(ACOScheduler);
-  gpuErrchk(cudaMallocManaged(&dev_AcoSchdulr, memSize));
-  gpuErrchk(cudaMemcpy(dev_AcoSchdulr, AcoSchdulr, memSize,
-                       cudaMemcpyHostToDevice));
-  AcoSchdulr->CopyPointersToDevice(dev_AcoSchdulr);
+    dataDepGraph_->CopyPointersToDevice(dev_DDG);
+    // Copy this(BBWithSpill) to device
+    Logger::Info("Copying BBWithSpill to Device");
+    BBWithSpill *dev_rgn;
+    memSize = sizeof(BBWithSpill);
+    // Allocate device mem
+    gpuErrchk(cudaMallocManaged((void**)&dev_rgn, memSize));
+    // Copy this to device
+    gpuErrchk(cudaMemcpy(dev_rgn, this, memSize, cudaMemcpyHostToDevice));
+    dev_rgn->machMdl_ = dev_machMdl_;
+    CopyPointersToDevice(dev_rgn, NUMTHREADS);
+    // Create and copy an array of DeviceVector<Choice>* for use during scheduling
+    Logger::Info("Creating and Copying ready arrays to device");
+    DeviceVector<Choice> **host_ready = new DeviceVector<Choice> *[NUMTHREADS];
+    Choice *dev_elmnts;
+    DeviceVector<Choice> *ready = 
+            new DeviceVector<Choice>(dataDepGraph_->GetInstCnt());
+    //memSize = sizeof(DeviceVector<Choice>);
+    for (int i = 0; i < NUMTHREADS; i++) {
+      memSize = sizeof(DeviceVector<Choice>);
+      gpuErrchk(cudaMallocManaged(&host_ready[i], memSize));
+      gpuErrchk(cudaMemcpy(host_ready[i], ready, memSize, 
+                           cudaMemcpyHostToDevice));
+      //copy ready->elmnts_ and link to dev_ready'
+      memSize = sizeof(Choice) * dataDepGraph_->GetInstCnt();
+      gpuErrchk(cudaMalloc(&dev_elmnts, memSize));
+      gpuErrchk(cudaMemcpy(dev_elmnts, ready->elmnts_, memSize,
+                           cudaMemcpyHostToDevice));
+      host_ready[i]->elmnts_ = dev_elmnts;
+    }
+    delete ready;
+    // copy array of device pointers to device
+    DeviceVector<Choice> **dev_ready;
+    memSize = sizeof(DeviceVector<Choice> *) * NUMTHREADS;
+    gpuErrchk(cudaMalloc(&dev_ready, memSize));
+    gpuErrchk(cudaMemcpy(dev_ready, host_ready, memSize, cudaMemcpyHostToDevice));
+    // Allocate dev_states for curand RNG and run curand_init() to initialize
+    Logger::Info("Initializing states for cuRand");
+    curandState_t *dev_states;
+    memSize = sizeof(curandState_t) * NUMTHREADS;
+    gpuErrchk(cudaMalloc(&dev_states, memSize));
+    InitCurand<<<NUMBLOCKS, NUMTHREADSPERBLOCK>>>(dev_states, 
+                                                  unsigned(time(NULL)));
+    //cudaDeviceSynchronize();
+    Logger::Info("Creating ACOScheduler");
+    ACOScheduler *AcoSchdulr = new ACOScheduler(
+        dataDepGraph_, machMdl_, abslutSchedUprBound_, hurstcPrirts_, vrfySched_,
+        (SchedRegion *)dev_rgn, dev_DDG, dev_ready, dev_machMdl_, dev_states);
+    AcoSchdulr->setInitialSched(InitSched);
+    // Alloc dev arrays for parallel ACO
+    Logger::Info("Allocating ACOScheduler Arrays for Parallel ACO");
+    AcoSchdulr->AllocDevArraysForParallelACO();
+    // Copy ACOScheduler to device
+    Logger::Info("Copying ACOScheduler to device");
+    ACOScheduler *dev_AcoSchdulr;
+    memSize = sizeof(ACOScheduler);
+    gpuErrchk(cudaMallocManaged(&dev_AcoSchdulr, memSize));
+    gpuErrchk(cudaMemcpy(dev_AcoSchdulr, AcoSchdulr, memSize,
+                         cudaMemcpyHostToDevice));
+    AcoSchdulr->CopyPointersToDevice(dev_AcoSchdulr);
 
-  FUNC_RESULT Rslt = AcoSchdulr->FindSchedule(ReturnSched, this, dev_AcoSchdulr);
-  dev_AcoSchdulr->FreeDevicePointers();
-  cudaFree(dev_AcoSchdulr);
-  delete AcoSchdulr;
+    Rslt = AcoSchdulr->FindSchedule(ReturnSched, this, dev_AcoSchdulr);
+    dev_AcoSchdulr->FreeDevicePointers();
+    cudaFree(dev_AcoSchdulr);
+    delete AcoSchdulr;
 
-  for (int i = 0; i < NUMTHREADS; i++) {
-    cudaFree(host_ready[i]->elmnts_);
-    cudaFree(host_ready[i]);
+    for (int i = 0; i < NUMTHREADS; i++) {
+      cudaFree(host_ready[i]->elmnts_);
+      cudaFree(host_ready[i]);
+    }
+    cudaFree(dev_ready);
+    delete[] host_ready;
+    dev_rgn->FreeDevicePointers(NUMTHREADS);
+    cudaFree(dev_rgn);
+    dev_DDG->FreeDevicePointers(NUMTHREADS);
+    cudaFree(dev_DDG);
+    cudaFree(dev_states);
+    // Ocasionally BBWithSpill deletes an empty pointer, which causes the next
+    // kernel to report an invalid argument error after execution even
+    // though the non issue error happens here. This call is to clear errors
+    // from BBWithSpill deletion.
+    cudaGetLastError();
+  } else {
+    ACOScheduler *AcoSchdulr = new ACOScheduler(
+        dataDepGraph_, machMdl_, abslutSchedUprBound_, hurstcPrirts_, vrfySched_);
+    AcoSchdulr->setInitialSched(InitSched);
+    Rslt = AcoSchdulr->FindSchedule(ReturnSched, this);
   }
-  cudaFree(dev_ready);
-  delete[] host_ready;
-  dev_rgn->FreeDevicePointers(NUMTHREADS);
-  cudaFree(dev_rgn);
-  dev_DDG->FreeDevicePointers(NUMTHREADS);
-  cudaFree(dev_DDG);
-  cudaFree(dev_states);
-  // Ocasionally BBWithSpill deletes an empty pointer, which causes the next
-  // kernel to report an invalid argument error after execution even
-  // though the non issue error happens here. This call is to clear errors
-  // from BBWithSpill deletion.
-  cudaGetLastError();
   return Rslt;
 }

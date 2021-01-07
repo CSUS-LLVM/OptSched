@@ -100,7 +100,7 @@ public:
   __host__
   void Print(std::ostream &out);
   // Cannot use cout on device, invoke this on device instead
-  __host__ __device__
+  __device__
   void Dev_Print();
   // Copy pointers to device and link them to passed device pointer
   void CopyPointersToDevice(ReadyList *dev_rdyLst, DataDepGraph *dev_DDG,
@@ -141,10 +141,6 @@ private:
   InstCount maxInptSchedOrder_;
 
   unsigned long maxPriority_;
-  // An array of size numThreads to allow an independent maxPriority for each
-  // thread
-  unsigned long *dev_maxPriority_;
-
   // The number of bits for each part of the priority key.
   int16_t useCntBits_;
   int16_t crtclPathBits_;

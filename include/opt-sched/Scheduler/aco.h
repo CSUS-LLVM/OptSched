@@ -21,7 +21,9 @@ namespace opt_sched {
 
 typedef double pheremone_t;
 
-#define NUMBLOCKS 1
+// If set to 1 ACO is run on device
+#define DEV_ACO 1
+#define NUMBLOCKS 20
 #define NUMTHREADSPERBLOCK 128
 #define NUMTHREADS NUMBLOCKS * NUMTHREADSPERBLOCK
 
@@ -34,9 +36,10 @@ class ACOScheduler : public ConstrainedScheduler {
 public:
   ACOScheduler(DataDepGraph *dataDepGraph, MachineModel *machineModel,
                InstCount upperBound, SchedPriorities priorities,
-               bool vrfySched, SchedRegion *dev_rgn, DataDepGraph *dev_DDG,
-	       DeviceVector<Choice> **dev_ready, MachineModel *dev_MM, 
-	       curandState_t *dev_states);
+               bool vrfySched, SchedRegion *dev_rgn = NULL,
+	       DataDepGraph *dev_DDG = NULL,
+	       DeviceVector<Choice> **dev_ready = NULL,
+	       MachineModel *dev_MM = NULL, curandState_t *dev_states = NULL);
   __host__ __device__
   virtual ~ACOScheduler();
   FUNC_RESULT FindSchedule(InstSchedule *schedule, SchedRegion *region, 

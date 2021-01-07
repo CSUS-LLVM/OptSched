@@ -97,158 +97,6 @@ const int NUM_GRAPH_TRANS = 1;
 // Values for Uninitiated nodes
 const InstCount UNINITIATED_NUM = -1;
 const InstType UNINITIATED_TYPE = -1;
-//const char[12] UNINITIATED_NAME = "UNINITIATED";
-
-//struct for transfer of prdcsr/scrsr data to device
-struct EdgeData {
-  InstCount toNodeNum_;
-  int ltncy_;
-  DependenceType depType_;
-};
-
-//data structure for transfer of inst node data to device
-struct NodeData {
-  InstCount instNum_;
-  char instName_[50];
-  InstType instType_;
-  char opCode_[50];
-  int nodeID_;
-  InstCount fileSchedOrder_;
-  InstCount fileSchedCycle_;
-  InstCount fileLB_;
-  InstCount fileUB_; 
-  EdgeData *prdcsrs_;
-  int prdcsrCnt_;
-  EdgeData *scsrs_;
-  int scsrCnt_;
-
-  //copies prdcsrs_ and scsrs_ arrays to device
-  void CopyPointersToDevice(NodeData *dev_nodeData) {
-    EdgeData *dev_prdcsrs = NULL;
- 
-    if (prdcsrCnt_ > 0) {
-      //allocate device memory
-      if (cudaSuccess != cudaMallocManaged((void**)&dev_prdcsrs, prdcsrCnt_ * sizeof(EdgeData)))
-        printf("Error allocating dev mem for dev_prdcsrs: %s\n", cudaGetErrorString(cudaGetLastError()));
-
-      //copy array to device
-      if (cudaSuccess != cudaMemcpy(dev_prdcsrs, prdcsrs_, prdcsrCnt_ * sizeof(EdgeData), cudaMemcpyHostToDevice))
-        printf("Error copying prdcsrs_ to device: %s\n", cudaGetErrorString(cudaGetLastError()));
-
-      //update device pointer
-      dev_nodeData->prdcsrs_ = dev_prdcsrs;
-
-      //free up host EdgeData
-      delete[] prdcsrs_;
-    }
-
-    EdgeData *dev_scsrs = NULL;
-
-    if (scsrCnt_ > 0) {
-      //allocate device memory
-      if (cudaSuccess != cudaMallocManaged((void**)&dev_scsrs, scsrCnt_ * sizeof(EdgeData)))
-        printf("Error allocating dev mem for dev_scsrs: %s\n", cudaGetErrorString(cudaGetLastError()));
-
-      //copy array to device
-      if (cudaSuccess != cudaMemcpy(dev_scsrs, scsrs_, scsrCnt_ * sizeof(EdgeData), cudaMemcpyHostToDevice))
-        printf("Error copying scsrs_ to device: %s\n", cudaGetErrorString(cudaGetLastError()));
-
-      //update device pointer
-      dev_nodeData->scsrs_ = dev_scsrs;
-
-      //free up host EdgeData'
-      delete[] scsrs_;
-    }
-  }
-
-  void FreeDevicePointers() {
-    cudaFree(prdcsrs_);
-    cudaFree(scsrs_);
-  }
-};
-
-//DS for transfer of register data to device
-struct RegData {
-  int wght_;
-  bool isLiveIn_;
-  bool isLiveOut_;
-  //instNum of insts that use/define the reg
-  InstCount *uses_;
-  int useCnt_;
-  InstCount *defs_;
-  int defCnt_;
-
-  void CopyPointersToDevice(RegData *dev_regData) {
-    InstCount *dev_uses = NULL;
-
-    if (useCnt_ > 0) {
-      if (cudaSuccess != cudaMallocManaged((void**)&dev_uses, useCnt_ * sizeof(InstCount)))
-        printf("Error allocating dev mem for dev_uses: %s\n", cudaGetErrorString(cudaGetLastError()));
-
-      if (cudaSuccess != cudaMemcpy(dev_uses, uses_, useCnt_ * sizeof(InstCount), cudaMemcpyHostToDevice))
-        printf("Error copying uses_ to device: %s\n", cudaGetErrorString(cudaGetLastError()));
-
-      dev_regData->uses_ = dev_uses;
-
-      delete[] uses_;
-    }
-    InstCount *dev_defs = NULL;
-
-    if (defCnt_ > 0) {
-      if (cudaSuccess != cudaMallocManaged((void**)&dev_defs, defCnt_ * sizeof(InstCount)))
-        printf("Error allocating dev mem for dev_defs: %s\n", cudaGetErrorString(cudaGetLastError()));
-
-      if (cudaSuccess != cudaMemcpy(dev_defs, defs_, defCnt_ * sizeof(InstCount), cudaMemcpyHostToDevice))
-        printf("Error copying defs_ to device: %s\n", cudaGetErrorString(cudaGetLastError()));
-
-      dev_regData->defs_ = dev_defs;
-
-      delete[] defs_;
-    }
-  }
-
-  void FreeDevicePointers() {
-    if (useCnt_ > 0)
-      cudaFree(uses_);
-    if (defCnt_ > 0)
-      cudaFree(defs_);
-  }
-};
-
-//data structure for transfer of register file data to device
-struct RegFileData {
-  int16_t regType_;
-  int regCnt_;
-  RegData *regs_;
-
-  void CopyPointersToDevice(RegFileData *dev_regFileData) {
-    RegData *dev_regs = NULL;
-
-    if (regCnt_ > 0) {
-      if (cudaSuccess != cudaMallocManaged((void**)&dev_regs, regCnt_ * sizeof(RegData)))
-        printf("Error allocating dev mem for dev_regs: %s\n", cudaGetErrorString(cudaGetLastError()));
-
-      if (cudaSuccess != cudaMemcpy(dev_regs, regs_, regCnt_ * sizeof(RegData), cudaMemcpyHostToDevice))
-        printf("Error copying regs_ to device: %s\n", cudaGetErrorString(cudaGetLastError()));
-
-      dev_regFileData->regs_ = dev_regs;
-
-      for (int i = 0; i < regCnt_; i++)
-        regs_[i].CopyPointersToDevice(&dev_regs[i]);
-
-      //free up host regs
-      delete[] regs_;
-    }
-  }
-
-  void FreeDevicePointers() {
-    for (int i = 0; i < regCnt_; i++)
-      regs_[i].FreeDevicePointers();
-
-    if (regs_)
-      cudaFree(regs_);
-  }
-};
 
 // Forward declarations used to reduce the number of #includes.
 class MachineModel;
@@ -491,32 +339,6 @@ public:
   Register *getRegByTuple(RegIndxTuple *tuple) { 
     return RegFiles[tuple->regType_].GetReg(tuple->regNum_); 
   }
-
-  // Creates an array of NodeData which hold the information
-  // about the DDG in order to create DDG on device
-  void CreateNodeData(NodeData *nodeData);
-  // Creates and array of reg file data with holds the information
-  // about the RegFiles and its Regs in order to recreate
-  // egFiles on device
-  void CreateRegData(RegFileData *regFileData);
-
-  // Used to setup DDG on device
-  __device__
-  void ReconstructOnDevice(InstCount instCnt, NodeData *nodeData, 
-		           RegFileData *regFileData);
-  // Initalized allocated SchedInsts and Edges
-  __device__
-  void InitializeOnDevice(InstCount instCnt, NodeData *nodeData,
-                           RegFileData *regFileData);
-  // Initializes a blank edge to given values. Same behavior as create
-  // edge except edges are taken from a pre allocated pool and not created
-  __device__
-  void InitializeEdge_(InstCount frmNodeNum, InstCount toNodeNum, int ltncy, 
-		       DependenceType depType);
-  // Allocates a full DDG with nodes = maxRgnSize and n-1 edges per node
-  __device__
-  void AllocateMaxDDG(InstCount maxRgnSize, InstCount maxEdgeCnt, 
-		      GraphEdge *dev_edges, SchedInstruction *dev_insts);
   // Resets DDG to blank state for later reinitilization
   __device__
   void Reset();
@@ -818,7 +640,7 @@ public:
   void UndoInstLost(SchedInstruction *inst);
   InstCount GetAvlblSlots(IssueType issuType);
 };
-/*****************************************************************************/
+*****************************************************************************/
 
 // An instance of this class holds all the necessary information about an
 // instruction schedule. A scheduler starts with an empty object of this
@@ -857,10 +679,12 @@ private:
   // An array indexed by linear slot number which contains the instruction
   // number scheuled in that slot
   InstCount *instInSlot_;
+  InstCount *dev_instInSlot_;
 
   // An array indexed by instruction number which contains the linear slot
   // number in which that instruction has been scheduled
   InstCount *slotForInst_;
+  InstCount *dev_slotForInst_;
 
   // The current slot number for the iterator
   InstCount iterSlotNum_;
@@ -870,6 +694,7 @@ private:
 
   // An array of spill costs at all points in the schedule
   InstCount *spillCosts_;
+  InstCount *dev_spillCosts_;
 
   // Tot spill cost across the entire schedule
   InstCount totSpillCost_;
@@ -879,6 +704,7 @@ private:
 
   // An array of peak reg pressures for all reg types in the schedule
   InstCount *peakRegPressures_;
+  InstCount *dev_peakRegPressures_;
 
   // The number of conflicts among live ranges
   int cnflctCnt_;
@@ -889,6 +715,7 @@ private:
   int spillCnddtCnt_;
 
   MachineModel *machMdl_;
+  MachineModel *dev_machMdl_;
 
   bool vrfy_;
 
@@ -899,9 +726,9 @@ private:
                             InstCount &slotNum);
 
 public:
-  __host__ __device__
   InstSchedule(MachineModel *machMdl, DataDepGraph *dataDepGraph, bool vrfy);
-  __host__ __device__
+  // dummy constructor
+  InstSchedule();
   ~InstSchedule();
   bool operator==(InstSchedule &b) const;
 
@@ -972,9 +799,13 @@ public:
   bool Verify(MachineModel *machMdl, DataDepGraph *dataDepGraph);
   void PrintClassData();
   //copies InstSchedules pointers to device
-  void CopyPointersToDevice(MachineModel *dev_machMdl);
+  void AllocateOnDevice(MachineModel *dev_machMdl);
   //copies schedule from device pointer to this object
-  void CopyPointersToHost(MachineModel *machMdl);
+  void CopyArraysToHost();
+  void FreeDeviceArrays();
+  // Initializes schedules on device, used between iterations of ACO
+  __device__
+  void Initialize();
 };
 /*****************************************************************************/
 

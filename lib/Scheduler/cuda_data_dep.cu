@@ -1027,65 +1027,6 @@ void DataDepGraph::CreateEdge_(InstCount frmNodeNum, InstCount toNodeNum,
   }
 }
 
-__device__
-void DataDepGraph::InitializeEdge_(InstCount frmNodeNum, InstCount toNodeNum,
-                                   int ltncy, DependenceType depType) {
-  GraphEdge *edge;
-
-  assert(frmNodeNum < instCnt_);
-  assert(nodes_[frmNodeNum] != NULL);
-
-  assert(toNodeNum < instCnt_);
-
-  assert(nodes_[toNodeNum] != NULL);
-
-  GraphNode *frmNode = nodes_[frmNodeNum];
-  GraphNode *toNode = nodes_[toNodeNum];
-
-#ifdef IS_DEBUG_LATENCIES
-  stats::dependenceTypeLatencies.Add(GetDependenceTypeName(depType), ltncy);
-  if (depType == DEP_DATA) {
-    InstType inst = ((SchedInstruction *)frmNode)->GetInstType();
-    stats::instructionTypeLatencies.Add(machMdl_->GetInstTypeNameByCode(inst),
-                                        ltncy);
-  }
-#endif
-
-  edge = frmNode->FindScsr(toNode);
-
-  if (edge == NULL) {
-#ifdef IS_DEBUG_DAG
-    Logger::Info("Creating edge from %d to %d of type %d and latency %d",
-                 frmNodeNum, toNodeNum, depType, ltncy);
-#endif
-    edge = &edges_[initializedEdges_++];
-    edge->from = frmNode->GetNum();
-    edge->to = toNode->GetNum();
-    edge->label = ltncy;
-    edge->label2 = depType;
-
-    frmNode->AddScsr(edge);
-    toNode->AddPrdcsr(edge);
-  } else {
-    if (ltncy > edge->label) {
-#ifdef IS_DEBUG_DAG
-      Logger::Info("Setting latency of the edge from %d to %d to %d",
-                   frmNodeNum, toNodeNum, ltncy);
-#endif
-      edge->label = ltncy;
-      insts_[edge->from].UpdtMaxEdgLbl(ltncy);
-    }
-  }
-
-  if (ltncy > maxLtncy_) {
-    maxLtncy_ = ltncy;
-  }
-
-  if (ltncy <= MAX_LATENCY_VALUE) {
-    edgeCntPerLtncy_[ltncy]++;
-  }
-}
-
 FUNC_RESULT DataDepGraph::FinishNode_(InstCount nodeNum, InstCount edgeCnt) {
   if (edgeCnt != -1) {
     assert(edgeCnt == insts_[nodeNum]->GetScsrCnt());
@@ -1432,301 +1373,6 @@ void DataDepGraph::PrintEdgeCntPerLtncyInfo() {
     totEdgeCnt += edgeCntPerLtncy_[i];
   }
   Logger::Info("Total edge count: %d", totEdgeCnt);
-}
-
-void DataDepGraph::CreateNodeData(NodeData *nodeData) {
-  SchedInstruction *inst;
-
-  for (InstCount i = 0; i < instCnt_; i++) {
-    inst = GetInstByIndx(i);
-    nodeData[i].instNum_ = inst->GetNum();
-    strncpy(nodeData[i].instName_, inst->GetName(), 50);
-    nodeData[i].instType_ = inst->GetInstType();
-    strncpy(nodeData[i].opCode_, inst->GetOpCode(), 50);
-    nodeData[i].nodeID_ = inst->GetNodeID();
-    nodeData[i].fileSchedOrder_ = inst->GetFileSchedOrder();
-    nodeData[i].fileSchedCycle_ = inst->GetFileSchedCycle();
-    nodeData[i].fileUB_ = inst->GetFileUB();
-    nodeData[i].fileLB_ = inst->GetFileLB();
-    nodeData[i].prdcsrCnt_ = (int)inst->GetPrdcsrCnt();
-    nodeData[i].prdcsrs_ = new EdgeData[nodeData[i].prdcsrCnt_];
-    nodeData[i].scsrCnt_ = (int)inst->GetScsrCnt();
-    nodeData[i].scsrs_ = new EdgeData[nodeData[i].scsrCnt_];
-
-    if(nodeData[i].prdcsrCnt_ > 0) {
-      //get prdcsr data
-      inst->GetFrstPrdcsr(NULL, &(nodeData[i].prdcsrs_[0].ltncy_), 
-		          &(nodeData[i].prdcsrs_[0].depType_), 
-			  &(nodeData[i].prdcsrs_[0].toNodeNum_));
-
-      for (int j = 1; j < nodeData[i].prdcsrCnt_; j++) {
-        inst->GetNxtPrdcsr(NULL, &(nodeData[i].prdcsrs_[j].ltncy_), 
-			   &(nodeData[i].prdcsrs_[j].depType_), 
-			   &(nodeData[i].prdcsrs_[j].toNodeNum_));
-      }
-    }
-
-    if(nodeData[i].scsrCnt_ > 0) {
-      //get scsr data
-      inst->GetFrstScsr(NULL, &(nodeData[i].scsrs_[0].ltncy_), 
-		        &(nodeData[i].scsrs_[0].depType_), 
-			&(nodeData[i].scsrs_[0].toNodeNum_));
-      for (int j = 1; j < nodeData[i].scsrCnt_; j++) {
-        inst->GetNxtScsr(NULL, &(nodeData[i].scsrs_[j].ltncy_), 
-			 &(nodeData[i].scsrs_[j].depType_), 
-			 &(nodeData[i].scsrs_[j].toNodeNum_));
-      }
-    }
-  }
-}
-
-void DataDepGraph::CreateRegData(RegFileData *regFileData) {
-  Register *reg = NULL;
-  int x;
-
-  for (int i = 0; i < machMdl_->GetRegTypeCnt(); i++) {
-    regFileData[i].regType_ = RegFiles[i].GetRegType();
-    regFileData[i].regCnt_ = RegFiles[i].GetRegCnt();
-    regFileData[i].regs_ = new RegData[regFileData[i].regCnt_];
-
-    for (int j = 0; j < regFileData[i].regCnt_; j++) {
-      reg = RegFiles[i].GetReg(j);
-      regFileData[i].regs_[j].wght_ = reg->GetWght();
-      regFileData[i].regs_[j].isLiveIn_ = reg->IsLiveIn();
-      regFileData[i].regs_[j].isLiveOut_ = reg->IsLiveOut();
-      regFileData[i].regs_[j].useCnt_ = 0;
-      
-      if (reg->GetSizeOfUseList() > 0) {
-        regFileData[i].regs_[j].uses_ = new InstCount[reg->GetSizeOfUseList()];
-
-	x = 0;
-        for (const auto &instNum : reg->GetUseList()) {
-	  regFileData[i].regs_[j].uses_[x++] = (InstCount)instNum;
-	  regFileData[i].regs_[j].useCnt_++;
-        }
-
-	//debug
-	//if (regFileData[i].regs_[j].useCnt_ != (InstCount)reg->GetSizeOfUseList())
-          //printf("regFileData[%d].regs_[%d].useCnt_ != (InstCount)reg->GetSizeOfUseList()\n", i, j);
-
-      } else
-        regFileData[i].regs_[j].uses_ = NULL;
-
-      regFileData[i].regs_[j].defCnt_ = 0;
-
-      if (reg->GetSizeOfDefList() > 0) {
-        regFileData[i].regs_[j].defs_ = new InstCount[reg->GetSizeOfDefList()];
-
-	x = 0;
-        for (const auto &instNum : reg->GetDefList()) {
-          regFileData[i].regs_[j].defs_[x++] = (InstCount)instNum;
-	  regFileData[i].regs_[j].defCnt_++;
-	}
-
-	//debug
-	if (regFileData[i].regs_[j].defCnt_ != (InstCount)reg->GetSizeOfDefList())
-          printf("regFileData[%d].regs_[%d].defCnt_ != (InstCount)reg->GetSizeOfDefList()\n", i, j);
-
-      } else
-        regFileData[i].regs_[j].defs_ = NULL;
-    }
-  }
-}
-
-// Reconstruct the DDG on device using nodeData
-__device__
-void DataDepGraph::ReconstructOnDevice(InstCount instCnt, NodeData *nodeData,
-	                        	RegFileData *regFileData) {
-  AllocArrays_(instCnt);
-
-  SchedInstruction *inst = NULL;
-  // Create nodes
-  for (InstCount i = 0; i < instCnt; i++) {
-    inst = CreateNode_(nodeData[i].instNum_, nodeData[i].instName_, 
-		       nodeData[i].instType_, nodeData[i].opCode_, 
-		       nodeData[i].nodeID_, nodeData[i].fileSchedOrder_, 
-		       nodeData[i].fileSchedCycle_, nodeData[i].fileLB_, 
-		       nodeData[i].fileUB_, 0);
-
-    //debug
-    if (!inst) {
-      printf("Node Creation failed for node num %d\n", nodeData[i].instNum_);
-      printf("Printing input:\ninstName_: %s\ninstType: %d\nopCode_: %s\nnodeID: %d\nfileSchedOrder: %d\nfileSChedCycle_: %d\nfileLB: %d\nfileUB: %d\n", 
-	     nodeData[i].instName_, nodeData[i].instType_, 
-	     nodeData[i].opCode_, nodeData[i].nodeID_, 
-	     nodeData[i].fileSchedOrder_, nodeData[i].fileSchedCycle_, 
-	     nodeData[i].fileLB_, nodeData[i].fileUB_);
-    }
-
-    // Set root_
-    if (nodeData[i].prdcsrCnt_ == 0)
-      root_ = (GraphNode *)inst;
-
-    // Set leaf_
-    if (nodeData[i].scsrCnt_ == 0)
-      leaf_ = (GraphNode *)inst;
-  }
-
-  // Create edges
-  for (InstCount i = 0; i < instCnt; i++) {
-    for (int j = 0; j < nodeData[i].prdcsrCnt_; j++) {
-      CreateEdge_(nodeData[i].prdcsrs_[j].toNodeNum_, nodeData[i].instNum_,
-                  nodeData[i].prdcsrs_[j].ltncy_, 
-                  nodeData[i].prdcsrs_[j].depType_);
-    }
-
-    for (int j = 0; j < nodeData[i].scsrCnt_; j++) {
-      CreateEdge_(nodeData[i].instNum_, nodeData[i].scsrs_[j].toNodeNum_, 
-		  nodeData[i].scsrs_[j].ltncy_, nodeData[i].scsrs_[j].depType_);
-    }
-  }
-  
-  Register *reg = NULL;
-  // Recreate RegFiles
-  for (int i = 0; i < machMdl_->GetRegTypeCnt(); i++) {
-    RegFiles[i].SetRegType(regFileData[i].regType_);
-    RegFiles[i].SetRegCnt(regFileData[i].regCnt_);
-
-    for (int j = 0; j < regFileData[i].regCnt_; j++) {
-      reg = RegFiles[i].GetReg(j);
-      reg->SetWght(regFileData[i].regs_[j].wght_);
-      reg->SetIsLiveIn(regFileData[i].regs_[j].isLiveIn_);
-      reg->SetIsLiveOut(regFileData[i].regs_[j].isLiveOut_);
-
-      //add uses
-      for (int x = 0; x < regFileData[i].regs_[j].useCnt_; x++) {
-        inst = &insts_[regFileData[i].regs_[j].uses_[x]];
-	inst->AddUse(reg);
-	reg->AddUse(inst);
-      }
- 
-      //add defs
-      for (int x = 0; x < regFileData[i].regs_[j].defCnt_; x++) {
-        inst = &insts_[regFileData[i].regs_[j].defs_[x]];
-        inst->AddDef(reg);
-        reg->AddDef(inst);
-      }
-    }
-  }
-}
-
-__device__
-void DataDepGraph::InitializeOnDevice(InstCount instCnt, NodeData *nodeData,
-                                        RegFileData *regFileData) {
-  InstCount i = blockIdx.x;
-  
-  if (i == 0) {
-    instCnt_ = instCnt;
-    DirAcycGraph::nodeCnt_ = instCnt;
-  }
-
-  // Instantiate nodes in parallel
-  //for (InstCount i = 0; i < instCnt; i++) {
-  if (i < instCnt){
-    insts_[i].InitializeNode_(nodeData[i].instNum_, nodeData[i].instName_,
-                               nodeData[i].instType_, nodeData[i].opCode_,
-                               nodeData[i].nodeID_, nodeData[i].fileSchedOrder_,
-                               nodeData[i].fileSchedCycle_, nodeData[i].fileLB_,
-                               nodeData[i].fileUB_, 0, machMdl_, nodes_, 
-			       RegFiles);
-
-    //if (!insts_[i])
-      //printf("Node creation failed for node num %d\n", i);
- 
-    //set root_
-    if (nodeData[i].prdcsrCnt_ == 0)
-      root_ = (GraphNode *)&insts_[i];
-
-    //set leaf_
-    if (nodeData[i].scsrCnt_ == 0)
-      leaf_ = (GraphNode *)&insts_[i];
-  }
-  // Single threaded
-  if (i == 0) {
-    // Instantiate edges
-    for (InstCount i = 0; i < instCnt; i++) {
-      for (int j = 0; j < nodeData[i].prdcsrCnt_; j++) {
-        InitializeEdge_(nodeData[i].prdcsrs_[j].toNodeNum_, nodeData[i].instNum_,
-                    nodeData[i].prdcsrs_[j].ltncy_,
-                    nodeData[i].prdcsrs_[j].depType_);
-      }
-
-      for (int j = 0; j < nodeData[i].scsrCnt_; j++) {
-        InitializeEdge_(nodeData[i].instNum_, nodeData[i].scsrs_[j].toNodeNum_,
-                    nodeData[i].scsrs_[j].ltncy_, nodeData[i].scsrs_[j].depType_);
-      }
-    }
-  }
-
-  SchedInstruction *inst = NULL;
-  Register *reg = NULL;
-  // Recreate RegFiles
-  //for (int i = 0; i < machMdl_->GetRegTypeCnt(); i++) {
-  if (i < machMdl_->GetRegTypeCnt()) {
-    RegFiles[i].SetRegType(regFileData[i].regType_);
-    RegFiles[i].SetRegCnt(regFileData[i].regCnt_);
-
-    for (int j = 0; j < regFileData[i].regCnt_; j++) {
-      reg = RegFiles[i].GetReg(j);
-      reg->SetWght(regFileData[i].regs_[j].wght_);
-      reg->SetIsLiveIn(regFileData[i].regs_[j].isLiveIn_);
-      reg->SetIsLiveOut(regFileData[i].regs_[j].isLiveOut_);
-
-      //add uses
-      for (int x = 0; x < regFileData[i].regs_[j].useCnt_; x++) {
-        inst = &insts_[regFileData[i].regs_[j].uses_[x]];
-        inst->AddUse(reg);
-        reg->AddUse(inst);
-      }    
- 
-      //add defs
-      for (int x = 0; x < regFileData[i].regs_[j].defCnt_; x++) {
-        inst = &insts_[regFileData[i].regs_[j].defs_[x]];
-        inst->AddDef(reg);
-        reg->AddDef(inst);
-      }    
-    }    
-  }
-}
-
-
-__device__
-void DataDepGraph::AllocateMaxDDG(InstCount maxRgnSize, InstCount maxEdgeCnt, 
-		                  GraphEdge *dev_edges, 
-				  SchedInstruction *dev_insts) {
-  AllocArrays_(maxRgnSize);
-
-  DirAcycGraph::tplgclOrdr_ = new GraphNode *[maxRgnSize];
-
-  insts_ = dev_insts;
-
-  for (InstCount i = 0; i < maxRgnSize; i++) {
-    //insts_[i] = &dev_insts[i];
-    insts_[i].CreatePrdcsrScsrLists(maxRgnSize);
-    insts_[i].CreateSchedRange();
-
-/*    // Allocate blank nodes for later 
-    inst = CreateNode_( i, "UNINITIATED",
-                       UNINITIATED_TYPE, "UNINITIATED",
-                       UNINITIATED_NUM, UNINITIATED_NUM,
-                       UNINITIATED_NUM, UNINITIATED_NUM,
-                       UNINITIATED_NUM, UNINITIATED_NUM);
-
-    //debug
-    if (!inst) {
-      printf("Node Creation failed for node num %d\n", i);
-    }
-*/
-  }
-
-  // Set edges_ pointer to point at dev_edges
-  edges_ = dev_edges;
-
-  // Hold all pointers in edges for later initilization
-  //edges_ = new GraphEdge[maxEdgeCnt];
-
-  // Set unused edge pool counter
-  initializedEdges_ = 0;
 }
 
 __device__
@@ -3054,7 +2700,6 @@ InstCount DataDepSubGraph::GetDistFrmLeaf(SchedInstruction *inst) {
 }
 */
 
-__host__ __device__
 InstSchedule::InstSchedule(MachineModel *machMdl, DataDepGraph *dataDepGraph,
                            bool vrfy) {
   machMdl_ = machMdl;
@@ -3068,6 +2713,10 @@ InstSchedule::InstSchedule(MachineModel *machMdl, DataDepGraph *dataDepGraph,
   slotForInst_ = new InstCount[totInstCnt_];
   spillCosts_ = new InstCount[totInstCnt_];
   peakRegPressures_ = new InstCount[machMdl->GetRegTypeCnt()];
+  dev_instInSlot_ = NULL;
+  dev_slotForInst_ = NULL;
+  dev_spillCosts_ = NULL;
+  dev_peakRegPressures_ = NULL;
 
   InstCount i;
 
@@ -3092,7 +2741,19 @@ InstSchedule::InstSchedule(MachineModel *machMdl, DataDepGraph *dataDepGraph,
   spillCnddtCnt_ = 0;
 }
 
-__host__ __device__
+InstSchedule::InstSchedule() {
+  schduldInstCnt_ = 0;
+  crntSlotNum_ = 0;
+  maxSchduldInstCnt_ = 0;
+  maxInstNumSchduld_ = -1;
+  iterSlotNum_ = 0;
+  cost_ = INVALID_VALUE;
+  execCost_ = INVALID_VALUE;
+  totSpillCost_ = 0;
+  cnflctCnt_ = 0;
+  spillCnddtCnt_ = 0;
+}
+
 InstSchedule::~InstSchedule() {
   delete[] instInSlot_;
   delete[] slotForInst_;
@@ -3114,6 +2775,37 @@ bool InstSchedule::operator==(InstSchedule &b) const {
 
 __host__ __device__
 bool InstSchedule::AppendInst(InstCount instNum) {
+#ifdef __CUDA_ARCH__
+  assert(crntSlotNum_ < totSlotCnt_);
+  dev_instInSlot_[crntSlotNum_] = instNum;
+
+  if (vrfy_)
+    if (instNum > maxInstNumSchduld_) {
+      maxInstNumSchduld_ = instNum;
+    }
+
+  if (instNum != SCHD_STALL) {
+    assert(instNum >= 0 && instNum < totInstCnt_);
+    dev_slotForInst_[instNum] = crntSlotNum_;
+    schduldInstCnt_++;
+#ifdef IS_DEBUG_SCHED2
+
+    if (schduldInstCnt_ > maxSchduldInstCnt_) {
+      maxSchduldInstCnt_ = schduldInstCnt_;
+      printf("INFO: Maximum # of Instructions Scheduled: %d\n",
+                   maxSchduldInstCnt_);
+    }
+
+#endif
+  }
+
+#ifdef IS_DEBUG_SCHED2
+  printf("INFO: Instructions Scheduled: %d\n", schduldInstCnt_);
+#endif
+  crntSlotNum_++;
+  return true;
+
+#else
   assert(crntSlotNum_ < totSlotCnt_);
   instInSlot_[crntSlotNum_] = instNum;
 
@@ -3142,6 +2834,7 @@ bool InstSchedule::AppendInst(InstCount instNum) {
 #endif
   crntSlotNum_++;
   return true;
+#endif
 }
 
 bool InstSchedule::RemoveLastInst() {
@@ -3180,15 +2873,13 @@ InstCount InstSchedule::GetNxtInst(InstCount &cycleNum, InstCount &slotNum) {
   if (iterSlotNum_ == crntSlotNum_) {
     return INVALID_VALUE;
   }
-
-  //debug
-  //Logger::Info("totSlotCnt_ = %d", totSlotCnt_);
-  
   do {
+#ifdef __CUDA_ARCH__
+    instNum = dev_instInSlot_[iterSlotNum_];
+#else
     instNum = instInSlot_[iterSlotNum_];
+#endif
     iterSlotNum_++;
-    //debug
-    //Logger::Info("iterSlotNum_ = %d", iterSlotNum_);
   } while (instNum == SCHD_STALL);
 
   assert(instNum != SCHD_STALL);
@@ -3199,9 +2890,19 @@ InstCount InstSchedule::GetNxtInst(InstCount &cycleNum, InstCount &slotNum) {
 __host__ __device__
 void InstSchedule::Reset() {
   InstCount i;
-
+#ifdef __CUDA_ARCH__
   if (vrfy_) {
     for (i = 0; i <= maxInstNumSchduld_; i++) {
+      dev_slotForInst_[i] = SCHD_UNSCHDULD;
+    }
+
+    for (i = 0; i <= crntSlotNum_; i++) {
+      dev_instInSlot_[i] = SCHD_UNSCHDULD;
+    }
+  }
+#else
+  if (vrfy_) {
+    for (i = 0; i < maxInstNumSchduld_; i++) {
       slotForInst_[i] = SCHD_UNSCHDULD;
     }
 
@@ -3209,6 +2910,7 @@ void InstSchedule::Reset() {
       instInSlot_[i] = SCHD_UNSCHDULD;
     }
   }
+#endif
 
   schduldInstCnt_ = 0;
   crntSlotNum_ = 0;
@@ -3220,7 +2922,15 @@ void InstSchedule::Reset() {
 __host__ __device__
 void InstSchedule::Copy(InstSchedule *src) {
   Reset();
+#ifdef __CUDA_ARCH__
+  InstCount i;
+  for (i = 0; i < totSlotCnt_ && src->dev_instInSlot_[i] != SCHD_UNSCHDULD; i++) {
+    AppendInst(src->dev_instInSlot_[i]);
+  }
 
+  SetSpillCosts(src->dev_spillCosts_);
+  SetPeakRegPressures(src->dev_peakRegPressures_);
+#else
   InstCount i;
   for (i = 0; i < totSlotCnt_ && src->instInSlot_[i] != SCHD_UNSCHDULD; i++) {
     AppendInst(src->instInSlot_[i]);
@@ -3228,6 +2938,7 @@ void InstSchedule::Copy(InstSchedule *src) {
 
   SetSpillCosts(src->spillCosts_);
   SetPeakRegPressures(src->peakRegPressures_);
+#endif
   cost_ = src->cost_;
   execCost_ = src->execCost_;
   spillCost_ = src->spillCost_;
@@ -3235,19 +2946,32 @@ void InstSchedule::Copy(InstSchedule *src) {
 
 __host__ __device__
 void InstSchedule::SetSpillCosts(InstCount spillCosts[]) {
+#ifdef __CUDA_ARCH__
+  totSpillCost_ = 0;
+  for (InstCount i = 0; i < totInstCnt_; i++) {
+    dev_spillCosts_[i] = spillCosts[i];
+    totSpillCost_ += spillCosts[i];
+  }
+#else
   totSpillCost_ = 0;
   for (InstCount i = 0; i < totInstCnt_; i++) {
     spillCosts_[i] = spillCosts[i];
     totSpillCost_ += spillCosts[i];
   }
+#endif
 }
 
 __host__ __device__
 void InstSchedule::SetPeakRegPressures(InstCount peakRegPressures[]) {
-
+#ifdef __CUDA_ARCH__
+  for (InstCount i = 0; i < dev_machMdl_->GetRegTypeCnt(); i++) {
+    dev_peakRegPressures_[i] = peakRegPressures[i];
+  }
+#else
   for (InstCount i = 0; i < machMdl_->GetRegTypeCnt(); i++) {
     peakRegPressures_[i] = peakRegPressures[i];
   }
+#endif
 }
 
 InstCount
@@ -3259,7 +2983,11 @@ InstSchedule::GetPeakRegPressures(const InstCount *&regPressures) const {
 __host__ __device__
 InstCount InstSchedule::GetSpillCost(InstCount stepNum) {
   assert(stepNum >= 0 && stepNum < totInstCnt_);
+#ifdef __CUDA_ARCH__
+  return dev_spillCosts_[stepNum];
+#else
   return spillCosts_[stepNum];
+#endif
 }
 
 InstCount InstSchedule::GetTotSpillCost() { return totSpillCost_; }
@@ -3280,29 +3008,15 @@ void InstSchedule::Print() {
   InstCount slotInCycle = 0;
   InstCount cycleNum = 0;
   InstCount i;
-
-  // out << '\n' << label << " Schedule";
-#ifdef __CUDA_ARCH__  
-  printf("Printing Device Schedule\n");
-#else
-  printf("Printing Host Schedule\n");
-#endif
-
   for (i = 0; i < crntSlotNum_; i++) {
     if (slotInCycle == 0)
+#ifdef __CUDA_ARCH__
+      printf("Cycle# %d : %d\n", cycleNum, dev_instInSlot_[i]);
+#else
       printf("Cycle# %d : %d\n", cycleNum, instInSlot_[i]);
-    /*
-    out << "\nCycle# " << cycleNum << ":  ";
-
-    if (instInSlot_[i] == SCHD_STALL) {
-      out << "X ";
-    } else {
-      out << instInSlot_[i] << ' ';
-    }
-   */
+#endif
 
     slotInCycle++;
-
     if (slotInCycle == issuRate_) {
       slotInCycle = 0;
       cycleNum++;
@@ -3535,72 +3249,70 @@ void InstSchedule::SetSpillCost(InstCount cost) { spillCost_ = cost; }
 
 InstCount InstSchedule::GetSpillCost() const { return spillCost_; }
 
-void InstSchedule::CopyPointersToDevice(MachineModel *dev_machMdl) {
-  // Copy instInSlot_ to device
-  InstCount *dev_instInSlot = NULL;
+void InstSchedule::AllocateOnDevice(MachineModel *dev_machMdl) {
+  // Alloc instInSlot_ on device
   size_t memSize = totSlotCnt_ * sizeof(InstCount);
-  gpuErrchk(cudaMalloc((void**)&dev_instInSlot, memSize));
-  gpuErrchk(cudaMemcpy(dev_instInSlot, instInSlot_, memSize, 
-		       cudaMemcpyHostToDevice));
-  delete[] instInSlot_;
-  instInSlot_ = dev_instInSlot;
-  //copy slotForInst_ to device
-  InstCount *dev_slotForInst = NULL;
+  gpuErrchk(cudaMalloc((void**)&dev_instInSlot_, memSize));
+  // Alloc slotForInst_ on device
   memSize = totInstCnt_ * sizeof(InstCount);
-  gpuErrchk(cudaMalloc((void**)&dev_slotForInst, memSize));
-  gpuErrchk(cudaMemcpy(dev_slotForInst, slotForInst_, memSize, 
-		       cudaMemcpyHostToDevice));
-  delete[] slotForInst_;
-  slotForInst_ = dev_slotForInst;
-  //copy spillCosts_ to device
-  InstCount *dev_spillCosts = NULL;
-  gpuErrchk(cudaMalloc((void**)&dev_spillCosts, memSize));
-  gpuErrchk(cudaMemcpy(dev_spillCosts, spillCosts_, memSize, 
-		       cudaMemcpyHostToDevice));
-  delete[] spillCosts_;
-  spillCosts_ = dev_spillCosts;
-  //copy peakRegPressures_ to device
-  InstCount *dev_peakRegPressures = NULL;
+  gpuErrchk(cudaMalloc((void**)&dev_slotForInst_, memSize));
+  // Alloc spillCosts_ on device
+  gpuErrchk(cudaMalloc((void**)&dev_spillCosts_, memSize));
+  // Alloc peakRegPressures_ on device
   memSize = machMdl_->GetRegTypeCnt() * sizeof(InstCount);
-  gpuErrchk(cudaMalloc((void**)&dev_peakRegPressures, memSize));
-  gpuErrchk(cudaMemcpy(dev_peakRegPressures, peakRegPressures_, memSize, 
-		       cudaMemcpyHostToDevice));
-  delete[] peakRegPressures_;
-  peakRegPressures_ = dev_peakRegPressures;
-  machMdl_ = dev_machMdl;
+  gpuErrchk(cudaMalloc((void**)&dev_peakRegPressures_, memSize));
+  dev_machMdl_ = dev_machMdl;
 }
 
-void InstSchedule::CopyPointersToHost(MachineModel *machMdl) {
+void InstSchedule::CopyArraysToHost() {
   size_t memSize;
-  //update machMdl_ pointer to host machMdl
-  machMdl_ = machMdl;
   // Copy instInSlot to host
-  InstCount *host_instInSlot = new InstCount[totSlotCnt_];
   memSize = totSlotCnt_ * sizeof(InstCount);
-  gpuErrchk(cudaMemcpy(host_instInSlot, instInSlot_, memSize,
+  gpuErrchk(cudaMemcpy(instInSlot_, dev_instInSlot_, memSize,
 		       cudaMemcpyDeviceToHost));
-  cudaFree(instInSlot_);
-  instInSlot_ = host_instInSlot;
   // Copy slotForInst_ to host
-  InstCount *host_slotForInst = new InstCount[totInstCnt_];
   memSize = totInstCnt_ * sizeof(InstCount);
-  gpuErrchk(cudaMemcpy(host_slotForInst, slotForInst_, memSize, 
+  gpuErrchk(cudaMemcpy(slotForInst_, dev_slotForInst_, memSize, 
 		       cudaMemcpyDeviceToHost));
-  cudaFree(slotForInst_);
-  slotForInst_ = host_slotForInst;
   // Copy spillCosts to host
-  InstCount *host_spillCosts = new InstCount[totInstCnt_];
-  gpuErrchk(cudaMemcpy(host_spillCosts, spillCosts_, memSize, 
+  gpuErrchk(cudaMemcpy(spillCosts_, dev_spillCosts_, memSize, 
 		       cudaMemcpyDeviceToHost));
-  cudaFree(spillCosts_);
-  spillCosts_ = host_spillCosts;
   // Copy peakRegPressures to host
-  InstCount *host_peakRegPressures = new InstCount[machMdl_->GetRegTypeCnt()];
   memSize = machMdl_->GetRegTypeCnt() * sizeof(InstCount);
-  gpuErrchk(cudaMemcpy(host_peakRegPressures, peakRegPressures_, memSize,
+  gpuErrchk(cudaMemcpy(peakRegPressures_, dev_peakRegPressures_, memSize,
 		       cudaMemcpyDeviceToHost));
-  cudaFree(peakRegPressures_);
-  peakRegPressures_ = host_peakRegPressures;
+}
+
+void InstSchedule::FreeDeviceArrays() {
+  cudaFree(dev_instInSlot_);
+  cudaFree(dev_slotForInst_);
+  cudaFree(dev_spillCosts_);
+  cudaFree(dev_peakRegPressures_);  
+}
+
+__device__
+void InstSchedule::Initialize() {
+  InstCount i;
+
+  for (i = 0; i < totInstCnt_; i++) {
+    dev_slotForInst_[i] = SCHD_UNSCHDULD;
+    dev_spillCosts_[i] = 0;
+  }
+
+  for (i = 0; i < totSlotCnt_; i++) {
+    dev_instInSlot_[i] = SCHD_UNSCHDULD;
+  }
+
+  schduldInstCnt_ = 0;
+  crntSlotNum_ = 0;
+  maxSchduldInstCnt_ = 0;
+  maxInstNumSchduld_ = -1;
+  iterSlotNum_ = 0;
+  cost_ = INVALID_VALUE;
+  execCost_ = INVALID_VALUE;
+  totSpillCost_ = 0;
+  cnflctCnt_ = 0;
+  spillCnddtCnt_ = 0;
 }
 
 /*******************************************************************************

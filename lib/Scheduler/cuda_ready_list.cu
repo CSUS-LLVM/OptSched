@@ -238,16 +238,16 @@ void ReadyList::Print(std::ostream &out) {
   prirtyLst_->ResetIterator();
 }
 
-__host__ __device__
+__device__
 void ReadyList::Dev_Print() {
   printf("Ready List: ");
-  for (auto crntInst = prirtyLst_->GetFrstElmnt(); crntInst != END;
-       crntInst = prirtyLst_->GetNxtElmnt()) {
+  for (auto crntInst = dev_prirtyLst_[GLOBALTID].GetFrstElmnt(); crntInst != END;
+       crntInst = dev_prirtyLst_[GLOBALTID].GetNxtElmnt()) {
     printf(" %d", crntInst);
   }
   printf("\n");
 
-  prirtyLst_->ResetIterator();
+  dev_prirtyLst_[GLOBALTID].ResetIterator();
 }
 
 __host__ __device__
@@ -430,17 +430,12 @@ void ReadyList::CopyPointersToDevice(ReadyList *dev_rdyLst,
   size_t memSize;
   dev_rdyLst->dataDepGraph_ = dev_DDG;
   // Copy prirtyLst_
+  prirtyLst_->ResetIterator();
   memSize = sizeof(PriorityArrayList<InstCount>);
   for (int i = 0; i < numThreads; i++) {
     gpuErrchk(cudaMemcpy(&dev_rdyLst->dev_prirtyLst_[i], prirtyLst_, memSize,
 	  	         cudaMemcpyHostToDevice));
   }
-/*
-  // debug
-  Logger::Info("Testing prirtyLst_ copy to device:");
-  for (int i = 0; i < numThreads; i++)
-    Logger::Info("size of dev_rdyLst->dev_prirtyLst_[%d] = %d", i, dev_rdyLst->dev_prirtyLst_[i].size_);
-*/
   // Alloc elmnts for each prirtyLst_ in one cudaMalloc call
   InstCount *temp_arr;
   memSize = sizeof(InstCount) * prirtyLst_->maxSize_ * numThreads;

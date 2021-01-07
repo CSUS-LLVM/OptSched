@@ -92,8 +92,6 @@ ConstrainedScheduler::ConstrainedScheduler(DataDepGraph *dataDepGraph,
     frstRdyLstPerCycle_[i] = NULL;
   }
 
-  //dev_prevFrstRdyLstPerCycle_ = NULL;
-  //dev_frstRdyLstPerCycle_ = NULL;
   dev_instsWithPrdcsrsSchduld_ = NULL;
 
   rdyLst_ = NULL;
@@ -134,15 +132,6 @@ bool ConstrainedScheduler::Initialize_(InstCount trgtSchedLngth,
   }
 
 #ifdef __CUDA_ARCH__
-/*
-  if (dev_prevFrstRdyLstPerCycle_)
-    dev_prevFrstRdyLstPerCycle_[GLOBALTID]->Reset();
-  if (dev_frstRdyLstPerCycle_) {
-    for (int i = 0; i < dataDepGraph_->GetMaxLtncy(); i++)
-      dev_frstRdyLstPerCycle_[GLOBALTID][i]->Reset();
-  }
-  dev_frstRdyLstPerCycle_[GLOBALTID][0]->InsrtElmnt(rootInst_->GetNum());
-*/
   dev_instsWithPrdcsrsSchduld_[GLOBALTID]->
 	                   InsrtElmnt(rootInst_->GetNum(), 0, true);
 
@@ -153,6 +142,8 @@ bool ConstrainedScheduler::Initialize_(InstCount trgtSchedLngth,
   dev_crntRealSlotNum_[GLOBALTID] = 0;
   dev_crntCycleNum_[GLOBALTID] = 0;
 #else
+  if (!frstRdyLstPerCycle_[0])
+    frstRdyLstPerCycle_[0] = new ArrayList<InstCount>(dataDepGraph_->GetInstCnt());
   frstRdyLstPerCycle_[0]->InsrtElmnt(rootInst_->GetNum());
 
   if (rsrvSlots_ != NULL) {
@@ -193,13 +184,6 @@ void ConstrainedScheduler::SchdulInst_(SchedInstruction *inst, InstCount) {
       // If all other predecessors of this successor have been scheduled then
       // we now know in which cycle this successor will become ready.
       assert(scsrRdyCycle < schedUprBound_);
-/*
-      // Add this succesor to the first-ready list of the future cycle
-      // in which we now know it will become ready
-      scsrRdyListNum = scsrRdyCycle - dev_crntCycleNum_[GLOBALTID];
-      dev_frstRdyLstPerCycle_[GLOBALTID][scsrRdyListNum]->
-	                                          InsrtElmnt(crntScsr->GetNum());
-*/
       dev_instsWithPrdcsrsSchduld_[GLOBALTID]->
                      InsrtElmnt(crntScsr->GetNum(), scsrRdyCycle, true);
     }
@@ -394,24 +378,11 @@ bool ConstrainedScheduler::MovToPrevSlot_(int prevRealSlotNum) {
 #endif
 }
 
-__host__ __device__
 void ConstrainedScheduler::CleanupCycle_(InstCount cycleNum) {
-#ifdef __CUDA_ARCH__
-/*
-  //prevFrstRdyLstPerCycle_->Reset();
-  // crnt becomes prev
-  ArrayList<InstCount> *temp = dev_prevFrstRdyLstPerCycle_[GLOBALTID];
-  dev_prevFrstRdyLstPerCycle_[GLOBALTID] = 
-	  dev_crntFrstRdyLstPerCycle_[GLOBALTID];
-
-  dev_crntFrstRdyLstPerCycle_[GLOBALTID] = temp;
-*/
-#else
   if (frstRdyLstPerCycle_[cycleNum] != NULL) {
     delete frstRdyLstPerCycle_[cycleNum];
     frstRdyLstPerCycle_[cycleNum] = NULL;
   }
-#endif
 }
 
 __host__ __device__
