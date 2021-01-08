@@ -31,6 +31,12 @@ class Logs:
         for bench in self.benchmarks:
             yield from bench.blocks
 
+    def __getitem__(self, benchname):
+        '''
+        Gets the becnhmark with the specified name
+        '''
+        return self.benchmark(benchname)
+
     def benchmark(self, name):
         '''
         Gets the benchmark with the specified name
