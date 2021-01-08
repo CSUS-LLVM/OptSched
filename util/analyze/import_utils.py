@@ -34,6 +34,16 @@ def parse_multi_bench_file(logtext, *, benchstart, filename=None):
     return Logs(benchmarks)
 
 
+def parse_single_bench_file(logtext, *, benchname, filename=None):
+    return Logs([
+        _parse_benchmark(
+            {'name': benchname},
+            logtext, 0, len(logtext),
+            filenamere=filename,
+        )
+    ])
+
+
 _FileInfo = namedtuple('_FileInfo', ('filename', 'from_pos'))
 
 

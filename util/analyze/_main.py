@@ -5,6 +5,7 @@ import argparse
 from .analyzer import Analyzer
 
 from . import import_cpu2006
+from . import import_plaidml
 from . import import_utils
 
 
@@ -35,7 +36,7 @@ def basemain(*, positional, options, description, action, manual_options={}):
     parser.add_argument(
         '--benchsuite',
         default=manual_options.get('benchsuite', None),
-        choices=('spec',),
+        choices=('spec', 'plaidml'),
         help='Select the benchmark suite which the input satisfies. Valid options: spec',
     )
     parser.add_argument(
@@ -51,6 +52,7 @@ def basemain(*, positional, options, description, action, manual_options={}):
     FILE_PARSERS = {
         None: __load_filepath,
         'spec': import_cpu2006.parse,
+        'plaidml': import_plaidml.parse
     }
     parser = FILE_PARSERS[args.benchsuite]
 
