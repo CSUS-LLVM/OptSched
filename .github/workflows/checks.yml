@@ -66,8 +66,8 @@ jobs:
     steps:
     - uses: actions/checkout@v2
       with:
-        ref: ${{ needs.git-ref.ref }}
-    - run: git checkout ${{ needs.git-ref.sha }}
+        ref: ${{ needs.git-ref.outputs.ref }}
+    - run: git checkout ${{ needs.git-ref.outputs.sha }}
 
     - name: Install dependencies
       run: |
@@ -123,8 +123,8 @@ jobs:
     steps:
     - uses: actions/checkout@v2
       with:
-        ref: ${{ needs.git-ref.ref }}
-    - run: git checkout ${{ needs.git-ref.sha }}
+        ref: ${{ needs.git-ref.outputs.ref }}
+    - run: git checkout ${{ needs.git-ref.outputs.sha }}
 
       # https://github.com/DoozyX/clang-format-lint-action
     - uses: DoozyX/clang-format-lint-action@v0.5
@@ -140,8 +140,8 @@ jobs:
     steps:
     - uses: actions/checkout@v2
       with:
-        ref: ${{ needs.git-ref.ref }}
-    - run: git checkout ${{ needs.git-ref.sha }}
+        ref: ${{ needs.git-ref.outputs.ref }}
+    - run: git checkout ${{ needs.git-ref.outputs.sha }}
 
     - name: Install dependencies
       run: |
@@ -217,8 +217,8 @@ jobs:
     - uses: actions/checkout@v2
       with:
         fetch-depth: 0
-        ref: ${{ needs.git-ref.ref }}
-    - run: git checkout ${{ needs.git-ref.sha }}
+        ref: ${{ needs.git-ref.outputs.ref }}
+    - run: git checkout ${{ needs.git-ref.outputs.sha }}
 
     - name: Check Trailing Whitespace
       # git diff --check checks the diff for any whitespace violations.
@@ -234,8 +234,8 @@ jobs:
     steps:
     - uses: actions/checkout@v2
       with:
-        ref: ${{ needs.git-ref.ref }}
-    - run: git checkout ${{ needs.git-ref.sha }}
+        ref: ${{ needs.git-ref.outputs.ref }}
+    - run: git checkout ${{ needs.git-ref.outputs.sha }}
 
     - name: Check failures
       run: |
