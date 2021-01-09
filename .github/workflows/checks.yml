@@ -1,0 +1,289 @@
+name: Run Checks
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+  issue_comment: # On PR issue comment
+    types: [ created ]
+
+env:
+  CCACHE_BASEDIR: $GITHUB_WORKSPACE
+  CCACHE_DIR: $GITHUB_WORKSPACE/.ccache
+  CCACHE_COMPRESS: true
+  CCACHE_COMPRESSLEVEL: 6
+
+jobs:
+  init-report:
+    runs-on: ubuntu-latest
+    # Also allow triggering with a comment of `Do: Run Checks`.
+    # If we are a pull_request, we have the trigger comment, and the person
+    # requesting is the one who made the PR, then we run.
+    if: >-
+      github.event_name == 'issue_comment'
+      && github.event.issue.pull_request != ''
+      && github.event.comment.body == 'Do: Run Checks'
+      && github.event.comment.user.id == github.event.issue.user.id
+
+    outputs:
+      report: ${{ steps.report.outputs.comment-id }}
+
+    steps:
+    - name: Initialize Report
+      uses: peter-evans/create-or-update-comment@v1.4.3
+      id: report
+      with:
+        issue-number: ${{ github.event.issue.number }}
+        body: |
+          Rerunning checks: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
+
+  git-ref:
+    needs: init-report
+    runs-on: ubuntu-latest
+    if: always()
+
+    outputs:
+      ref: ${{ steps.git-ref.outputs.ref }}
+
+    steps:
+    - id: git-ref
+      run: |
+        if [[ '${{ steps.init-report.result }}' == 'success' ]]; then
+          echo '::set-output name=ref::pull/${{ github.event.issue.number }}/head'
+          echo '::set-output name=sha::HEAD'
+        else
+          echo '::set-output name=ref::${{ github.ref }}'
+          echo '::set-output name=sha::${{ github.sha }}'
+        fi
+
+  ci:
+    needs: git-ref
+    runs-on: ubuntu-latest
+    if: always()
+
+    steps:
+    - uses: actions/checkout@v2
+      with:
+        ref: ${{ needs.git-ref.ref }}
+
+    - name: Install dependencies
+      run: |
+        sudo apt-get install ninja-build
+        sudo apt-get install ccache
+
+    - name: Set up ccache
+      uses: actions/cache@v1.1.0
+      with:
+        path: .ccache
+        key: ccache
+
+    - name: Configure
+      run: |
+        mkdir build-ci && cd build-ci
+
+        # Release build because Debug builds run out of memory.
+        # ccache greatly improves build speed, especially since we're mostly compiling llvm.
+        cmake .. -GNinja                                                               \
+            -DCMAKE_BUILD_TYPE=Release                                                 \
+            -DLLVM_PARALLEL_LINK_JOBS=1 ../cmake/superbuild                            \
+            -DCMAKE_CXX_COMPILER_LAUNCHER=ccache -DCMAKE_C_COMPILER_LAUNCHER=ccache    \
+            -DCMAKE_CXX_COMPILER=g++ -DCMAKE_C_COMPILER=gcc                            \
+            -DOPTSCHEDSUPER_LLVM_EXTRA_CMAKE_ARGS='-DLLVM_ENABLE_ASSERTIONS=ON'        \
+            -DOPTSCHED_EXTRA_DEFINITIONS='-DIS_DEBUG'
+
+    - name: Build
+      working-directory: build-ci
+      run: |
+        # Zero out stats so we get an accurate report at the end.
+        ccache -z
+
+        # Build multiple times to avoid spurious problems with improperly set up CMake
+        # target dependencies by LLVM.
+        ninja || true
+        (ninja | grep -E -v '^-- Up-to-date: ') || true
+        (ninja | grep -E -v '^-- Up-to-date: ') || true
+        (ninja | grep -E -v '^-- Up-to-date: ') || true
+        (ninja | grep -E -v '^-- Up-to-date: ')
+
+    - name: Dump ccache Statistics
+      run: ccache -s
+
+    - name: Run tests
+      working-directory: build-ci
+      run: ctest -VV
+
+  clang-format:
+    needs: git-ref
+    runs-on: ubuntu-latest
+    if: always()
+
+    steps:
+    - uses: actions/checkout@v2
+      with:
+        ref: ${{ needs.git-ref.ref }}
+
+      # https://github.com/DoozyX/clang-format-lint-action
+    - uses: DoozyX/clang-format-lint-action@v0.5
+      with:
+        source: '.'
+        clangFormatVersion: 9
+
+  clang-tidy:
+    needs: git-ref
+    runs-on: ubuntu-latest
+    if: always()
+
+    steps:
+    - uses: actions/checkout@v2
+      with:
+        ref: ${{ needs.git-ref.ref }}
+
+    - name: Install dependencies
+      run: |
+        # Setup LLVM GPG Key
+        wget -O - https://apt.llvm.org/llvm-snapshot.gpg.key | sudo apt-key add -
+
+        sudo add-apt-repository "deb http://apt.llvm.org/bionic/ llvm-toolchain-bionic-9 main"
+        sudo add-apt-repository "deb http://apt.llvm.org/bionic/ llvm-toolchain-bionic-7 main"
+        sudo apt-get update
+
+        # Install clang-tidy
+        sudo apt-get install clang-tidy-9
+
+        # Install tblgen so that we don't have to build it. The version must match the version of LLVM
+        # which we are building.
+        sudo apt-get install llvm-7-tools
+
+        # Install Ninja
+        sudo apt-get install ninja-build
+
+    - uses: actions/checkout@v2
+      with:
+        repository: CSUS-LLVM/llvm-project
+        ref: release/7.x
+        path: llvm-project
+
+    - name: Setup Compilation Database
+      id: compiledb
+      run: |
+        mkdir build-tidy && cd build-tidy
+
+        # We configure because we want to set up a compilation database.
+        cmake ../llvm-project/llvm -GNinja -DCMAKE_BUILD_TYPE=Debug                    \
+            -DCMAKE_CXX_COMPILER=g++                                                   \
+            -DCMAKE_C_COMPILER=gcc                                                     \
+            -DCMAKE_EXPORT_COMPILE_COMMANDS=ON                                         \
+            '-DLLVM_TARGETS_TO_BUILD=X86;AMDGPU'                                       \
+            -DLLVM_TABLEGEN=$(which llvm-tblgen-7)                                     \
+            -DLLVM_EXTERNAL_PROJECTS=OptSched                                          \
+            -DLLVM_EXTERNAL_OPTSCHED_SOURCE_DIR=$(cd .. && pwd)
+
+        # Generate relevant "source" files so that clang-tidy knows where to find them.
+        cmake --build . --target X86CommonTableGen intrinsics_gen AttributeCompatFuncTableGen AMDGPUCommonTableGen
+
+        # Export the path to the compilation database.
+        echo "::set-output name=dbjson::$PWD/compile_commands.json"
+
+    - name: Run Clang Tidy
+      run: |
+        shopt -s globstar
+        clang-tidy-9 -p ${{ steps.compiledb.outputs.dbjson }}                  \
+            --checks=-readability-identifier-naming                            \
+            --warnings-as-errors='*'                                           \
+            include/**/*.h lib/**/*.h lib/**/*.cpp
+
+      # This check is noisy over our codebase, so we pull it out into its own step and don't allow
+      # it to fail the build.
+    - name: Run Clang Tidy - Noisy
+      if: always() # Run even if the prior clang-tidy found problems.
+      run: |
+        shopt -s globstar
+        clang-tidy-9 -p ${{ steps.compiledb.outputs.dbjson }}                  \
+            --checks='-*,readability-identifier-naming'                        \
+            --warnings-as-errors='-*'                                          \
+            include/**/*.h lib/**/*.h lib/**/*.cpp
+
+  trailing-whitespace:
+    needs: git-ref
+    runs-on: ubuntu-latest
+    if: always()
+
+    steps:
+    - uses: actions/checkout@v2
+      with:
+        fetch-depth: 0
+        ref: ${{ needs.git-ref.ref }}
+
+    - name: Check Trailing Whitespace
+      # git diff --check checks the diff for any whitespace violations.
+      # By diffing HEAD against an empty tree, we are checking every file.
+      # However, we exclude .patch files, as those correctly have trailing whitespace.
+      run: git diff --check $(git hash-object -t tree /dev/null) HEAD -- ':(exclude)*.patch'
+
+  west-const:
+    needs: git-ref
+    runs-on: ubuntu-latest
+    if: always()
+
+    steps:
+    - uses: actions/checkout@v2
+      with:
+        ref: ${{ needs.git-ref.ref }}
+
+    - name: Check failures
+      run: |
+        grep -E '[a-zA-Z_0-9]+ const\b' --with-filename -n -r include lib unittests \
+            | grep -Ev '(static|constexpr|inline|virtual|else|new|sizeof|typedef|typename|volatile|consteval|constinit)\s+const\b' \
+            | tee eastconst.txt
+
+        python -c 'text = open("eastconst.txt", "r").read(); exit(int(len(text) > 0))'
+
+  report:
+    needs: [init-report, ci, clang-format, clang-tidy, trailing-whitespace, west-const]
+    runs-on: ubuntu-latest
+    if: needs.init-report.result == 'success'
+
+    steps:
+    - name: Report CI
+      uses: peter-evans/create-or-update-comment@v1.4.3
+      with:
+        comment-id: ${{ needs.init-report.outputs.report }}
+        body: |
+          | Check | Status |
+          | ----- | ------ |
+          ${{
+            format('| C++ Build | {0}{1}{2} |',
+              needs.ci.result == 'success' && '&#x2714; Passed' || '',
+              needs.ci.result == 'failure' && '&#x274C; Failed' || '',
+              (needs.ci.result != 'success' && needs.ci.result != 'failure') && 'Skipped' || ''
+            )
+          }}
+          ${{
+            format('| Clang-Format | {0}{1}{2} |',
+              needs.clang-format.result == 'success' && '&#x2714; Passed' || '',
+              needs.clang-format.result == 'failure' && '&#x274C; Failed' || '',
+              (needs.clang-format.result != 'success' && needs.clang-format.result != 'failure') && 'Skipped' || ''
+            )
+          }}
+          ${{
+            format('| Clang-Tidy | {0}{1}{2} |',
+              needs.clang-tidy.result == 'success' && '&#x2714; Passed' || '',
+              needs.clang-tidy.result == 'failure' && '&#x274C; Failed' || '',
+              (needs.clang-tidy.result != 'success' && needs.clang-tidy.result != 'failure') && 'Skipped' || ''
+            )
+          }}
+          ${{
+            format('| Trailing Whitespace | {0}{1}{2} |',
+              needs.trailing-whitespace.result == 'success' && '&#x2714; Passed' || '',
+              needs.trailing-whitespace.result == 'failure' && '&#x274C; Failed' || '',
+              (needs.trailing-whitespace.result != 'success' && needs.trailing-whitespace.result != 'failure') && 'Skipped' || ''
+            )
+          }}
+          ${{
+            format('| west-const | {0}{1}{2} |',
+              needs.west-const.result == 'success' && '&#x2714; Passed' || '',
+              needs.west-const.result == 'failure' && '&#x274C; Failed' || '',
+              (needs.west-const.result != 'success' && needs.west-const.result != 'failure') && 'Skipped' || ''
+            )
+          }}
