@@ -248,10 +248,11 @@ jobs:
   report:
     needs: [init-report, ci, clang-format, clang-tidy, trailing-whitespace, west-const]
     runs-on: ubuntu-latest
-    if: ${{ needs.init-report.result == 'success' }}
+    if: always()
 
     steps:
     - name: Report CI
+      if: needs.init-report.result == 'success'
       uses: peter-evans/create-or-update-comment@v1.4.3
       with:
         comment-id: ${{ needs.init-report.outputs.report }}
