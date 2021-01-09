@@ -147,6 +147,7 @@ protected:
 
   // The spill cost function to be used.
   SPILL_COST_FUNCTION SCF;
+  SPILL_COST_FUNCTION SecondPassSCF;
 
   // The algorithm to use for determining the lower bound. Valid values are
   LB_ALG LowerBoundAlgorithm;
