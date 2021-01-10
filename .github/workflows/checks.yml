@@ -13,18 +13,19 @@ env:
   CCACHE_DIR: $GITHUB_WORKSPACE/.ccache
   CCACHE_COMPRESS: true
   CCACHE_COMPRESSLEVEL: 6
+  # Also allow triggering with a comment of `Do: Run Checks`.
+  # If we are a pull_request, we have the trigger comment, and the person
+  # requesting is the one who made the PR, then we run.
+  COMMENT_TRIGGERED: >-
+    ${{ github.event_name == 'issue_comment'
+    && github.event.issue.pull_request != ''
+    && github.event.comment.body == 'Do: Run Checks'
+    && github.event.comment.user.id == github.event.issue.user.id }}
 
 jobs:
   init-report:
     runs-on: ubuntu-latest
-    # Also allow triggering with a comment of `Do: Run Checks`.
-    # If we are a pull_request, we have the trigger comment, and the person
-    # requesting is the one who made the PR, then we run.
-    if: >-
-      github.event_name == 'issue_comment'
-      && github.event.issue.pull_request != ''
-      && github.event.comment.body == 'Do: Run Checks'
-      && github.event.comment.user.id == github.event.issue.user.id
+    if: $COMMENT_TRIGGERED
 
     outputs:
       report: ${{ steps.report.outputs.comment-id }}
@@ -38,36 +39,15 @@ jobs:
         body: |
           Rerunning checks: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
 
-  git-ref:
-    needs: init-report
-    runs-on: ubuntu-latest
-    if: always()
-
-    outputs:
-      ref: ${{ steps.git-ref.outputs.ref }}
-      sha: ${{ steps.git-ref.outputs.sha }}
-
-    steps:
-    - id: git-ref
-      run: |
-        if [[ '${{ needs.init-report.result }}' == 'success' ]]; then
-          echo '::set-output name=ref::pull/${{ github.event.issue.number }}/head'
-          echo '::set-output name=sha::HEAD'
-        else
-          echo '::set-output name=ref::${{ github.ref }}'
-          echo '::set-output name=sha::${{ github.sha }}'
-        fi
-
   ci:
-    needs: git-ref
     runs-on: ubuntu-latest
-    if: always()
 
     steps:
     - uses: actions/checkout@v2
       with:
-        ref: ${{ needs.git-ref.outputs.ref }}
-    - run: git checkout ${{ needs.git-ref.outputs.sha }}
+        fetch-depth: 0
+    - run: gh pr checkout ${{ github.event.issue.number }}
+      if: $COMMENT_TRIGGERED
 
     - name: Install dependencies
       run: |
@@ -123,8 +103,9 @@ jobs:
     steps:
     - uses: actions/checkout@v2
       with:
-        ref: ${{ needs.git-ref.outputs.ref }}
-    - run: git checkout ${{ needs.git-ref.outputs.sha }}
+        fetch-depth: 0
+    - run: gh pr checkout ${{ github.event.issue.number }}
+      if: $COMMENT_TRIGGERED
 
       # https://github.com/DoozyX/clang-format-lint-action
     - uses: DoozyX/clang-format-lint-action@v0.5
@@ -140,8 +121,9 @@ jobs:
     steps:
     - uses: actions/checkout@v2
       with:
-        ref: ${{ needs.git-ref.outputs.ref }}
-    - run: git checkout ${{ needs.git-ref.outputs.sha }}
+        fetch-depth: 0
+    - run: gh pr checkout ${{ github.event.issue.number }}
+      if: $COMMENT_TRIGGERED
 
     - name: Install dependencies
       run: |
@@ -217,8 +199,8 @@ jobs:
     - uses: actions/checkout@v2
       with:
         fetch-depth: 0
-        ref: ${{ needs.git-ref.outputs.ref }}
-    - run: git checkout ${{ needs.git-ref.outputs.sha }}
+    - run: gh pr checkout ${{ github.event.issue.number }}
+      if: $COMMENT_TRIGGERED
 
     - name: Check Trailing Whitespace
       # git diff --check checks the diff for any whitespace violations.
@@ -234,8 +216,9 @@ jobs:
     steps:
     - uses: actions/checkout@v2
       with:
-        ref: ${{ needs.git-ref.outputs.ref }}
-    - run: git checkout ${{ needs.git-ref.outputs.sha }}
+        fetch-depth: 0
+    - run: gh pr checkout ${{ github.event.issue.number }}
+      if: $COMMENT_TRIGGERED
 
     - name: Check failures
       run: |
