@@ -35,7 +35,7 @@ jobs:
   init-report:
     needs: comment-triggered
     runs-on: ubuntu-latest
-    if: needs.comment-triggered.outputs.value
+    if: needs.comment-triggered.outputs.value == 'true'
 
     outputs:
       report: ${{ steps.report.outputs.comment-id }}
@@ -58,7 +58,7 @@ jobs:
       with:
         fetch-depth: 0
     - run: gh pr checkout ${{ github.event.issue.number }}
-      if: needs.comment-triggered.outputs.value
+      if: needs.comment-triggered.outputs.value == 'true'
 
     - name: Install dependencies
       run: |
@@ -116,7 +116,7 @@ jobs:
       with:
         fetch-depth: 0
     - run: gh pr checkout ${{ github.event.issue.number }}
-      if: needs.comment-triggered.outputs.value
+      if: needs.comment-triggered.outputs.value == 'true'
 
       # https://github.com/DoozyX/clang-format-lint-action
     - uses: DoozyX/clang-format-lint-action@v0.5
@@ -134,7 +134,7 @@ jobs:
       with:
         fetch-depth: 0
     - run: gh pr checkout ${{ github.event.issue.number }}
-      if: needs.comment-triggered.outputs.value
+      if: needs.comment-triggered.outputs.value == 'true'
 
     - name: Install dependencies
       run: |
@@ -211,7 +211,7 @@ jobs:
       with:
         fetch-depth: 0
     - run: gh pr checkout ${{ github.event.issue.number }}
-      if: needs.comment-triggered.outputs.value
+      if: needs.comment-triggered.outputs.value == 'true'
 
     - name: Check Trailing Whitespace
       # git diff --check checks the diff for any whitespace violations.
@@ -229,7 +229,7 @@ jobs:
       with:
         fetch-depth: 0
     - run: gh pr checkout ${{ github.event.issue.number }}
-      if: needs.comment-triggered.outputs.value
+      if: needs.comment-triggered.outputs.value == 'true'
 
     - name: Check failures
       run: |
@@ -242,7 +242,7 @@ jobs:
   report:
     needs: [comment-triggered, init-report, ci, clang-format, clang-tidy, trailing-whitespace, west-const]
     runs-on: ubuntu-latest
-    if: needs.comment-triggered.outputs.value
+    if: needs.comment-triggered.outputs.value == 'true'
 
     steps:
     - name: Report CI
