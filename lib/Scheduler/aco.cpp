@@ -133,13 +133,14 @@ bool ACOScheduler::shouldReplaceSchedule(InstSchedule *OldSched,
   // GLOBAL_ONLY - Only applies to comparisons of the globally best schedule
   // GLOBAL_AND_TIGHTEN - If a schedule has a lower DCFCost it wins
   // GLOBAL_AND_ITERATION - Rejects any schedule with a worse DCFCost
-  if ((DCFOption != DCF_OPT::GLOBAL_ONLY && IsGlobal) &&
-      DCFOption != DCF_OPT::OFF) {
+  if ((DCFOption == DCF_OPT::GLOBAL_ONLY && IsGlobal) ||
+      DCFOption == DCF_OPT::GLOBAL_AND_TIGHTEN ||
+      DCFOption == DCF_OPT::GLOBAL_AND_ITERATION) {
     InstCount NewDCFCost = NewSched->GetExtraSpillCost(DCFCostFn);
     InstCount OldDCFCost = OldSched->GetExtraSpillCost(DCFCostFn);
     if (NewDCFCost < OldDCFCost)
       return true;
-    else if ((DCFOption != DCF_OPT::GLOBAL_ONLY && IsGlobal) ||
+    else if ((DCFOption == DCF_OPT::GLOBAL_ONLY && IsGlobal) ||
              DCFOption == DCF_OPT::GLOBAL_AND_ITERATION) {
       if (NewDCFCost > OldDCFCost)
         return false;
