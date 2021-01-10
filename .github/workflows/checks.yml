@@ -252,10 +252,11 @@ jobs:
   report:
     needs: [comment-triggered, init-report, ci, clang-format, clang-tidy, trailing-whitespace, west-const]
     runs-on: ubuntu-latest
-    if: needs.comment-triggered.outputs.value == 'true'
+    if: always()
 
     steps:
     - name: Report CI
+      if: needs.comment-triggered.outputs.value == 'true'
       uses: peter-evans/create-or-update-comment@v1.4.3
       with:
         comment-id: ${{ needs.init-report.outputs.report }}
