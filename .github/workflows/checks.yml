@@ -13,19 +13,29 @@ env:
   CCACHE_DIR: $GITHUB_WORKSPACE/.ccache
   CCACHE_COMPRESS: true
   CCACHE_COMPRESSLEVEL: 6
-  # Also allow triggering with a comment of `Do: Run Checks`.
-  # If we are a pull_request, we have the trigger comment, and the person
-  # requesting is the one who made the PR, then we run.
-  COMMENT_TRIGGERED: >-
-    ${{ github.event_name == 'issue_comment'
-    && github.event.issue.pull_request != ''
-    && github.event.comment.body == 'Do: Run Checks'
-    && github.event.comment.user.id == github.event.issue.user.id }}
 
 jobs:
-  init-report:
+  comment-triggered:
     runs-on: ubuntu-latest
-    if: $COMMENT_TRIGGERED
+
+    outputs:
+      value: ${{ steps.value.outputs.value }}
+
+    steps:
+    - id: value
+    # Allow triggering with a comment of `Do: Run Checks`.
+    # If we are a pull_request, we have the trigger comment, and the person
+    # requesting is the one who made the PR, then we run.
+      run: >-
+        echo ${{ github.event_name == 'issue_comment'
+        && github.event.issue.pull_request != ''
+        && github.event.comment.body == 'Do: Run Checks'
+        && github.event.comment.user.id == github.event.issue.user.id }}
+
+  init-report:
+    needs: comment-triggered
+    runs-on: ubuntu-latest
+    if: needs.comment-triggered.outputs.value
 
     outputs:
       report: ${{ steps.report.outputs.comment-id }}
@@ -40,6 +50,7 @@ jobs:
           Rerunning checks: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
 
   ci:
+    needs: comment-triggered
     runs-on: ubuntu-latest
 
     steps:
@@ -47,7 +58,7 @@ jobs:
       with:
         fetch-depth: 0
     - run: gh pr checkout ${{ github.event.issue.number }}
-      if: $COMMENT_TRIGGERED
+      if: needs.comment-triggered.outputs.value
 
     - name: Install dependencies
       run: |
@@ -96,7 +107,7 @@ jobs:
       run: ctest -VV
 
   clang-format:
-    needs: git-ref
+    needs: comment-triggered
     runs-on: ubuntu-latest
     if: always()
 
@@ -105,7 +116,7 @@ jobs:
       with:
         fetch-depth: 0
     - run: gh pr checkout ${{ github.event.issue.number }}
-      if: $COMMENT_TRIGGERED
+      if: needs.comment-triggered.outputs.value
 
       # https://github.com/DoozyX/clang-format-lint-action
     - uses: DoozyX/clang-format-lint-action@v0.5
@@ -114,7 +125,7 @@ jobs:
         clangFormatVersion: 9
 
   clang-tidy:
-    needs: git-ref
+    needs: comment-triggered
     runs-on: ubuntu-latest
     if: always()
 
@@ -123,7 +134,7 @@ jobs:
       with:
         fetch-depth: 0
     - run: gh pr checkout ${{ github.event.issue.number }}
-      if: $COMMENT_TRIGGERED
+      if: needs.comment-triggered.outputs.value
 
     - name: Install dependencies
       run: |
@@ -191,7 +202,7 @@ jobs:
             include/**/*.h lib/**/*.h lib/**/*.cpp
 
   trailing-whitespace:
-    needs: git-ref
+    needs: comment-triggered
     runs-on: ubuntu-latest
     if: always()
 
@@ -200,7 +211,7 @@ jobs:
       with:
         fetch-depth: 0
     - run: gh pr checkout ${{ github.event.issue.number }}
-      if: $COMMENT_TRIGGERED
+      if: needs.comment-triggered.outputs.value
 
     - name: Check Trailing Whitespace
       # git diff --check checks the diff for any whitespace violations.
@@ -209,7 +220,7 @@ jobs:
       run: git diff --check $(git hash-object -t tree /dev/null) HEAD -- ':(exclude)*.patch'
 
   west-const:
-    needs: git-ref
+    needs: comment-triggered
     runs-on: ubuntu-latest
     if: always()
 
@@ -218,7 +229,7 @@ jobs:
       with:
         fetch-depth: 0
     - run: gh pr checkout ${{ github.event.issue.number }}
-      if: $COMMENT_TRIGGERED
+      if: needs.comment-triggered.outputs.value
 
     - name: Check failures
       run: |
@@ -229,13 +240,12 @@ jobs:
         python -c 'text = open("eastconst.txt", "r").read(); exit(int(len(text) > 0))'
 
   report:
-    needs: [init-report, ci, clang-format, clang-tidy, trailing-whitespace, west-const]
+    needs: [comment-triggered, init-report, ci, clang-format, clang-tidy, trailing-whitespace, west-const]
     runs-on: ubuntu-latest
-    if: always()
+    if: needs.comment-triggered.outputs.value
 
     steps:
     - name: Report CI
-      if: needs.init-report.result == 'success'
       uses: peter-evans/create-or-update-comment@v1.4.3
       with:
         comment-id: ${{ needs.init-report.outputs.report }}
