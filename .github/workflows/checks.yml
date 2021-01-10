@@ -27,10 +27,10 @@ jobs:
     # If we are a pull_request, we have the trigger comment, and the person
     # requesting is the one who made the PR, then we run.
       run: >-
-        echo ${{ github.event_name == 'issue_comment'
+        echo "::set-output name=value::${{ github.event_name == 'issue_comment'
         && github.event.issue.pull_request != ''
         && github.event.comment.body == 'Do: Run Checks'
-        && github.event.comment.user.id == github.event.issue.user.id }}
+        && github.event.comment.user.id == github.event.issue.user.id }}"
 
   init-report:
     needs: comment-triggered
