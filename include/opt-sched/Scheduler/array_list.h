@@ -686,32 +686,44 @@ void PriorityArrayList<T,K>::InsrtElmnt(T elmnt, K key, bool allowDplct) {
     ArrayList<T>::size_++;
     return;
   }
-
-  int indx;
-  bool foundDplct = false;
-
-  for (indx = 0; indx < ArrayList<T>::size_; indx++) {
-    if (keys_[indx] <= key) {
-      foundDplct = (keys_[indx] == key);
-      break;
+  if (allowDplct) { // Do reverse insertion
+    for (int i = ArrayList<T>::size_ - 1; i > -2; i--) {
+      if (i == -1 || keys_[i] >= key) {
+        ArrayList<T>::elmnts_[i + 1] = elmnt;
+        keys_[i + 1] = key;
+        ArrayList<T>::size_++;
+        break;
+      }
+      ArrayList<T>::elmnts_[i + 1] = ArrayList<T>::elmnts_[i];
+      keys_[i + 1] = keys_[i];
     }
-  }
+  } else {  // Do regular insert so we can scan for duplicates before shifting
+    int indx;
+    bool foundDplct = false;
 
-  if (!allowDplct && foundDplct)
-    return;
-
-  // if indx != size_ we must move all entries at and after indx to make
-  // space for new elmnt
-  if (indx != ArrayList<T>::size_) {
-    for (int i = ArrayList<T>::size_; i > indx; i--) {
-      ArrayList<T>::elmnts_[i] = ArrayList<T>::elmnts_[i - 1];
-      keys_[i] = keys_[i - 1];
+    for (indx = 0; indx < ArrayList<T>::size_; indx++) {
+      if (keys_[indx] <= key) {
+        foundDplct = (keys_[indx] == key);
+        break;
+      }
     }
-  }
 
-  ArrayList<T>::elmnts_[indx] = elmnt;
-  keys_[indx] = key;
-  ArrayList<T>::size_++;
+    if (!allowDplct && foundDplct)
+      return;
+
+    // if indx != size_ we must move all entries at and after indx to make
+    // space for new elmnt
+    if (indx != ArrayList<T>::size_) {
+      for (int i = ArrayList<T>::size_; i > indx; i--) {
+        ArrayList<T>::elmnts_[i] = ArrayList<T>::elmnts_[i - 1];
+        keys_[i] = keys_[i - 1];
+      }
+    }
+
+    ArrayList<T>::elmnts_[indx] = elmnt;
+    keys_[indx] = key;
+    ArrayList<T>::size_++;
+  }
 }
 
 template <typename T, typename K>

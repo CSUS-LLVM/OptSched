@@ -380,6 +380,8 @@ FUNC_RESULT SchedRegion::FindOptimalSchedule(
 
   // Step #2: Use ACO to find a schedule if enabled and no optimal schedule is
   // yet to be found.
+  if (AcoBeforeEnum && dataDepGraph_->GetInstCnt() < 20)
+    AcoBeforeEnum = false;
   if (AcoBeforeEnum && !isLstOptml) {
     AcoStart = Utilities::GetProcessorTime();
     AcoSchedule = new InstSchedule(machMdl_, dataDepGraph_, vrfySched_);

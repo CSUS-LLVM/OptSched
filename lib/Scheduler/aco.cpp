@@ -355,10 +355,6 @@ InstSchedule *ACOScheduler::FindOneSchedule(InstSchedule *dev_schedule,
 #endif
 }
 
-// tracks amount of schedules copied to output schedules
-__device__ int schedsCopied;
-__device__ int *mutex;
-
 __global__
 void Dev_FindOneSchedule(SchedRegion *dev_rgn, DataDepGraph *dev_DDG,
             ACOScheduler *dev_AcoSchdulr, InstSchedule **dev_schedules,
@@ -366,9 +362,6 @@ void Dev_FindOneSchedule(SchedRegion *dev_rgn, DataDepGraph *dev_DDG,
   if (GLOBALTID == 0) {
     dev_rgn->SetDepGraph(dev_DDG);
     ((BBWithSpill *)dev_rgn)->SetRegFiles(dev_DDG->getRegFiles());
-    //schedsCopied = 0;
-    //mutex = new int;
-    //*mutex = 0;
   }
   dev_schedules[GLOBALTID]->Initialize();
   dev_AcoSchdulr->FindOneSchedule(dev_schedules[GLOBALTID],
@@ -382,30 +375,51 @@ void Dev_FindOneSchedule(SchedRegion *dev_rgn, DataDepGraph *dev_DDG,
     }
 */
 /*
+  if (GLOBALTID == 0)
+    dev_iterationBest->Copy(dev_schedules[GLOBALTID]);
+*/
+}
+
+__global__ 
+void Dev_SelectBestSched(InstSchedule **dev_schedules,
+                         InstSchedule *dev_iterationBest,
+                         bool *dev_foundBestSched) {
   // Each thread counts how many schedules are worse or equal to it,
   // those that are better than or equal to NUMTHREADS schedules 
-  // race to the lock and copy their schedule to dev_iterationBest
+  // set their index in foundBestSched to true. 1 tread iterates through
+  // the foundBestSched array and copies the schedule that correlates to the first
+  // true it finds
+  // reset foundBestSched array
+  //dev_foundBestSched[GLOBALTID] = false;
   int cost = dev_schedules[GLOBALTID]->GetCost();
   int compCnt = 0;
   for (int i = 0; i < NUMTHREADS; i++) {
-    if (dev_schedules[i]->GetCost() >= cost)
-      compCnt++;
+    compCnt+= (dev_schedules[i]->GetCost() >= cost);
   }
+/*
+  //debug
   printf("Thread %d has compCnt = %d\n", GLOBALTID, compCnt);
-  // All threads that counted 
-  if (compCnt == NUMTHREADS) {
-    // lock
-    while (atomicCAS(mutex, 0, 1) != 0);
-    if (schedsCopied < 1) { // only want one sched copied right now
-      printf("Thread %d copying to dev_iterationBest\n");
-      dev_iterationBest->Copy(dev_schedules[GLOBALTID]);
+  for (int i = 0; i < NUMTHREADS; i++)
+    if (GLOBALTID == 0) {
+      printf("Printing schedule for thread %d\n", i);
+      dev_schedules[GLOBALTID]->Print();
     }
-    //unlock
-    atomicExch(mutex, 0);
-  }
 */
-  if (GLOBALTID == 0)
-    dev_iterationBest->Copy(dev_schedules[GLOBALTID]);
+  // Set if thread found an iterationBestSched
+  dev_foundBestSched[GLOBALTID] = (compCnt == NUMTHREADS);
+  // one thread selects and copied a schedule
+  if (GLOBALTID == 0) {
+    int i;
+    for (i = 0; i < NUMTHREADS; i++) {
+      if (dev_foundBestSched[i] == true) {
+        //debug
+        printf("Thread %d's schedule will be copied back to host\n", i);
+        dev_iterationBest->Initialize(); 
+        dev_iterationBest->Copy(dev_schedules[i]);
+        break;
+      }   
+    }   
+  }
 }
 
 FUNC_RESULT ACOScheduler::FindSchedule(InstSchedule *schedule_out,
@@ -451,6 +465,8 @@ FUNC_RESULT ACOScheduler::FindSchedule(InstSchedule *schedule_out,
   InstSchedule *iterationBest;
   // Holds best schedule for iteration on the device to be copied back to host
   InstSchedule *dev_iterationBest;
+  // holds which threads found the best schedule
+  bool *dev_foundBestSched;
   while (true) {
     if (DEV_ACO) { // Run ACO on device
       size_t memSize;
@@ -485,6 +501,9 @@ FUNC_RESULT ACOScheduler::FindSchedule(InstSchedule *schedule_out,
         gpuErrchk(cudaMalloc((void**)&dev_iterationBest, memSize));
         gpuErrchk(cudaMemcpy(dev_iterationBest, iterationBest, memSize,
                              cudaMemcpyHostToDevice));
+        // allocate an array of bools for dev_foundBestSched
+        memSize = sizeof(bool) * NUMTHREADS;
+        gpuErrchk(cudaMalloc(&dev_foundBestSched, memSize));
 /* Implementation with one array of schedules, has unsolved memory errors
         // Create and array of schedules with dummy constructor
         schedules = new InstSchedule[NUMTHREADS];
@@ -506,6 +525,11 @@ FUNC_RESULT ACOScheduler::FindSchedule(InstSchedule *schedule_out,
       Dev_FindOneSchedule<<<NUMBLOCKS,NUMTHREADSPERBLOCK>>>(dev_rgn_, dev_DDG_,
 		                     dev_AcoSchdulr, dev_schedules, dev_ready_,
                                      dev_iterationBest);
+      cudaDeviceSynchronize();
+      Logger::Info("Post Kernel Error: %s", cudaGetErrorString(cudaGetLastError()));
+      Logger::Info("Launching Dev_SelectBestSched");
+      Dev_SelectBestSched<<<NUMBLOCKS,NUMTHREADSPERBLOCK>>>(dev_schedules, 
+                                      dev_iterationBest, dev_foundBestSched);
       cudaDeviceSynchronize();
       Logger::Info("Post Kernel Error: %s", cudaGetErrorString(cudaGetLastError()));
       // Copy dev_iterationBest back to host
@@ -623,6 +647,7 @@ FUNC_RESULT ACOScheduler::FindSchedule(InstSchedule *schedule_out,
     cudaFree(dev_schedules);
     delete[] host_schedules;
     delete[] schedules;
+    cudaFree(dev_foundBestSched);
 /*  Implementation with one array of schedules, has unsolved memory errors
     for (int i = 0; i < NUMTHREADS; i++)
       schedules[i].FreeArrays();
