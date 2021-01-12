@@ -60,7 +60,7 @@ ACOScheduler::ACOScheduler(DataDepGraph *dataDepGraph,
   ants_per_iteration = schedIni.GetInt("ACO_ANT_PER_ITERATION");
   print_aco_trace = schedIni.GetBool("ACO_TRACE");
   IsTwoPassEn = schedIni.GetBool("USE_TWO_PASS");
-  DCFOption = ParseDCFOpt(schedIni.GetString("ACO_DUAL_COST_FN_ENABLE"));
+  DCFOption = ParseDCFOpt(schedIni.GetString("ACO_DUAL_COST_FN_ENABLE", "OFF"));
 
   // pheromone Graph Debugging start
   std::string TgtRgns = schedIni.GetString("ACO_DBG_REGIONS");
@@ -386,12 +386,14 @@ FUNC_RESULT ACOScheduler::FindSchedule(InstSchedule *schedule_out,
   fixed_bias = schedIni.GetInt(IsFirst ? "ACO_FIXED_BIAS" : "ACO2P_FIXED_BIAS");
   noImprovementMax = schedIni.GetInt(IsFirst ? "ACO_STOP_ITERATIONS"
                                              : "ACO2P_STOP_ITERATIONS");
-  std::string DcfFnString = schedIni.GetString(IsFirst ? "ACO_DUAL_COST_FN"
-                                                       : "ACO2P_DUAL_COST_FN");
-  if (DcfFnString!="NONE")
-	  DCFCostFn = ParseSCFName(DcfFnString);
-  else
+  if(DCFOption != DCF_OPT::OFF) {
+    std::string DcfFnString = schedIni.GetString(IsFirst ? "ACO_DUAL_COST_FN"
+                                                         : "ACO2P_DUAL_COST_FN");
+    if (DcfFnString!="NONE")
+      DCFCostFn = ParseSCFName(DcfFnString);
+    else
       DCFOption = DCF_OPT::OFF;
+  }
 
   // compute the relative maximum score inverse
   ScRelMax = rgn_->GetHeuristicCost();
