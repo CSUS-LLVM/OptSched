@@ -261,15 +261,6 @@ FUNC_RESULT SchedRegion::FindOptimalSchedule(
 
   const bool IsSeqListSched = GetHeuristicSchedulerType() == SCHED_SEQ;
 
-  // The SeqListSched won't respect the added edges if we do graph
-  // transformations now, so we delay until after the Seq scheduler.
-  if (!IsSeqListSched) {
-    rslt = applyGraphTransformations();
-
-    if (rslt != RES_SUCCESS)
-      return rslt;
-  }
-
   SetupForSchdulng_();
   CmputAbslutUprBound_();
   schedLwrBound_ = dataDepGraph_->GetSchedLwrBound();
@@ -310,13 +301,6 @@ FUNC_RESULT SchedRegion::FindOptimalSchedule(
       Logger::Info("Invalid DAG after adding artificial cluster edges");
       return rslt;
     }
-  }
-
-  if (IsSeqListSched) {
-    rslt = applyGraphTransformations();
-
-    if (rslt != RES_SUCCESS)
-      return rslt;
   }
 
   // This must be done after SetupForSchdulng() or UpdateSetupForSchdulng() to
@@ -415,6 +399,13 @@ FUNC_RESULT SchedRegion::FindOptimalSchedule(
   Logger::Info("Lower bound of cost before scheduling: %d", costLwrBound_);
   Logger::Info("Lower bound of spill cost before scheduling: %d",
                SpillCostLwrBound_);
+
+  if (!isLstOptml) {
+    rslt = applyGraphTransformations();
+
+    if (rslt != RES_SUCCESS)
+      return rslt;
+  }
 
   // Step #2: Use ACO to find a schedule if enabled and no optimal schedule is
   // yet to be found.
