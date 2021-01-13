@@ -60,7 +60,6 @@ FUNC_RESULT StaticNodeSupOccupancyPreservingILPTrans::ApplyTrans() {
     ILP::addNecessaryResourceEdges(Data, i, j);
 
     ILP::updateDistanceTable(Data, i, j);
-    ILP::updateSuperiorArray(Data, i, j);
     // ILP redundant edges are also redundant from RP point of view.
     // This is because ILP redundant edges are transitive edges with more
     // conditions met, and the RP point of view considers transitive edges to be
