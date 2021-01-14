@@ -15,16 +15,27 @@ env:
   CCACHE_COMPRESSLEVEL: 6
 
 jobs:
-  init-report:
+  comment-triggered:
     runs-on: ubuntu-latest
-    # Also allow triggering with a comment of `Do: Run Checks`.
+
+    outputs:
+      value: ${{ steps.value.outputs.value }}
+
+    steps:
+    - id: value
+    # Allow triggering with a comment of `Do: Run Checks`.
     # If we are a pull_request, we have the trigger comment, and the person
     # requesting is the one who made the PR, then we run.
-    if: >-
-      github.event_name == 'issue_comment'
-      && github.event.issue.pull_request != ''
-      && github.event.comment.body == 'Do: Run Checks'
-      && github.event.comment.user.id == github.event.issue.user.id
+      run: >-
+        echo "::set-output name=value::${{ github.event_name == 'issue_comment'
+        && github.event.issue.pull_request != ''
+        && github.event.comment.body == 'Do: Run Checks'
+        && github.event.comment.user.id == github.event.issue.user.id }}"
+
+  init-report:
+    needs: comment-triggered
+    runs-on: ubuntu-latest
+    if: needs.comment-triggered.outputs.value == 'true'
 
     outputs:
       report: ${{ steps.report.outputs.comment-id }}
@@ -38,34 +49,18 @@ jobs:
         body: |
           Rerunning checks: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
 
-  git-ref:
-    needs: init-report
-    runs-on: ubuntu-latest
-    if: always()
-
-    outputs:
-      ref: ${{ steps.git-ref.outputs.ref }}
-
-    steps:
-    - id: git-ref
-      run: |
-        if [[ '${{ steps.init-report.result }}' == 'success' ]]; then
-          echo '::set-output name=ref::pull/${{ github.event.issue.number }}/head'
-          echo '::set-output name=sha::HEAD'
-        else
-          echo '::set-output name=ref::${{ github.ref }}'
-          echo '::set-output name=sha::${{ github.sha }}'
-        fi
-
   ci:
-    needs: git-ref
+    needs: comment-triggered
     runs-on: ubuntu-latest
-    if: always()
 
     steps:
     - uses: actions/checkout@v2
       with:
-        ref: ${{ needs.git-ref.ref }}
+        fetch-depth: 0
+    - run: |
+        echo ${{ github.token }} | gh auth login --with-token
+        gh pr checkout ${{ github.event.issue.number }}
+      if: needs.comment-triggered.outputs.value == 'true'
 
     - name: Install dependencies
       run: |
@@ -114,14 +109,18 @@ jobs:
       run: ctest -VV
 
   clang-format:
-    needs: git-ref
+    needs: comment-triggered
     runs-on: ubuntu-latest
     if: always()
 
     steps:
     - uses: actions/checkout@v2
       with:
-        ref: ${{ needs.git-ref.ref }}
+        fetch-depth: 0
+    - run: |
+        echo ${{ github.token }} | gh auth login --with-token
+        gh pr checkout ${{ github.event.issue.number }}
+      if: needs.comment-triggered.outputs.value == 'true'
 
       # https://github.com/DoozyX/clang-format-lint-action
     - uses: DoozyX/clang-format-lint-action@v0.5
@@ -130,14 +129,18 @@ jobs:
         clangFormatVersion: 9
 
   clang-tidy:
-    needs: git-ref
+    needs: comment-triggered
     runs-on: ubuntu-latest
     if: always()
 
     steps:
     - uses: actions/checkout@v2
       with:
-        ref: ${{ needs.git-ref.ref }}
+        fetch-depth: 0
+    - run: |
+        echo ${{ github.token }} | gh auth login --with-token
+        gh pr checkout ${{ github.event.issue.number }}
+      if: needs.comment-triggered.outputs.value == 'true'
 
     - name: Install dependencies
       run: |
@@ -205,7 +208,7 @@ jobs:
             include/**/*.h lib/**/*.h lib/**/*.cpp
 
   trailing-whitespace:
-    needs: git-ref
+    needs: comment-triggered
     runs-on: ubuntu-latest
     if: always()
 
@@ -213,7 +216,10 @@ jobs:
     - uses: actions/checkout@v2
       with:
         fetch-depth: 0
-        ref: ${{ needs.git-ref.ref }}
+    - run: |
+        echo ${{ github.token }} | gh auth login --with-token
+        gh pr checkout ${{ github.event.issue.number }}
+      if: needs.comment-triggered.outputs.value == 'true'
 
     - name: Check Trailing Whitespace
       # git diff --check checks the diff for any whitespace violations.
@@ -222,14 +228,18 @@ jobs:
       run: git diff --check $(git hash-object -t tree /dev/null) HEAD -- ':(exclude)*.patch'
 
   west-const:
-    needs: git-ref
+    needs: comment-triggered
     runs-on: ubuntu-latest
     if: always()
 
     steps:
     - uses: actions/checkout@v2
       with:
-        ref: ${{ needs.git-ref.ref }}
+        fetch-depth: 0
+    - run: |
+        echo ${{ github.token }} | gh auth login --with-token
+        gh pr checkout ${{ github.event.issue.number }}
+      if: needs.comment-triggered.outputs.value == 'true'
 
     - name: Check failures
       run: |
@@ -240,12 +250,13 @@ jobs:
         python -c 'text = open("eastconst.txt", "r").read(); exit(int(len(text) > 0))'
 
   report:
-    needs: [init-report, ci, clang-format, clang-tidy, trailing-whitespace, west-const]
+    needs: [comment-triggered, init-report, ci, clang-format, clang-tidy, trailing-whitespace, west-const]
     runs-on: ubuntu-latest
-    if: needs.init-report.result == 'success'
+    if: always()
 
     steps:
     - name: Report CI
+      if: needs.comment-triggered.outputs.value == 'true'
       uses: peter-evans/create-or-update-comment@v1.4.3
       with:
         comment-id: ${{ needs.init-report.outputs.report }}
