@@ -207,6 +207,9 @@ protected:
   // Occupancy-preserving ILP Static Node Superiority graph transformation
   bool OccupancyPreservingILPStaticNodeSup;
 
+  // Occupancy-preserving ILP Static Node Superiority graph transformation
+  bool OccupancyPreservingILPStaticNodeSup2ndPass;
+
   // Run multiple passes of the static node superiority algorithm
   // (StaticNodeSup must be enabled).
   bool MultiPassStaticNodeSup;

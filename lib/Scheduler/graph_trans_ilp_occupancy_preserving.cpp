@@ -26,7 +26,7 @@ StaticNodeSupOccupancyPreservingILPTrans::
     : GraphTrans(DDG) {}
 
 FUNC_RESULT StaticNodeSupOccupancyPreservingILPTrans::ApplyTrans() {
-  Logger::Info("Performing occupancy-preserving ILP graph transformations");
+  Logger::Event("GraphTransOccupancyPreservingILPNodeSuperiority");
 
   DataDepGraph &DDG = *GetDataDepGraph_();
   assert(GetNumNodesInGraph_() == DDG.GetNodeCnt());
@@ -69,12 +69,12 @@ FUNC_RESULT StaticNodeSupOccupancyPreservingILPTrans::ApplyTrans() {
     DEBUG_LOG("Finished iteration for (%d, %d)\n", i, j);
   }
 
-  Logger::Info(
-      "Finished occupancy-preserving ILP graph transformations. Added edges: "
-      "%d. Removed redundant edges: %d. Resource edges utilized: %d. Passed "
-      "ILP conditions: %d. Failed RP conditions: %d.",
-      Data.Stats.NumEdgesAdded, Data.Stats.NumEdgesRemoved,
-      Data.Stats.NumResourceEdgesAdded, NumPassedILP, NumFailedRP);
+  Logger::Event("GraphTransOccupancyPreservingILPNodeSuperiorityFinished",
+                "superior_edges", Data.Stats.NumEdgesAdded,         //
+                "removed_edges", Data.Stats.NumEdgesRemoved,        //
+                "resource_edges", Data.Stats.NumResourceEdgesAdded, //
+                "passed_ilp", NumPassedILP,                         //
+                "failed_rp", NumFailedRP);
 
   return RES_SUCCESS;
 }
