@@ -770,6 +770,10 @@ public:
   InstCount GetFrstInst(InstCount &cycleNum, InstCount &slotNum);
   __host__ __device__
   InstCount GetNxtInst(InstCount &cycleNum, InstCount &slotNum);
+  // Returns instNum of instruction that is scheduled immediately
+  // before the instNum that is passed in. Used for parallel UpdatePheremone
+  __device__
+  InstCount GetPrevInstNum(InstCount instNum);
 
   __host__ __device__
   bool IsComplete();
@@ -798,9 +802,11 @@ public:
   void PrintRegPressures() const;
   bool Verify(MachineModel *machMdl, DataDepGraph *dataDepGraph);
   void PrintClassData();
-  //copies InstSchedules pointers to device
+  // Allocates arrays on device
   void AllocateOnDevice(MachineModel *dev_machMdl);
-  //copies schedule from device pointer to this object
+  // Copies host arrays to device
+  void CopyArraysToDevice();
+  // Copies device arrays to host
   void CopyArraysToHost();
   void FreeDeviceArrays();
   // Initializes schedules on device, used between iterations of ACO

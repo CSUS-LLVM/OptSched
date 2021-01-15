@@ -113,18 +113,26 @@ __host__ __device__
 SchedInstruction *
 ACOScheduler::SelectInstruction(DeviceVector<Choice> &ready,
                                 SchedInstruction *lastInst) {
-#if USE_ACS
+  double rand;
+#ifdef __CUDA_ARCH__
+  rand = curand_uniform(&dev_states_[GLOBALTID]);
+#else
+  rand = RandDouble(0, 1); 
+#endif
+//#if USE_ACS
   double choose_best_chance;
   if (use_fixed_bias) {
-    //choose_best_chance = fmax(0, 1 - (double)fixed_bias / count_);
+/*
     if (0 > 1 - (double)fixed_bias / count_)
       choose_best_chance = 0;
     else
       choose_best_chance = 1 - (double)fixed_bias / count_;
+*/
+    choose_best_chance = (1 - (double)fixed_bias / count_) * (0 < 1 - (double)fixed_bias / count_);
   } else
     choose_best_chance = bias_ratio;
 
-  if (RandDouble(0, 1) < choose_best_chance) {
+  if (rand < choose_best_chance) {
     if (print_aco_trace)
       printf("choose_best, use fixed bias: %d\n", use_fixed_bias);
     pheremone_t max = -1;
@@ -137,7 +145,7 @@ ACOScheduler::SelectInstruction(DeviceVector<Choice> &ready,
     }
     return maxChoice.inst;
   }
-#endif
+//#endif
   if (use_tournament) {
     int POPULATION_SIZE = ready.size();
 #ifdef __CUDA_ARCH__
@@ -167,7 +175,7 @@ ACOScheduler::SelectInstruction(DeviceVector<Choice> &ready,
   for (auto choice : ready)
     sum += Score(lastInst, choice);
 #ifdef __CUDA_ARCH__
-  pheremone_t point = sum * (pheremone_t)(curand_uniform(&dev_states_[GLOBALTID]));
+  pheremone_t point = sum * rand;
 #else
   pheremone_t point = RandDouble(0, sum);
 #endif
@@ -355,71 +363,98 @@ InstSchedule *ACOScheduler::FindOneSchedule(InstSchedule *dev_schedule,
 #endif
 }
 
-__global__
-void Dev_FindOneSchedule(SchedRegion *dev_rgn, DataDepGraph *dev_DDG,
-            ACOScheduler *dev_AcoSchdulr, InstSchedule **dev_schedules,
-	    DeviceVector<Choice>**dev_ready, InstSchedule *dev_iterationBest) {
-  if (GLOBALTID == 0) {
-    dev_rgn->SetDepGraph(dev_DDG);
-    ((BBWithSpill *)dev_rgn)->SetRegFiles(dev_DDG->getRegFiles());
-  }
-  dev_schedules[GLOBALTID]->Initialize();
-  dev_AcoSchdulr->FindOneSchedule(dev_schedules[GLOBALTID],
-		                  dev_ready[GLOBALTID]);
-/*
-  //debug
-  for (int i = 0; i < NUMTHREADS; i++)
-    if (GLOBALTID == 0) {
-      printf("Printing schedule for thread %d\n", i);
-      dev_schedules[GLOBALTID]->Print();
-    }
-*/
-/*
-  if (GLOBALTID == 0)
-    dev_iterationBest->Copy(dev_schedules[GLOBALTID]);
-*/
-}
+__device__ int dev_noImprovement = 0; // how many iterations with no improvement
+__device__ int dev_doneBlockCnt = 0;
+__device__ int mutex = 0;
 
-__global__ 
-void Dev_SelectBestSched(InstSchedule **dev_schedules,
-                         InstSchedule *dev_iterationBest,
-                         bool *dev_foundBestSched) {
-  // Each thread counts how many schedules are worse or equal to it,
-  // those that are better than or equal to NUMTHREADS schedules 
-  // set their index in foundBestSched to true. 1 tread iterates through
-  // the foundBestSched array and copies the schedule that correlates to the first
-  // true it finds
-  // reset foundBestSched array
-  //dev_foundBestSched[GLOBALTID] = false;
-  int cost = dev_schedules[GLOBALTID]->GetCost();
-  int compCnt = 0;
-  for (int i = 0; i < NUMTHREADS; i++) {
-    compCnt+= (dev_schedules[i]->GetCost() >= cost);
-  }
-/*
-  //debug
-  printf("Thread %d has compCnt = %d\n", GLOBALTID, compCnt);
-  for (int i = 0; i < NUMTHREADS; i++)
-    if (GLOBALTID == 0) {
-      printf("Printing schedule for thread %d\n", i);
-      dev_schedules[GLOBALTID]->Print();
+__global__
+void Dev_ACO(SchedRegion *dev_rgn, DataDepGraph *dev_DDG,
+            ACOScheduler *dev_AcoSchdulr, InstSchedule **dev_schedules,
+            DeviceVector<Choice>**dev_ready, InstSchedule *dev_bestSched,
+            int noImprovementMax) {
+  // holds cost and index of bestSched per block
+  __shared__ int bestCost, bestIndex;
+  dev_rgn->SetDepGraph(dev_DDG);
+  ((BBWithSpill *)dev_rgn)->SetRegFiles(dev_DDG->getRegFiles());
+  int dev_iterations = 0;
+  dev_noImprovement = 0;
+  
+  // Start ACO
+  // subtracting numthreads -1 from noImprovementMax to prevent fast
+  // blocks from starting an extra iteration.
+  while (dev_noImprovement < noImprovementMax - (NUMBLOCKS - 1)) {
+    dev_doneBlockCnt = 0;
+    // Reset schedules to post constructor state
+    dev_schedules[GLOBALTID]->Initialize();
+    dev_AcoSchdulr->FindOneSchedule(dev_schedules[GLOBALTID],
+                                  dev_ready[GLOBALTID]);
+    // Make sure all threads in block have constructed schedules
+    __syncthreads();
+    // 1 thread per block finds blockIterationBest, updates pheremones, and 
+    // compares blockIterationBest to dev_bestSched
+    if (threadIdx.x == 0) { // only thread 0 of each block enters this branch
+      // iterate over all schedules created by this thread block
+      bestCost = dev_schedules[GLOBALTID]->GetCost();
+      bestIndex = GLOBALTID;
+      for (int i = GLOBALTID + 1; i < GLOBALTID + NUMTHREADSPERBLOCK; i++) {
+        if (dev_schedules[i]->GetCost() == -1)
+          printf("thread %d of block %d found thread %d made invalid sched\n",
+                 GLOBALTID, blockIdx.x, i);
+        if (dev_schedules[i]->GetCost() < bestCost) {
+          bestCost = dev_schedules[i]->GetCost();
+          bestIndex = i;
+          // debug
+          //printf("Block %d has set bestIndex to %d with bestCost %d\n", blockIdx.x, i, bestCost);
+        }
+      }
     }
-*/
-  // Set if thread found an iterationBestSched
-  dev_foundBestSched[GLOBALTID] = (compCnt == NUMTHREADS);
-  // one thread selects and copied a schedule
-  if (GLOBALTID == 0) {
-    int i;
-    for (i = 0; i < NUMTHREADS; i++) {
-      if (dev_foundBestSched[i] == true) {
-        //debug
-        printf("Thread %d's schedule will be copied back to host\n", i);
-        dev_iterationBest->Initialize(); 
-        dev_iterationBest->Copy(dev_schedules[i]);
-        break;
-      }   
-    }   
+    // make sure thread 0 has picked best sched for the block before
+    // updating pheremones
+    __syncthreads();
+    // debug
+    //printf("Thread %d has bestIndex = %d and bestCost = %d\n", GLOBALTID, bestIndex, bestCost);
+    dev_AcoSchdulr->UpdatePheremone(dev_schedules[bestIndex]);
+    // 1 thread per block compares block iteration best to overall bestsched
+    if (threadIdx.x == 0) {
+      // Compare to initialSched/current best
+      if (bestCost < dev_bestSched->GetCost()) {
+        // mutex lock updating best sched so multiple blocks dont write
+        // at the same time
+        while(atomicCAS(&mutex, 0, 1) != 0);
+        // check if this blocks iteration best schedule is still better
+        // since another block could have lowered cost of best sched
+        if (bestCost < dev_bestSched->GetCost()) {
+          dev_bestSched->Copy(dev_schedules[bestIndex]);
+          printf("ACO found schedule "
+                 "cost:%d, rp cost:%d, sched length: %d, and "
+                 "iteration:%d\n",
+               dev_bestSched->GetCost(), dev_bestSched->GetSpillCost(),
+               dev_bestSched->GetCrntLngth(), dev_iterations);
+          dev_noImprovement = 0;
+        }
+        // unlock mutex 
+        atomicExch(&mutex, 0);
+      } else {
+        atomicAdd(&dev_noImprovement, 1);
+        if (dev_noImprovement > noImprovementMax)
+          break;
+      }
+      // wait for other blocks to finish before starting next iteration
+      atomicAdd(&dev_doneBlockCnt, 1);
+      while (dev_doneBlockCnt < NUMBLOCKS);
+      // if dev_noImprovement is not a multiple of NUMBLOCKS after blocks finish
+      // current iteration, that means a block has found a new bestSched
+      // and reset dev_noImprovement, and other blocks have increased
+      // it after not finding a new bestSched. Set to 0 if this is the case.
+      if (dev_noImprovement % NUMBLOCKS != 0)
+          dev_noImprovement = 0;
+    }
+    // make sure no threads reset schedule before above operations complete
+    __syncthreads();
+    dev_iterations++;
   }
+  if (threadIdx.x == 0)
+    printf("Block %d finished Dev_ACO after %d iterations\n", blockIdx.x, dev_iterations); 
 }
 
 FUNC_RESULT ACOScheduler::FindSchedule(InstSchedule *schedule_out,
@@ -449,221 +484,156 @@ FUNC_RESULT ACOScheduler::FindSchedule(InstSchedule *schedule_out,
   if (bestSchedule) {
     UpdatePheremone(bestSchedule);
   }
-
   int noImprovement = 0; // how many iterations with no improvement
   int iterations = 0;
-  // dev array of dev pointers to schedules
-  InstSchedule **dev_schedules;
-  // host array of dev pointers to schedules
-  InstSchedule **host_schedules = new InstSchedule *[NUMTHREADS];
-  // holds schedules to be copied over
-  InstSchedule **schedules = new InstSchedule *[NUMTHREADS];
-/* Implementation with one array of schedules, has unsolved memory errors
-  InstSchedule *dev_schedules;
-  InstSchedule *schedules;
-*/
   InstSchedule *iterationBest;
-  // Holds best schedule for iteration on the device to be copied back to host
-  InstSchedule *dev_iterationBest;
-  // holds which threads found the best schedule
-  bool *dev_foundBestSched;
-  while (true) {
-    if (DEV_ACO) { // Run ACO on device
-      size_t memSize;
-      Logger::Info("Updating Pheremones"); 
-      CopyPheremonesToDevice(dev_AcoSchdulr);
-      // Copy Schedule to device
-      if (iterations == 0) {
-        Logger::Info("Creating and copying schedules to device");
-        //iterationBest = new InstSchedule(machMdl_, dataDepGraph_, true);
-        bestSchedule = new InstSchedule(machMdl_, dataDepGraph_, true);
-        bestSchedule->Copy(InitialSchedule);
-        //printf("InitialSchedule: ");
-        //PrintSchedule(bestSchedule);
-        for (int i = 0; i < NUMTHREADS; i++) {
-          schedules[i] = new InstSchedule(machMdl_, dataDepGraph_, true);
-          schedules[i]->AllocateOnDevice(dev_MM_);
-          memSize = sizeof(InstSchedule);
-          gpuErrchk(cudaMalloc(&host_schedules[i], memSize));
-          gpuErrchk(cudaMemcpy(host_schedules[i], schedules[i], memSize,
-                               cudaMemcpyHostToDevice));
-        }
-        memSize = sizeof(InstSchedule *) * NUMTHREADS;
-        gpuErrchk(cudaMalloc((void**)&dev_schedules, memSize));
-        // Copy schedule to device
-        gpuErrchk(cudaMemcpy(dev_schedules, host_schedules, memSize,
-                             cudaMemcpyHostToDevice));
-        // Allocate dev mem for and copy over dev_iterationBest so it is the
-        // only schedule that needs to be copied back to host
-        iterationBest = new InstSchedule(machMdl_, dataDepGraph_, true);
-        iterationBest->AllocateOnDevice(dev_MM_);
-        memSize = sizeof(InstSchedule);
-        gpuErrchk(cudaMalloc((void**)&dev_iterationBest, memSize));
-        gpuErrchk(cudaMemcpy(dev_iterationBest, iterationBest, memSize,
-                             cudaMemcpyHostToDevice));
-        // allocate an array of bools for dev_foundBestSched
-        memSize = sizeof(bool) * NUMTHREADS;
-        gpuErrchk(cudaMalloc(&dev_foundBestSched, memSize));
-/* Implementation with one array of schedules, has unsolved memory errors
-        // Create and array of schedules with dummy constructor
-        schedules = new InstSchedule[NUMTHREADS];
-        for (int i = 0; i < NUMTHREADS; i++) {
-          // Run constructor for each schedule
-          schedules[i] = InstSchedule(machMdl_, dataDepGraph_, true);
-          // allocate dev arrays for each schedule
-          schedules[i].AllocateOnDevice(dev_MM_);
-        }
-        memSize = sizeof(InstSchedule) * NUMTHREADS;
-        // Alloc dev mem for schedules array
-        gpuErrchk(cudaMalloc((void**)&dev_schedules, memSize));
-        // Copy schedules to device
-        gpuErrchk(cudaMemcpy(dev_schedules, schedules, memSize,
-                             cudaMemcpyHostToDevice));
-*/
-      }
-      Logger::Info("Launching Dev_FindOneSchedule()");
-      Dev_FindOneSchedule<<<NUMBLOCKS,NUMTHREADSPERBLOCK>>>(dev_rgn_, dev_DDG_,
-		                     dev_AcoSchdulr, dev_schedules, dev_ready_,
-                                     dev_iterationBest);
-      cudaDeviceSynchronize();
-      Logger::Info("Post Kernel Error: %s", cudaGetErrorString(cudaGetLastError()));
-      Logger::Info("Launching Dev_SelectBestSched");
-      Dev_SelectBestSched<<<NUMBLOCKS,NUMTHREADSPERBLOCK>>>(dev_schedules, 
-                                      dev_iterationBest, dev_foundBestSched);
-      cudaDeviceSynchronize();
-      Logger::Info("Post Kernel Error: %s", cudaGetErrorString(cudaGetLastError()));
-      // Copy dev_iterationBest back to host
-      memSize = sizeof(InstSchedule);
-      gpuErrchk(cudaMemcpy(iterationBest, dev_iterationBest, memSize,
-                           cudaMemcpyDeviceToHost));
-      iterationBest->CopyArraysToHost();
-/* Implementation with one array of schedules, has unsolved memory errors
-      // Copy schedule to Host
-      memSize = sizeof(InstSchedule) * NUMTHREADS;
-      gpuErrchk(cudaMemcpy(schedules, dev_schedules, memSize, 
-			   cudaMemcpyDeviceToHost));
-      int bestSched = 0;
-      for (int i = 0; i < NUMTHREADS; i++) {
-	//PrintSchedule(&schedules[i]);
-        // Copy dev array contents to host
-        schedules[i].CopyArraysToHost();
-        //debug
-        printf("Printing schedule for thread %d\n", i);
-        PrintSchedule(&schedules[i]);
-        if (schedules[i].GetCost() == -1)
-          Logger::Fatal("Error with scheduling on thread num %d", i);
-        if (schedules[bestSched].GetCost() > schedules[i].GetCost())
-	  bestSched = i;
-      }
   
-      InstSchedule *schedule = &schedules[bestSched];
-      if (print_aco_trace)
-        PrintSchedule(schedule);
-      if (iterationBest->GetCost() == -1 ||
-          schedule->GetCost() < iterationBest->GetCost())
-        iterationBest->Copy(schedule);
-*/
-#if !USE_ACS
-      UpdatePheremone(iterationBest);
-#endif
-      //printf("Iteration best: ");
-      //PrintSchedule(iterationBest); 
-
-      if (bestSchedule->GetCost() == -1 || iterationBest->GetCost() < bestSchedule->GetCost()) {
-        bestSchedule->Copy(iterationBest);
-        //printf("ACO found schedule with spill cost %d\n",
-               //bestSchedule->GetCost());
-        printf("ACO found schedule "
-               "cost:%d, rp cost:%d, sched length: %d, and "
-               "iteration:%d\n",
-               bestSchedule->GetCost(), bestSchedule->GetSpillCost(),
-               bestSchedule->GetCrntLngth(), iterations);
-        noImprovement = 0;
-      } else {
-        noImprovement++;
-        if (noImprovement > noImprovementMax) {
-          //for (int i = 0; i < NUMTHREADS; i++)
-            //schedules[i].FreeDeviceArrays();
-          break;
-        }
-      } //End run on GPU
-
-    } else { // Run ACO on cpu
-      for (int i = 0; i < NUMTHREADS; i++) {
-        InstSchedule *schedule = FindOneSchedule();
-	if (print_aco_trace)
-          PrintSchedule(schedule);
-        if (iterationBest == nullptr ||
-            schedule->GetCost() < iterationBest->GetCost()) {
-          if (iterationBest && iterationBest != InitialSchedule)
-            delete iterationBest;
-          iterationBest = schedule;
-        } else {
-          delete schedule;
-        }
-      }
-#if !USE_ACS
-      UpdatePheremone(iterationBest);
-#endif
-      //PrintSchedule(iterationBest); 
-      if (bestSchedule == nullptr ||
-          iterationBest->GetCost() < bestSchedule->GetCost()) {
-        if (bestSchedule && bestSchedule != InitialSchedule)
-          delete bestSchedule;
-        bestSchedule = std::move(iterationBest);
-        //printf("ACO found schedule with spill cost %d\n",
-               //bestSchedule->GetCost());
-        printf("ACO found schedule "
-               "cost:%d, rp cost:%d, sched length: %d, and "
-               "iteration:%d\n",
-               bestSchedule->GetCost(), bestSchedule->GetSpillCost(),
-               bestSchedule->GetCrntLngth(), iterations);
-        noImprovement = 0;
-      } else {
-        noImprovement++;
-        if (noImprovement > noImprovementMax)
-          break;
-      }
-    } // End run on CPU
-#if USE_ACS
-    UpdatePheremone(bestSchedule);
-#endif
-    iterations++;
-  }
-  printf("Best schedule: ");
-  PrintSchedule(bestSchedule);
-  schedule_out->Copy(bestSchedule);
-  if (DEV_ACO) {
-    iterationBest->FreeDeviceArrays();
-    delete iterationBest;
-    cudaFree(dev_iterationBest);
-    delete bestSchedule;
-    // cudaFree dev arrays
+  if (DEV_ACO) { // Run ACO on device
+    size_t memSize;
+    // Update pheremones on device
+    CopyPheremonesToDevice(dev_AcoSchdulr);
+    Logger::Info("Creating and copying schedules to device");
+    // dev array of dev pointers to schedules
+    InstSchedule **dev_schedules;
+    // holds device copy of best sched, to be copied back to host after kernel
+    InstSchedule *dev_bestSched;
+    // host array of dev pointers to schedules, 1 per thread plus 1 extra per
+    // block to hold block iteration best
+    InstSchedule **host_schedules = new InstSchedule *[NUMTHREADS];
+    // holds schedules to be copied over
+    InstSchedule **schedules = new InstSchedule *[NUMTHREADS];
+    bestSchedule = new InstSchedule(machMdl_, dataDepGraph_, true);
+    bestSchedule->Copy(InitialSchedule);
+    //printf("InitialSchedule: ");
+    //PrintSchedule(bestSchedule);
+    for (int i = 0; i < NUMTHREADS; i++) {
+      schedules[i] = new InstSchedule(machMdl_, dataDepGraph_, true);
+      schedules[i]->AllocateOnDevice(dev_MM_);
+      memSize = sizeof(InstSchedule);
+      gpuErrchk(cudaMalloc(&host_schedules[i], memSize));
+      gpuErrchk(cudaMemcpy(host_schedules[i], schedules[i], memSize,
+                           cudaMemcpyHostToDevice));
+    }
+    memSize = sizeof(InstSchedule *) * NUMTHREADS;
+    gpuErrchk(cudaMalloc((void**)&dev_schedules, memSize));
+    // Copy schedule to device
+    gpuErrchk(cudaMemcpy(dev_schedules, host_schedules, memSize,
+                         cudaMemcpyHostToDevice));
+    bestSchedule->AllocateOnDevice(dev_MM_);
+    bestSchedule->CopyArraysToDevice();
+    memSize = sizeof(InstSchedule);
+    gpuErrchk(cudaMalloc((void**)&dev_bestSched, memSize));
+    gpuErrchk(cudaMemcpy(dev_bestSched, bestSchedule, memSize,
+                         cudaMemcpyHostToDevice));
+    Logger::Info("Launching Dev_ACO");
+    // Launch with noImprovementMax * NUMBLOCKS so each threadblock can
+    // increment dev_noImprovement once per iteration
+    Dev_ACO<<<NUMBLOCKS,NUMTHREADSPERBLOCK>>>(dev_rgn_, dev_DDG_,
+                      dev_AcoSchdulr, dev_schedules, dev_ready_, dev_bestSched,
+                      noImprovementMax * NUMBLOCKS);
+    cudaDeviceSynchronize();
+    Logger::Info("Post Kernel Error: %s", cudaGetErrorString(cudaGetLastError()));
+    // Copy dev_bestSched back to host
+    memSize = sizeof(InstSchedule);
+    gpuErrchk(cudaMemcpy(bestSchedule, dev_bestSched, memSize,
+                         cudaMemcpyDeviceToHost));
+    bestSchedule->CopyArraysToHost();
+    // Free allocated memory that is no longer needed
+    bestSchedule->FreeDeviceArrays();
+    cudaFree(dev_bestSched);
     for (int i = 0; i < NUMTHREADS; i++) {
       schedules[i]->FreeDeviceArrays();
       cudaFree(host_schedules[i]);
       delete schedules[i];
     }
-    cudaFree(dev_schedules);
     delete[] host_schedules;
     delete[] schedules;
-    cudaFree(dev_foundBestSched);
-/*  Implementation with one array of schedules, has unsolved memory errors
-    for (int i = 0; i < NUMTHREADS; i++)
-      schedules[i].FreeArrays();
-    delete[] schedules;
-    cudaFree(dev_schedules);
-*/
-  } else {
-    if (bestSchedule != InitialSchedule)
-      delete bestSchedule;
-  }
-  printf("ACO finished after %d iterations\n", iterations);
+
+    } else { // Run ACO on cpu
+      while (true) {
+        for (int i = 0; i < NUMTHREADS; i++) {
+          InstSchedule *schedule = FindOneSchedule();
+          if (print_aco_trace)
+            PrintSchedule(schedule);
+          if (iterationBest == nullptr ||
+              schedule->GetCost() < iterationBest->GetCost()) {
+            if (iterationBest && iterationBest != InitialSchedule)
+              delete iterationBest;
+            iterationBest = schedule;
+          } else {
+            delete schedule;
+          }
+        }
+#if !USE_ACS
+        UpdatePheremone(iterationBest);
+#endif
+        //PrintSchedule(iterationBest); 
+        if (bestSchedule == nullptr ||
+            iterationBest->GetCost() < bestSchedule->GetCost()) {
+          if (bestSchedule && bestSchedule != InitialSchedule)
+            delete bestSchedule;
+          bestSchedule = std::move(iterationBest);
+          //printf("ACO found schedule with spill cost %d\n",
+                 //bestSchedule->GetCost());
+          printf("ACO found schedule "
+                 "cost:%d, rp cost:%d, sched length: %d, and "
+                 "iteration:%d\n",
+                 bestSchedule->GetCost(), bestSchedule->GetSpillCost(),
+                 bestSchedule->GetCrntLngth(), iterations);
+          noImprovement = 0;
+        } else {
+          noImprovement++;
+          if (noImprovement > noImprovementMax)
+            break;
+        }
+#if USE_ACS
+      UpdatePheremone(bestSchedule);
+#endif
+      iterations++;
+    }
+  } // End run on CPU
+
+  printf("Best schedule: ");
+  PrintSchedule(bestSchedule);
+  schedule_out->Copy(bestSchedule);
+  if (bestSchedule != InitialSchedule)
+    delete bestSchedule;
+  if (!DEV_ACO)
+    printf("ACO finished after %d iterations\n", iterations);
   return RES_SUCCESS;
 }
 
 __host__ __device__
 void ACOScheduler::UpdatePheremone(InstSchedule *schedule) {
+#ifdef __CUDA_ARCH__ // device version of function
+  // parallel on a block level, use threadIdx.x instead of GLOBALTID
+  int instNum = threadIdx.x;
+  // Each thread updates pheremone table for 1 instruction
+  // For the case NUMTHREADSPERBLOCK < count_, increase instNum by 
+  // NUMTHREADSPERBLOCK at the end of the loop.
+  InstCount lastInstNum = -1;
+  pheremone_t *pheremone;
+  while (instNum < count_) {
+    // debug
+    //printf("Updating pheremone for instNum = %d\n", instNum);
+    // Get the instruction that comes before inst in the schedule
+    // if instNum == count_ - 2 it has the root inst and lastInstNum = -1
+    lastInstNum = schedule->GetPrevInstNum(instNum);
+    // Get corresponding pheremone and update it
+    pheremone = &Pheremone(lastInstNum, instNum);
+    *pheremone = *pheremone + 1 / (schedule->GetCost() + 1);
+    // decay pheremone for all trails leaving instNum
+    for (int j = 0; j < count_; j++) {
+      Pheremone(instNum, j) *= (1 - decay_factor);
+    }
+    // Increase instNum by NUMTHREADSPERBLOCK in case there are less threads
+    // per block than instruction in the region
+    instNum += NUMTHREADSPERBLOCK;
+  }
+  if (print_aco_trace)
+    PrintPheremone();
+
+#else // host version of function
   // I wish InstSchedule allowed you to just iterate over it, but it's got this
   // cycle and slot thing which needs to be accounted for
   InstCount instNum, cycleNum, slotNum;
@@ -698,6 +668,7 @@ void ACOScheduler::UpdatePheremone(InstSchedule *schedule) {
 #endif
   if (print_aco_trace)
     PrintPheremone();
+#endif
 }
 
 // copied from Enumerator
@@ -866,7 +837,6 @@ void ACOScheduler::CopyPheremonesToDevice(ACOScheduler *dev_AcoSchdulr) {
 }
 
 void ACOScheduler::CopyPointersToDevice(ACOScheduler *dev_ACOSchedulr) {
-  //dev_ACOSchedulr->InitialSchedule = dev_InitSched;
   size_t memSize;
   dev_ACOSchedulr->machMdl_ = dev_MM_;
   dev_ACOSchedulr->dataDepGraph_ = dev_DDG_;
@@ -912,7 +882,6 @@ void ACOScheduler::CopyPointersToDevice(ACOScheduler *dev_ACOSchedulr) {
 		       cudaMemcpyHostToDevice));
   rdyLst_->CopyPointersToDevice(dev_ACOSchedulr->dev_rdyLst_, dev_DDG_,
 		                NUMTHREADS);
-
 }
 
 void ACOScheduler::FreeDevicePointers() {

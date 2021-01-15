@@ -23,8 +23,8 @@ typedef double pheremone_t;
 
 // If set to 1 ACO is run on device
 #define DEV_ACO 1
-#define NUMBLOCKS 20
-#define NUMTHREADSPERBLOCK 128
+#define NUMBLOCKS 5
+#define NUMTHREADSPERBLOCK 512
 #define NUMTHREADS NUMBLOCKS * NUMTHREADSPERBLOCK
 
 struct Choice {
@@ -63,6 +63,9 @@ public:
   __host__ __device__
   InstSchedule *FindOneSchedule(InstSchedule *dev_schedule = NULL, 
 		                DeviceVector<Choice> *dev_ready = NULL);
+  __host__ __device__
+  void UpdatePheremone(InstSchedule *schedule);
+
 private:
   __host__ __device__
   pheremone_t &Pheremone(SchedInstruction *from, SchedInstruction *to);
@@ -77,8 +80,8 @@ private:
   __host__ __device__
   SchedInstruction *SelectInstruction(DeviceVector<Choice> &ready,
                                       SchedInstruction *lastInst);
-  __host__ __device__
-  void UpdatePheremone(InstSchedule *schedule);
+  //__host__ __device__
+  //void UpdatePheremone(InstSchedule *schedule);
   //__host__ __device__
   //InstSchedule *FindOneSchedule(InstSchedule *dev_schedule = NULL);
   DeviceVector<pheremone_t> pheremone_;

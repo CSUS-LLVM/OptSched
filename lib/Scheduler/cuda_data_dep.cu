@@ -2887,6 +2887,20 @@ InstCount InstSchedule::GetNxtInst(InstCount &cycleNum, InstCount &slotNum) {
   return instNum;
 }
 
+__device__
+InstCount InstSchedule::GetPrevInstNum(InstCount instNum) {
+  //debug
+  //printf("Finding inst that comes before instNum = %d\n", instNum);
+  int slot = dev_slotForInst_[instNum];
+  if (slot > 0) { // not the first inst in schedule
+    // iterate through instInSlot_ backwards and return first instNum reached
+    for (int i = slot - 1; i >= 0; i--)
+      if (dev_instInSlot_[i] != SCHD_STALL)
+        return dev_instInSlot_[i];
+  }
+  return INVALID_VALUE;  
+}
+
 __host__ __device__
 void InstSchedule::Reset() {
   InstCount i;
@@ -3262,6 +3276,25 @@ void InstSchedule::AllocateOnDevice(MachineModel *dev_machMdl) {
   memSize = machMdl_->GetRegTypeCnt() * sizeof(InstCount);
   gpuErrchk(cudaMalloc((void**)&dev_peakRegPressures_, memSize));
   dev_machMdl_ = dev_machMdl;
+}
+
+void InstSchedule::CopyArraysToDevice() {
+  size_t memSize;
+  // Copy instInSlot to device
+  memSize = totSlotCnt_ * sizeof(InstCount);
+  gpuErrchk(cudaMemcpy(dev_instInSlot_, instInSlot_, memSize,
+                       cudaMemcpyHostToDevice));
+  // Copy slotForInst_ to device
+  memSize = totInstCnt_ * sizeof(InstCount);
+  gpuErrchk(cudaMemcpy(dev_slotForInst_, slotForInst_, memSize,
+                       cudaMemcpyHostToDevice));
+  // Copy spillCosts to device
+  gpuErrchk(cudaMemcpy(dev_spillCosts_, spillCosts_, memSize,
+                       cudaMemcpyHostToDevice));
+  // Copy peakRegPressures to device
+  memSize = machMdl_->GetRegTypeCnt() * sizeof(InstCount);
+  gpuErrchk(cudaMemcpy(dev_peakRegPressures_, peakRegPressures_, memSize,
+                       cudaMemcpyHostToDevice));
 }
 
 void InstSchedule::CopyArraysToHost() {
