@@ -305,6 +305,32 @@ void StaticNodeSupILPTrans::updateDistanceTable(Data &Data, int i_, int j_) {
   }
 }
 
+static bool isRedundant(SchedInstruction *NodeI, SchedInstruction *NodeJ,
+                        ArrayRef2D<int> DistanceTable, GraphEdge &e) {
+  // If this is the edge we just added, it's not redundant
+  if (e.from == NodeI && e.to == NodeJ) {
+    return false;
+  }
+
+  const size_t From = castUnsigned(e.from->GetNum());
+  const size_t To = castUnsigned(e.to->GetNum());
+
+  return NodeJ->IsRcrsvScsr(e.to) && e.label <= DistanceTable[{From, To}];
+}
+
+static LinkedList<GraphEdge>::iterator
+removeEdge(LinkedList<GraphEdge> &Succs, LinkedList<GraphEdge>::iterator it,
+           StaticNodeSupILPTrans::Statistics &stats) {
+  GraphEdge &e = *it;
+  it = Succs.RemoveAt(it);
+  e.to->RemovePredFrom(e.from);
+  DEBUG_LOG("  Deleting GraphEdge* at %p: (%zu, %zu)", (void *)&e, From, To);
+  delete &e;
+  ++stats.NumEdgesRemoved;
+
+  return it;
+}
+
 void StaticNodeSupILPTrans::removeRedundantEdges(DataDepGraph &DDG,
                                                  ArrayRef2D<int> DistanceTable,
                                                  int i, int j,
@@ -313,27 +339,37 @@ void StaticNodeSupILPTrans::removeRedundantEdges(DataDepGraph &DDG,
   SchedInstruction *NodeI = DDG.GetInstByIndx(i);
   SchedInstruction *NodeJ = DDG.GetInstByIndx(j);
 
-  for (GraphNode &Pred : *NodeI->GetRecursivePredecessors()) {
-    LinkedList<GraphEdge> &PSuccs = Pred.GetSuccessors();
-
-    for (auto it = PSuccs.begin(); it != PSuccs.end();) {
-      GraphEdge &e = *it;
-
-      const size_t From = castUnsigned(e.from->GetNum());
-      const size_t To = castUnsigned(e.to->GetNum());
-
-      if (NodeJ->IsRcrsvScsr(e.to) && e.label <= DistanceTable[{From, To}]) {
-        it = PSuccs.RemoveAt(it);
-        e.to->RemovePredFrom(&Pred);
-        DEBUG_LOG("  Deleting GraphEdge* at %p: (%zu, %zu)", (void *)&e, From,
-                  To);
-        delete &e;
-        ++stats.NumEdgesRemoved;
+  // Check edges from I itself, since GetRecursivePredecessors() doesn't include
+  // I.
+  {
+    LinkedList<GraphEdge> &ISuccs = NodeI->GetSuccessors();
+    for (auto it = ISuccs.begin(); it != ISuccs.end();) {
+      if (isRedundant(NodeI, NodeJ, DistanceTable, *it)) {
+        it = removeEdge(ISuccs, it, stats);
       } else {
         ++it;
       }
     }
   }
+
+  // Check edges from a predecessor of I to a successor of J (or J itself).
+  // We don't need to explicitly check J itself in a separate step because
+  // the isRedundant() check appropriately considers edges ending at J.
+  for (GraphNode &Pred : *NodeI->GetRecursivePredecessors()) {
+    LinkedList<GraphEdge> &PSuccs = Pred.GetSuccessors();
+
+    for (auto it = PSuccs.begin(); it != PSuccs.end();) {
+      if (isRedundant(NodeI, NodeJ, DistanceTable, *it)) {
+        it = removeEdge(PSuccs, it, stats);
+      } else {
+        ++it;
+      }
+    }
+  }
+
+  // Don't need to repeat for successors of J, as those are already considered
+  // by the prior loops. We could have checked the successors of J instead of
+  // predecessors of I, but we don't need to explicitly check both.
 }
 
 StaticNodeSupILPTrans::StaticNodeSupILPTrans(DataDepGraph *dataDepGraph)
