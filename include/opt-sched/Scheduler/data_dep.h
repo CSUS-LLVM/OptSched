@@ -13,8 +13,8 @@ Last Update:  Mar. 2011
 #include "opt-sched/Scheduler/buffers.h"
 #include "opt-sched/Scheduler/defines.h"
 #include "opt-sched/Scheduler/sched_basic_data.h"
-#include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/IndexedMap.h"
+#include "llvm/ADT/SmallVector.h"
 #include <memory>
 
 namespace llvm {
@@ -633,7 +633,7 @@ private:
   // The normalized spill cost (absolute Spill Cost - lower bound of spill cost)
   InstCount NormSpillCost;
 
-  //Stores the spill cost of other spill cost functions
+  // Stores the spill cost of other spill cost functions
   InstCount storedSC[MAX_SCHED_PRIRTS];
 
   // An array of peak reg pressures for all reg types in the schedule

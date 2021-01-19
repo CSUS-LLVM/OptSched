@@ -108,8 +108,8 @@ private:
   void UpdateSpillInfoForSchdul_(SchedInstruction *inst, bool trackCnflcts);
   void UpdateSpillInfoForUnSchdul_(SchedInstruction *inst);
   void SetupPhysRegs_();
-  //can only compute SLIL if SLIL was the spillCostFunc
-  //This function must only be called after the regPressures_ is computed
+  // can only compute SLIL if SLIL was the spillCostFunc
+  // This function must only be called after the regPressures_ is computed
   InstCount CmputCostForFunction(SPILL_COST_FUNCTION SpillCF);
   void CmputCrntSpillCost_();
   bool ChkSchedule_(InstSchedule *bestSched, InstSchedule *lstSched);

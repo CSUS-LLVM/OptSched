@@ -431,8 +431,10 @@ void ScheduleDAGOptSched::schedule() {
 
   // add extra recorded costs
   if (schedIni.GetBool("ACO_ENABLED") &&
-      std::string(schedIni.GetString("ACO_DUAL_COST_FN_ENABLE", "OFF")) != "OFF") {
-    std::string costFn = schedIni.GetString(!SecondPass ? "ACO_DUAL_COST_FN" : "ACO2P_DUAL_COST_FN");
+      std::string(schedIni.GetString("ACO_DUAL_COST_FN_ENABLE", "OFF")) !=
+          "OFF") {
+    std::string costFn = schedIni.GetString(!SecondPass ? "ACO_DUAL_COST_FN"
+                                                        : "ACO2P_DUAL_COST_FN");
     if (costFn != "NONE")
       region->addRecordedCost(ParseSCFName(costFn));
   }

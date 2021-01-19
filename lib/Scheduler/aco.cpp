@@ -172,7 +172,6 @@ DCF_OPT ACOScheduler::ParseDCFOpt(std::string opt) {
                            false);
 }
 
-
 Choice ACOScheduler::SelectInstruction(const llvm::ArrayRef<Choice> &ready,
                                        SchedInstruction *lastInst) {
 #if TWO_STEP
@@ -386,10 +385,10 @@ FUNC_RESULT ACOScheduler::FindSchedule(InstSchedule *schedule_out,
   fixed_bias = schedIni.GetInt(IsFirst ? "ACO_FIXED_BIAS" : "ACO2P_FIXED_BIAS");
   noImprovementMax = schedIni.GetInt(IsFirst ? "ACO_STOP_ITERATIONS"
                                              : "ACO2P_STOP_ITERATIONS");
-  if(DCFOption != DCF_OPT::OFF) {
-    std::string DcfFnString = schedIni.GetString(IsFirst ? "ACO_DUAL_COST_FN"
-                                                         : "ACO2P_DUAL_COST_FN");
-    if (DcfFnString!="NONE")
+  if (DCFOption != DCF_OPT::OFF) {
+    std::string DcfFnString =
+        schedIni.GetString(IsFirst ? "ACO_DUAL_COST_FN" : "ACO2P_DUAL_COST_FN");
+    if (DcfFnString != "NONE")
       DCFCostFn = ParseSCFName(DcfFnString);
     else
       DCFOption = DCF_OPT::OFF;
