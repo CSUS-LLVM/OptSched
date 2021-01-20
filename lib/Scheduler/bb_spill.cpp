@@ -325,7 +325,14 @@ InstCount BBWithSpill::CmputRPCostLwrBound() {
 /*****************************************************************************/
 
 void BBWithSpill::addRecordedCost(SPILL_COST_FUNCTION Scf) {
-  recordedCostFunctions.insert(Scf);
+  // Do nothing if the CF is already recorded
+  for (auto it = recordedCostFunctions.begin();
+       it != recordedCostFunctions.end(); ++it)
+    if (*it == Scf)
+      return;
+
+  // If this is the first time we see the value in Scf then insert it
+  recordedCostFunctions.push_back(Scf);
 }
 /*****************************************************************************/
 
@@ -849,7 +856,7 @@ FUNC_RESULT BBWithSpill::Enumerate_(Milliseconds startTime,
 // can only compute SLIL if SLIL was the spillCostFunc
 InstCount BBWithSpill::CmputCostForFunction(SPILL_COST_FUNCTION SpillCF) {
   // assert that if we are asking for SLIL that the CF is SLIL
-  assert(SpillCF != SCF_SLIL | GetSpillCostFunc() == SCF_SLIL);
+  assert(SpillCF != SCF_SLIL || GetSpillCostFunc() == SCF_SLIL);
 
   // return the requested cost
   switch (SpillCF) {
