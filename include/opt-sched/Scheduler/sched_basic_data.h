@@ -425,9 +425,9 @@ public:
   void ComputeAdjustedUseCnt(SchedInstruction *inst);
 
   int16_t CmputLastUseCnt();
-  int16_t GetLastUseCnt() { return lastUseCnt_; }
+  int16_t GetLastUseCnt() const { return lastUseCnt_; }
 
-  InstType GetCrtclPathFrmRoot() { return crtclPathFrmRoot_; }
+  InstType GetCrtclPathFrmRoot() const { return crtclPathFrmRoot_; }
 
   friend class SchedRange;
 

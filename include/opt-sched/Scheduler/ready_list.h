@@ -86,6 +86,13 @@ public:
   // Constructs the priority-list key based on the schemes listed in prirts_.
   unsigned long CmputKey_(SchedInstruction *inst, bool isUpdate, bool &changed);
 
+  template <typename InstructionVisitor>
+  void ForEachReadyInstruction(InstructionVisitor &&visitor) const {
+    for (const SchedInstruction &Inst : prirtyLst_) {
+      visitor(Inst);
+    }
+  }
+
 private:
   // An ordered vector of priorities
   SchedPriorities prirts_;
