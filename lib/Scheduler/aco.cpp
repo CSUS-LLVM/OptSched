@@ -242,7 +242,8 @@ std::unique_ptr<InstSchedule> ACOScheduler::FindOneSchedule() {
   std::unique_ptr<InstSchedule> schedule =
       llvm::make_unique<InstSchedule>(machMdl_, dataDepGraph_, true);
   InstCount maxPriority = rdyLst_->MaxPriority();
-  maxPriority |= !maxPriority; // divide by 0 is bad(increase to 1 if 0)
+  if (maxPriority == 0)
+    maxPriority = 1; // divide by 0 is bad
   Initialize_();
   rgn_->InitForSchdulng();
 

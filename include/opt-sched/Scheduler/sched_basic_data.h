@@ -99,7 +99,7 @@ const int MAX_DEFS_PER_INSTR = 4096;
 const int MAX_USES_PER_INSTR = 4096;
 
 // function for parsing cost function names to enum values
-SPILL_COST_FUNCTION ParseSCFName(std::string name);
+SPILL_COST_FUNCTION ParseSCFName(const std::string &name);
 
 // Forward declarations used to reduce the number of #includes.
 class DataDepGraph;

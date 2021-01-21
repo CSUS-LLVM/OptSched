@@ -7,7 +7,7 @@
 
 using namespace llvm::opt_sched;
 
-SPILL_COST_FUNCTION llvm::opt_sched::ParseSCFName(std::string name) {
+SPILL_COST_FUNCTION llvm::opt_sched::ParseSCFName(const std::string &name) {
   // PERP used to be called PEAK.
   if (name == "PERP" || name == "PEAK") {
     return SCF_PERP;
