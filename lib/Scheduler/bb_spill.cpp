@@ -325,14 +325,8 @@ InstCount BBWithSpill::CmputRPCostLwrBound() {
 /*****************************************************************************/
 
 void BBWithSpill::addRecordedCost(SPILL_COST_FUNCTION Scf) {
-  // Do nothing if the CF is already recorded
-  for (auto it = recordedCostFunctions.begin();
-       it != recordedCostFunctions.end(); ++it)
-    if (*it == Scf)
-      return;
-
-  // If this is the first time we see the value in Scf then insert it
-  recordedCostFunctions.push_back(Scf);
+  if (!llvm::is_contained(recordedCostFunctions, Scf))
+    recordedCostFunctions.push_back(Scf);
 }
 /*****************************************************************************/
 
@@ -419,9 +413,8 @@ InstCount BBWithSpill::CmputCost_(InstSchedule *sched, COST_COMP_MODE compMode,
   sched->SetPeakRegPressures(peakRegPressures_);
   sched->SetSpillCost(crntSpillCost_);
 
-  for (auto it = recordedCostFunctions.begin();
-       it != recordedCostFunctions.end(); ++it)
-    storeExtraCost(sched, *it);
+  for (SPILL_COST_FUNCTION CostFunction : recordedCostFunctions)
+    storeExtraCost(sched, CostFunction);
 
   return cost;
 }

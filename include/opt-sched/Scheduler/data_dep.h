@@ -13,7 +13,6 @@ Last Update:  Mar. 2011
 #include "opt-sched/Scheduler/buffers.h"
 #include "opt-sched/Scheduler/defines.h"
 #include "opt-sched/Scheduler/sched_basic_data.h"
-#include "llvm/ADT/IndexedMap.h"
 #include "llvm/ADT/SmallVector.h"
 #include <memory>
 

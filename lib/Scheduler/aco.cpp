@@ -158,7 +158,7 @@ bool ACOScheduler::shouldReplaceSchedule(InstSchedule *OldSched,
            (NewSched->GetExecCost() < OldSched->GetExecCost());
 }
 
-DCF_OPT ACOScheduler::ParseDCFOpt(std::string opt) {
+DCF_OPT ACOScheduler::ParseDCFOpt(const std::string &opt) {
   if (opt == "OFF")
     return DCF_OPT::OFF;
   else if (opt == "GLOBAL_ONLY")
@@ -432,7 +432,8 @@ FUNC_RESULT ACOScheduler::FindSchedule(InstSchedule *schedule_out,
       std::unique_ptr<InstSchedule> schedule = FindOneSchedule();
       if (print_aco_trace)
         PrintSchedule(schedule.get());
-      if (shouldReplaceSchedule(iterationBest.get(), schedule.get(), false)) {
+      if (shouldReplaceSchedule(iterationBest.get(), schedule.get(),
+                                /*IsGlobal=*/false)) {
         iterationBest = std::move(schedule);
         if (IsDbg)
           IterAntEdges = CrntAntEdges;
@@ -442,7 +443,8 @@ FUNC_RESULT ACOScheduler::FindSchedule(InstSchedule *schedule_out,
     /* PrintSchedule(iterationBest); */
     /* std::cout << iterationBest->GetCost() << std::endl; */
     // TODO DRY
-    if (shouldReplaceSchedule(bestSchedule.get(), iterationBest.get(), true)) {
+    if (shouldReplaceSchedule(bestSchedule.get(), iterationBest.get(),
+                              /*IsGlobal=*/true)) {
       bestSchedule = std::move(iterationBest);
       Logger::Info("ACO found schedule with spill cost %d",
                    bestSchedule->GetCost());

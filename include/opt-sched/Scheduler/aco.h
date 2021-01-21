@@ -54,7 +54,7 @@ private:
   double Score(SchedInstruction *from, Choice choice);
   bool shouldReplaceSchedule(InstSchedule *OldSched, InstSchedule *NewSched,
                              bool IsGlobal);
-  DCF_OPT ParseDCFOpt(std::string opt);
+  DCF_OPT ParseDCFOpt(const std::string &opt);
 
   void PrintPheromone();
 
