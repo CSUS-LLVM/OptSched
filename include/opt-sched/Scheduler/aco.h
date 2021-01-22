@@ -23,6 +23,13 @@ namespace opt_sched {
 
 typedef double pheromone_t;
 
+enum class DCF_OPT {
+  OFF,
+  GLOBAL_ONLY,
+  GLOBAL_AND_TIGHTEN,
+  GLOBAL_AND_ITERATION
+};
+
 struct Choice {
   SchedInstruction *inst;
   double heuristic;  // range 1 to 2
@@ -45,7 +52,9 @@ private:
   pheromone_t &Pheromone(SchedInstruction *from, SchedInstruction *to);
   pheromone_t &Pheromone(InstCount from, InstCount to);
   double Score(SchedInstruction *from, Choice choice);
-  bool shouldReplaceSchedule(InstSchedule *OldSched, InstSchedule *NewSched);
+  bool shouldReplaceSchedule(InstSchedule *OldSched, InstSchedule *NewSched,
+                             bool IsGlobal);
+  DCF_OPT ParseDCFOpt(const std::string &opt);
 
   void PrintPheromone();
 
@@ -86,7 +95,10 @@ private:
   std::unique_ptr<InstSchedule> InitialSchedule;
   bool VrfySched_;
   bool IsPostBB;
+  bool IsTwoPassEn;
   pheromone_t ScRelMax;
+  DCF_OPT DCFOption;
+  SPILL_COST_FUNCTION DCFCostFn;
 };
 
 } // namespace opt_sched

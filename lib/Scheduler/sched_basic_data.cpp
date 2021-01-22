@@ -7,6 +7,28 @@
 
 using namespace llvm::opt_sched;
 
+SPILL_COST_FUNCTION llvm::opt_sched::ParseSCFName(const std::string &name) {
+  // PERP used to be called PEAK.
+  if (name == "PERP" || name == "PEAK") {
+    return SCF_PERP;
+  } else if (name == "PRP") {
+    return SCF_PRP;
+  } else if (name == "PEAK_PER_TYPE") {
+    return SCF_PEAK_PER_TYPE;
+  } else if (name == "SUM") {
+    return SCF_SUM;
+  } else if (name == "PEAK_PLUS_AVG") {
+    return SCF_PEAK_PLUS_AVG;
+  } else if (name == "SLIL") {
+    return SCF_SLIL;
+  } else if (name == "OCC" || name == "TARGET") {
+    return SCF_TARGET;
+  }
+
+  llvm::report_fatal_error(
+      "Unrecognized option for SPILL_COST_FUNCTION setting: " + name, false);
+}
+
 SchedInstruction::SchedInstruction(InstCount num, const string &name,
                                    InstType instType, const string &opCode,
                                    InstCount maxInstCnt, int nodeID,

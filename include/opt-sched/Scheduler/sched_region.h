@@ -55,7 +55,9 @@ public:
   // Returns the dependence graph of this region.
   inline DataDepGraph *GetDepGraph() { return dataDepGraph_; }
   // Returns the lower bound on the cost of this region.
-  inline int GetCostLwrBound() { return costLwrBound_; }
+  inline InstCount GetCostLwrBound() { return costLwrBound_; }
+  inline InstCount GetExecCostLwrBound() { return ExecCostLwrBound_; }
+  inline InstCount GetRPCostLwrBound() { return RpCostLwrBound_; }
   // Returns the best cost found so far for this region.
   inline InstCount GetBestCost() { return bestCost_; }
   // Returns the heuristic cost for this region.
@@ -76,7 +78,9 @@ public:
   // External abstract functions.
 
   // TODO(max): Document.
-  virtual int CmputCostLwrBound() = 0;
+  virtual InstCount CmputCostLwrBound() = 0;
+  virtual InstCount CmputExecCostLwrBound() = 0;
+  virtual InstCount CmputRPCostLwrBound() = 0;
   // TODO(max): Document.
   virtual InstCount UpdtOptmlSched(InstSchedule *crntSched,
                                    LengthCostEnumerator *enumrtr) = 0;
@@ -176,6 +180,14 @@ protected:
   InstCount schedUprBound_;
   // TODO(max): Document.
   InstCount abslutSchedUprBound_;
+
+  // The absolute lower bound on the ILP/execution cost for normalized costs
+  InstCount ExecCostLwrBound_ = 0;
+
+  // The STATIC absolute lower bound for register pressure/spill cost
+  // THIS LOWER BOUND IS NOT DYNAMIC.  It is used to get the static normalized
+  // cost of a schedule
+  InstCount RpCostLwrBound_ = 0;
 
   // TODO(max): Document.
   InstCount crntCycleNum_;

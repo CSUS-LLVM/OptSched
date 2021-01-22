@@ -2758,6 +2758,10 @@ void InstSchedule::Copy(InstSchedule *src) {
   cost_ = src->cost_;
   execCost_ = src->execCost_;
   spillCost_ = src->spillCost_;
+  NormSpillCost = src->NormSpillCost;
+
+  for (int i = 0; i < MAX_SCHED_PRIRTS; ++i)
+    storedSC[i] = src->storedSC[i];
 }
 
 void InstSchedule::SetSpillCosts(InstCount spillCosts[]) {
@@ -3054,6 +3058,20 @@ InstCount InstSchedule::GetExecCost() const { return execCost_; }
 void InstSchedule::SetSpillCost(InstCount cost) { spillCost_ = cost; }
 
 InstCount InstSchedule::GetSpillCost() const { return spillCost_; }
+
+// NOTE: ACO needs statically normalized costs.  These are statically normalized
+// costs that don't use the dynamic SLIL lower bound.
+void InstSchedule::SetNormSpillCost(InstCount cost) { NormSpillCost = cost; }
+
+InstCount InstSchedule::GetNormSpillCost() const { return NormSpillCost; }
+
+void InstSchedule::SetExtraSpillCost(SPILL_COST_FUNCTION Fn, InstCount cost) {
+  storedSC[Fn] = cost;
+}
+
+InstCount InstSchedule::GetExtraSpillCost(SPILL_COST_FUNCTION Fn) const {
+  return storedSC[Fn];
+}
 
 /*******************************************************************************
  * Previously inlined functions

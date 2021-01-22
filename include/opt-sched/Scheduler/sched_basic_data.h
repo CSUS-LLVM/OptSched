@@ -98,6 +98,9 @@ const int MAX_DEFS_PER_INSTR = 4096;
 // The maximum number of register usages per instruction node.
 const int MAX_USES_PER_INSTR = 4096;
 
+// function for parsing cost function names to enum values
+SPILL_COST_FUNCTION ParseSCFName(const std::string &name);
+
 // Forward declarations used to reduce the number of #includes.
 class DataDepGraph;
 class Register;
