@@ -3,14 +3,10 @@ import argparse
 import sys
 import re
 
-parser = argparse.ArgumentParser(
-    description='Convert data_dep WriteToFile format to a .dot file')
-parser.add_argument(
-    'input', help='The WriteToFile format file to convert. Input a single hyphen (-) to read from stdin')
-parser.add_argument(
-    '-o', '--output', help='The destination to write to. Defaults to stdout')
-parser.add_argument('--filter-weights', nargs='*', default=[],
-                    help='filter out weights with the respective values')
+parser = argparse.ArgumentParser(description='Convert data_dep WriteToFile format to a .dot file')
+parser.add_argument('input', help='The WriteToFile format file to convert. Input a single hyphen (-) to read from stdin')
+parser.add_argument('-o', '--output', help='The destination to write to. Defaults to stdout')
+parser.add_argument('--filter-weights', nargs='*', default=[], help='filter out weights with the respective values')
 parser.add_argument(
     '--base', help='Consider the edges from this other .ddg when layouting. Those edges will be made invisible.')
 
@@ -32,10 +28,8 @@ if args.base:
 else:
     basetext = ''
 
-NODE_RE = re.compile(
-    r'node (?P<number>\d+) "(?P<name>.*?)"(\s*"(?P<other_name>.*?)")?')
-EDGE_RE = re.compile(
-    r'dep (?P<from>\d+) (?P<to>\d+) "(?P<type>.*?)" (?P<weight>\d+)')
+NODE_RE = re.compile(r'node (?P<number>\d+) "(?P<name>.*?)"(\s*"(?P<other_name>.*?)")?')
+EDGE_RE = re.compile(r'dep (?P<from>\d+) (?P<to>\d+) "(?P<type>.*?)" (?P<weight>\d+)')
 
 # Holds the resulting strings as a list of the lines.
 result = ['digraph G {\n']
@@ -107,8 +101,10 @@ for match in EDGE_RE.finditer(basetext):
 # Graph is now finished:
 result.append('}\n')
 
-output = sys.stdout
-if args.output:
-    output = open(args.output, 'w')
+filecontents = ''.join(result)
 
-print(''.join(result), file=output)
+if args.output:
+    with open(args.output, 'w') as f:
+        print(filecontents, file=f)
+else:
+    print(filecontents)
