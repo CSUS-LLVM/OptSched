@@ -380,7 +380,8 @@ FUNC_RESULT SchedRegion::FindOptimalSchedule(
 
   // Step #2: Use ACO to find a schedule if enabled and no optimal schedule is
   // yet to be found.
-  //if (AcoBeforeEnum && dataDepGraph_->GetInstCnt() < 20)
+  // check if region is of appropriate size to execute ACO on
+  //if (AcoBeforeEnum && dataDepGraph_->GetInstCnt() > 100)
     //AcoBeforeEnum = false;
   if (AcoBeforeEnum && !isLstOptml) {
     AcoStart = Utilities::GetProcessorTime();
@@ -983,7 +984,7 @@ FUNC_RESULT SchedRegion::runACO(InstSchedule *ReturnSched,
     gpuErrchk(cudaMallocManaged(&dev_DDG, memSize));
     gpuErrchk(cudaMemcpy(dev_DDG, dataDepGraph_, memSize,
                          cudaMemcpyHostToDevice));
-    dataDepGraph_->CopyPointersToDevice(dev_DDG);
+    dataDepGraph_->CopyPointersToDevice(dev_DDG, NUMTHREADS);
     // Copy this(BBWithSpill) to device
     Logger::Info("Copying BBWithSpill to Device");
     BBWithSpill *dev_rgn;
@@ -1012,6 +1013,8 @@ FUNC_RESULT SchedRegion::runACO(InstSchedule *ReturnSched,
       gpuErrchk(cudaMemcpy(dev_elmnts, ready->elmnts_, memSize,
                            cudaMemcpyHostToDevice));
       host_ready[i]->elmnts_ = dev_elmnts;
+      memSize = sizeof(DeviceVector<Choice>);
+      gpuErrchk(cudaMemPrefetchAsync(host_ready[i], memSize, 0));
     }
     delete ready;
     // copy array of device pointers to device
@@ -1043,6 +1046,13 @@ FUNC_RESULT SchedRegion::runACO(InstSchedule *ReturnSched,
     gpuErrchk(cudaMemcpy(dev_AcoSchdulr, AcoSchdulr, memSize,
                          cudaMemcpyHostToDevice));
     AcoSchdulr->CopyPointersToDevice(dev_AcoSchdulr);
+    // Make sure mallocManaged memory is copied to device before kernel start
+    memSize = sizeof(DataDepGraph);
+    gpuErrchk(cudaMemPrefetchAsync(dev_DDG, memSize, 0));
+    memSize = sizeof(BBWithSpill);
+    gpuErrchk(cudaMemPrefetchAsync(dev_rgn, memSize, 0));
+    //memSize = sizeof(ACOScheduler);
+    //gpuErrchk(cudaMemPrefetchAsync(dev_AcoSchdulr, memSize, 0));
 
     Rslt = AcoSchdulr->FindSchedule(ReturnSched, this, dev_AcoSchdulr);
     dev_AcoSchdulr->FreeDevicePointers();

@@ -434,6 +434,7 @@ void RegisterFile::CopyPointersToDevice(RegisterFile *dev_regFile) {
   Register *dev_reg = NULL;
   for (int i = 0; i < getCount(); i++) {
     //allocate device memory
+    // managed for deleting later
     gpuErrchk(cudaMallocManaged((void**)&dev_reg, sizeof(Register)));
     //copy register to device
     gpuErrchk(cudaMemcpy(dev_reg, Regs[i], sizeof(Register), 
@@ -445,6 +446,8 @@ void RegisterFile::CopyPointersToDevice(RegisterFile *dev_regFile) {
   }
   //update dev_regFile->Regs pointer
   dev_regFile->Regs = dev_regs;
+  memSize = getCount() * sizeof(Register *);
+  //gpuErrchk(cudaMemPrefetchAsync(dev_regs, memSize, 0));
 }
 
 void RegisterFile::FreeDevicePointers() {

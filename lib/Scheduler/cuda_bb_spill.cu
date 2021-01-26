@@ -1451,6 +1451,8 @@ void BBWithSpill::CopyPointersToDevice(SchedRegion* dev_rgn, int numThreads) {
   unsigned int *vctr = NULL;
   unsigned int *dev_vctr = NULL;
   int unitCnt;
+  // timing
+  Logger::Info("Copying %d weightedBitVectors for dev_liveRegs", numThreads);
   for (int j = 0; j < numThreads; j++) {
     memSize = regTypeCnt_ * sizeof(WeightedBitVector);
     //allocate dev mem
@@ -1476,9 +1478,14 @@ void BBWithSpill::CopyPointersToDevice(SchedRegion* dev_rgn, int numThreads) {
     }
     //update device pointer
     ((BBWithSpill *)dev_rgn)->dev_liveRegs_[j] = dev_liveRegs;
+    // make sure managed mem is copied to device before kernel start
+    memSize = regTypeCnt_ * sizeof(WeightedBitVector);
+    gpuErrchk(cudaMemPrefetchAsync(dev_liveRegs, memSize, 0));
   }
   //copy livePhysRegs to device
   WeightedBitVector *dev_livePhysRegs = NULL;
+  // timing
+  Logger::Info("Copying %d weightedBitVectors for dev_livePhysRegs", numThreads);
   for (int j = 0; j < numThreads; j++) {
     memSize = regTypeCnt_ * sizeof(WeightedBitVector);
     //allocate dev mem
@@ -1504,7 +1511,24 @@ void BBWithSpill::CopyPointersToDevice(SchedRegion* dev_rgn, int numThreads) {
     }
     //update device pointer
     ((BBWithSpill *)dev_rgn)->dev_livePhysRegs_[j] = dev_livePhysRegs;
+    // make sure managed mem is copied to device before kernel start
+    memSize = regTypeCnt_ * sizeof(WeightedBitVector);
+    gpuErrchk(cudaMemPrefetchAsync(dev_livePhysRegs, memSize, 0));
   }
+  // timing
+  Logger::Info("Prefetching malloc managed");
+  // make sure managed mem is copied to device before kernel start
+  memSize = sizeof(WeightedBitVector *) * numThreads;
+  gpuErrchk(cudaMemPrefetchAsync(dev_liveRegs_, memSize, 0));
+  gpuErrchk(cudaMemPrefetchAsync(dev_livePhysRegs_, memSize, 0));
+  memSize = sizeof(InstCount *) * numThreads;
+  gpuErrchk(cudaMemPrefetchAsync(dev_peakRegPressures_, memSize, 0));
+  memSize = sizeof(unsigned *) * numThreads;
+  gpuErrchk(cudaMemPrefetchAsync(dev_regPressures_, memSize, 0));
+  memSize = sizeof(InstCount *) * numThreads;
+  gpuErrchk(cudaMemPrefetchAsync(dev_spillCosts_, memSize, 0));
+  memSize = sizeof(int *) * numThreads;
+  gpuErrchk(cudaMemPrefetchAsync(dev_sumOfLiveIntervalLengths_, memSize, 0));
 }
 
 void BBWithSpill::UpdateSpillInfoFromDevice(BBWithSpill *dev_rgn) {

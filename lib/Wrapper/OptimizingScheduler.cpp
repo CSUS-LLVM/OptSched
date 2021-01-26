@@ -31,6 +31,7 @@
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Support/raw_ostream.h"
+#include "opt-sched/Scheduler/dev_defines.h"
 #include <algorithm>
 #include <chrono>
 #include <string>
@@ -403,18 +404,14 @@ void ScheduleDAGOptSched::schedule() {
 
     // Copy MachineModel to device for use during DevListSched.
     // Allocate device memory
-    if (cudaSuccess != cudaMallocManaged((void**)&dev_MM,
-                                         sizeof(MachineModel)))
-      Logger::Fatal("Error allocating device space for dev_machMdl: %s",
-                    cudaGetErrorString(cudaGetLastError()));
+    gpuErrchk(cudaMallocManaged((void**)&dev_MM, sizeof(MachineModel)));
     // Copy machMdl_ to device
-    if (cudaSuccess != cudaMemcpy(dev_MM, MM.get(),
-                                  sizeof(MachineModel),
-                                  cudaMemcpyHostToDevice))
-      Logger::Fatal("Error copying machMdl_ to device: %s",
-                    cudaGetErrorString(cudaGetLastError()));
+    gpuErrchk(cudaMemcpy(dev_MM, MM.get(), sizeof(MachineModel),
+                         cudaMemcpyHostToDevice));
     // Copy over all pointers to device
     MM.get()->CopyPointersToDevice(dev_MM);
+    // make sure mallocmanaged mem is copied to device before kernel start
+    gpuErrchk(cudaMemPrefetchAsync(dev_MM, sizeof(MachineModel), 0));
   }
   
   // create region

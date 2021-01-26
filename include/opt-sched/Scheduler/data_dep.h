@@ -343,7 +343,7 @@ public:
   __device__
   void Reset();
   // Deep Copies DDG's arrays to device and links them to device DDG pointer
-  void CopyPointersToDevice(DataDepGraph *dev_DDG);
+  void CopyPointersToDevice(DataDepGraph *dev_DDG, int numThreads = 0);
   // Calls cudaFree on all arrays/objects that were allocated with cudaMalloc
   void FreeDevicePointers(int numThreads);
 

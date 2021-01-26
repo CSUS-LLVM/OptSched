@@ -3533,7 +3533,7 @@ bool DataDepGraph::DoesFeedUser(SchedInstruction *inst) {
 
 int DataDepGraph::GetFileCostUprBound() { return fileCostUprBound_; }
 
-void DataDepGraph::CopyPointersToDevice(DataDepGraph *dev_DDG) {
+void DataDepGraph::CopyPointersToDevice(DataDepGraph *dev_DDG, int numThreads) {
   // use to hold size of array
   size_t memSize;
   // Copy instCntPerType_ to device
@@ -3633,7 +3633,11 @@ void DataDepGraph::CopyPointersToDevice(DataDepGraph *dev_DDG) {
   Logger::Info("Copying SchedInstructions to device");
   for (InstCount i = 0; i < instCnt_; i++)
     insts_[i].CopyPointersToDevice(&dev_DDG->insts_[i], dev_DDG->nodes_, 
-		                   instCnt_, dev_regFiles);
+		                   instCnt_, dev_regFiles, numThreads);
+  memSize = sizeof(SchedInstruction) * instCnt_;
+  gpuErrchk(cudaMemPrefetchAsync(dev_insts, memSize, 0));
+  memSize = sizeof(RegisterFile) * machMdl_->GetRegTypeCnt();
+  gpuErrchk(cudaMemPrefetchAsync(dev_regFiles, memSize, 0));
 }
 
 void DataDepGraph::FreeDevicePointers(int numThreads) {

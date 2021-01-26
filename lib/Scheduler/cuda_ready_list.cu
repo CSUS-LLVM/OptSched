@@ -462,6 +462,8 @@ void ReadyList::CopyPointersToDevice(ReadyList *dev_rdyLst,
     gpuErrchk(cudaMalloc(&dev_rdyLst->prirtyLst_->keys_, memSize));
   }
 */
+  memSize = sizeof(PriorityArrayList<InstCount>) * numThreads;
+  gpuErrchk(cudaMemPrefetchAsync(dev_prirtyLst_, memSize, 0)); 
 }
 
 void ReadyList::FreeDevicePointers(int numThreads) {

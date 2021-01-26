@@ -112,14 +112,15 @@ double ACOScheduler::Score(SchedInstruction *from, Choice choice) {
 __host__ __device__
 SchedInstruction *
 ACOScheduler::SelectInstruction(DeviceVector<Choice> &ready,
-                                SchedInstruction *lastInst) {
+                                SchedInstruction *lastInst,
+                                pheremone_t *s_pheremone) {
   double rand;
 #ifdef __CUDA_ARCH__
   rand = curand_uniform(&dev_states_[GLOBALTID]);
 #else
   rand = RandDouble(0, 1); 
 #endif
-//#if USE_ACS
+#if USE_ACS
   double choose_best_chance;
   if (use_fixed_bias) {
 /*
@@ -145,7 +146,7 @@ ACOScheduler::SelectInstruction(DeviceVector<Choice> &ready,
     }
     return maxChoice.inst;
   }
-//#endif
+#endif
   if (use_tournament) {
     int POPULATION_SIZE = ready.size();
 #ifdef __CUDA_ARCH__
@@ -172,15 +173,26 @@ ACOScheduler::SelectInstruction(DeviceVector<Choice> &ready,
       return s.inst;
   }
   pheremone_t sum = 0;
+  int fromInstNum = -1;
+  if (lastInst != NULL)
+    fromInstNum = lastInst->GetNum();
   for (auto choice : ready)
+//#ifndef __CUDA_ARCH__
     sum += Score(lastInst, choice);
+//#else
+    //sum += s_pheremone[((fromInstNum + 1) * count_) + choice.inst->GetNum()] * pow(choice.heuristic, heuristicImportance_);
+//#endif
 #ifdef __CUDA_ARCH__
   pheremone_t point = sum * rand;
 #else
   pheremone_t point = RandDouble(0, sum);
 #endif
   for (auto choice : ready) {
+//#ifndef __CUDA_ARCH__
     point -= Score(lastInst, choice);
+//#else
+    //point -= s_pheremone[((fromInstNum + 1) * count_) + choice.inst->GetNum()] * pow(choice.heuristic, heuristicImportance_);
+//#endif
     if (point <= 0)
       return choice.inst;
   }
@@ -195,7 +207,8 @@ ACOScheduler::SelectInstruction(DeviceVector<Choice> &ready,
 
 __host__ __device__
 InstSchedule *ACOScheduler::FindOneSchedule(InstSchedule *dev_schedule, 
-		                            DeviceVector<Choice> *dev_ready) {
+		                            DeviceVector<Choice> *dev_ready,
+                                            pheremone_t *s_pheremone) {
 #ifdef __CUDA_ARCH__ // device version of function
   SchedInstruction *lastInst = NULL;
   InstSchedule *schedule;
@@ -233,7 +246,7 @@ InstSchedule *ACOScheduler::FindOneSchedule(InstSchedule *dev_schedule,
     dev_rdyLst_->ResetIterator();
     inst = NULL;
     if (!ready->empty())
-      inst = SelectInstruction(*ready, lastInst);
+      inst = SelectInstruction(*ready, lastInst, s_pheremone);
 /*
       if (returnLastInstCnt_ > 0) {
 	if (GLOBALTID == 0) {
@@ -372,6 +385,10 @@ void Dev_ACO(SchedRegion *dev_rgn, DataDepGraph *dev_DDG,
             ACOScheduler *dev_AcoSchdulr, InstSchedule **dev_schedules,
             DeviceVector<Choice>**dev_ready, InstSchedule *dev_bestSched,
             int noImprovementMax) {
+  // Allocate shared memory for the pheremone table to be stored
+  //extern __shared__ double s_pheremones[];
+  // Copy pheremone table to shared memory 
+  //dev_AcoSchdulr->CopyPheremonesToSharedMem((double *)&s_pheremones);
   // holds cost and index of bestSched per block
   __shared__ int bestCost, bestIndex;
   dev_rgn->SetDepGraph(dev_DDG);
@@ -387,7 +404,8 @@ void Dev_ACO(SchedRegion *dev_rgn, DataDepGraph *dev_DDG,
     // Reset schedules to post constructor state
     dev_schedules[GLOBALTID]->Initialize();
     dev_AcoSchdulr->FindOneSchedule(dev_schedules[GLOBALTID],
-                                  dev_ready[GLOBALTID]);
+                                    dev_ready[GLOBALTID]//,
+                                    /*(double *)&s_pheremones*/);
     // Make sure all threads in block have constructed schedules
     __syncthreads();
     // 1 thread per block finds blockIterationBest, updates pheremones, and 
@@ -413,7 +431,7 @@ void Dev_ACO(SchedRegion *dev_rgn, DataDepGraph *dev_DDG,
     __syncthreads();
     // debug
     //printf("Thread %d has bestIndex = %d and bestCost = %d\n", GLOBALTID, bestIndex, bestCost);
-    dev_AcoSchdulr->UpdatePheremone(dev_schedules[bestIndex]);
+    dev_AcoSchdulr->UpdatePheremone(dev_schedules[bestIndex]/*, (double *)&s_pheremones*/);
     // 1 thread per block compares block iteration best to overall bestsched
     if (threadIdx.x == 0) {
       // Compare to initialSched/current best
@@ -430,8 +448,12 @@ void Dev_ACO(SchedRegion *dev_rgn, DataDepGraph *dev_DDG,
                  "iteration:%d\n",
                dev_bestSched->GetCost(), dev_bestSched->GetSpillCost(),
                dev_bestSched->GetCrntLngth(), dev_iterations);
-          dev_noImprovement = 0;
-        }
+          //dev_noImprovement = 0;
+          // for testing compile times disable resetting dev_noImprovement to
+          // allow the same number of iterations every time
+          atomicAdd(&dev_noImprovement, 1);
+        } else
+          atomicAdd(&dev_noImprovement, 1);
         // unlock mutex 
         atomicExch(&mutex, 0);
       } else {
@@ -453,7 +475,7 @@ void Dev_ACO(SchedRegion *dev_rgn, DataDepGraph *dev_DDG,
     __syncthreads();
     dev_iterations++;
   }
-  if (threadIdx.x == 0)
+  if (GLOBALTID == 0)
     printf("Block %d finished Dev_ACO after %d iterations\n", blockIdx.x, dev_iterations); 
 }
 
@@ -525,10 +547,14 @@ FUNC_RESULT ACOScheduler::FindSchedule(InstSchedule *schedule_out,
     gpuErrchk(cudaMalloc((void**)&dev_bestSched, memSize));
     gpuErrchk(cudaMemcpy(dev_bestSched, bestSchedule, memSize,
                          cudaMemcpyHostToDevice));
+    // Make sure managed memory is copied to device before kernel start
+    memSize = sizeof(ACOScheduler);
+    gpuErrchk(cudaMemPrefetchAsync(dev_AcoSchdulr, memSize, 0));
     Logger::Info("Launching Dev_ACO");
     // Launch with noImprovementMax * NUMBLOCKS so each threadblock can
     // increment dev_noImprovement once per iteration
-    Dev_ACO<<<NUMBLOCKS,NUMTHREADSPERBLOCK>>>(dev_rgn_, dev_DDG_,
+    Dev_ACO<<<NUMBLOCKS,NUMTHREADSPERBLOCK/*,count_*(count_+1)*sizeof(double)*/>>>
+                      (dev_rgn_, dev_DDG_,
                       dev_AcoSchdulr, dev_schedules, dev_ready_, dev_bestSched,
                       noImprovementMax * NUMBLOCKS);
     cudaDeviceSynchronize();
@@ -580,7 +606,9 @@ FUNC_RESULT ACOScheduler::FindSchedule(InstSchedule *schedule_out,
                  "iteration:%d\n",
                  bestSchedule->GetCost(), bestSchedule->GetSpillCost(),
                  bestSchedule->GetCrntLngth(), iterations);
-          noImprovement = 0;
+          // disable resetting no improvement for runtime tests
+          //noImprovement = 0;
+          noImprovement++;
         } else {
           noImprovement++;
           if (noImprovement > noImprovementMax)
@@ -604,7 +632,8 @@ FUNC_RESULT ACOScheduler::FindSchedule(InstSchedule *schedule_out,
 }
 
 __host__ __device__
-void ACOScheduler::UpdatePheremone(InstSchedule *schedule) {
+void ACOScheduler::UpdatePheremone(InstSchedule *schedule,
+                                  pheremone_t *s_pheremone) {
 #ifdef __CUDA_ARCH__ // device version of function
   // parallel on a block level, use threadIdx.x instead of GLOBALTID
   int instNum = threadIdx.x;
@@ -621,10 +650,14 @@ void ACOScheduler::UpdatePheremone(InstSchedule *schedule) {
     lastInstNum = schedule->GetPrevInstNum(instNum);
     // Get corresponding pheremone and update it
     pheremone = &Pheremone(lastInstNum, instNum);
+    // Use shared memory pheremones
+    //pheremone = &s_pheremone[((lastInstNum + 1) * count_) + instNum];
     *pheremone = *pheremone + 1 / (schedule->GetCost() + 1);
-    // decay pheremone for all trails leaving instNum
+    // decay pheremone for all trails leading to instNum
     for (int j = 0; j < count_; j++) {
-      Pheremone(instNum, j) *= (1 - decay_factor);
+      Pheremone(j, instNum) *= (1 - decay_factor);
+      // use share memory pheremones
+      //s_pheremone[((j + 1) * count_) + instNum] *= (1-decay_factor);
     }
     // Increase instNum by NUMTHREADSPERBLOCK in case there are less threads
     // per block than instruction in the region
@@ -669,6 +702,17 @@ void ACOScheduler::UpdatePheremone(InstSchedule *schedule) {
   if (print_aco_trace)
     PrintPheremone();
 #endif
+}
+
+__device__
+void ACOScheduler::CopyPheremonesToSharedMem(double *s_pheremone) {
+  InstCount toInstNum = threadIdx.x;
+  while (toInstNum < count_) {
+    for (int fromInstNum = -1; fromInstNum < count_; fromInstNum++)
+      s_pheremone[((fromInstNum + 1) * count_) + toInstNum] = 
+                                        Pheremone(fromInstNum, toInstNum);
+    toInstNum += NUMTHREADSPERBLOCK;
+  }
 }
 
 // copied from Enumerator
@@ -872,6 +916,9 @@ void ACOScheduler::CopyPointersToDevice(ACOScheduler *dev_ACOSchedulr) {
     memSize = sizeof(InstCount) * dataDepGraph_->GetInstCnt();
     gpuErrchk(cudaMalloc(&dev_instsWithPrdcsrsSchduld_[i]->elmnts_, memSize));
     gpuErrchk(cudaMalloc(&dev_instsWithPrdcsrsSchduld_[i]->keys_, memSize));
+    // make sure mallocManaged memory is copied to device before kernel start
+    memSize = sizeof(PriorityArrayList<InstCount, InstCount>);
+    gpuErrchk(cudaMemPrefetchAsync(dev_instsWithPrdcsrsSchduld_[i], memSize, 0));
   }
   delete temp;
   // Copy rdyLst_
@@ -882,6 +929,15 @@ void ACOScheduler::CopyPointersToDevice(ACOScheduler *dev_ACOSchedulr) {
 		       cudaMemcpyHostToDevice));
   rdyLst_->CopyPointersToDevice(dev_ACOSchedulr->dev_rdyLst_, dev_DDG_,
 		                NUMTHREADS);
+  // make sure cudaMallocManaged memory is copied to device before kernel start
+  memSize = sizeof(int16_t *) * NUMTHREADS;
+  gpuErrchk(cudaMemPrefetchAsync(dev_avlblSlotsInCrntCycle_, memSize, 0));
+  memSize = sizeof(PriorityArrayList<InstCount, InstCount> *) * NUMTHREADS;
+  gpuErrchk(cudaMemPrefetchAsync(dev_instsWithPrdcsrsSchduld_, memSize, 0));
+  memSize = sizeof(ReserveSlot *) * NUMTHREADS;
+  gpuErrchk(cudaMemPrefetchAsync(dev_rsrvSlots_, memSize, 0));
+  memSize = sizeof(ReadyList);
+  gpuErrchk(cudaMemPrefetchAsync(&dev_ACOSchedulr->dev_rdyLst_, memSize, 0));
 }
 
 void ACOScheduler::FreeDevicePointers() {
