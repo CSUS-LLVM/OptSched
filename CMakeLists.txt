@@ -6,6 +6,7 @@ option(OPTSCHED_INCLUDE_TESTS "Generate build targets for the OptSched unit test
 option(OPTSCHED_ENABLE_AMDGPU "Build the AMDGPU code. Requires that the AMDGPU target is supported." ON)
 set(OPTSCHED_LIT_ARGS "-sv" CACHE STRING "Arguments to pass to lit")
 set(OPTSCHED_EXTRA_LINK_LIBRARIES "" CACHE STRING "Extra link_libraries to pass to OptSched, ;-separated")
+set(OPTSCHED_EXTRA_INCLUDE_DIRS "" CACHE STRING "Extra include_directories to pass to OptSched, ;-separated")
 # To add OptSched debug defines, e.g.:
 # '-DOPTSCHED_EXTRA_DEFINITIONS=-DIS_DEBUG_DEFS_AND_USES;-DIS_DEBUG_DEF_USE_COUNT'
 set(OPTSCHED_EXTRA_DEFINITIONS "" CACHE STRING "Extra add_definitions to pass to OptSched, ;-separated")
@@ -49,6 +50,7 @@ include_directories(
   ${OPTSCHED_SOURCE_DIR}/include
   ${OPTSCHED_SOURCE_DIR}/lib
   ${LLVM_INCLUDE_DIRS}
+  ${OPTSCHED_EXTRA_INCLUDE_DIRS}
 )
 add_definitions(${OPTSCHED_EXTRA_DEFINITIONS})
 link_directories(${OPTSCHED_EXTRA_LINK_LIBRARIES})
@@ -63,9 +65,6 @@ if(NOT HAS_PARENT)
   set(args)
   if(OPTSCHED_INCLUDE_TESTS)
     list(APPEND args GTEST)
-  endif()
-  if(OPTSCHED_ENABLE_AMDGPU)
-    list(APPEND args AMDGPU)
   endif()
 
   get_local_llvm(${args})

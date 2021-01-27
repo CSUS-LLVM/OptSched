@@ -34,7 +34,9 @@ if(OPTSCHED_ENABLE_AMDGPU)
     Wrapper/AMDGPU/OptSchedGCNTarget.cpp
     Wrapper/AMDGPU/OptSchedDDGWrapperGCN.cpp
   )
-  list(APPEND OPTSCHED_TARGET_DEPS AMDGPUCommonTableGen)
+  if(TARGET AMDGPUCommonTableGen)
+    list(APPEND OPTSCHED_TARGET_DEPS AMDGPUCommonTableGen)
+  endif()
 endif()
 
 function(add_optsched_library name)

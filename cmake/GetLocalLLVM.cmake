@@ -47,7 +47,11 @@ function(get_local_llvm)
     file(TOUCH ${LOCAL_LLVM_BINARY_DIR}/llvm-project.download-finished)
   endif()
 
-  cmake_parse_arguments(ARG "GTEST;AMDGPU" "" "" ${ARGN})
+  cmake_parse_arguments(ARG "GTEST" "" "" ${ARGN})
+
+  if(ARG_UNPARSED_ARGUMENTS)
+    message(FATAL_ERROR "Unknown arguments ${ARG_UNPARSED_ARGUMENTS}")
+  endif()
 
   set(llvm_dir ${LOCAL_LLVM_DIR}/llvm)
   set(llvm_build_dirs ${LOCAL_LLVM_BINARY_DIR}/llvm_build_dirs)
@@ -64,23 +68,5 @@ function(get_local_llvm)
       ${llvm_dir}/utils/unittest/googletest/include
       ${llvm_dir}/utils/unittest/googlemock/include
     )
-  endif()
-
-  if(ARG_AMDGPU)
-    list(APPEND LLVM_TABLEGEN_FLAGS -I ${llvm_dir}/lib/Target)
-    set(LLVM_TABLEGEN_EXE llvm-tblgen CACHE PATH "Path to llvm-tblgen")
-    include(TableGen)
-
-    # Adapted from llvm-project/llvm/lib/Targets/AMDGPU/CMakeLists.txt
-    set(AMDGPU_PATH ${llvm_dir}/lib/Target/AMDGPU)
-    set(AMDGPU_SOURCE_DIR ${LOCAL_LLVM_BINARY_DIR}/amdgpu-tblgen-source)
-    set(AMDGPU_BINARY_DIR ${LOCAL_LLVM_BINARY_DIR}/amdgpu-tblgen-binary)
-
-    file(COPY ${AMDGPU_PATH} DESTINATION ${LOCAL_LLVM_BINARY_DIR})
-    file(RENAME ${LOCAL_LLVM_BINARY_DIR}/AMDGPU ${AMDGPU_SOURCE_DIR})
-    file(COPY ${LOCAL_LLVM_LIST_DIR}/amdgpu-tblgen/CMakeLists.txt DESTINATION ${AMDGPU_SOURCE_DIR})
-    add_subdirectory(${AMDGPU_SOURCE_DIR} ${AMDGPU_BINARY_DIR})
-
-    include_directories(${AMDGPU_SOURCE_DIR} ${AMDGPU_BINARY_DIR})
   endif()
 endfunction()
