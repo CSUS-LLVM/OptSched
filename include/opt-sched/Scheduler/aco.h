@@ -23,7 +23,7 @@ typedef double pheremone_t;
 
 // If set to 1 ACO is run on device
 #define DEV_ACO 1
-#define NUMBLOCKS 40
+#define NUMBLOCKS 20
 #define NUMTHREADSPERBLOCK 128
 #define NUMTHREADS NUMBLOCKS * NUMTHREADSPERBLOCK
 
@@ -38,7 +38,7 @@ public:
                InstCount upperBound, SchedPriorities priorities,
                bool vrfySched, SchedRegion *dev_rgn = NULL,
 	       DataDepGraph *dev_DDG = NULL,
-	       DeviceVector<Choice> **dev_ready = NULL,
+	       DeviceVector<Choice> *dev_ready = NULL,
 	       MachineModel *dev_MM = NULL, curandState_t *dev_states = NULL);
   __host__ __device__
   virtual ~ACOScheduler();
@@ -107,7 +107,7 @@ private:
   InstSchedule *InitialSchedule;
   bool VrfySched_;
   DataDepGraph *dev_DDG_;
-  DeviceVector<Choice> **dev_ready_;
+  DeviceVector<Choice> *dev_ready_;
   MachineModel *dev_MM_;
   // Holds state for each thread for RNG
   curandState_t *dev_states_;

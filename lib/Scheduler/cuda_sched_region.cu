@@ -995,6 +995,33 @@ FUNC_RESULT SchedRegion::runACO(InstSchedule *ReturnSched,
     gpuErrchk(cudaMemcpy(dev_rgn, this, memSize, cudaMemcpyHostToDevice));
     dev_rgn->machMdl_ = dev_machMdl_;
     CopyPointersToDevice(dev_rgn, NUMTHREADS);
+    // new method
+    // create an array of DeviceVectors and copy to device for use 
+    // during Dev_ACO
+    Logger::Info("Creating and Copying ready array to device");
+    DeviceVector<Choice> *ready = new DeviceVector<Choice>[NUMTHREADS];
+    DeviceVector<Choice> *dev_ready;
+    Choice *dev_elmnts;
+    // Alloc dev mem for elmnts_ for all vectors
+    memSize = dataDepGraph_->GetInstCnt() * sizeof(Choice) * NUMTHREADS;
+    gpuErrchk(cudaMalloc(&dev_elmnts, memSize));
+    // set correct allocation size and elmnts_ dev pointer
+    for (int i = 0; i < NUMTHREADS; i++) {
+      ready[i].alloc_ = dataDepGraph_->GetInstCnt();
+      ready[i].elmnts_ = &dev_elmnts[i * dataDepGraph_->GetInstCnt()];
+    }
+    // Alloc dev mem for all dev vectors
+    memSize = sizeof(DeviceVector<Choice>) * NUMTHREADS;
+    gpuErrchk(cudaMallocManaged(&dev_ready, memSize));
+    // Copy array of vectors to device
+    gpuErrchk(cudaMemcpy(dev_ready, ready, memSize, cudaMemcpyHostToDevice));
+    // remove device array reference in host copy
+    for (int i = 0; i < NUMTHREADS; i++)
+      ready[i].elmnts_ = NULL;
+    // delete host copy
+    delete[] ready;
+
+/*  old method
     // Create and copy an array of DeviceVector<Choice>* for use during scheduling
     Logger::Info("Creating and Copying ready arrays to device");
     DeviceVector<Choice> **host_ready = new DeviceVector<Choice> *[NUMTHREADS];
@@ -1022,6 +1049,8 @@ FUNC_RESULT SchedRegion::runACO(InstSchedule *ReturnSched,
     memSize = sizeof(DeviceVector<Choice> *) * NUMTHREADS;
     gpuErrchk(cudaMalloc(&dev_ready, memSize));
     gpuErrchk(cudaMemcpy(dev_ready, host_ready, memSize, cudaMemcpyHostToDevice));
+*/
+
     // Allocate dev_states for curand RNG and run curand_init() to initialize
     Logger::Info("Initializing states for cuRand");
     curandState_t *dev_states;
@@ -1058,13 +1087,15 @@ FUNC_RESULT SchedRegion::runACO(InstSchedule *ReturnSched,
     dev_AcoSchdulr->FreeDevicePointers();
     cudaFree(dev_AcoSchdulr);
     delete AcoSchdulr;
-
+/*
     for (int i = 0; i < NUMTHREADS; i++) {
       cudaFree(host_ready[i]->elmnts_);
       cudaFree(host_ready[i]);
     }
+*/
+    cudaFree(dev_ready[0].elmnts_);
     cudaFree(dev_ready);
-    delete[] host_ready;
+    //delete[] host_ready;
     dev_rgn->FreeDevicePointers(NUMTHREADS);
     cudaFree(dev_rgn);
     dev_DDG->FreeDevicePointers(NUMTHREADS);

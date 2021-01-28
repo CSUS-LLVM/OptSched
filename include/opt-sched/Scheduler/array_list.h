@@ -12,7 +12,7 @@ template <typename T>
 class ArrayList {
   public:
     __host__ __device__
-    ArrayList(int maxSize);
+    ArrayList(int maxSize = 0);
     
     __host__ __device__
     ~ArrayList();
@@ -86,7 +86,7 @@ template <typename T, typename K = unsigned long>
 class PriorityArrayList : public ArrayList<T> {
   public:
     __host__ __device__
-    PriorityArrayList(int maxSize);
+    PriorityArrayList(int maxSize = 0);
 
     __host__ __device__
     ~PriorityArrayList();
@@ -123,17 +123,21 @@ template <>
 class ArrayList<int> {
   public:
     __host__ __device__
-    ArrayList(int maxSize) {
+    ArrayList(int maxSize = 0) {
       maxSize_ = maxSize;
       size_ = 0;
       crnt_ = 0;
       dev_crnt_ = NULL;
-      elmnts_ = new int[maxSize_];
+      if (maxSize > 0)
+        elmnts_ = new int[maxSize_];
+      else
+        elmnts_ = NULL;
     }
 
     __host__ __device__
     ~ArrayList() {
-      delete[] elmnts_;
+      if (elmnts_)
+        delete[] elmnts_;
     }
 
     // Appends a new element to the end of the list
@@ -393,13 +397,17 @@ ArrayList<T>::ArrayList(int maxSize) {
   size_ = 0;
   crnt_ = 0;
   dev_crnt_ = NULL;
-  elmnts_ = new T[maxSize_];
+  if (maxSize > 0)
+    elmnts_ = new T[maxSize_];
+  else
+    elmnts_ = NULL;
 }
 
 template <typename T>
 __host__ __device__
 ArrayList<T>::~ArrayList() {
-  delete[] elmnts_;
+  if (elmnts_)
+    delete[] elmnts_;
 }
 
 template <typename T>
@@ -664,13 +672,17 @@ bool ArrayList<T>::FindElmnt(const T element) const {
 template <typename T, typename K>
 __host__ __device__
 PriorityArrayList<T,K>::PriorityArrayList(int maxSize) : ArrayList<T>(maxSize) {
-  keys_ = new K[maxSize];
+  if (maxSize > 0)
+    keys_ = new K[maxSize];
+  else
+    keys_ = NULL;
 }
 
 template <typename T, typename K>
 __host__ __device__
 PriorityArrayList<T,K>::~PriorityArrayList() {
-  delete[] keys_;
+  if (keys_)
+    delete[] keys_;
 }
 
 template <typename T, typename K>
