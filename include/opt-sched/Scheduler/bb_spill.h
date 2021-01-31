@@ -80,6 +80,7 @@ private:
   InstCount totSpillCost_;
   InstCount slilSpillCost_;
   bool trackLiveRangeLngths_;
+  bool NeedsComputeSLIL;
 
   // Virtual Functions:
   // Given a schedule, compute the cost function value
@@ -141,6 +142,7 @@ public:
                     InstCount slotNum, EnumTreeNode *trgtNode);
   void SetSttcLwrBounds(EnumTreeNode *node);
   bool ChkInstLglty(SchedInstruction *inst);
+  bool needsSLIL();
   void InitForSchdulng();
 
 protected:

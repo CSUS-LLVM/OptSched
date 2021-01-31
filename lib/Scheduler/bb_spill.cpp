@@ -56,6 +56,7 @@ BBWithSpill::BBWithSpill(const OptSchedTarget *OST_, DataDepGraph *dataDepGraph,
   SCW_ = SCW;
   schedCostFactor_ = COST_WGHT_BASE;
   trackLiveRangeLngths_ = true;
+  NeedsComputeSLIL = (spillCostFunc == SCF_SLIL);
 
   regTypeCnt_ = OST->MM->GetRegTypeCnt();
   regFiles_ = dataDepGraph->getRegFiles();
@@ -312,7 +313,7 @@ InstCount BBWithSpill::CmputExecCostLwrBound() {
 InstCount BBWithSpill::CmputRPCostLwrBound() {
   InstCount spillCostLwrBound = 0;
 
-  if (GetSpillCostFunc() == SCF_SLIL) {
+  if (needsSLIL()) {
     spillCostLwrBound =
         ComputeSLILStaticLowerBound(regTypeCnt_, regFiles_, dataDepGraph_);
     dynamicSlilLowerBound_ = spillCostLwrBound;
@@ -325,6 +326,7 @@ InstCount BBWithSpill::CmputRPCostLwrBound() {
 /*****************************************************************************/
 
 void BBWithSpill::addRecordedCost(SPILL_COST_FUNCTION Scf) {
+  NeedsComputeSLIL |= (Scf == SCF_SLIL);
   if (!llvm::is_contained(recordedCostFunctions, Scf))
     recordedCostFunctions.push_back(Scf);
 }
@@ -480,7 +482,7 @@ void BBWithSpill::UpdateSpillInfoForSchdul_(SchedInstruction *inst,
       // (Chris): The SLIL calculation below the def and use for-loops doesn't
       // consider the last use of a register. Thus, an additional increment must
       // happen here.
-      if (GetSpillCostFunc() == SCF_SLIL) {
+      if (needsSLIL()) {
         sumOfLiveIntervalLengths_[regType]++;
         if (!use->IsInInterval(inst) && !use->IsInPossibleInterval(inst)) {
           ++dynamicSlilLowerBound_;
@@ -552,7 +554,7 @@ void BBWithSpill::UpdateSpillInfoForSchdul_(SchedInstruction *inst,
       peakRegPressures_[i] = liveRegs;
 
     // (Chris): Compute sum of live range lengths at this point
-    if (GetSpillCostFunc() == SCF_SLIL) {
+    if (needsSLIL()) {
       sumOfLiveIntervalLengths_[i] += liveRegs_[i].GetOneCnt();
       for (int j = 0; j < liveRegs_[i].GetSize(); ++j) {
         if (liveRegs_[i].GetBit(j)) {
@@ -613,7 +615,7 @@ void BBWithSpill::UpdateSpillInfoForUnSchdul_(SchedInstruction *inst) {
 #endif
 
   // (Chris): Update the SLIL for all live regs at this point.
-  if (GetSpillCostFunc() == SCF_SLIL) {
+  if (needsSLIL()) {
     for (int i = 0; i < regTypeCnt_; ++i) {
       for (int j = 0; j < liveRegs_[i].GetSize(); ++j) {
         if (liveRegs_[i].GetBit(j)) {
@@ -672,7 +674,7 @@ void BBWithSpill::UpdateSpillInfoForUnSchdul_(SchedInstruction *inst) {
     if (isLive == false) {
       // (Chris): Since this was the last use, the above SLIL calculation didn't
       // take this instruction into account.
-      if (GetSpillCostFunc() == SCF_SLIL) {
+      if (needsSLIL()) {
         sumOfLiveIntervalLengths_[regType]--;
         if (!use->IsInInterval(inst) && !use->IsInPossibleInterval(inst)) {
           --dynamicSlilLowerBound_;
@@ -846,11 +848,7 @@ FUNC_RESULT BBWithSpill::Enumerate_(Milliseconds startTime,
 }
 /*****************************************************************************/
 
-// can only compute SLIL if SLIL was the spillCostFunc
 InstCount BBWithSpill::CmputCostForFunction(SPILL_COST_FUNCTION SpillCF) {
-  // assert that if we are asking for SLIL that the CF is SLIL
-  assert(SpillCF != SCF_SLIL || GetSpillCostFunc() == SCF_SLIL);
-
   // return the requested cost
   switch (SpillCF) {
   case SCF_TARGET:
@@ -912,6 +910,10 @@ InstCount BBWithSpill::UpdtOptmlSched(InstSchedule *crntSched,
   return GetBestCost();
 }
 /*****************************************************************************/
+
+bool BBWithSpill::needsSLIL() {
+  return NeedsComputeSLIL;
+}
 
 void BBWithSpill::SetupForSchdulng_() {
   for (int i = 0; i < regTypeCnt_; i++) {

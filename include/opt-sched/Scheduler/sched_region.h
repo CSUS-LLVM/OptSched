@@ -253,6 +253,8 @@ protected:
 
   virtual bool EnableEnum_() = 0;
 
+  virtual bool needsSLIL() = 0;
+
   // Prepares the region for being scheduled.
   virtual void SetupForSchdulng_() = 0;
 

@@ -633,7 +633,7 @@ private:
   InstCount NormSpillCost;
 
   // Stores the spill cost of other spill cost functions
-  InstCount storedSC[MAX_SCHED_PRIRTS];
+  InstCount storedSC[MAX_SCF_TYPES];
 
   // An array of peak reg pressures for all reg types in the schedule
   InstCount *peakRegPressures_;

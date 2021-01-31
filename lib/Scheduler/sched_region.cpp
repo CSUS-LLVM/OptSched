@@ -238,8 +238,7 @@ FUNC_RESULT SchedRegion::FindOptimalSchedule(
   stats::problemSize.Record(dataDepGraph_->GetInstCnt());
 
   const auto *GraphTransformations = dataDepGraph_->GetGraphTrans();
-  if (BbSchedulerEnabled || GraphTransformations->size() > 0 ||
-      spillCostFunc_ == SCF_SLIL)
+  if (BbSchedulerEnabled || GraphTransformations->size() > 0 || needsSLIL())
     needTransitiveClosure = true;
 
   rslt = dataDepGraph_->SetupForSchdulng(needTransitiveClosure);
