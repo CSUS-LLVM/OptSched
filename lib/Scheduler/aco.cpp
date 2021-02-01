@@ -127,28 +127,32 @@ bool ACOScheduler::shouldReplaceSchedule(InstSchedule *OldSched,
   else if (!NewSched)
     return false;
 
-  // if we are using the dual cost function algorithm use the DCF code
-  // DCF has 4 different behaviors:
-  // OFF - Does Nothing
-  // GLOBAL_ONLY - Only applies to comparisons of the globally best schedule
-  // GLOBAL_AND_TIGHTEN - If a schedule has a lower DCFCost it wins
-  // GLOBAL_AND_ITERATION - Rejects any schedule with a worse DCFCost
-  if ((DCFOption == DCF_OPT::GLOBAL_ONLY && IsGlobal) ||
-      DCFOption == DCF_OPT::GLOBAL_AND_TIGHTEN ||
-      DCFOption == DCF_OPT::GLOBAL_AND_ITERATION) {
-    InstCount NewDCFCost = NewSched->GetExtraSpillCost(DCFCostFn);
-    InstCount OldDCFCost = OldSched->GetExtraSpillCost(DCFCostFn);
-    if (NewDCFCost < OldDCFCost)
-      return true;
-    else if ((DCFOption == DCF_OPT::GLOBAL_ONLY && IsGlobal) ||
-             DCFOption == DCF_OPT::GLOBAL_AND_ITERATION) {
-      if (NewDCFCost > OldDCFCost)
-        return false;
-    }
-  }
-
   // if it is the 1st pass return the cost comparison
   // if it is the 2nd pass return true if the RP cost and ILP cost is less
+  if (!IsTwoPassEn || !rgn_->IsSecondPass()) {
+    InstCount NewCost = (!IsTwoPassEn) ? NewSched->GetCost() : NewSched->GetNormSpillCost();
+    InstCount OldCost = (!IsTwoPassEn) ? OldSched->GetCost() : OldSched->GetNormSpillCost();
+
+    if (NewCost < OldCost)
+      return true;
+    else if (NewCost == OldCost &&
+             ((DCFOption == DCF_OPT::GLOBAL_ONLY && IsGlobal) ||
+             DCFOption == DCF_OPT::GLOBAL_AND_TIGHTEN ||
+             DCFOption == DCF_OPT::GLOBAL_AND_ITERATION)) {
+      InstCount NewDCFCost = NewSched->GetExtraSpillCost(DCFCostFn);
+      InstCount OldDCFCost = OldSched->GetExtraSpillCost(DCFCostFn);
+      if (NewDCFCost < OldDCFCost)
+        return true;
+      else if ((DCFOption == DCF_OPT::GLOBAL_ONLY && IsGlobal) ||
+               DCFOption == DCF_OPT::GLOBAL_AND_ITERATION) {
+        if (NewDCFCost > OldDCFCost)
+          return false;
+      }
+    }
+    else
+      return false;
+  }
+
   if (!IsTwoPassEn)
     return NewSched->GetCost() < OldSched->GetCost();
   else if (!rgn_->IsSecondPass())
