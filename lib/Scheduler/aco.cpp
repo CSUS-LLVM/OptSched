@@ -152,14 +152,11 @@ bool ACOScheduler::shouldReplaceSchedule(InstSchedule *OldSched,
     else
       return false;
   }
-
-  if (!IsTwoPassEn)
-    return NewSched->GetCost() < OldSched->GetCost();
-  else if (!rgn_->IsSecondPass())
-    return NewSched->GetNormSpillCost() < OldSched->GetNormSpillCost();
-  else
-    return (NewSched->GetNormSpillCost() <= OldSched->GetNormSpillCost()) &&
-           (NewSched->GetExecCost() < OldSched->GetExecCost());
+  else {
+    InstCount NewCost = NewSched->GetExecCost();
+    InstCount OldCost = OldSched->GetExecCost();
+    return NewCost < OldCost;
+  }
 }
 
 DCF_OPT ACOScheduler::ParseDCFOpt(const std::string &opt) {
