@@ -313,7 +313,7 @@ InstCount BBWithSpill::CmputExecCostLwrBound() {
 InstCount BBWithSpill::CmputRPCostLwrBound() {
   InstCount spillCostLwrBound = 0;
 
-  if (needsSLIL()) {
+  if (GetSpillCostFunc() == SCF_SLIL) {
     spillCostLwrBound =
         ComputeSLILStaticLowerBound(regTypeCnt_, regFiles_, dataDepGraph_);
     dynamicSlilLowerBound_ = spillCostLwrBound;

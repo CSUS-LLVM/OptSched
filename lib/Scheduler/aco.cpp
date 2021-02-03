@@ -120,12 +120,19 @@ double ACOScheduler::Score(SchedInstruction *from, Choice choice) {
 bool ACOScheduler::shouldReplaceSchedule(InstSchedule *OldSched,
                                          InstSchedule *NewSched,
                                          bool IsGlobal) {
+  std::string CmpLn="SRS/";
+  CmpLn += IsGlobal ? "g/" : "";
   // return true if the old schedule is null (eg:there is no old schedule)
   // return false if the new schedule is is NULL
-  if (!OldSched)
+  if (!OldSched) {
+    Logger::Info("SRS/Old:null, New:%d", !NewSched ? -1 : ((!IsTwoPassEn) ? NewSched->GetCost() : NewSched->GetNormSpillCost()));
     return true;
-  else if (!NewSched)
+  }
+  else if (!NewSched) {
+    //not likely to happen
+    Logger::Info("SRS/Old:%d, New:null", (!IsTwoPassEn) ? OldSched->GetCost() : OldSched->GetNormSpillCost());
     return false;
+  }
 
   // if it is the 1st pass return the cost comparison
   // if it is the 2nd pass return true if the RP cost and ILP cost is less
@@ -133,14 +140,22 @@ bool ACOScheduler::shouldReplaceSchedule(InstSchedule *OldSched,
     InstCount NewCost = (!IsTwoPassEn) ? NewSched->GetCost() : NewSched->GetNormSpillCost();
     InstCount OldCost = (!IsTwoPassEn) ? OldSched->GetCost() : OldSched->GetNormSpillCost();
 
-    if (NewCost < OldCost)
+    CmpLn += "Old:" + std::to_string(OldCost) + ", New:" + std::to_string(NewCost);
+
+    if (NewCost < OldCost) {
+      Logger::Info(CmpLn.c_str());
       return true;
+    }
     else if (NewCost == OldCost &&
              ((DCFOption == DCF_OPT::GLOBAL_ONLY && IsGlobal) ||
              DCFOption == DCF_OPT::GLOBAL_AND_TIGHTEN ||
              DCFOption == DCF_OPT::GLOBAL_AND_ITERATION)) {
       InstCount NewDCFCost = NewSched->GetExtraSpillCost(DCFCostFn);
       InstCount OldDCFCost = OldSched->GetExtraSpillCost(DCFCostFn);
+
+      CmpLn += ", OldDCF:" + std::to_string(OldDCFCost) + ", NewDCF:" + std::to_string(NewDCFCost);
+      Logger::Info(CmpLn.c_str());
+
       if (NewDCFCost < OldDCFCost)
         return true;
       else if ((DCFOption == DCF_OPT::GLOBAL_ONLY && IsGlobal) ||
@@ -149,10 +164,13 @@ bool ACOScheduler::shouldReplaceSchedule(InstSchedule *OldSched,
           return false;
       }
     }
-    else
+    else {
+      Logger::Info(CmpLn.c_str());
       return false;
+    }
   }
   else {
+    Logger::Info("2nd pass");
     InstCount NewCost = NewSched->GetExecCost();
     InstCount OldCost = OldSched->GetExecCost();
     return NewCost < OldCost;
