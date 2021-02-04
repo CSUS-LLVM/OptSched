@@ -381,8 +381,12 @@ FUNC_RESULT SchedRegion::FindOptimalSchedule(
   // Step #2: Use ACO to find a schedule if enabled and no optimal schedule is
   // yet to be found.
   // check if region is of appropriate size to execute ACO on
-  //if (AcoBeforeEnum && dataDepGraph_->GetInstCnt() > 100)
-    //AcoBeforeEnum = false;
+/*
+  if (AcoBeforeEnum && dataDepGraph_->GetInstCnt() < 20) {
+    Logger::Info("Skipping ACO on small region (under 20)");
+    AcoBeforeEnum = false;
+  }
+*/
   if (AcoBeforeEnum && !isLstOptml) {
     AcoStart = Utilities::GetProcessorTime();
     AcoSchedule = new InstSchedule(machMdl_, dataDepGraph_, vrfySched_);
@@ -953,8 +957,8 @@ void SchedRegion::RegAlloc_(InstSchedule *&bestSched, InstSchedule *&lstSched) {
 void SchedRegion::InitSecondPass() { isSecondPass_ = true; }
 
 __global__
-void InitCurand(curandState_t *dev_states, unsigned long seed) {
-  curand_init(seed, GLOBALTID, 0, &dev_states[GLOBALTID]);
+void InitCurand(curandState_t *dev_states, unsigned long seed, int instCnt) {
+  curand_init(seed, NUMTHREADS * GLOBALTID, GLOBALTID * instCnt * 2, &dev_states[GLOBALTID]);
 }
 
 FUNC_RESULT SchedRegion::runACO(InstSchedule *ReturnSched,
@@ -1020,44 +1024,14 @@ FUNC_RESULT SchedRegion::runACO(InstSchedule *ReturnSched,
       ready[i].elmnts_ = NULL;
     // delete host copy
     delete[] ready;
-
-/*  old method
-    // Create and copy an array of DeviceVector<Choice>* for use during scheduling
-    Logger::Info("Creating and Copying ready arrays to device");
-    DeviceVector<Choice> **host_ready = new DeviceVector<Choice> *[NUMTHREADS];
-    Choice *dev_elmnts;
-    DeviceVector<Choice> *ready = 
-            new DeviceVector<Choice>(dataDepGraph_->GetInstCnt());
-    //memSize = sizeof(DeviceVector<Choice>);
-    for (int i = 0; i < NUMTHREADS; i++) {
-      memSize = sizeof(DeviceVector<Choice>);
-      gpuErrchk(cudaMallocManaged(&host_ready[i], memSize));
-      gpuErrchk(cudaMemcpy(host_ready[i], ready, memSize, 
-                           cudaMemcpyHostToDevice));
-      //copy ready->elmnts_ and link to dev_ready'
-      memSize = sizeof(Choice) * dataDepGraph_->GetInstCnt();
-      gpuErrchk(cudaMalloc(&dev_elmnts, memSize));
-      gpuErrchk(cudaMemcpy(dev_elmnts, ready->elmnts_, memSize,
-                           cudaMemcpyHostToDevice));
-      host_ready[i]->elmnts_ = dev_elmnts;
-      memSize = sizeof(DeviceVector<Choice>);
-      gpuErrchk(cudaMemPrefetchAsync(host_ready[i], memSize, 0));
-    }
-    delete ready;
-    // copy array of device pointers to device
-    DeviceVector<Choice> **dev_ready;
-    memSize = sizeof(DeviceVector<Choice> *) * NUMTHREADS;
-    gpuErrchk(cudaMalloc(&dev_ready, memSize));
-    gpuErrchk(cudaMemcpy(dev_ready, host_ready, memSize, cudaMemcpyHostToDevice));
-*/
-
     // Allocate dev_states for curand RNG and run curand_init() to initialize
     Logger::Info("Initializing states for cuRand");
     curandState_t *dev_states;
     memSize = sizeof(curandState_t) * NUMTHREADS;
     gpuErrchk(cudaMalloc(&dev_states, memSize));
     InitCurand<<<NUMBLOCKS, NUMTHREADSPERBLOCK>>>(dev_states, 
-                                                  unsigned(time(NULL)));
+                                                  unsigned(time(NULL)),
+                                                  dataDepGraph_->GetInstCnt());
     //cudaDeviceSynchronize();
     Logger::Info("Creating ACOScheduler");
     ACOScheduler *AcoSchdulr = new ACOScheduler(
@@ -1080,22 +1054,13 @@ FUNC_RESULT SchedRegion::runACO(InstSchedule *ReturnSched,
     gpuErrchk(cudaMemPrefetchAsync(dev_DDG, memSize, 0));
     memSize = sizeof(BBWithSpill);
     gpuErrchk(cudaMemPrefetchAsync(dev_rgn, memSize, 0));
-    //memSize = sizeof(ACOScheduler);
-    //gpuErrchk(cudaMemPrefetchAsync(dev_AcoSchdulr, memSize, 0));
 
     Rslt = AcoSchdulr->FindSchedule(ReturnSched, this, dev_AcoSchdulr);
     dev_AcoSchdulr->FreeDevicePointers();
     cudaFree(dev_AcoSchdulr);
     delete AcoSchdulr;
-/*
-    for (int i = 0; i < NUMTHREADS; i++) {
-      cudaFree(host_ready[i]->elmnts_);
-      cudaFree(host_ready[i]);
-    }
-*/
     cudaFree(dev_ready[0].elmnts_);
     cudaFree(dev_ready);
-    //delete[] host_ready;
     dev_rgn->FreeDevicePointers(NUMTHREADS);
     cudaFree(dev_rgn);
     dev_DDG->FreeDevicePointers(NUMTHREADS);

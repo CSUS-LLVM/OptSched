@@ -112,41 +112,21 @@ double ACOScheduler::Score(SchedInstruction *from, Choice choice) {
 __host__ __device__
 SchedInstruction *
 ACOScheduler::SelectInstruction(DeviceVector<Choice> &ready,
-                                SchedInstruction *lastInst,
-                                pheremone_t *s_pheremone) {
+                                SchedInstruction *lastInst) {
   double rand;
 #ifdef __CUDA_ARCH__
   rand = curand_uniform(&dev_states_[GLOBALTID]);
 #else
   rand = RandDouble(0, 1); 
 #endif
-#if USE_ACS
   double choose_best_chance;
+  pheremone_t max = -1;
+  Choice maxChoice;
   if (use_fixed_bias) {
-/*
-    if (0 > 1 - (double)fixed_bias / count_)
-      choose_best_chance = 0;
-    else
-      choose_best_chance = 1 - (double)fixed_bias / count_;
-*/
     choose_best_chance = (1 - (double)fixed_bias / count_) * (0 < 1 - (double)fixed_bias / count_);
   } else
     choose_best_chance = bias_ratio;
-
-  if (rand < choose_best_chance) {
-    if (print_aco_trace)
-      printf("choose_best, use fixed bias: %d\n", use_fixed_bias);
-    pheremone_t max = -1;
-    Choice maxChoice;
-    for (auto choice : ready) {
-      if (Score(lastInst, choice) > max) {
-        max = Score(lastInst, choice);
-        maxChoice = choice;
-      }
-    }
-    return maxChoice.inst;
-  }
-#endif
+/* currently not used
   if (use_tournament) {
     int POPULATION_SIZE = ready.size();
 #ifdef __CUDA_ARCH__
@@ -172,27 +152,27 @@ ACOScheduler::SelectInstruction(DeviceVector<Choice> &ready,
     else
       return s.inst;
   }
+*/
   pheremone_t sum = 0;
   int fromInstNum = -1;
   if (lastInst != NULL)
     fromInstNum = lastInst->GetNum();
-  for (auto choice : ready)
-//#ifndef __CUDA_ARCH__
+  for (auto choice : ready) {
     sum += Score(lastInst, choice);
-//#else
-    //sum += s_pheremone[((fromInstNum + 1) * count_) + choice.inst->GetNum()] * pow(choice.heuristic, heuristicImportance_);
-//#endif
+    if (Score(lastInst, choice) > max) {
+      max = Score(lastInst, choice);
+      maxChoice = choice;
+    }
+  }
+  if (rand < choose_best_chance)
+    return maxChoice.inst;
 #ifdef __CUDA_ARCH__
-  pheremone_t point = sum * rand;
+  pheremone_t point = sum * curand_uniform(&dev_states_[GLOBALTID]);
 #else
   pheremone_t point = RandDouble(0, sum);
 #endif
   for (auto choice : ready) {
-//#ifndef __CUDA_ARCH__
     point -= Score(lastInst, choice);
-//#else
-    //point -= s_pheremone[((fromInstNum + 1) * count_) + choice.inst->GetNum()] * pow(choice.heuristic, heuristicImportance_);
-//#endif
     if (point <= 0)
       return choice.inst;
   }
@@ -207,8 +187,7 @@ ACOScheduler::SelectInstruction(DeviceVector<Choice> &ready,
 
 __host__ __device__
 InstSchedule *ACOScheduler::FindOneSchedule(InstSchedule *dev_schedule, 
-		                            DeviceVector<Choice> *dev_ready,
-                                            pheremone_t *s_pheremone) {
+		                            DeviceVector<Choice> *dev_ready) {
 #ifdef __CUDA_ARCH__ // device version of function
   SchedInstruction *lastInst = NULL;
   InstSchedule *schedule;
@@ -246,7 +225,7 @@ InstSchedule *ACOScheduler::FindOneSchedule(InstSchedule *dev_schedule,
     dev_rdyLst_->ResetIterator();
     inst = NULL;
     if (!ready->empty())
-      inst = SelectInstruction(*ready, lastInst, s_pheremone);
+      inst = SelectInstruction(*ready, lastInst);
 /*
       if (returnLastInstCnt_ > 0) {
 	if (GLOBALTID == 0) {
@@ -378,17 +357,13 @@ InstSchedule *ACOScheduler::FindOneSchedule(InstSchedule *dev_schedule,
 
 __device__ int dev_noImprovement = 0; // how many iterations with no improvement
 __device__ int dev_doneBlockCnt = 0;
-__device__ int mutex = 0;
+__device__ int mutex = 0, globalBestIndex;
 
 __global__
 void Dev_ACO(SchedRegion *dev_rgn, DataDepGraph *dev_DDG,
             ACOScheduler *dev_AcoSchdulr, InstSchedule **dev_schedules,
             DeviceVector<Choice> *dev_ready, InstSchedule *dev_bestSched,
             int noImprovementMax) {
-  // Allocate shared memory for the pheremone table to be stored
-  //extern __shared__ double s_pheremones[];
-  // Copy pheremone table to shared memory 
-  //dev_AcoSchdulr->CopyPheremonesToSharedMem((double *)&s_pheremones);
   // holds cost and index of bestSched per block
   __shared__ int bestCost, bestIndex;
   dev_rgn->SetDepGraph(dev_DDG);
@@ -404,8 +379,43 @@ void Dev_ACO(SchedRegion *dev_rgn, DataDepGraph *dev_DDG,
     // Reset schedules to post constructor state
     dev_schedules[GLOBALTID]->Initialize();
     dev_AcoSchdulr->FindOneSchedule(dev_schedules[GLOBALTID],
-                                    &dev_ready[GLOBALTID]//,
-                                    /*(double *)&s_pheremones*/);
+                                    &dev_ready[GLOBALTID]);
+
+    // 1 iteration best per iteration code
+    // make sure all threads have constructed schedules, then pick 1 iteration
+    // best schedule for pheremone update
+    __syncthreads();
+    if (threadIdx.x == 0) {
+      atomicAdd(&dev_doneBlockCnt, 1);
+      while (dev_doneBlockCnt < NUMBLOCKS);
+    }
+    //__syncthreads();
+    if (GLOBALTID == 0) {
+      bestCost = dev_schedules[0]->GetCost();
+      bestIndex = 0;
+      for (int i = 1; i < NUMTHREADS; i++) {
+        if (dev_schedules[i]->GetCost() == -1)
+          printf("thread %d of block %d found thread %d made invalid sched\n",
+                 GLOBALTID, blockIdx.x, i);
+        if (dev_schedules[i]->GetCost() < bestCost && dev_schedules[i]->GetCost() != -1) {
+          bestCost = dev_schedules[i]->GetCost();
+          bestIndex = i;
+          // debug
+          //printf("Block %d has set bestIndex to %d with bestCost %d\n", blockIdx.x, i, bestCost);
+        }
+      }
+      globalBestIndex = bestIndex;
+    }
+    // Another hard sync point after iteration best selection
+    __syncthreads();
+    if (threadIdx.x == 0) {
+      atomicAdd(&dev_doneBlockCnt, 1);
+      while (dev_doneBlockCnt < NUMBLOCKS);
+    }
+    //if (blockIdx.x == 0)
+    dev_AcoSchdulr->UpdatePheremone(dev_schedules[globalBestIndex]);
+/*
+    // 1 iteration best per block code
     // Make sure all threads in block have constructed schedules
     __syncthreads();
     // 1 thread per block finds blockIterationBest, updates pheremones, and 
@@ -431,11 +441,24 @@ void Dev_ACO(SchedRegion *dev_rgn, DataDepGraph *dev_DDG,
     __syncthreads();
     // debug
     //printf("Thread %d has bestIndex = %d and bestCost = %d\n", GLOBALTID, bestIndex, bestCost);
-    dev_AcoSchdulr->UpdatePheremone(dev_schedules[bestIndex]/*, (double *)&s_pheremones*/);
+    // Update pheremones with block iteration best
+    //dev_AcoSchdulr->UpdatePheremone(dev_schedules[bestIndex]);
+*/
+/*
+    // Update pheremones with ALL schedules
+    int startingIndex = blockIdx.x * NUMTHREADSPERBLOCK;
+    for (int i = startingIndex; i < startingIndex + NUMTHREADSPERBLOCK; i++) {
+      dev_AcoSchdulr->UpdatePheremone(dev_schedules[i]);
+      __syncthreads();
+    }
+*/
     // 1 thread per block compares block iteration best to overall bestsched
     if (threadIdx.x == 0) {
       // Compare to initialSched/current best
-      if (bestCost < dev_bestSched->GetCost()) {
+      if (blockIdx.x == 0 && bestCost < dev_bestSched->GetCost()) {
+        //debug
+        printf("Thread %d is comparing iteration best to global best\n", GLOBALTID);
+
         // mutex lock updating best sched so multiple blocks dont write
         // at the same time
         while(atomicCAS(&mutex, 0, 1) != 0);
@@ -443,15 +466,16 @@ void Dev_ACO(SchedRegion *dev_rgn, DataDepGraph *dev_DDG,
         // since another block could have lowered cost of best sched
         if (bestCost < dev_bestSched->GetCost()) {
           dev_bestSched->Copy(dev_schedules[bestIndex]);
+          printf("New best sched found by thread %d\n", bestIndex);
           printf("ACO found schedule "
                  "cost:%d, rp cost:%d, sched length: %d, and "
                  "iteration:%d\n",
                dev_bestSched->GetCost(), dev_bestSched->GetSpillCost(),
                dev_bestSched->GetCrntLngth(), dev_iterations);
-          //dev_noImprovement = 0;
+          dev_noImprovement = 0;
           // for testing compile times disable resetting dev_noImprovement to
           // allow the same number of iterations every time
-          atomicAdd(&dev_noImprovement, 1);
+          //atomicAdd(&dev_noImprovement, 1);
         } else
           atomicAdd(&dev_noImprovement, 1);
         // unlock mutex 
@@ -462,8 +486,9 @@ void Dev_ACO(SchedRegion *dev_rgn, DataDepGraph *dev_DDG,
           break;
       }
       // wait for other blocks to finish before starting next iteration
+      // multiplied by number of sync points (currently 3)
       atomicAdd(&dev_doneBlockCnt, 1);
-      while (dev_doneBlockCnt < NUMBLOCKS);
+      while (dev_doneBlockCnt < NUMBLOCKS * 3);
       // if dev_noImprovement is not a multiple of NUMBLOCKS after blocks finish
       // current iteration, that means a block has found a new bestSched
       // and reset dev_noImprovement, and other blocks have increased
@@ -508,7 +533,7 @@ FUNC_RESULT ACOScheduler::FindSchedule(InstSchedule *schedule_out,
   }
   int noImprovement = 0; // how many iterations with no improvement
   int iterations = 0;
-  InstSchedule *iterationBest;
+  InstSchedule *iterationBest = nullptr;
   
   if (DEV_ACO) { // Run ACO on device
     size_t memSize;
@@ -577,6 +602,9 @@ FUNC_RESULT ACOScheduler::FindSchedule(InstSchedule *schedule_out,
     delete[] schedules;
 
     } else { // Run ACO on cpu
+      Logger::Info("Running host ACO with %d ants per iteration", NUMTHREADS);
+      // change seed on host
+      RandomGen::SetSeed(int32_t(time(NULL)));
       while (true) {
         for (int i = 0; i < NUMTHREADS; i++) {
           InstSchedule *schedule = FindOneSchedule();
@@ -584,8 +612,10 @@ FUNC_RESULT ACOScheduler::FindSchedule(InstSchedule *schedule_out,
             PrintSchedule(schedule);
           if (iterationBest == nullptr ||
               schedule->GetCost() < iterationBest->GetCost()) {
-            if (iterationBest && iterationBest != InitialSchedule)
+            if (iterationBest && iterationBest != InitialSchedule) {
+              //Logger::Info("Deleting iterationBest");
               delete iterationBest;
+            }
             iterationBest = schedule;
           } else {
             delete schedule;
@@ -597,8 +627,12 @@ FUNC_RESULT ACOScheduler::FindSchedule(InstSchedule *schedule_out,
         //PrintSchedule(iterationBest); 
         if (bestSchedule == nullptr ||
             iterationBest->GetCost() < bestSchedule->GetCost()) {
-          if (bestSchedule && bestSchedule != InitialSchedule)
+/*        TODO: Why does this crash in gromacs block #7?
+          if (bestSchedule && bestSchedule != InitialSchedule) {
+            Logger::Info("Deleting bestSchedule");
             delete bestSchedule;
+          }
+*/
           bestSchedule = std::move(iterationBest);
           //printf("ACO found schedule with spill cost %d\n",
                  //bestSchedule->GetCost());
@@ -608,8 +642,8 @@ FUNC_RESULT ACOScheduler::FindSchedule(InstSchedule *schedule_out,
                  bestSchedule->GetCost(), bestSchedule->GetSpillCost(),
                  bestSchedule->GetCrntLngth(), iterations);
           // disable resetting no improvement for runtime tests
-          //noImprovement = 0;
-          noImprovement++;
+          noImprovement = 0;
+          //noImprovement++;
         } else {
           noImprovement++;
           if (noImprovement > noImprovementMax)
@@ -633,14 +667,13 @@ FUNC_RESULT ACOScheduler::FindSchedule(InstSchedule *schedule_out,
 }
 
 __host__ __device__
-void ACOScheduler::UpdatePheremone(InstSchedule *schedule,
-                                  pheremone_t *s_pheremone) {
+void ACOScheduler::UpdatePheremone(InstSchedule *schedule) {
 #ifdef __CUDA_ARCH__ // device version of function
-  // parallel on a block level, use threadIdx.x instead of GLOBALTID
-  int instNum = threadIdx.x;
+  // parallel on global level
+  int instNum = GLOBALTID;
   // Each thread updates pheremone table for 1 instruction
-  // For the case NUMTHREADSPERBLOCK < count_, increase instNum by 
-  // NUMTHREADSPERBLOCK at the end of the loop.
+  // For the case NUMTHREADS < count_, increase instNum by 
+  // NUMTHREADS at the end of the loop.
   InstCount lastInstNum = -1;
   pheremone_t *pheremone;
   while (instNum < count_) {
@@ -651,18 +684,14 @@ void ACOScheduler::UpdatePheremone(InstSchedule *schedule,
     lastInstNum = schedule->GetPrevInstNum(instNum);
     // Get corresponding pheremone and update it
     pheremone = &Pheremone(lastInstNum, instNum);
-    // Use shared memory pheremones
-    //pheremone = &s_pheremone[((lastInstNum + 1) * count_) + instNum];
     *pheremone = *pheremone + 1 / (schedule->GetCost() + 1);
     // decay pheremone for all trails leading to instNum
     for (int j = 0; j < count_; j++) {
       Pheremone(j, instNum) *= (1 - decay_factor);
-      // use share memory pheremones
-      //s_pheremone[((j + 1) * count_) + instNum] *= (1-decay_factor);
     }
     // Increase instNum by NUMTHREADSPERBLOCK in case there are less threads
     // per block than instruction in the region
-    instNum += NUMTHREADSPERBLOCK;
+    instNum += NUMTHREADS;
   }
   if (print_aco_trace)
     PrintPheremone();
