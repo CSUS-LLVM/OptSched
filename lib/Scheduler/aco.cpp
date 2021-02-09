@@ -235,11 +235,15 @@ InstSchedule *ACOScheduler::FindOneSchedule(InstSchedule *dev_schedule,
       }
 */
     if (inst != NULL) {
-#ifdef USE_ACS
+
+#if USE_ACS
+      // debug
+      printf("Inside USE_ACS macro, USE_ACS = %d\n", USE_ACS);
       // local pheremone decay
       pheremone_t *pheremone = &Pheremone(lastInst, inst);
       *pheremone = (1 - local_decay) * *pheremone + local_decay * initialValue_;
 #endif
+
       lastInst = inst;
     }
 
@@ -316,7 +320,7 @@ InstSchedule *ACOScheduler::FindOneSchedule(InstSchedule *dev_schedule,
     if (!ready->empty())
       inst = SelectInstruction(*ready, lastInst);
     if (inst != NULL) {
-#ifdef USE_ACS
+#if USE_ACS
       // local pheremone decay
       pheremone_t *pheremone = &Pheremone(lastInst, inst);
       *pheremone = (1 - local_decay) * *pheremone + local_decay * initialValue_;
@@ -412,52 +416,13 @@ void Dev_ACO(SchedRegion *dev_rgn, DataDepGraph *dev_DDG,
       atomicAdd(&dev_doneBlockCnt, 1);
       while (dev_doneBlockCnt < NUMBLOCKS);
     }
-    //if (blockIdx.x == 0)
     dev_AcoSchdulr->UpdatePheremone(dev_schedules[globalBestIndex]);
-/*
-    // 1 iteration best per block code
-    // Make sure all threads in block have constructed schedules
-    __syncthreads();
-    // 1 thread per block finds blockIterationBest, updates pheremones, and 
-    // compares blockIterationBest to dev_bestSched
-    if (threadIdx.x == 0) { // only thread 0 of each block enters this branch
-      // iterate over all schedules created by this thread block
-      bestCost = dev_schedules[GLOBALTID]->GetCost();
-      bestIndex = GLOBALTID;
-      for (int i = GLOBALTID + 1; i < GLOBALTID + NUMTHREADSPERBLOCK; i++) {
-        if (dev_schedules[i]->GetCost() == -1)
-          printf("thread %d of block %d found thread %d made invalid sched\n",
-                 GLOBALTID, blockIdx.x, i);
-        if (dev_schedules[i]->GetCost() < bestCost) {
-          bestCost = dev_schedules[i]->GetCost();
-          bestIndex = i;
-          // debug
-          //printf("Block %d has set bestIndex to %d with bestCost %d\n", blockIdx.x, i, bestCost);
-        }
-      }
-    }
-    // make sure thread 0 has picked best sched for the block before
-    // updating pheremones
-    __syncthreads();
-    // debug
-    //printf("Thread %d has bestIndex = %d and bestCost = %d\n", GLOBALTID, bestIndex, bestCost);
-    // Update pheremones with block iteration best
-    //dev_AcoSchdulr->UpdatePheremone(dev_schedules[bestIndex]);
-*/
-/*
-    // Update pheremones with ALL schedules
-    int startingIndex = blockIdx.x * NUMTHREADSPERBLOCK;
-    for (int i = startingIndex; i < startingIndex + NUMTHREADSPERBLOCK; i++) {
-      dev_AcoSchdulr->UpdatePheremone(dev_schedules[i]);
-      __syncthreads();
-    }
-*/
-    // 1 thread per block compares block iteration best to overall bestsched
+    // 1 thread compares iteration best to overall bestsched
     if (threadIdx.x == 0) {
       // Compare to initialSched/current best
       if (blockIdx.x == 0 && bestCost < dev_bestSched->GetCost()) {
         //debug
-        printf("Thread %d is comparing iteration best to global best\n", GLOBALTID);
+        //printf("Thread %d is comparing iteration best to global best\n", GLOBALTID);
 
         // mutex lock updating best sched so multiple blocks dont write
         // at the same time
@@ -472,10 +437,13 @@ void Dev_ACO(SchedRegion *dev_rgn, DataDepGraph *dev_DDG,
                  "iteration:%d\n",
                dev_bestSched->GetCost(), dev_bestSched->GetSpillCost(),
                dev_bestSched->GetCrntLngth(), dev_iterations);
-          dev_noImprovement = 0;
-          // for testing compile times disable resetting dev_noImprovement to
-          // allow the same number of iterations every time
-          //atomicAdd(&dev_noImprovement, 1);
+#if !RUNTIME_TESTING
+            dev_noImprovement = 0;
+#else
+            // for testing compile times disable resetting dev_noImprovement to
+            // allow the same number of iterations every time
+            atomicAdd(&dev_noImprovement, 1);
+#endif     
         } else
           atomicAdd(&dev_noImprovement, 1);
         // unlock mutex 
@@ -641,9 +609,12 @@ FUNC_RESULT ACOScheduler::FindSchedule(InstSchedule *schedule_out,
                  "iteration:%d\n",
                  bestSchedule->GetCost(), bestSchedule->GetSpillCost(),
                  bestSchedule->GetCrntLngth(), iterations);
-          // disable resetting no improvement for runtime tests
-          noImprovement = 0;
-          //noImprovement++;
+#if !RUNTIME_TESTING
+            noImprovement = 0;
+#else
+            // Disable resetting noImp to lock iterations to 10
+            noImprovement++;
+#endif
         } else {
           noImprovement++;
           if (noImprovement > noImprovementMax)

@@ -381,12 +381,12 @@ FUNC_RESULT SchedRegion::FindOptimalSchedule(
   // Step #2: Use ACO to find a schedule if enabled and no optimal schedule is
   // yet to be found.
   // check if region is of appropriate size to execute ACO on
-/*
-  if (AcoBeforeEnum && dataDepGraph_->GetInstCnt() < 20) {
-    Logger::Info("Skipping ACO on small region (under 20)");
+  if (AcoBeforeEnum && REGION_MIN_SIZE > 0 && 
+      dataDepGraph_->GetInstCnt() < REGION_MIN_SIZE) {
+    Logger::Info("Skipping ACO on small region (under %d)", REGION_MIN_SIZE);
     AcoBeforeEnum = false;
   }
-*/
+
   if (AcoBeforeEnum && !isLstOptml) {
     AcoStart = Utilities::GetProcessorTime();
     AcoSchedule = new InstSchedule(machMdl_, dataDepGraph_, vrfySched_);
