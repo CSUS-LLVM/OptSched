@@ -53,10 +53,14 @@ static void UpdateRecursiveNeighbors(SchedInstruction *A, SchedInstruction *B) {
   }
 }
 
-void llvm::opt_sched::addSuperiorEdge(DataDepGraph &DDG, SchedInstruction *A,
-                                      SchedInstruction *B, int latency) {
-  DDG.CreateEdge(A, B, latency, DEP_OTHER);
+GraphEdge *llvm::opt_sched::addSuperiorEdge(DataDepGraph &DDG,
+                                            SchedInstruction *A,
+                                            SchedInstruction *B, int latency) {
+  GraphEdge *e = DDG.CreateEdge(A, B, latency, DEP_OTHER);
+  e->IsArtificial = true;
   UpdateRecursiveNeighbors(A, B);
+
+  return e;
 }
 
 GraphTrans::GraphTrans(DataDepGraph *dataDepGraph) {

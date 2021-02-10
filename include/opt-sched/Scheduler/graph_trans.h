@@ -24,8 +24,8 @@ bool areNodesIndependent(const SchedInstruction *A, const SchedInstruction *B);
 
 // Adds an edge (A --> B) to the graph, updating recursive neighbors.
 // The type of the added edge is OTHER.
-void addSuperiorEdge(DataDepGraph &DDG, SchedInstruction *A,
-                     SchedInstruction *B, int latency = 0);
+GraphEdge *addSuperiorEdge(DataDepGraph &DDG, SchedInstruction *A,
+                           SchedInstruction *B, int latency = 0);
 
 // An abstract graph transformation class.
 class GraphTrans {
