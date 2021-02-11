@@ -958,7 +958,7 @@ void SchedRegion::InitSecondPass() { isSecondPass_ = true; }
 
 __global__
 void InitCurand(curandState_t *dev_states, unsigned long seed, int instCnt) {
-  curand_init(seed, NUMTHREADS * GLOBALTID, GLOBALTID * instCnt * 2, &dev_states[GLOBALTID]);
+  curand_init(seed * GLOBALTID, 0, 0, &dev_states[GLOBALTID]);
 }
 
 FUNC_RESULT SchedRegion::runACO(InstSchedule *ReturnSched,

@@ -227,6 +227,7 @@ InstSchedule *ACOScheduler::FindOneSchedule(InstSchedule *dev_schedule,
     if (!ready->empty())
       inst = SelectInstruction(*ready, lastInst);
 /*
+      // Keeps track of the amount of threads returning last instruction
       if (returnLastInstCnt_ > 0) {
 	if (GLOBALTID == 0) {
 	  printf("%d threads returned last instruction\n", returnLastInstCnt_);
@@ -237,8 +238,6 @@ InstSchedule *ACOScheduler::FindOneSchedule(InstSchedule *dev_schedule,
     if (inst != NULL) {
 
 #if USE_ACS
-      // debug
-      printf("Inside USE_ACS macro, USE_ACS = %d\n", USE_ACS);
       // local pheremone decay
       pheremone_t *pheremone = &Pheremone(lastInst, inst);
       *pheremone = (1 - local_decay) * *pheremone + local_decay * initialValue_;
@@ -490,7 +489,7 @@ FUNC_RESULT ACOScheduler::FindSchedule(InstSchedule *schedule_out,
 #if USE_ACS
   initialValue_ = 2.0 / ((double)count_ * heuristicCost);
 #else
-  initialValue_ = (double)ants_per_iteration / heuristicCost;
+  initialValue_ = (double)NUMTHREADS / heuristicCost;
 #endif
   for (int i = 0; i < pheremone_size; i++)
     pheremone_[i] = initialValue_;
@@ -572,7 +571,7 @@ FUNC_RESULT ACOScheduler::FindSchedule(InstSchedule *schedule_out,
     } else { // Run ACO on cpu
       Logger::Info("Running host ACO with %d ants per iteration", NUMTHREADS);
       // change seed on host
-      RandomGen::SetSeed(int32_t(time(NULL)));
+      //RandomGen::SetSeed(int32_t(time(NULL)));
       while (true) {
         for (int i = 0; i < NUMTHREADS; i++) {
           InstSchedule *schedule = FindOneSchedule();

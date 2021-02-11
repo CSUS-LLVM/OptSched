@@ -423,6 +423,9 @@ InstCount BBWithSpill::CmputNormCost_(InstSchedule *sched,
                                       InstCount &execCost, bool trackCnflcts) {
   InstCount cost = CmputCost_(sched, compMode, execCost, trackCnflcts);
 
+  // debug
+  //Logger::Info("Cost = %d - CostLwrBound = %d", cost, GetCostLwrBound());
+
   cost -= GetCostLwrBound();
   execCost -= GetCostLwrBound();
 
@@ -471,16 +474,18 @@ InstCount BBWithSpill::CmputCost_(InstSchedule *sched, COST_COMP_MODE compMode,
 __device__
 InstCount BBWithSpill::Dev_CmputCost_(InstSchedule *sched, COST_COMP_MODE compMode,
                                   InstCount &execCost, bool trackCnflcts) {
-/* device is only called with CCM_DYNMC
   if (compMode == CCM_STTC) {
+    //printf("Device called with CCM_STTC\n");
+/*
     if (GetSpillCostFunc() == SCF_SPILLS) {
       LocalRegAlloc regAlloc(sched, dataDepGraph_);
       regAlloc.SetupForRegAlloc();
       regAlloc.AllocRegs();
       crntSpillCost_ = regAlloc.GetCost();
     }
-  }
 */
+  }
+
   assert(sched->IsComplete());
   InstCount cost = sched->GetCrntLngth() * schedCostFactor_;
   execCost = cost;
@@ -667,7 +672,7 @@ void BBWithSpill::UpdateSpillInfoForSchdul_(SchedInstruction *inst,
         }
       }
     }
-
+/*
     // FIXME: Can this be taken out of this loop?
     if (GetSpillCostFunc() == SCF_SLIL) {
       accumulator = 0;
@@ -675,6 +680,14 @@ void BBWithSpill::UpdateSpillInfoForSchdul_(SchedInstruction *inst,
         accumulator += dev_sumOfLiveIntervalLengths_[GLOBALTID][x];
       dev_slilSpillCost_[GLOBALTID] = accumulator;
     }
+*/
+  }
+  // FIXME: Can this be taken out of this loop?
+  if (GetSpillCostFunc() == SCF_SLIL) {
+    accumulator = 0;
+    for (int x = 0; x < regTypeCnt_; x++)
+      accumulator += dev_sumOfLiveIntervalLengths_[GLOBALTID][x];
+    dev_slilSpillCost_[GLOBALTID] = accumulator;
   }
 
   if (GetSpillCostFunc() == SCF_TARGET) {
@@ -852,7 +865,7 @@ void BBWithSpill::UpdateSpillInfoForSchdul_(SchedInstruction *inst,
         }
       }
     }
-
+/*
     // FIXME: Can this be taken out of this loop?
     if (GetSpillCostFunc() == SCF_SLIL) {
       accumulator = 0;
@@ -860,6 +873,15 @@ void BBWithSpill::UpdateSpillInfoForSchdul_(SchedInstruction *inst,
         accumulator += sumOfLiveIntervalLengths_[x];
       slilSpillCost_ = accumulator;
     }
+*/
+  }
+  
+  // FIXME: Can this be taken out of this loop?
+  if (GetSpillCostFunc() == SCF_SLIL) {
+    accumulator = 0;
+    for (int x = 0; x < regTypeCnt_; x++)
+      accumulator += sumOfLiveIntervalLengths_[x];
+    slilSpillCost_ = accumulator;
   }
 
   if (GetSpillCostFunc() == SCF_TARGET) {

@@ -485,7 +485,7 @@ void GraphNode::CopyPointersToDevice(GraphNode *dev_node, GraphNode **dev_nodes,
   unsigned long *dev_vctr;
   if (isRcrsvScsr_) {
     memSize = sizeof(BitVector);
-    gpuErrchk(cudaMalloc(&dev_isRcrsvScsr, memSize));
+    gpuErrchk(cudaMallocManaged(&dev_isRcrsvScsr, memSize));
     gpuErrchk(cudaMemcpy(dev_isRcrsvScsr, isRcrsvScsr_, memSize,
 		         cudaMemcpyHostToDevice));
     gpuErrchk(cudaMemcpy(&dev_node->isRcrsvScsr_, &dev_isRcrsvScsr,
@@ -504,7 +504,7 @@ void GraphNode::CopyPointersToDevice(GraphNode *dev_node, GraphNode **dev_nodes,
   BitVector *dev_isRcrsvPrdcsr;
   if (isRcrsvPrdcsr_) {
     memSize = sizeof(BitVector);
-    gpuErrchk(cudaMalloc(&dev_isRcrsvPrdcsr, memSize));
+    gpuErrchk(cudaMallocManaged(&dev_isRcrsvPrdcsr, memSize));
     gpuErrchk(cudaMemcpy(dev_isRcrsvPrdcsr, isRcrsvPrdcsr_, memSize,
                          cudaMemcpyHostToDevice));
     gpuErrchk(cudaMemcpy(&dev_node->isRcrsvPrdcsr_, &dev_isRcrsvPrdcsr,

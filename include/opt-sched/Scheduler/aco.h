@@ -22,11 +22,11 @@ namespace opt_sched {
 typedef double pheremone_t;
 
 // If set to 1 ACO is run on device
-#define DEV_ACO 0
+#define DEV_ACO 1
 // setting to 1 locks ACO to 10 iterations
 #define RUNTIME_TESTING 0
 #define REGION_MIN_SIZE 200
-#define NUMBLOCKS 20
+#define NUMBLOCKS 80
 #define NUMTHREADSPERBLOCK 128
 #define NUMTHREADS NUMBLOCKS * NUMTHREADSPERBLOCK
 

@@ -25,22 +25,8 @@ static uint32_t Z[] = {
 
 // The current generator state. Magical starting values.
 static long j = 23;
-__device__ static long dev_j = 23;
 static long k = 54;
-__device__ static long dev_k = 54;
 static uint32_t y[] = {
-    0x8ca0df45, 0x37334f23, 0x4a5901d2, 0xaeede075, 0xd84bd3cf, 0xa1ce3350,
-    0x35074a8f, 0xfd4e6da0, 0xe2c22e6f, 0x045de97e, 0x0e6d45b9, 0x201624a2,
-    0x01e10dca, 0x2810aef2, 0xea0be721, 0x3a3781e4, 0xa3602009, 0xd2ffcf69,
-    0xff7102e9, 0x36fab972, 0x5c3650ff, 0x8cd44c9c, 0x25a4a676, 0xbd6385ce,
-    0xcd55c306, 0xec8a31f5, 0xa87b24ce, 0x1e025786, 0x53d713c9, 0xb29d308f,
-    0x0dc6cf3f, 0xf11139c9, 0x3afb3780, 0x0ed6b24c, 0xef04c8fe, 0xab53d825,
-    0x3ca69893, 0x35460fb1, 0x058ead73, 0x0b567c59, 0xfdddca3f, 0x6317e77d,
-    0xaa5febe5, 0x655f73e2, 0xd42455bb, 0xe845a8bb, 0x351e4a67, 0xa36a9dfb,
-    0x3e0ac91d, 0xbaa0de01, 0xec60dc66, 0xdb29309e, 0xcfa52971, 0x1f3eddaf,
-    0xe14aae61,
-};
-__device__ static uint32_t dev_y[] = { 
     0x8ca0df45, 0x37334f23, 0x4a5901d2, 0xaeede075, 0xd84bd3cf, 0xa1ce3350,
     0x35074a8f, 0xfd4e6da0, 0xe2c22e6f, 0x045de97e, 0x0e6d45b9, 0x201624a2,
     0x01e10dca, 0x2810aef2, 0xea0be721, 0x3a3781e4, 0xa3602009, 0xd2ffcf69,
@@ -55,7 +41,6 @@ __device__ static uint32_t dev_y[] = {
 
 // The last random number.
 static uint32_t randNum;
-__device__ static uint32_t dev_randNum;
 
 void GenerateNextNumber() {
   randNum = y[j] + y[k];
@@ -65,17 +50,6 @@ void GenerateNextNumber() {
   if (--k < 0)
     k = 54;
   randNum &= 0x7fffffff;
-}
-
-__device__
-void Dev_GenerateNextNumber() {
-  dev_randNum = dev_y[dev_j] + dev_y[dev_k];
-  dev_y[dev_k] = dev_randNum;
-  if (--dev_j < 0)
-    dev_j = 54;
-  if (--dev_k < 0)
-    dev_k = 54;
-  dev_randNum &= 0x7fffffff;
 }
 
 void RandomGen::SetSeed(int32_t iseed) {
@@ -102,12 +76,6 @@ uint32_t RandomGen::GetRand32WithinRange(uint32_t min, uint32_t max) {
 uint32_t RandomGen::GetRand32() {
   GenerateNextNumber();
   return randNum;
-}
-
-__device__
-uint32_t RandomGen::Dev_GetRand32() {
-  Dev_GenerateNextNumber();
-  return dev_randNum;
 }
 
 uint64_t RandomGen::GetRand64() {
