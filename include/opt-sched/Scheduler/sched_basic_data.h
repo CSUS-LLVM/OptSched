@@ -150,6 +150,8 @@ public:
   void SetupForSchdulng(InstCount instCnt, bool isCP_FromScsr,
                         bool isCP_FromPrdcsr);
 
+  void UpdateNeighborNums();
+
   // Sets the instruction's bounds to the ones specified in the input file.
   bool UseFileBounds();
 

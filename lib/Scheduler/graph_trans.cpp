@@ -70,6 +70,53 @@ GraphTrans::GraphTrans(DataDepGraph *dataDepGraph) {
   SetNumNodesInGraph(dataDepGraph->GetInstCnt());
 }
 
+FUNC_RESULT GraphTrans::updateGraph() const {
+  DataDepGraph &ddg = *GetDataDepGraph_();
+  const InstCount numNodes = GetNumNodesInGraph_();
+
+  // Nodes may have more or less neighbors, so re-number their neighbors
+  for (int i = 0; i < numNodes; i++) {
+    SchedInstruction *inst = ddg.GetInstByIndx(i);
+    inst->UpdateNeighborNums();
+  }
+  // The previously found topological sort may be invalid.
+  // Find a new topological sort:
+  FUNC_RESULT result = ddg.DepthFirstSearch();
+  if (result != FUNC_RESULT::RES_SUCCESS)
+    return result;
+
+  return postUpdateGraph();
+}
+
+FUNC_RESULT GraphTrans::postUpdateGraph() const {
+  return FUNC_RESULT::RES_SUCCESS;
+}
+
+void GraphTrans::updateCriticalPaths() const {
+  DataDepGraph &ddg = *GetDataDepGraph_();
+  ddg.UpdateCriticalPaths();
+}
+
+FUNC_RESULT GraphTrans::updateRecursiveNeighbors() const {
+  DataDepGraph &ddg = *GetDataDepGraph_();
+  FUNC_RESULT result = FUNC_RESULT::RES_SUCCESS;
+
+  result = FindRcrsvNghbrs(DIR_FRWRD);
+  if (result != FUNC_RESULT::RES_SUCCESS)
+    return result;
+
+  result = FindRcrsvNghbrs(DIR_BKWRD);
+  if (result != FUNC_RESULT::RES_SUCCESS)
+    return result;
+
+  return result;
+}
+
+void GraphTrans::updateRelativeCriticalPaths() const {
+  DataDepGraph &ddg = *GetDataDepGraph_();
+  ddg.UpdateRelativeCriticalPaths();
+}
+
 StaticNodeSupTrans::StaticNodeSupTrans(DataDepGraph *dataDepGraph,
                                        bool IsMultiPass_)
     : GraphTrans(dataDepGraph) {

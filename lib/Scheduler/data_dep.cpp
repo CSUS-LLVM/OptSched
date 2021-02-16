@@ -302,6 +302,13 @@ FUNC_RESULT DataDepGraph::UpdateSetupForSchdulng(bool cmputTrnstvClsr) {
   return RES_SUCCESS;
 }
 
+void DataDepGraph::UpdateCriticalPaths() { CmputCrtclPaths_(); }
+
+void DataDepGraph::UpdateRelativeCriticalPaths() {
+  CmputRltvCrtclPaths_(DIR_FRWRD);
+  CmputRltvCrtclPaths_(DIR_BKWRD);
+}
+
 void DataDepGraph::CmputBasicLwrBounds_() {
   for (InstCount i = 0; i < instCnt_; i++) {
     SchedInstruction *inst = GetInstByIndx(i);

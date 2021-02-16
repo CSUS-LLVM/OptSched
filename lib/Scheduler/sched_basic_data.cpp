@@ -709,6 +709,11 @@ void SchedInstruction::SetPrdcsrNums_() {
   assert(prdcsrNum == GetPrdcsrCnt());
 }
 
+void SchedInstruction::UpdateNeighborNums() {
+  SetPrdcsrNums_();
+  SetScsrNums_();
+}
+
 int16_t SchedInstruction::CmputLastUseCnt() {
   lastUseCnt_ = 0;
 

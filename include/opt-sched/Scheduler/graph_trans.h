@@ -39,6 +39,9 @@ public:
   // Apply the graph transformation to the DataDepGraph.
   virtual FUNC_RESULT ApplyTrans() = 0;
 
+  // Fix up any properties on the DDG
+  FUNC_RESULT updateGraph() const;
+
   void SetDataDepGraph(DataDepGraph *dataDepGraph);
 
   void SetSchedRegion(SchedRegion *schedRegion);
@@ -49,6 +52,18 @@ protected:
   DataDepGraph *GetDataDepGraph_() const;
   SchedRegion *GetSchedRegion_() const;
   InstCount GetNumNodesInGraph_() const;
+
+  // Continuation of updateGraph() with any conditional updates; defaults to nop
+  virtual FUNC_RESULT postUpdateGraph() const;
+
+  // For calling inside postUpdateGraph():
+  // Informs the graph of updates to the full critical path (entry -> exit).
+  void updateCriticalPaths() const;
+  // Informs the graph of updates to recursive neighbors that weren't properly
+  // propagated.
+  FUNC_RESULT updateRecursiveNeighbors() const;
+  // Informs the graph of updates to relative critical paths (between nodes).
+  void updateRelativeCriticalPaths() const;
 
 private:
   // A pointer to the graph.
