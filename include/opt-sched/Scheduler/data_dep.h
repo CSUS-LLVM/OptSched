@@ -200,12 +200,6 @@ public:
   FUNC_RESULT SetupForSchdulng(bool cmputTrnstvClsr);
   // Update the Dep after applying graph transformations
   FUNC_RESULT UpdateSetupForSchdulng(bool cmputTrnstvClsr);
-  // Updates critical paths in response to a change in it (due to graph
-  // transformations)
-  void UpdateCriticalPaths();
-  // Updates relative critical paths in response to a change in it (due to graph
-  // transformations)
-  void UpdateRelativeCriticalPaths();
 
   // Returns transformations that we will apply to the graph
   SmallVector<std::unique_ptr<GraphTrans>, 0> *GetGraphTrans() {

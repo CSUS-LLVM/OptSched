@@ -1027,8 +1027,7 @@ static FUNC_RESULT applyGraphTransformation(DataDepGraph *DDG, GraphTrans *GT) {
     return result;
 
   // Update graph after each transformation
-  result = GT->updateGraph();
-
+  result = DDG->UpdateSetupForSchdulng(/* need transitive closure? = */ true);
   if (result != RES_SUCCESS) {
     Logger::Error("Invalid DAG after graph transformations");
     return result;
