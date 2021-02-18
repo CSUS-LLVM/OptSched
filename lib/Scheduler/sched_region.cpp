@@ -1033,6 +1033,12 @@ static FUNC_RESULT applyGraphTransformation(DataDepGraph *DDG, GraphTrans *GT) {
     return result;
   }
 
+  CmputAbslutUprBound_();
+  if (!BbSchedulerEnabled)
+    CmputAndSetCostLwrBound();
+  else
+    CmputLwrBounds_(false);
+
   return result;
 }
 
