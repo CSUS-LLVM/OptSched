@@ -111,6 +111,11 @@ ConstrainedScheduler *BBWithSpill::AllocHeuristicScheduler_() {
                                        abslutSchedUprBound_,
                                        GetHeuristicPriorities());
     break;
+  case SCHED_STALLING_LIST:
+    return new StallSchedulingListScheduler(dataDepGraph_, machMdl_,
+                                            abslutSchedUprBound_,
+                                            GetHeuristicPriorities());
+    break;
   }
   llvm_unreachable("Unknown heuristic scheduler type!");
 }
