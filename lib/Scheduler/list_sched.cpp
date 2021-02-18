@@ -157,3 +157,36 @@ void ListScheduler::UpdtRdyLst_(InstCount cycleNum, int slotNum) {
     lst2->Reset();
   }
 }
+
+StallSchedulingListScheduler::
+  StallSchedulingListScheduler(DataDepGraph *dataDepGraph, MachineModel *machMdl,
+                               InstCount schedUprBound, SchedPriorities prirts)
+    : ListScheduler(dataDepGraph, machMdl, schedUprBound, prirts) {}
+
+SchedInstruction *StallSchedulingListScheduler::PickInst() const {
+  unsigned long CurrentHeuristic;
+  SchedInstruction *inst = rdyLst_->GetNextPriorityInst(CurrentHeuristic);
+
+  //now inst stores the latency ready instruction w/ the best heuristic
+  for (InstCount fCycle = 1; fCycle < dataDepGraph_->GetMaxLtncy() &&
+                             crntCycleNum_ + fCycle < schedUprBound_;
+       ++fCycle) {
+    LinkedList<SchedInstruction> *futureReady =
+        frstRdyLstPerCycle_[crntCycleNum_ + fCycle];
+    if (!futureReady)
+      continue;
+
+    for (SchedInstruction *fIns = futureReady->GetFrstElmnt(); fIns;
+         fIns = futureReady->GetNxtElmnt()) {
+      bool Changed;
+      unsigned long Heuristic = rdyLst_->CmputKey_(fIns, false, Changed);
+      if (Heuristic > CurrentHeuristic) {
+        futureReady->ResetIterator();
+        return NULL;
+      }
+    }
+    futureReady->ResetIterator();
+  }
+
+  return ChkInstLglty_(inst) ? inst : NULL;
+}
