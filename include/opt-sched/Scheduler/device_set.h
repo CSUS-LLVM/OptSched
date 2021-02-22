@@ -24,7 +24,7 @@ class DevicePtrSet {
     //entry is a duplicate
     __host__ __device__
     bool insert(T entry) {
-      bool dupl = false;
+      bool insert = true;
       if (alloc_ == 0) {
 	alloc_ = 4;
         elmnt = new T[alloc_];
@@ -33,10 +33,10 @@ class DevicePtrSet {
         //check if entry has already been entered
         for (int i = 0; i < size_; i++) {
           if (entry == elmnt[i])
-            dupl = true;
+            insert = false;
         }
 	//if not duplicate, insert
-	if (!dupl) {
+	if (insert) {
 	  //allocate more space if full
 	  if (alloc_ == size_) {
 	    alloc_ *= 2;
@@ -51,7 +51,7 @@ class DevicePtrSet {
           elmnt[size_++] = entry;
 	}
       }
-      return dupl;
+      return insert;
     }
 
     __host__ __device__

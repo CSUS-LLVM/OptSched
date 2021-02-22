@@ -22,12 +22,14 @@
 #include <utility>
 #include <cuda_runtime.h>
 
+#define IS_DEBUG_SLIL_COST_LOWER_BOUND 1
+
 extern bool OPTSCHED_gPrintSpills;
 
 using namespace llvm::opt_sched;
 
 // The denominator used when calculating cost weight.
-static const int COST_WGHT_BASE = 10;
+static const int COST_WGHT_BASE = 100;
 
 BBWithSpill::BBWithSpill(const OptSchedTarget *OST_, DataDepGraph *dataDepGraph,
                          long rgnNum, int16_t sigHashSize, LB_ALG lbAlg,
