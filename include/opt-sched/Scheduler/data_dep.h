@@ -261,8 +261,8 @@ public:
   void SetCrntFrwrdLwrBound(SchedInstruction *inst);
   void SetSttcLwrBounds();
   void SetDynmcLwrBounds();
-  void CreateEdge(SchedInstruction *frmNode, SchedInstruction *toNode,
-                  int ltncy, DependenceType depType);
+  GraphEdge *CreateEdge(SchedInstruction *frmNode, SchedInstruction *toNode,
+                        int ltncy, DependenceType depType);
   InstCount GetDistFrmLeaf(SchedInstruction *inst);
 
   void SetPrblmtc();

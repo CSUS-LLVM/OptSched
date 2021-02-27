@@ -844,9 +844,9 @@ SchedInstruction *DataDepGraph::CreateNode_(
   return newInstPtr;
 }
 
-void DataDepGraph::CreateEdge(SchedInstruction *frmNode,
-                              SchedInstruction *toNode, int ltncy,
-                              DependenceType depType) {
+GraphEdge *DataDepGraph::CreateEdge(SchedInstruction *frmNode,
+                                    SchedInstruction *toNode, int ltncy,
+                                    DependenceType depType) {
 #if defined(IS_DEBUG) || defined(IS_DEBUG_DAG)
   InstCount frmNodeNum = frmNode->GetNum();
   InstCount toNodeNum = toNode->GetNum();
@@ -886,7 +886,7 @@ void DataDepGraph::CreateEdge(SchedInstruction *frmNode,
       edge->from->UpdtMaxEdgLbl(ltncy);
     }
 
-    return;
+    return nullptr;
   }
 
   GraphEdge *newEdg = new GraphEdge(frmNode, toNode, ltncy, depType);
@@ -897,6 +897,8 @@ void DataDepGraph::CreateEdge(SchedInstruction *frmNode,
   if (ltncy > maxLtncy_) {
     maxLtncy_ = ltncy;
   }
+
+  return newEdg;
 }
 
 void DataDepGraph::CreateEdge_(InstCount frmNodeNum, InstCount toNodeNum,
