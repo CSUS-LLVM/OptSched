@@ -191,7 +191,9 @@ bool ACOScheduler::shouldReplaceSchedule(InstSchedule *OldSched,
 #endif //DBG_SRS
     InstCount NewCost = NewSched->GetExecCost();
     InstCount OldCost = OldSched->GetExecCost();
-    return NewCost < OldCost;
+    InstCount NewSpillCost = NewSched->GetExecCost();
+    InstCount OldSpillCost = OldSched->GetExecCost();
+    return NewCost < OldCost && NewSpillCost <= OldSpillCost;
   }
 }
 
