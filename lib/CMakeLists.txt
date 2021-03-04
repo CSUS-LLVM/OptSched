@@ -37,6 +37,12 @@ if(OPTSCHED_ENABLE_AMDGPU)
   if(TARGET AMDGPUCommonTableGen)
     list(APPEND OPTSCHED_TARGET_DEPS AMDGPUCommonTableGen)
   endif()
+  if(llvm_subproject)
+    include_directories(
+      ${LLVM_MAIN_SRC_DIR}/lib/Target/AMDGPU
+      ${LLVM_BINARY_DIR}/lib/Target/AMDGPU
+    )
+  endif()
 endif()
 
 function(add_optsched_library name)

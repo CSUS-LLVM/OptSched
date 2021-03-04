@@ -11,7 +11,13 @@ set(OPTSCHED_EXTRA_INCLUDE_DIRS "" CACHE STRING "Extra include_directories to pa
 # '-DOPTSCHED_EXTRA_DEFINITIONS=-DIS_DEBUG_DEFS_AND_USES;-DIS_DEBUG_DEF_USE_COUNT'
 set(OPTSCHED_EXTRA_DEFINITIONS "" CACHE STRING "Extra add_definitions to pass to OptSched, ;-separated")
 
-if(NOT TARGET LLVMCodeGen)
+if(TARGET LLVMCodeGen)
+  set(llvm_subproject TRUE)
+else()
+  set(llvm_subproject FALSE)
+endif()
+
+if(NOT llvm_subproject)
   if(OPTSCHED_ENABLE_AMDGPU)
     find_package(LLVM 9.0 REQUIRED CONFIG)
   else()
@@ -44,8 +50,6 @@ set(OPTSCHED_BINARY_DIR ${CMAKE_CURRENT_BINARY_DIR})
 list(APPEND CMAKE_MODULE_PATH "${LLVM_CMAKE_DIR}" ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
 include(AddLLVM)
 
-get_directory_property(HAS_PARENT PARENT_DIRECTORY)
-
 include_directories(
   ${OPTSCHED_SOURCE_DIR}/include
   ${OPTSCHED_SOURCE_DIR}/lib
@@ -59,7 +63,7 @@ if(LLVM_VERSION VERSION_LESS 7.0)
   add_definitions(-DLLVM_DEBUG=DEBUG)
 endif()
 
-if(NOT HAS_PARENT)
+if(NOT llvm_subproject)
   include(GetLocalLLVM)
 
   set(args)
