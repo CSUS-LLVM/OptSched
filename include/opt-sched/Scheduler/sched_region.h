@@ -327,7 +327,8 @@ protected:
   FUNC_RESULT runACO(InstSchedule *ReturnSched, InstSchedule *InitSched,
                      bool IsPostBB);
 
-  FUNC_RESULT applyGraphTransformations();
+  FUNC_RESULT applyGraphTransformations(bool BbScheduleEnabled);
+  FUNC_RESULT applyGraphTransformation(GraphTrans *GT, bool BbSchedulerEnabled);
 };
 
 } // namespace opt_sched

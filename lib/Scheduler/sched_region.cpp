@@ -401,7 +401,7 @@ FUNC_RESULT SchedRegion::FindOptimalSchedule(
                SpillCostLwrBound_);
 
   if (!isLstOptml) {
-    rslt = applyGraphTransformations();
+    rslt = applyGraphTransformations(BbSchedulerEnabled);
 
     if (rslt != RES_SUCCESS)
       return rslt;
@@ -1011,7 +1011,9 @@ FUNC_RESULT SchedRegion::runACO(InstSchedule *ReturnSched,
   return Rslt;
 }
 
-static FUNC_RESULT applyGraphTransformation(DataDepGraph *DDG, GraphTrans *GT) {
+FUNC_RESULT SchedRegion::applyGraphTransformation(GraphTrans *GT,
+                                                  bool BbSchedulerEnabled) {
+  DataDepGraph *DDG = dataDepGraph_;
   FUNC_RESULT result = GT->ApplyTrans();
 
   if (result != RES_SUCCESS)
@@ -1025,6 +1027,7 @@ static FUNC_RESULT applyGraphTransformation(DataDepGraph *DDG, GraphTrans *GT) {
   }
 
   CmputAbslutUprBound_();
+  schedLwrBound_ = dataDepGraph_->GetSchedLwrBound();
   if (!BbSchedulerEnabled)
     CmputAndSetCostLwrBound();
   else
@@ -1033,11 +1036,11 @@ static FUNC_RESULT applyGraphTransformation(DataDepGraph *DDG, GraphTrans *GT) {
   return result;
 }
 
-FUNC_RESULT SchedRegion::applyGraphTransformations() {
+FUNC_RESULT SchedRegion::applyGraphTransformations(bool BbSchedulerEnabled) {
   FUNC_RESULT result = RES_SUCCESS;
 
   for (auto &GT : *dataDepGraph_->GetGraphTrans()) {
-    result = applyGraphTransformation(dataDepGraph_, GT.get());
+    result = applyGraphTransformation(GT.get(), BbSchedulerEnabled);
 
     if (result != RES_SUCCESS)
       return result;
