@@ -20,6 +20,7 @@ jobs:
 
     outputs:
       value: ${{ steps.value.outputs.value }}
+      checks_should_run: ${{ steps.checks_should_run.outputs.checks_should_run }}
 
     steps:
     - id: value
@@ -31,6 +32,13 @@ jobs:
         && github.event.issue.pull_request != ''
         && github.event.comment.body == 'Do: Run Checks'
         && github.event.comment.user.id == github.event.issue.user.id }}"
+
+    - id: checks_should_run
+      run: >-
+        echo "::set-output name=checks_should_run::${{
+          steps.value.outputs.value == 'true'
+          || github.event_name == 'push'
+          || github.event_name == 'pull_request' }}"
 
   init-report:
     needs: comment-triggered
@@ -52,6 +60,7 @@ jobs:
   ci:
     needs: comment-triggered
     runs-on: ubuntu-latest
+    if: needs.comment-triggered.outputs.checks_should_run == 'true'
 
     steps:
     - uses: actions/checkout@v2
@@ -111,7 +120,7 @@ jobs:
   clang-format:
     needs: comment-triggered
     runs-on: ubuntu-latest
-    if: always()
+    if: needs.comment-triggered.outputs.checks_should_run == 'true'
 
     steps:
     - uses: actions/checkout@v2
@@ -131,7 +140,7 @@ jobs:
   clang-tidy:
     needs: comment-triggered
     runs-on: ubuntu-latest
-    if: always()
+    if: needs.comment-triggered.outputs.checks_should_run == 'true'
 
     steps:
     - uses: actions/checkout@v2
@@ -210,7 +219,7 @@ jobs:
   trailing-whitespace:
     needs: comment-triggered
     runs-on: ubuntu-latest
-    if: always()
+    if: needs.comment-triggered.outputs.checks_should_run == 'true'
 
     steps:
     - uses: actions/checkout@v2
@@ -230,7 +239,7 @@ jobs:
   west-const:
     needs: comment-triggered
     runs-on: ubuntu-latest
-    if: always()
+    if: needs.comment-triggered.outputs.checks_should_run == 'true'
 
     steps:
     - uses: actions/checkout@v2
