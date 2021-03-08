@@ -79,7 +79,8 @@ SchedRegion::SchedRegion(MachineModel *machMdl, DataDepGraph *dataDepGraph,
                          SchedPriorities hurstcPrirts,
                          SchedPriorities enumPrirts, bool vrfySched,
                          Pruning PruningStrategy, SchedulerType HeurSchedType,
-                         SPILL_COST_FUNCTION spillCostFunc) {
+                         SPILL_COST_FUNCTION spillCostFunc,
+                         GT_POSITION GraphTransPosition) {
   machMdl_ = machMdl;
   dataDepGraph_ = dataDepGraph;
   rgnNum_ = rgnNum;
@@ -110,6 +111,8 @@ SchedRegion::SchedRegion(MachineModel *machMdl, DataDepGraph *dataDepGraph,
 
   DumpDDGs_ = GetDumpDDGs();
   DDGDumpPath_ = GetDDGDumpPath();
+
+  GraphTransPosition_ = GraphTransPosition;
 }
 
 void SchedRegion::UseFileBounds_() {
@@ -261,6 +264,16 @@ FUNC_RESULT SchedRegion::FindOptimalSchedule(
 
   const bool IsSeqListSched = GetHeuristicSchedulerType() == SCHED_SEQ;
 
+  if ((GraphTransPosition_ & GT_POSITION::BEFORE_HEURISTIC) != GT_POSITION::NONE
+      // The sequential list scheduler can "find" schedules invalidated by graph
+      // transformations. Delay until _after_ it.
+      && !IsSeqListSched) {
+    rslt = applyGraphTransformations(BbSchedulerEnabled);
+
+    if (rslt != RES_SUCCESS)
+      return rslt;
+  }
+
   SetupForSchdulng_();
   CmputAbslutUprBound_();
   schedLwrBound_ = dataDepGraph_->GetSchedLwrBound();
@@ -301,6 +314,15 @@ FUNC_RESULT SchedRegion::FindOptimalSchedule(
       Logger::Info("Invalid DAG after adding artificial cluster edges");
       return rslt;
     }
+  }
+
+  if ((GraphTransPosition_ & GT_POSITION::BEFORE_HEURISTIC) != GT_POSITION::NONE
+      // Run GT now that the sequential list scheduler is done.
+      && IsSeqListSched) {
+    rslt = applyGraphTransformations(BbSchedulerEnabled);
+
+    if (rslt != RES_SUCCESS)
+      return rslt;
   }
 
   // This must be done after SetupForSchdulng() or UpdateSetupForSchdulng() to
@@ -400,7 +422,8 @@ FUNC_RESULT SchedRegion::FindOptimalSchedule(
   Logger::Info("Lower bound of spill cost before scheduling: %d",
                SpillCostLwrBound_);
 
-  if (!isLstOptml) {
+  if (!isLstOptml && (GraphTransPosition_ & GT_POSITION::AFTER_HEURISTIC) !=
+                         GT_POSITION::NONE) {
     rslt = applyGraphTransformations(BbSchedulerEnabled);
 
     if (rslt != RES_SUCCESS)

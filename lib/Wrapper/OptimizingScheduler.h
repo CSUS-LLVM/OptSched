@@ -16,6 +16,7 @@
 #include "opt-sched/Scheduler/sched_region.h"
 #include "llvm/ADT/BitVector.h"
 #include "llvm/ADT/SmallString.h"
+#include "llvm/ADT/StringRef.h"
 #include "llvm/CodeGen/MachineScheduler.h"
 #include "llvm/Support/Debug.h"
 #include <chrono>
@@ -198,6 +199,8 @@ protected:
   // scheduling approach.
   SchedPriorities SecondPassEnumPriorities;
 
+  GT_POSITION GraphTransPosition = GT_POSITION::NONE;
+
   // Static node superiority RP only graph transformation.
   bool StaticNodeSup;
 
@@ -231,6 +234,9 @@ protected:
 
   // Get spill cost function
   SPILL_COST_FUNCTION parseSpillCostFunc() const;
+
+  // Get the GT_POSITION
+  static GT_POSITION parseGraphTransPosition(llvm::StringRef Str);
 
   // Return true if the OptScheduler should be enabled for the function this
   // ScheduleDAG was created for

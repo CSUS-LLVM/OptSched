@@ -201,7 +201,7 @@ void ScheduleDAGOptSched::addGraphTransformations(
   }
 
   if (OccupancyPreservingILPStaticNodeSup ||
-      OccupancyPreservingILPStaticNodeSup2ndPass && SecondPass) {
+      (OccupancyPreservingILPStaticNodeSup2ndPass && SecondPass)) {
     GraphTransformations->push_back(
         llvm::make_unique<StaticNodeSupOccupancyPreservingILPTrans>(BDDG));
   }
@@ -434,7 +434,8 @@ void ScheduleDAGOptSched::schedule() {
   auto region = llvm::make_unique<BBWithSpill>(
       OST.get(), static_cast<DataDepGraph *>(DDG.get()), 0, HistTableHashBits,
       LowerBoundAlgorithm, HeuristicPriorities, EnumPriorities, VerifySchedule,
-      PruningStrategy, SchedForRPOnly, EnumStalls, SCW, SCF, HeurSchedType);
+      PruningStrategy, SchedForRPOnly, EnumStalls, SCW, SCF, HeurSchedType,
+      GraphTransPosition);
 
   bool IsEasy = false;
   InstCount NormBestCost = 0;
@@ -607,6 +608,8 @@ void ScheduleDAGOptSched::loadOptSchedConfig() {
   UseLLVMScheduler = false;
   // should we print spills for the current function
   OPTSCHED_gPrintSpills = shouldPrintSpills();
+  GraphTransPosition =
+      parseGraphTransPosition(schedIni.GetString("GT_POSITION"));
   StaticNodeSup = schedIni.GetBool("STATIC_NODE_SUPERIORITY", false);
   MultiPassStaticNodeSup =
       schedIni.GetBool("MULTI_PASS_NODE_SUPERIORITY", false);
@@ -732,6 +735,33 @@ static LISTSCHED_HEURISTIC GetNextHeuristicName(const std::string &Str,
     }
 
   llvm::report_fatal_error("Unrecognized heuristic used: " + Str, false);
+}
+
+GT_POSITION
+ScheduleDAGOptSched::parseGraphTransPosition(const llvm::StringRef Str) {
+  GT_POSITION result = GT_POSITION::NONE;
+
+  llvm::StringRef Cur = Str;
+
+  do {
+    auto NextRest = Cur.split('_');
+    const llvm::StringRef Next = NextRest.first;
+    Cur = NextRest.second;
+
+    if (Next.empty())
+      break;
+
+    if (Next == "AH")
+      result |= GT_POSITION::AFTER_HEURISTIC;
+    else if (Next == "BH")
+      result |= GT_POSITION::BEFORE_HEURISTIC;
+    else
+      llvm::report_fatal_error("Unrecognized option for GT_POSITION setting: " +
+                                   Next.str() + " out of " + Str.str(),
+                               false);
+  } while (true);
+
+  return result;
 }
 
 SchedPriorities ScheduleDAGOptSched::parseHeuristic(const std::string &Str) {
