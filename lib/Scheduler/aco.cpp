@@ -123,52 +123,59 @@ bool ACOScheduler::shouldReplaceSchedule(InstSchedule *OldSched,
                                          InstSchedule *NewSched,
                                          bool IsGlobal) {
 #if DBG_SRS
-  std::string CmpLn="SRS/";
+  std::string CmpLn = "SRS/";
   CmpLn += IsGlobal ? "g/" : "";
-#endif //DBG_SRS
+#endif // DBG_SRS
 
   // return true if the old schedule is null (eg:there is no old schedule)
   // return false if the new schedule is is NULL
   if (!OldSched) {
 #if DBG_SRS
-    Logger::Info("SRS/Old:null, New:%d", !NewSched ? -1 : ((!IsTwoPassEn) ? NewSched->GetCost() : NewSched->GetNormSpillCost()));
-#endif //DBG_SRS
+    Logger::Info("SRS/Old:null, New:%d",
+                 !NewSched ? -1
+                           : ((!IsTwoPassEn) ? NewSched->GetCost()
+                                             : NewSched->GetNormSpillCost()));
+#endif // DBG_SRS
     return true;
-  }
-  else if (!NewSched) {
-    //not likely to happen
+  } else if (!NewSched) {
+    // not likely to happen
 #if DBG_SRS
-    Logger::Info("SRS/Old:%d, New:null", (!IsTwoPassEn) ? OldSched->GetCost() : OldSched->GetNormSpillCost());
-#endif //DBG_SRS
+    Logger::Info("SRS/Old:%d, New:null", (!IsTwoPassEn)
+                                             ? OldSched->GetCost()
+                                             : OldSched->GetNormSpillCost());
+#endif // DBG_SRS
     return false;
   }
 
   // if it is the 1st pass return the cost comparison
   // if it is the 2nd pass return true if the RP cost and ILP cost is less
   if (!IsTwoPassEn || !rgn_->IsSecondPass()) {
-    InstCount NewCost = (!IsTwoPassEn) ? NewSched->GetCost() : NewSched->GetNormSpillCost();
-    InstCount OldCost = (!IsTwoPassEn) ? OldSched->GetCost() : OldSched->GetNormSpillCost();
+    InstCount NewCost =
+        (!IsTwoPassEn) ? NewSched->GetCost() : NewSched->GetNormSpillCost();
+    InstCount OldCost =
+        (!IsTwoPassEn) ? OldSched->GetCost() : OldSched->GetNormSpillCost();
 #if DBG_SRS
-    CmpLn += "Old:" + std::to_string(OldCost) + ", New:" + std::to_string(NewCost);
-#endif //DBG_SRS
+    CmpLn +=
+        "Old:" + std::to_string(OldCost) + ", New:" + std::to_string(NewCost);
+#endif // DBG_SRS
 
     if (NewCost < OldCost) {
 #if DBG_SRS
       Logger::Info(CmpLn.c_str());
-#endif //DBG_SRS
+#endif // DBG_SRS
       return true;
-    }
-    else if (NewCost == OldCost &&
-             ((DCFOption == DCF_OPT::GLOBAL_ONLY && IsGlobal) ||
-             DCFOption == DCF_OPT::GLOBAL_AND_TIGHTEN ||
-             DCFOption == DCF_OPT::GLOBAL_AND_ITERATION)) {
+    } else if (NewCost == OldCost &&
+               ((DCFOption == DCF_OPT::GLOBAL_ONLY && IsGlobal) ||
+                DCFOption == DCF_OPT::GLOBAL_AND_TIGHTEN ||
+                DCFOption == DCF_OPT::GLOBAL_AND_ITERATION)) {
       InstCount NewDCFCost = NewSched->GetExtraSpillCost(DCFCostFn);
       InstCount OldDCFCost = OldSched->GetExtraSpillCost(DCFCostFn);
 
 #if DBG_SRS
-      CmpLn += ", OldDCF:" + std::to_string(OldDCFCost) + ", NewDCF:" + std::to_string(NewDCFCost);
+      CmpLn += ", OldDCF:" + std::to_string(OldDCFCost) +
+               ", NewDCF:" + std::to_string(NewDCFCost);
       Logger::Info(CmpLn.c_str());
-#endif //DBG_SRS
+#endif // DBG_SRS
 
       if (NewDCFCost < OldDCFCost)
         return true;
@@ -177,18 +184,16 @@ bool ACOScheduler::shouldReplaceSchedule(InstSchedule *OldSched,
         if (NewDCFCost > OldDCFCost)
           return false;
       }
-    }
-    else {
+    } else {
 #if DBG_SRS
       Logger::Info(CmpLn.c_str());
-#endif //DBG_SRS
+#endif // DBG_SRS
       return false;
     }
-  }
-  else {
+  } else {
 #if DBG_SRS
     Logger::Info("2nd pass");
-#endif //DBG_SRS
+#endif // DBG_SRS
     InstCount NewCost = NewSched->GetExecCost();
     InstCount OldCost = OldSched->GetExecCost();
     InstCount NewSpillCost = NewSched->GetExecCost();

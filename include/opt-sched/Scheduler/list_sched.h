@@ -59,11 +59,11 @@ private:
 // Then stalls will be inserted until it is ready
 class StallSchedulingListScheduler : public ListScheduler {
 public:
-  StallSchedulingListScheduler(DataDepGraph *dataDepGraph, MachineModel *machMdl,
-                               InstCount schedUprBound, SchedPriorities prirts);
+  StallSchedulingListScheduler(DataDepGraph *dataDepGraph,
+                               MachineModel *machMdl, InstCount schedUprBound,
+                               SchedPriorities prirts);
 
   SchedInstruction *PickInst() const;
-
 };
 
 } // namespace opt_sched

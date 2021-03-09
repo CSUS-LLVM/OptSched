@@ -916,9 +916,7 @@ InstCount BBWithSpill::UpdtOptmlSched(InstSchedule *crntSched,
 }
 /*****************************************************************************/
 
-bool BBWithSpill::needsSLIL() {
-  return NeedsComputeSLIL;
-}
+bool BBWithSpill::needsSLIL() { return NeedsComputeSLIL; }
 
 void BBWithSpill::SetupForSchdulng_() {
   for (int i = 0; i < regTypeCnt_; i++) {

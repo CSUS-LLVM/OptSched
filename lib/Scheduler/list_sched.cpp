@@ -158,16 +158,16 @@ void ListScheduler::UpdtRdyLst_(InstCount cycleNum, int slotNum) {
   }
 }
 
-StallSchedulingListScheduler::
-  StallSchedulingListScheduler(DataDepGraph *dataDepGraph, MachineModel *machMdl,
-                               InstCount schedUprBound, SchedPriorities prirts)
+StallSchedulingListScheduler::StallSchedulingListScheduler(
+    DataDepGraph *dataDepGraph, MachineModel *machMdl, InstCount schedUprBound,
+    SchedPriorities prirts)
     : ListScheduler(dataDepGraph, machMdl, schedUprBound, prirts) {}
 
 SchedInstruction *StallSchedulingListScheduler::PickInst() const {
   unsigned long CurrentHeuristic;
   SchedInstruction *inst = rdyLst_->GetNextPriorityInst(CurrentHeuristic);
 
-  //now inst stores the latency ready instruction w/ the best heuristic
+  // now inst stores the latency ready instruction w/ the best heuristic
   for (InstCount fCycle = 1; fCycle < dataDepGraph_->GetMaxLtncy() &&
                              crntCycleNum_ + fCycle < schedUprBound_;
        ++fCycle) {

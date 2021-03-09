@@ -819,7 +819,7 @@ void ScheduleDAGOptSched::scheduleOptSchedMinRP() {
   // Set times for the first pass
   RegionTimeout = FirstPassRegionTimeout;
   LengthTimeout = FirstPassLengthTimeout;
-  if(HeurSchedType == SCHED_SEQ)
+  if (HeurSchedType == SCHED_SEQ)
     HeurSchedType = SCHED_LIST;
 
   schedule();
