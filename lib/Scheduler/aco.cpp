@@ -176,14 +176,8 @@ bool ACOScheduler::shouldReplaceSchedule(InstSchedule *OldSched,
                ", NewDCF:" + std::to_string(NewDCFCost);
       Logger::Info(CmpLn.c_str());
 #endif // DBG_SRS
+      return (NewDCFCost < OldDCFCost);
 
-      if (NewDCFCost < OldDCFCost)
-        return true;
-      else if ((DCFOption == DCF_OPT::GLOBAL_ONLY && IsGlobal) ||
-               DCFOption == DCF_OPT::GLOBAL_AND_ITERATION) {
-        if (NewDCFCost > OldDCFCost)
-          return false;
-      }
     } else {
 #if DBG_SRS
       Logger::Info(CmpLn.c_str());
