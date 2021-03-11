@@ -64,6 +64,8 @@ public:
   inline int GetCostLwrBound() { return costLwrBound_; }
   // Returns the best cost found so far for this region.
   inline InstCount GetBestCost() { return bestCost_; }
+  // Returns the heuristic cost for this region.
+  inline InstCount GetHeuristicCost() { return hurstcCost_; }
   // Returns a pointer to the list scheduler heurisitcs.
   inline SchedPriorities GetHeuristicPriorities() { return hurstcPrirts_; }
   // Get the number of simulated spills code added for this block.
@@ -120,6 +122,7 @@ public:
   virtual void CopyPointersToDevice(SchedRegion* dev_rgn, int numThreads) = 0;
   __host__ __device__
   MachineModel *GetMM() { return machMdl_; }
+  bool IsSecondPass() const { return isSecondPass_; }
 
 private:
   // The algorithm to use for calculated lower bounds.
@@ -199,8 +202,6 @@ protected:
 
   // protected accessors:
   SchedulerType GetHeuristicSchedulerType() const { return HeurSchedType_; }
-
-  bool IsSecondPass() const { return isSecondPass_; }
 
   void SetBestCost(InstCount bestCost) { bestCost_ = bestCost; }
 

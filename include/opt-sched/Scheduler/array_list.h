@@ -105,6 +105,12 @@ class PriorityArrayList : public ArrayList<T> {
     __host__ __device__
     void RmvCrntElmnt();
 
+    // Get Key at current index
+    __host__ __device__
+    K GetCrntKey() {
+      return keys_[ArrayList<T>::crnt_];
+    }
+
     // Returns key at passed index
     __host__ __device__
     K GetKey(int indx) {

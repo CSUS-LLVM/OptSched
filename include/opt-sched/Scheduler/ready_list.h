@@ -110,6 +110,9 @@ public:
   void AllocDevArraysForParallelACO(int numThreads);
   // Calls cudaFree on all arrays/objects that were allocated with cudaMalloc
   void FreeDevicePointers(int numThreads);
+  // Constructs the priority-list key based on the schemes listed in prirts_.
+  __host__ __device__
+  unsigned long CmputKey_(SchedInstruction *inst, bool isUpdate, bool &changed);
 
 private:
   // A pointer to the DDG for the region
@@ -148,10 +151,6 @@ private:
   int16_t ltncySumBits_;
   int16_t nodeID_Bits_;
   int16_t inptSchedOrderBits_;
-
-  // Constructs the priority-list key based on the schemes listed in prirts_.
-  __host__ __device__
-  unsigned long CmputKey_(SchedInstruction *inst, bool isUpdate, bool &changed);
 
   // Adds instructions at the bottom of a given list which have not been added
   // to the ready list already.

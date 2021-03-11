@@ -67,7 +67,14 @@ static constexpr const char *DEFAULT_CFGMM_FNAME = "/machine_model.cfg";
 
 // Create OptSched ScheduleDAG.
 static ScheduleDAGInstrs *createOptSched(MachineSchedContext *C) {
-  return new ScheduleDAGOptSched(C, llvm::make_unique<GenericScheduler>(C));
+  ScheduleDAGMILive *DAG =
+      new ScheduleDAGOptSched(C, llvm::make_unique<GenericScheduler>(C));
+  DAG->addMutation(createCopyConstrainDAGMutation(DAG->TII, DAG->TRI));
+  // README: if you need the x86 mutations uncomment the next line.
+  // addMutation(createX86MacroFusionDAGMutation());
+  // You also need to add the next line somewhere above this function
+  //#include "../../../../../llvm/lib/Target/X86/X86MacroFusion.h"
+  return DAG;
 }
 
 // Register the machine scheduler.
@@ -381,10 +388,18 @@ void ScheduleDAGOptSched::schedule() {
         dep.setSUnit(&SUnits[nodeNumMap[pred->NodeNum]]);
       }
     }
+  } else {
+    // Only call SetupLLVMDag if ScheduleDAGMILive::schedule() was not invoked.
+    // ScheduleDAGMILive::schedule() will perform the same post processing
+    // steps that SetupLLVMDag() does when called, and if the post processing
+    // is called a second time the post processing will be applied a second
+    // time.  This will lead to the leads to the a different LLVM DAG and will
+    // cause the LLVM heuristic to produce a schedule which is significantly
+    // different from the one produced by LLVM without OptSched.
+    SetupLLVMDag();
   }
-
   // Build LLVM DAG
-  SetupLLVMDag();
+  //SetupLLVMDag();
   OST->initRegion(this, MM.get());
   // Convert graph
   auto DDG =

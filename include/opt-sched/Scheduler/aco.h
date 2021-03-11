@@ -19,20 +19,28 @@ Last Update:  Jan. 2020
 namespace llvm {
 namespace opt_sched {
 
-typedef double pheremone_t;
+typedef double pheromone_t;
 
 // If set to 1 ACO is run on device
-#define DEV_ACO 0
-// setting to 1 locks ACO to 10 iterations
+#define DEV_ACO 1
+// setting to 1 locks ACO to iterations_without_improvement iterations
 #define RUNTIME_TESTING 0
 #define REGION_MIN_SIZE 200
-#define NUMBLOCKS 20
-#define NUMTHREADSPERBLOCK 128
+#define NUMBLOCKS 40
+#define NUMTHREADSPERBLOCK 64
 #define NUMTHREADS NUMBLOCKS * NUMTHREADSPERBLOCK
+
+enum class DCF_OPT {
+  OFF,
+  GLOBAL_ONLY,
+  GLOBAL_AND_TIGHTEN,
+  GLOBAL_AND_ITERATION
+};
 
 struct Choice {
   SchedInstruction *inst;
-  double heuristic; // range 0 to 1
+  double heuristic; // range 1 to 2
+  InstCount readyOn; // number of cycles until this instruction becomes ready
 };
 
 class ACOScheduler : public ConstrainedScheduler {
@@ -54,8 +62,8 @@ public:
   void setInitialSched(InstSchedule *Sched);
   // Copies the objects pointed to by ACOSched to device
   void CopyPointersToDevice(ACOScheduler *dev_ACOSchedur);
-  // Copies the current pheremone values to device pheremone array
-  void CopyPheremonesToDevice(ACOScheduler *dev_AcoSchdulr);
+  // Copies the current pheromone values to device pheromone array
+  void CopyPheromonesToDevice(ACOScheduler *dev_AcoSchdulr);
   // Calls cudaFree on all arrays/objects that were allocated with cudaMalloc
   void FreeDevicePointers();
   // Allocates device arrays of size NUMTHREADS of dynamic variables to allow
@@ -67,33 +75,29 @@ public:
   InstSchedule *FindOneSchedule(InstSchedule *dev_schedule = NULL, 
 		                DeviceVector<Choice> *dev_ready = NULL);
   __host__ __device__
-  void UpdatePheremone(InstSchedule *schedule);
-  // Copies pheremone table to passed shared memory array
+  void UpdatePheromone(InstSchedule *schedule);
+  // Copies pheromone table to passed shared memory array
   __device__ 
-  void CopyPheremonesToSharedMem(double *s_pheremone);
+  void CopyPheromonesToSharedMem(double *s_pheromone);
 
 private:
   __host__ __device__
-  pheremone_t &Pheremone(SchedInstruction *from, SchedInstruction *to);
+  pheromone_t &Pheromone(SchedInstruction *from, SchedInstruction *to);
   __host__ __device__
-  pheremone_t &Pheremone(InstCount from, InstCount to);
+  pheromone_t &Pheromone(InstCount from, InstCount to);
   __host__ __device__
   double Score(SchedInstruction *from, Choice choice);
 
   __host__ __device__
-  void PrintPheremone();
+  void PrintPheromone();
 
   __host__ __device__
-  SchedInstruction *SelectInstruction(DeviceVector<Choice> &ready,
-                                      SchedInstruction *lastInst);
-  //__host__ __device__
-  //void UpdatePheremone(InstSchedule *schedule);
-  //__host__ __device__
-  //InstSchedule *FindOneSchedule(InstSchedule *dev_schedule = NULL);
-  DeviceVector<pheremone_t> pheremone_;
-  // True if pheremone_.elmnts_ alloced on device
-  bool dev_pheremone_elmnts_alloced_;
-  pheremone_t initialValue_;
+  Choice SelectInstruction(DeviceVector<Choice> &ready, 
+                           SchedInstruction *lastInst);
+  DeviceVector<pheromone_t> pheromone_;
+  // True if pheromone_.elmnts_ alloced on device
+  bool dev_pheromone_elmnts_alloced_;
+  pheromone_t initialValue_;
   bool use_fixed_bias;
   int count_;
   int heuristicImportance_;
@@ -107,6 +111,11 @@ private:
   bool print_aco_trace;
   InstSchedule *InitialSchedule;
   bool VrfySched_;
+  bool IsPostBB;
+  bool IsTwoPassEn;
+  pheromone_t ScRelMax;
+  DCF_OPT DCFOption;
+  SPILL_COST_FUNCTION DCFCostFn;
   DataDepGraph *dev_DDG_;
   DeviceVector<Choice> *dev_ready_;
   MachineModel *dev_MM_;
