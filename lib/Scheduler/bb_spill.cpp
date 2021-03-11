@@ -932,6 +932,9 @@ void BBWithSpill::UpdtOptmlSchedScndPss(InstSchedule *crntSched,
     SetBestSchedLength(crntSched->GetCrntLngth());
     enumBestSched_->Copy(crntSched);
     bestSched_ = enumBestSched_;
+
+    if (!enumFoundSchedule())
+      setEnumFoundSchedule();
   }
 }
 

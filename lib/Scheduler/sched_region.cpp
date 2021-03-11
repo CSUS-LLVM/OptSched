@@ -106,6 +106,7 @@ SchedRegion::SchedRegion(MachineModel *machMdl, DataDepGraph *dataDepGraph,
   schedUprBound_ = INVALID_VALUE;
 
   spillCostFunc_ = spillCostFunc;
+  EnumFoundSchedule = false;
 
   DumpDDGs_ = GetDumpDDGs();
   DDGDumpPath_ = GetDDGDumpPath();
@@ -310,7 +311,7 @@ FUNC_RESULT SchedRegion::FindOptimalSchedule(
   // to the DDG. Some mutations were adding artificial edges which caused a
   // conflict with the sequential scheduler. Therefore, wait until the
   // sequential scheduler is done before adding artificial edges.
-  if (IsSecondPass()) {
+  if (IsSecondPass() && EnableMutations) {
     static_cast<OptSchedDDGWrapperBasic *>(dataDepGraph_)->addArtificialEdges();
     rslt = dataDepGraph_->UpdateSetupForSchdulng(needTransitiveClosure);
     if (rslt != RES_SUCCESS) {
@@ -823,47 +824,60 @@ void SchedRegion::CmputLwrBounds_(bool useFileBounds) {
   RelaxedScheduler *rlxdSchdulr = NULL;
   RelaxedScheduler *rvrsRlxdSchdulr = NULL;
   InstCount rlxdUprBound = dataDepGraph_->GetAbslutSchedUprBound();
+  UDT_GLABEL MaxLatency = dataDepGraph_->GetMaxLtncy();
 
-  switch (lbAlg_) {
-  case LBA_LC:
-    rlxdSchdulr = new LC_RelaxedScheduler(dataDepGraph_, machMdl_, rlxdUprBound,
-                                          DIR_FRWRD);
-    rvrsRlxdSchdulr = new LC_RelaxedScheduler(dataDepGraph_, machMdl_,
-                                              rlxdUprBound, DIR_BKWRD);
-    break;
-  case LBA_RJ:
-    rlxdSchdulr = new RJ_RelaxedScheduler(dataDepGraph_, machMdl_, rlxdUprBound,
-                                          DIR_FRWRD, RST_STTC);
-    rvrsRlxdSchdulr = new RJ_RelaxedScheduler(
-        dataDepGraph_, machMdl_, rlxdUprBound, DIR_BKWRD, RST_STTC);
-    break;
-  }
+  // If the minimum latency is less than one then we don't need to estimate the
+  // schedule length lower bound. The lower bound should be the sum of the
+  // number of instructions.
+  if (MaxLatency > 1) {
 
-  InstCount frwrdLwrBound = 0;
-  InstCount bkwrdLwrBound = 0;
-  frwrdLwrBound = rlxdSchdulr->FindSchedule();
-  bkwrdLwrBound = rvrsRlxdSchdulr->FindSchedule();
-  InstCount rlxdLwrBound = std::max(frwrdLwrBound, bkwrdLwrBound);
+    switch (lbAlg_) {
+    case LBA_LC:
+      rlxdSchdulr = new LC_RelaxedScheduler(dataDepGraph_, machMdl_,
+                                            rlxdUprBound, DIR_FRWRD);
+      rvrsRlxdSchdulr = new LC_RelaxedScheduler(dataDepGraph_, machMdl_,
+                                                rlxdUprBound, DIR_BKWRD);
+      break;
+    case LBA_RJ:
+      rlxdSchdulr = new RJ_RelaxedScheduler(dataDepGraph_, machMdl_,
+                                            rlxdUprBound, DIR_FRWRD, RST_STTC);
+      rvrsRlxdSchdulr = new RJ_RelaxedScheduler(
+          dataDepGraph_, machMdl_, rlxdUprBound, DIR_BKWRD, RST_STTC);
+      break;
+    }
 
-  assert(rlxdLwrBound >= schedLwrBound_);
+    InstCount frwrdLwrBound = 0;
+    InstCount bkwrdLwrBound = 0;
+    frwrdLwrBound = rlxdSchdulr->FindSchedule();
+    bkwrdLwrBound = rvrsRlxdSchdulr->FindSchedule();
+    InstCount rlxdLwrBound = std::max(frwrdLwrBound, bkwrdLwrBound);
 
-  if (rlxdLwrBound > schedLwrBound_)
-    schedLwrBound_ = rlxdLwrBound;
+    assert(rlxdLwrBound >= schedLwrBound_);
+
+    if (rlxdLwrBound > schedLwrBound_)
+      schedLwrBound_ = rlxdLwrBound;
 
 #ifdef IS_DEBUG_PRINT_BOUNDS
-  dataDepGraph_->PrintLwrBounds(DIR_FRWRD, Logger::GetLogStream(),
-                                "Relaxed Forward Lower Bounds");
-  dataDepGraph_->PrintLwrBounds(DIR_BKWRD, Logger::GetLogStream(),
-                                "Relaxed Backward Lower Bounds");
+    dataDepGraph_->PrintLwrBounds(DIR_FRWRD, Logger::GetLogStream(),
+                                  "Relaxed Forward Lower Bounds");
+    dataDepGraph_->PrintLwrBounds(DIR_BKWRD, Logger::GetLogStream(),
+                                  "Relaxed Backward Lower Bounds");
 #endif
+
+    delete rlxdSchdulr;
+    delete rvrsRlxdSchdulr;
+  } else {
+    if (dataDepGraph_->GetInstCnt() > schedLwrBound_)
+      Logger::Fatal(
+          "Previous schedule lower bound is %d but new lower bound is %d",
+          schedLwrBound_, dataDepGraph_->GetInstCnt());
+    schedLwrBound_ = dataDepGraph_->GetInstCnt();
+  }
 
   if (useFileBounds)
     UseFileBounds_();
 
   CmputAndSetCostLwrBound();
-
-  delete rlxdSchdulr;
-  delete rvrsRlxdSchdulr;
 }
 
 bool SchedRegion::CmputUprBounds_(InstSchedule *schedule, bool useFileBounds) {
@@ -993,7 +1007,10 @@ void SchedRegion::RegAlloc_(InstSchedule *&bestSched, InstSchedule *&lstSched) {
                 "num_loads", regAllocChoice->GetNumLoads());
 }
 
-void SchedRegion::InitSecondPass() { isSecondPass_ = true; }
+void SchedRegion::InitSecondPass(bool EnableMutations) {
+  this->EnableMutations = EnableMutations;
+  isSecondPass_ = true;
+}
 
 void SchedRegion::initTwoPassAlg() { TwoPassEnabled_ = true; }
 

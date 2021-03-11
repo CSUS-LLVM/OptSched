@@ -133,7 +133,7 @@ public:
   SPILL_COST_FUNCTION GetSpillCostFunc();
 
   // Initialize variables for the second pass of the two-pass-optsched
-  void InitSecondPass();
+  void InitSecondPass(bool EnableMutations);
 
   // Initialize variables to reflect that we are using two-pass version of
   // algorithm
@@ -142,6 +142,9 @@ public:
   bool isTwoPassEnabled() const { return TwoPassEnabled_; }
 
   bool IsSecondPass() const { return isSecondPass_; }
+
+  bool enumFoundSchedule() { return EnumFoundSchedule; }
+  void setEnumFoundSchedule() { EnumFoundSchedule = true; }
 
 private:
   // The algorithm to use for calculated lower bounds.
@@ -170,6 +173,13 @@ private:
 
   // Used for two-pass-optsched to enable second pass functionalies.
   bool isSecondPass_;
+
+  /// If mutations are enabled then the sequential list scheduler must ignore
+  /// artificial edges when scheduling then add them back in after scheduling.
+  bool EnableMutations;
+
+  /// Indicate whether the B&B enumerator found any schedule.
+  bool EnumFoundSchedule;
 
   // The absolute cost lower bound to be used as a ref for normalized costs.
   InstCount costLwrBound_ = 0;
