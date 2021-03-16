@@ -10,7 +10,7 @@
 
 using namespace llvm::opt_sched;
 
-#define IS_DEBUG_ILP_GRAPH_TRANS
+// #define IS_DEBUG_ILP_GRAPH_TRANS
 
 #ifdef IS_DEBUG_ILP_GRAPH_TRANS
 #define DEBUG_LOG(...) Logger::Info(__VA_ARGS__)
