@@ -435,7 +435,7 @@ void ScheduleDAGOptSched::schedule() {
       OST.get(), static_cast<DataDepGraph *>(DDG.get()), 0, HistTableHashBits,
       LowerBoundAlgorithm, HeuristicPriorities, EnumPriorities, VerifySchedule,
       PruningStrategy, SchedForRPOnly, EnumStalls, SCW, SCF, HeurSchedType,
-      GraphTransPosition);
+      SecondPass ? GraphTransPosition2ndPass : GraphTransPosition);
 
   bool IsEasy = false;
   InstCount NormBestCost = 0;
@@ -610,6 +610,8 @@ void ScheduleDAGOptSched::loadOptSchedConfig() {
   OPTSCHED_gPrintSpills = shouldPrintSpills();
   GraphTransPosition =
       parseGraphTransPosition(schedIni.GetString("GT_POSITION"));
+  GraphTransPosition2ndPass =
+      parseGraphTransPosition(schedIni.GetString("2ND_PASS_GT_POSITION"));
   StaticNodeSup = schedIni.GetBool("STATIC_NODE_SUPERIORITY", false);
   MultiPassStaticNodeSup =
       schedIni.GetBool("MULTI_PASS_NODE_SUPERIORITY", false);

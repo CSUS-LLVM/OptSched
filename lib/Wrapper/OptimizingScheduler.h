@@ -200,6 +200,7 @@ protected:
   SchedPriorities SecondPassEnumPriorities;
 
   GT_POSITION GraphTransPosition = GT_POSITION::NONE;
+  GT_POSITION GraphTransPosition2ndPass = GT_POSITION::NONE;
 
   // Static node superiority RP only graph transformation.
   bool StaticNodeSup;
