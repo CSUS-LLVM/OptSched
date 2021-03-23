@@ -5,10 +5,10 @@ import inspect
 from inspect import Parameter
 import functools
 import argparse
-from ..analyze import logs
-from ..analyze import import_cpu2006
-from ..analyze import import_plaidml
-from ..analyze import import_shoc
+from . import logs
+from . import import_cpu2006
+from . import import_plaidml
+from . import import_shoc
 
 
 def _get_annotations(sig: inspect.Signature):
@@ -39,16 +39,18 @@ def _compute_options(parser: argparse.ArgumentParser, sig: inspect.Signature, *,
                 abbrev = paraminfo[param.name]['abbrev']
                 args.append(f'-{abbrev}')
             args.append(f'--{param.name}')
+            is_positional = False
         else:
             args.append(param.name)
+            is_positional = True
 
         the_type = param.annotation
-        if type(the_type) is type:
+        if the_type != Parameter.empty and type(the_type) is type:
             kwargs['type'] = the_type
 
         if param.default != Parameter.empty:
             kwargs['default'] = param.default
-        else:
+        elif not is_positional:
             kwargs['required'] = True
 
         if param.name in paraminfo and 'help' in paraminfo[param.name]:
@@ -79,7 +81,7 @@ class AnalyzerDecorator:
             choices=('spec', 'plaidml', 'shoc'),
             help='Select the benchmark suite which the input satisfies. Valid options: spec, plaidml, shoc',
         )
-        _compute_options(parser, self._sig, self._paraminfo)
+        _compute_options(parser, self._sig, paraminfo=self._paraminfo)
 
         args = vars(parser.parse_args())
 
@@ -88,36 +90,31 @@ class AnalyzerDecorator:
             'plaidml': import_plaidml.parse,
             'shoc': import_shoc.parse,
         }
-        parser = FILE_PARSERS[args.benchsuite]
+        parser = FILE_PARSERS[args['benchsuite']]
 
         for arg, value in args.items():
             if arg in self._logs_args:
                 args[arg] = parser(value)
 
-        params = self._sig.bind(**args)
-        return self(*params.args, **params.kwargs)
+        positional = []
+        kwargs = {}
+        for name, param in self._sig.parameters.items():
+            if param.kind in (Parameter.POSITIONAL_ONLY, Parameter.POSITIONAL_OR_KEYWORD):
+                positional.append(args[name])
+            else:
+                assert param.kind == Parameter.KEYWORD_ONLY
+                kwargs[name] = args[name]
+
+        return self(*positional, **kwargs)
 
 
 def analyzer(analyzer_fn=None, **paraminfo):
     def _decorate(analyzer_fn):
-        functools.wraps(analyzer_fn)(AnalyzerDecorator(analyzer_fn, paraminfo))
+        return functools.wraps(analyzer_fn)(AnalyzerDecorator(analyzer_fn, paraminfo))
 
     if analyzer_fn is not None:
         return _decorate(analyzer_fn)
     return _decorate
-
-
-@analyzer
-def find_negative_blocks(first, second):
-    logs = zip((blk for blk in first if 'NodeExamineCount' in blk),
-               (blk for blk in second if 'NodeExamineCount' in blk))
-    logs = [(f.single('ProcessDag')['name'],
-             f.single('NodeExamineCount')['num_nodes'] - s.single('NodeExamineCount')['num_nodes'])
-            for f, s in logs]
-    logs = [(name, diff) for name, diff in logs if diff < 0]
-    logs = list(sorted(logs, key=lambda x: x[1]))
-
-    return logs
 
 
 class Analyzer:
