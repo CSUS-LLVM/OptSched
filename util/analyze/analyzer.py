@@ -1,5 +1,6 @@
 import csv
-import sys
+import json
+import fnmatch
 
 import inspect
 from inspect import Parameter
@@ -38,7 +39,8 @@ def _compute_options(parser: argparse.ArgumentParser, sig: inspect.Signature, *,
             if param.name in paraminfo and 'abbrev' in paraminfo[param.name]:
                 abbrev = paraminfo[param.name]['abbrev']
                 args.append(f'-{abbrev}')
-            args.append(f'--{param.name}')
+            name = param.name.replace('_', '-')
+            args.append(f'--{name}')
             is_positional = False
         else:
             args.append(param.name)
@@ -81,9 +83,32 @@ class AnalyzerDecorator:
             choices=('spec', 'plaidml', 'shoc'),
             help='Select the benchmark suite which the input satisfies. Valid options: spec, plaidml, shoc',
         )
+        parser.add_argument(
+            '--keep-blocks-if',
+            default='{}',
+            help='Keep blocks matching (JSON format)',
+        )
         _compute_options(parser, self._sig, paraminfo=self._paraminfo)
 
         args = vars(parser.parse_args())
+        blk_filter = json.loads(args['keep_blocks_if'])
+
+        def log_matches(log, pattern):
+            if not isinstance(pattern, dict):
+                if isinstance(pattern, str):
+                    return fnmatch.fnmatchcase(str(log), pattern)
+                return log == pattern
+
+            return all(
+                k in log and log_matches(log[k], v)
+                for k, v in pattern.items()
+            )
+
+        def blk_filter_f(blk):
+            return all(
+                event in blk and all(log_matches(log, matcher) for log in blk[event])
+                for event, matcher in blk_filter.items()
+            )
 
         FILE_PARSERS = {
             'spec': import_cpu2006.parse,
@@ -94,7 +119,7 @@ class AnalyzerDecorator:
 
         for arg, value in args.items():
             if arg in self._logs_args:
-                args[arg] = parser(value)
+                args[arg] = parser(value).keep_blocks_if(blk_filter_f)
 
         positional = []
         kwargs = {}

@@ -45,6 +45,9 @@ class Logs:
         benchmarks = ','.join(b.name for b in self.benchmarks)
         return f'<Logs({benchmarks})>'
 
+    def keep_blocks_if(self, p):
+        return Logs([bench.keep_blocks_if(p) for bench in self.benchmarks])
+
 
 class Benchmark:
     '''
@@ -70,6 +73,9 @@ class Benchmark:
 
     def __repr__(self):
         return f'<Benchmark({self.info}, {len(self.blocks)} blocks)>'
+
+    def keep_blocks_if(self, p):
+        return Benchmark(self.info, [blk for blk in self.blocks if p(blk)])
 
 
 class Block:
@@ -123,3 +129,6 @@ class Block:
 
     def __repr__(self):
         return f'<Block({self.info}, {len(self.events)} events)>'
+
+    def uniqueid(self):
+        return frozenset(self.info.items())
