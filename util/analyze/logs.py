@@ -24,19 +24,6 @@ class Logs:
 
         return self
 
-    def all_blocks(self):
-        '''
-        Iterates over the blocks in every benchmark
-        '''
-        for bench in self.benchmarks:
-            yield from bench.blocks
-
-    def __getitem__(self, benchname):
-        '''
-        Gets the becnhmark with the specified name
-        '''
-        return self.benchmark(benchname)
-
     def benchmark(self, name):
         '''
         Gets the benchmark with the specified name
@@ -48,7 +35,11 @@ class Logs:
         raise KeyError(f'No benchmark `{name}` in this Logs')
 
     def __iter__(self):
-        return iter(self.benchmarks)
+        '''
+        Iterates over the blocks in every benchmark
+        '''
+        for bench in self.benchmarks:
+            yield from bench.blocks
 
     def __repr__(self):
         benchmarks = ','.join(b.name for b in self.benchmarks)
@@ -73,8 +64,9 @@ class Benchmark:
     def __iter__(self):
         return iter(self.blocks)
 
-    def all_blocks(self):
-        return self
+    @property
+    def benchmarks(self):
+        return (self,)
 
     def __repr__(self):
         return f'<Benchmark({self.info}, {len(self.blocks)} blocks)>'
