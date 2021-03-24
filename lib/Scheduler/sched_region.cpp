@@ -866,13 +866,8 @@ void SchedRegion::CmputLwrBounds_(bool useFileBounds) {
 
     delete rlxdSchdulr;
     delete rvrsRlxdSchdulr;
-  } else {
-    if (dataDepGraph_->GetInstCnt() > schedLwrBound_)
-      Logger::Fatal(
-          "Previous schedule lower bound is %d but new lower bound is %d",
-          schedLwrBound_, dataDepGraph_->GetInstCnt());
+  } else
     schedLwrBound_ = dataDepGraph_->GetInstCnt();
-  }
 
   if (useFileBounds)
     UseFileBounds_();
