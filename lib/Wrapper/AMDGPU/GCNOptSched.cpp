@@ -74,7 +74,7 @@ void ScheduleDAGOptSchedGCN::finalizeSchedule() {
   if (TwoPassEnabled && OptSchedEnabled) {
     initSchedulers();
     RescheduleRegions.resize(Regions.size());
-    RescheduleRegions.reset();
+    RescheduleRegions.set();
 
     LLVM_DEBUG(dbgs() << "Starting two pass scheduling approach\n");
     TwoPassSchedulingStarted = true;

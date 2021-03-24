@@ -865,7 +865,14 @@ void ScheduleDAGOptSched::scheduleOptSchedMinRP() {
   LengthTimeout = FirstPassLengthTimeout;
   HeurSchedType = SCHED_LIST;
 
+  // Disable relaxed scheduling pruning since we already know what the minimum
+  // length should be in the occupancy pass
+  bool Temp1 = PruningStrategy.rlxd;
+  PruningStrategy.rlxd = false;
+
   schedule();
+
+  PruningStrategy.rlxd = Temp1;
 }
 
 void ScheduleDAGOptSched::scheduleOptSchedBalanced() {
@@ -909,7 +916,7 @@ void ScheduleDAGOptSched::scheduleWithReducedLatencies() {
   // We do not want to run the enumerator again for the regions that does not
   // need re-scheduling.
   if (!RescheduleRegions[RegionNumber + 1]) {
-    RegionNumber += 1;
+    RegionNumber++;
     return;
   }
 
