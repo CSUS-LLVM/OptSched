@@ -474,7 +474,7 @@ void OptSchedDDGWrapperBasic::convertEdges(const SUnit &SU,
 
     CreateEdge_(SU.NodeNum, I->getSUnit()->NodeNum, Latency, DepType,
                 IsArtificial);
-    }
+  }
 }
 
 void OptSchedDDGWrapperBasic::convertSUnit(const SUnit &SU) {
