@@ -52,11 +52,11 @@ void ScheduleDAGOptSchedGCN::initSchedulers() {
   // SchedPasses.push_back(GCNMaxOcc);
   // Add passes in the corresponding order that they are inserted.
   for (auto const &Pass : PassOrder) {
-    if (Pass == "1") // MinRP pass
+    if (Pass == "OCC") // MinRP pass
       SchedPasses.push_back(OptSchedMaxOcc);
-    else if (Pass == "2") // Regular ILP Pass
+    else if (Pass == "ILP") // Regular ILP Pass
       SchedPasses.push_back(OptSchedBalanced);
-    else if (Pass == "3") // ILP Reduced Latency Pass
+    else if (Pass == "ILP_RL") // ILP Reduced Latency Pass
       SchedPasses.push_back(OptSchedReducedLatency);
     else
       llvm::report_fatal_error("Invalid value for pass order: " + Pass, false);
