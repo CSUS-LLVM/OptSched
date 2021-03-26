@@ -256,7 +256,7 @@ void ScheduleDAGOptSched::SetupLLVMDag() {
 // Add the two passes used for the two pass scheduling approach
 void ScheduleDAGOptSched::initSchedulers() {
   // Add passes in the corresponding order that they are inserted.
-  for (auto const &Pass : PassOrder) {
+  for (const auto &Pass : PassOrder) {
     if (Pass == "OCC") // MinRP pass
       SchedPasses.push_back(OptSchedMinRP);
     else if (Pass == "ILP") // Regular ILP Pass

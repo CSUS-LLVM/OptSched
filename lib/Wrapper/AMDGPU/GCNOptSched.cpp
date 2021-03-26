@@ -51,7 +51,7 @@ ScheduleDAGOptSchedGCN::ScheduleDAGOptSchedGCN(
 void ScheduleDAGOptSchedGCN::initSchedulers() {
   // SchedPasses.push_back(GCNMaxOcc);
   // Add passes in the corresponding order that they are inserted.
-  for (auto const &Pass : PassOrder) {
+  for (const auto &Pass : PassOrder) {
     if (Pass == "OCC") // MinRP pass
       SchedPasses.push_back(OptSchedMaxOcc);
     else if (Pass == "ILP") // Regular ILP Pass
