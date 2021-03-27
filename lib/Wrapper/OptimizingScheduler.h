@@ -14,6 +14,7 @@
 #include "opt-sched/Scheduler/data_dep.h"
 #include "opt-sched/Scheduler/graph_trans.h"
 #include "opt-sched/Scheduler/sched_region.h"
+#include "llvm/ADT/BitVector.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/CodeGen/MachineScheduler.h"
 #include "llvm/Support/Debug.h"
@@ -31,7 +32,12 @@ class OptSchedDDGWrapperBasic;
 class ScheduleDAGOptSched : public ScheduleDAGMILive {
 
 private:
-  enum SchedPassStrategy { OptSchedMinRP, OptSchedBalanced };
+  enum SchedPassStrategy {
+    OptSchedMinRP,
+    OptSchedBalanced,
+    OptSchedReducedLatency,
+    OptSchedSeqScheduler
+  };
 
   // Vector of scheduling passes to execute.
   SmallVector<SchedPassStrategy, 4> SchedPasses;
@@ -87,9 +93,39 @@ protected:
   // instead of the original one pass scheduling.
   bool TwoPassEnabled;
 
+  /// The order of the passes to execute.
+  std::list<std::string> PassOrder;
+
   // Flag indicating whether or not the two pass scheduling approach
   // has started. The two pass scheduling approach starts in finalizeSchedule.
   bool TwoPassSchedulingStarted;
+
+  /// Flag indicating whether or not the ILP Reduced Latency pass has started.
+  bool LatencyPassStarted;
+
+  /// Settings to control the ILP Reduced Latencies pass
+  /// If latency for an edge is greater than this amount then reduce the
+  /// latency by
+  int LatencyTarget;
+
+  /// Settings to control the ILP Reduced Latencies pass
+  /// The amount to divide the original latency by.
+  int LatencyDivisor;
+
+  /// Settings to control the ILP Reduced Latencies pass
+  /// The minimum amount latency can be reduced to.
+  int LatencyMinimun;
+
+  /// Flag indicating whether or not to run another pass with actual latencies.
+  /// This is useful for gathering actual schedule length data but can be
+  /// disabled if schedule length data is not required.
+  bool CompileTimeDataPass;
+
+  /// Begin recording regions that we want to reschedule
+  bool RecordTimedOutRegions;
+
+  /// Store which region to reschedule.
+  llvm::BitVector RescheduleRegions;
 
   // Precision of latency info
   LATENCY_PRECISION LatencyPrecision;
@@ -249,11 +285,26 @@ public:
   // Run OptSched in ILP/RP balanced mode.
   virtual void scheduleOptSchedBalanced();
 
+  /// If any region timed out then re-schedule them with the latencies reduced
+  /// artificially.
+  void scheduleWithReducedLatencies();
+
+  /// Compile-time data gathering pass for the ILP Reduced Latency pass.
+  void scheduleWithSeqScheduler();
+
   // Print info for all LLVM registers that are used or defined in the region.
   void dumpLLVMRegisters() const;
 
   // Getter for region number
   int getRegionNum() const { return RegionNumber; }
+
+  int getLatencyTarget() const { return LatencyTarget; }
+
+  int getLatencyDivisor() const { return LatencyDivisor; }
+
+  int getLatencyMinimun() const { return LatencyMinimun; }
+
+  bool reducedLatencyPassStarted() const { return LatencyPassStarted; }
 
   // Return the boundary instruction for this region if it is not a sentinel
   // value.
