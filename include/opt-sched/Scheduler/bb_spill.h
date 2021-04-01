@@ -63,7 +63,7 @@ private:
   // each thread by parallel ACO
   WeightedBitVector **dev_livePhysRegs_;
 
-  // Sum of lengths of live ranges. This vector is indexed by register type,
+  // Sum of lengths of live ranges. This array is indexed by register type,
   // and each type will have its sum of live interval lengths computed.
   int *sumOfLiveIntervalLengths_;
   // pointer to a device array used to store sumOfLiveIntervalLengths_ for
@@ -126,6 +126,7 @@ private:
   // each thread by parallel ACO
   InstCount *dev_slilSpillCost_;
   bool trackLiveRangeLngths_;
+  bool NeedsComputeSLIL;
 
   // Virtual Functions:
   // Given a schedule, compute the cost function value
@@ -160,6 +161,12 @@ private:
   void UpdateSpillInfoForSchdul_(SchedInstruction *inst, bool trackCnflcts);
   void UpdateSpillInfoForUnSchdul_(SchedInstruction *inst);
   void SetupPhysRegs_();
+  // can only compute SLIL if SLIL was the spillCostFunc
+  // This function must only be called after the regPressures_ is computed
+  InstCount CmputCostForFunction(SPILL_COST_FUNCTION SpillCF);
+  // Device version of above function
+  __device__
+  InstCount Dev_CmputCostForFunction(SPILL_COST_FUNCTION SpillCF);
   __host__ __device__
   void CmputCrntSpillCost_();
   bool ChkSchedule_(InstSchedule *bestSched, InstSchedule *lstSched);
@@ -175,7 +182,9 @@ public:
 	      MachineModel *dev_machMdl);
   ~BBWithSpill();
 
-  int CmputCostLwrBound();
+  InstCount CmputCostLwrBound();
+  InstCount CmputExecCostLwrBound();
+  InstCount CmputRPCostLwrBound();
 
   InstCount UpdtOptmlSched(InstSchedule *crntSched,
                            LengthCostEnumerator *enumrtr);

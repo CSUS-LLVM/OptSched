@@ -199,7 +199,7 @@ public:
   virtual ~DataDepGraph();
 
   //Prevent DDG from being abstract, these should not actually be invoked
-  virtual void convertSUnits() {
+  virtual void convertSUnits(bool IgnoreRealEdges, bool IgnoreArtificialEdges) {
     Logger::Fatal("Wrong convertSUnits called");
   }
 
@@ -702,6 +702,12 @@ private:
   // The schedule's spill cost according to the cost function used
   InstCount spillCost_;
 
+  // The normalized spill cost (absolute Spill Cost - lower bound of spill cost)
+  InstCount NormSpillCost;
+
+  // Stores the spill cost of other spill cost functions
+  InstCount storedSC[MAX_SCF_TYPES];
+
   // An array of peak reg pressures for all reg types in the schedule
   InstCount *peakRegPressures_;
   InstCount *dev_peakRegPressures_;
@@ -758,11 +764,20 @@ public:
   InstCount GetCost() const;
   __host__ __device__
   void SetExecCost(InstCount cost);
+  __host__ __device__
   InstCount GetExecCost() const;
   __host__ __device__
   void SetSpillCost(InstCount cost);
   __host__ __device__
   InstCount GetSpillCost() const;
+  __host__ __device__
+  void SetNormSpillCost(InstCount cost);
+  __host__ __device__
+  InstCount GetNormSpillCost() const;
+  __host__ __device__
+  void SetExtraSpillCost(SPILL_COST_FUNCTION Fn, InstCount cost);
+  __host__ __device__
+  InstCount GetExtraSpillCost(SPILL_COST_FUNCTION Fn) const;
 
   __host__ __device__
   void ResetInstIter();

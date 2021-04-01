@@ -62,6 +62,10 @@ public:
   // Returns the lower bound on the cost of this region.
   __host__ __device__
   inline int GetCostLwrBound() { return costLwrBound_; }
+  __host__ __device__
+  inline InstCount GetExecCostLwrBound() { return ExecCostLwrBound_; }
+  __host__ __device__
+  inline InstCount GetRPCostLwrBound() { return RpCostLwrBound_; }
   // Returns the best cost found so far for this region.
   inline InstCount GetBestCost() { return bestCost_; }
   // Returns the heuristic cost for this region.
@@ -122,6 +126,7 @@ public:
   virtual void CopyPointersToDevice(SchedRegion* dev_rgn, int numThreads) = 0;
   __host__ __device__
   MachineModel *GetMM() { return machMdl_; }
+  __host__ __device__
   bool IsSecondPass() const { return isSecondPass_; }
 
 private:
@@ -188,6 +193,14 @@ protected:
   InstCount schedUprBound_;
   // TODO(max): Document.
   InstCount abslutSchedUprBound_;
+
+  // The absolute lower bound on the ILP/execution cost for normalized costs
+  InstCount ExecCostLwrBound_ = 0;
+
+  // The STATIC absolute lower bound for register pressure/spill cost
+  // THIS LOWER BOUND IS NOT DYNAMIC.  It is used to get the static normalized
+  // cost of a schedule
+  InstCount RpCostLwrBound_ = 0;
 
   // TODO(max): Document.
   InstCount crntCycleNum_;
@@ -267,7 +280,8 @@ protected:
   //get size of SLIL array
   virtual const int GetSLIL_size_() const = 0;
 
-  FUNC_RESULT runACO(InstSchedule *ReturnSched, InstSchedule *InitSched);
+  FUNC_RESULT runACO(InstSchedule *ReturnSched, InstSchedule *InitSched,
+                     bool IsPostBB);
 };
 
 } // namespace opt_sched

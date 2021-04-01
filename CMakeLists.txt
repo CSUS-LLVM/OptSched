@@ -1,6 +1,5 @@
 cmake_minimum_required(VERSION 3.9)
 project(OptSched LANGUAGES CXX CUDA)
-#find_package(CUDA REQUIRED)
 #include_directories("${CUDA_INCLUDE_DIRS}")
 
 include(CTest)
@@ -27,9 +26,6 @@ SET(OPT_SCHED_DEBUG_FLAGS "")
 SET(CMAKE_CXX_FLAGS_DEBUG " -DIS_DEBUG")
 SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OPT_SCHED_DEBUG_FLAGS}")
 
-#does not work as intended flags
-#SET(CMAKE_CUDA_FLAGS "-G -Xcompiler \"-fPIC ${CMAKE_CUDA_FLAGS}\" --relocatable-device-code=true")
-
 SET(CUDA_SEPARABLE_COMPILATION ON)
 #SET(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
@@ -41,32 +37,34 @@ set(OPTSCHED_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR})
 set(OPTSCHED_BINARY_DIR ${CMAKE_CURRENT_BINARY_DIR})
 
 # OptSched sources
-SET(OPT_SCHED_SRCS Scheduler/aco.cpp
-  Scheduler/cuda_bb_spill.cu
+SET(OPT_SCHED_SRCS Scheduler/aco.cu
+  Scheduler/bb_spill.cpp
   Scheduler/buffers.cpp
   Scheduler/config.cpp
-  Scheduler/cuda_data_dep.cu
+  Scheduler/data_dep.cpp
   Scheduler/enumerator.cpp
-  Scheduler/cuda_gen_sched.cu
-  Scheduler/cuda_graph.cu
+  Scheduler/gen_sched.cpp
+  Scheduler/graph.cpp
   Scheduler/graph_trans.cpp
   Scheduler/hist_table.cpp
-  Scheduler/cuda_list_sched.cu
+  Scheduler/list_sched.cpp
   Scheduler/logger.cpp
   Scheduler/reg_alloc.cpp
   Scheduler/utilities.cpp
-  Scheduler/cuda_machine_model.cu
+  Scheduler/machine_model.cpp
   Scheduler/random.cpp
-  Scheduler/cuda_ready_list.cu
-  Scheduler/cuda_register.cu
+  Scheduler/ready_list.cpp
+  Scheduler/register.cpp
   Scheduler/relaxed_sched.cpp
-  Scheduler/cuda_sched_basic_data.cu
-  Scheduler/cuda_sched_region.cu
+  Scheduler/sched_basic_data.cpp
+  Scheduler/sched_region.cpp
   Scheduler/stats.cpp
   Wrapper/OptimizingScheduler.cpp
   Wrapper/OptSchedMachineWrapper.cpp
   Wrapper/OptSchedDDGWrapperBasic.cpp
   Wrapper/OptSchedGenericTarget.cpp)
+
+set_source_files_properties( Scheduler/aco.cpp PROPERTIES LANGUAGE CUDA )
 
 SET(OPT_SCHED_INCLUDE_DIRS ${CMAKE_CURRENT_SOURCE_DIR}/include)
 SET(OPT_SCHED_TARGET_DEPS "LLVMCodeGen")

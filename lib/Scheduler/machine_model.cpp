@@ -4,6 +4,7 @@
 // for setiosflags(), setprecision().
 #include "opt-sched/Scheduler/buffers.h"
 #include "opt-sched/Scheduler/logger.h"
+#include "opt-sched/Scheduler/dev_defines.h"
 #include <cassert>
 #include <iomanip>
 
@@ -20,8 +21,10 @@ MachineModel::MachineModel(const string &modelFile) {
 
   issueRate_ = buf.ReadIntSpec("ISSUE_RATE:");
 
-  issueTypes_.resize(buf.ReadIntSpec("ISSUE_TYPE_COUNT:"));
-  for (size_t j = 0; j < issueTypes_.size(); j++) {
+  issueTypes_size_ = buf.ReadIntSpec("ISSUE_TYPE_COUNT:");
+
+  issueTypes_ = new IssueTypeInfo[issueTypes_size_];
+  for (size_t j = 0; j < (size_t)issueTypes_size_; j++) {
     int pieceCnt;
     char *strngs[INBUF_MAX_PIECES_PERLINE];
     int lngths[INBUF_MAX_PIECES_PERLINE];
@@ -30,7 +33,8 @@ MachineModel::MachineModel(const string &modelFile) {
     if (pieceCnt != 2)
       Logger::Fatal("Invalid issue type spec");
 
-    issueTypes_[j].name = strngs[0];
+    strncpy((char *)issueTypes_[j].name, (const char *)strngs[0], 50);
+
     issueTypes_[j].slotsCount = atoi(strngs[1]);
   }
 
@@ -42,9 +46,9 @@ MachineModel::MachineModel(const string &modelFile) {
   dependenceLatencies_[DEP_OTHER] =
       (int16_t)buf.ReadIntSpec("DEP_LATENCY_OTHER:");
 
-  registerTypes_.resize(buf.ReadIntSpec("REG_TYPE_COUNT:"));
-
-  for (size_t i = 0; i < registerTypes_.size(); i++) {
+  registerTypes_size_ = buf.ReadIntSpec("REG_TYPE_COUNT:");
+  registerTypes_ = new RegTypeInfo[registerTypes_size_];
+  for (size_t i = 0; i < (size_t)registerTypes_size_; i++) {
     int pieceCnt;
     char *strngs[INBUF_MAX_PIECES_PERLINE];
     int lngths[INBUF_MAX_PIECES_PERLINE];
@@ -54,53 +58,56 @@ MachineModel::MachineModel(const string &modelFile) {
       Logger::Fatal("Invalid register type spec");
     }
 
-    registerTypes_[i].name = strngs[0];
+    strncpy((char *)registerTypes_[i].name, (const char *)strngs[0], 50);
+
     registerTypes_[i].count = atoi(strngs[1]);
   }
 
   // Read instruction types.
-  instTypes_.resize(buf.ReadIntSpec("INST_TYPE_COUNT:"));
+  instTypes_size_ = instTypes_alloc_ = buf.ReadIntSpec("INST_TYPE_COUNT:");
+  instTypes_ = new InstTypeInfo[instTypes_alloc_];
 
-  for (vector<InstTypeInfo>::iterator it = instTypes_.begin();
-       it != instTypes_.end(); it++) {
+  for (int i = 0; i < instTypes_size_; i++) {
     buf.ReadSpec("INST_TYPE:", buffer);
-    it->name = buffer;
-    it->isCntxtDep = (it->name.find("_after_") != string::npos);
+    strncpy((char *)instTypes_[i].name, (const char *)buffer, 50);
+
+    string tempName(instTypes_[i].name);
+    instTypes_[i].isCntxtDep = (tempName.find("_after_") != string::npos);
 
     buf.ReadSpec("ISSUE_TYPE:", buffer);
     IssueType issuType = GetIssueTypeByName(buffer);
 
     if (issuType == INVALID_ISSUE_TYPE) {
       Logger::Fatal("Invalid issue type %s for inst. type %s", buffer,
-                    it->name.c_str());
+                    instTypes_[i].name);
     }
 
-    it->issuType = issuType;
-    it->ltncy = (int16_t)buf.ReadIntSpec("LATENCY:");
-    it->pipelined = buf.ReadFlagSpec("PIPELINED:", true);
-    it->blksCycle = buf.ReadFlagSpec("BLOCKS_CYCLE:", false);
-    it->sprtd = buf.ReadFlagSpec("SUPPORTED:", true);
+    instTypes_[i].issuType = issuType;
+    instTypes_[i].ltncy = (int16_t)buf.ReadIntSpec("LATENCY:");
+    instTypes_[i].pipelined = buf.ReadFlagSpec("PIPELINED:", true);
+    instTypes_[i].blksCycle = buf.ReadFlagSpec("BLOCKS_CYCLE:", false);
+    instTypes_[i].sprtd = buf.ReadFlagSpec("SUPPORTED:", true);
   }
 }
 
 InstType MachineModel::GetInstTypeByName(const string &typeName,
                                          const string &prevName) const {
   string composite = prevName.size() ? typeName + "_after_" + prevName : "";
-  for (size_t i = 0; i < instTypes_.size(); i++) {
-    if (instTypes_[i].isCntxtDep && instTypes_[i].name == composite) {
+  for (size_t i = 0; i < (size_t)instTypes_size_; i++) {
+    if (instTypes_[i].isCntxtDep && (0 == strncmp(instTypes_[i].name, composite.c_str(), composite.length()))) {
       return (InstType)i;
-    } else if (!instTypes_[i].isCntxtDep && instTypes_[i].name == typeName) {
+    } else if (!instTypes_[i].isCntxtDep && (0 == strncmp(instTypes_[i].name, typeName.c_str(), typeName.length()))) {
       return (InstType)i;
     }
   }
-  //  Logger::Error("Unrecognized instruction type %s.", typeName.c_str());
+  //Logger::Error("Unrecognized instruction type %s.", typeName.c_str());
   return INVALID_INST_TYPE;
 }
 
 int16_t MachineModel::GetRegTypeByName(const char *const regTypeName) const {
   int16_t Type = INVALID_VALUE;
-  for (size_t i = 0; i < registerTypes_.size(); i++) {
-    if (regTypeName == registerTypes_[i].name) {
+  for (size_t i = 0; i < (size_t)registerTypes_size_; i++) {
+    if (0 == strncmp(regTypeName, (const char *)registerTypes_[i].name, 50)) {
       Type = (int16_t)i;
       break;
     }
@@ -112,8 +119,8 @@ int16_t MachineModel::GetRegTypeByName(const char *const regTypeName) const {
 
 IssueType
 MachineModel::GetIssueTypeByName(const char *const issuTypeName) const {
-  for (size_t i = 0; i < issueTypes_.size(); i++) {
-    if (issuTypeName == issueTypes_[i].name) {
+  for (size_t i = 0; i < (size_t)issueTypes_size_; i++) {
+    if (0 == strncmp(issuTypeName, (const char *)issueTypes_[i].name, 50)) {
       return (InstType)i;
     }
   }
@@ -121,18 +128,22 @@ MachineModel::GetIssueTypeByName(const char *const issuTypeName) const {
   return INVALID_ISSUE_TYPE;
 }
 
+__host__ __device__
 int MachineModel::GetPhysRegCnt(int16_t regType) const {
   return registerTypes_[regType].count;
 }
 
-const string &MachineModel::GetRegTypeName(int16_t regType) const {
+__host__ __device__
+const char *MachineModel::GetRegTypeName(int16_t regType) const {
   return registerTypes_[regType].name;
 }
 
+__host__ __device__
 IssueType MachineModel::GetIssueType(InstType instTypeCode) const {
   return instTypes_[instTypeCode].issuType;
 }
 
+__host__ __device__
 bool MachineModel::IsPipelined(InstType instTypeCode) const {
   return instTypes_[instTypeCode].pipelined;
 }
@@ -141,13 +152,23 @@ bool MachineModel::IsSupported(InstType instTypeCode) const {
   return instTypes_[instTypeCode].sprtd;
 }
 
+__host__ __device__
 bool MachineModel::BlocksCycle(InstType instTypeCode) const {
   return instTypes_[instTypeCode].blksCycle;
 }
 
+__host__ __device__
 bool MachineModel::IsRealInst(InstType instTypeCode) const {
   IssueType issuType = GetIssueType(instTypeCode);
-  return issueTypes_[issuType].name != "NULL";
+  bool match = true;
+  char nullstr[] = "NULL";
+
+  for (int i = 0; i < 4; i++) {
+    if (instTypes_[instTypeCode].name[i] != nullstr[i]);
+      match = false;
+  }
+
+  return match;
 }
 
 int16_t MachineModel::GetLatency(InstType instTypeCode,
@@ -159,35 +180,37 @@ int16_t MachineModel::GetLatency(InstType instTypeCode,
   }
 }
 
+__host__ __device__
 int MachineModel::GetSlotsPerCycle(IssueType issuType) const {
   return issueTypes_[issuType].slotsCount;
 }
 
+__host__ __device__
 int MachineModel::GetSlotsPerCycle(int slotsPerCycle[]) const {
-  for (size_t i = 0; i < issueTypes_.size(); i++) {
+  for (size_t i = 0; i < (size_t)issueTypes_size_; i++) {
     slotsPerCycle[i] = issueTypes_[i].slotsCount;
   }
-  return issueTypes_.size();
+  return issueTypes_size_;
 }
 
 const char *MachineModel::GetInstTypeNameByCode(InstType typeCode) const {
-  return instTypes_[typeCode].name.c_str();
+  return instTypes_[typeCode].name;
 }
 
 const char *MachineModel::GetIssueTypeNameByCode(IssueType typeCode) const {
-  return issueTypes_[typeCode].name.c_str();
+  return issueTypes_[typeCode].name;
 }
 
 bool MachineModel::IsBranch(InstType instTypeCode) const {
-  return instTypes_[instTypeCode].name == "br";
+  return (0 == strncmp((const char *)instTypes_[instTypeCode].name, "br", 2));
 }
 
 bool MachineModel::IsArtificial(InstType instTypeCode) const {
-  return instTypes_[instTypeCode].name == "artificial";
+  return (0 == strncmp((const char *)instTypes_[instTypeCode].name, "artificial", 10));
 }
 
 bool MachineModel::IsCall(InstType instTypeCode) const {
-  return instTypes_[instTypeCode].name == "call";
+  return (0 == strncmp((const char *)instTypes_[instTypeCode].name, "call", 4));
 }
 
 bool MachineModel::IsFloat(InstType instTypeCode) const {
@@ -199,7 +222,41 @@ void MachineModel::AddInstType(InstTypeInfo &instTypeInfo) {
   if (!instTypeInfo.pipelined)
     includesUnpipelined_ = true;
 
-  instTypes_.push_back(std::move(instTypeInfo));
+  if (instTypes_size_ == instTypes_alloc_) {  //double size of array if full
+    if (instTypes_alloc_ > 0)
+      instTypes_alloc_ *= 2;
+    else
+      instTypes_alloc_ = 2;
+    InstTypeInfo *newArray = new InstTypeInfo[instTypes_alloc_];
+    //copy old array to new array
+    for (int i = 0; i < instTypes_size_; i++) {
+      strncpy((char *)newArray[i].name, (const char *)instTypes_[i].name, 50);
+
+      //debug
+      printf("copy inst instTypes_[%d].name : %s\n", i, instTypes_[i].name);
+
+      newArray[i].isCntxtDep = instTypes_[i].isCntxtDep;
+      newArray[i].issuType = instTypes_[i].issuType;
+      newArray[i].ltncy = instTypes_[i].ltncy;
+      newArray[i].pipelined = instTypes_[i].pipelined;
+      newArray[i].sprtd = instTypes_[i].sprtd;
+      newArray[i].blksCycle = instTypes_[i].blksCycle;
+    }
+    //delete old array
+    delete[] instTypes_;
+    //set new array as instTypes_
+    instTypes_ = newArray;
+  }
+  //copy element to next open slot
+  strncpy((char *)instTypes_[instTypes_size_].name, (const char*)instTypeInfo.name, 50);
+
+  instTypes_[instTypes_size_].issuType = instTypeInfo.issuType;
+  instTypes_[instTypes_size_].isCntxtDep = instTypeInfo.isCntxtDep;
+  instTypes_[instTypes_size_].ltncy = instTypeInfo.ltncy;
+  instTypes_[instTypes_size_].pipelined = instTypeInfo.pipelined;
+  instTypes_[instTypes_size_].sprtd = instTypeInfo.sprtd;
+  instTypes_[instTypes_size_].blksCycle = instTypeInfo.blksCycle;
+  instTypes_size_++;
 }
 
 InstType MachineModel::getDefaultInstType() const {
@@ -212,12 +269,56 @@ InstType MachineModel::getDefaultIssueType() const {
 
 const string &MachineModel::GetModelName() const { return mdlName_; }
 
-int MachineModel::GetInstTypeCnt() const { return instTypes_.size(); }
+__host__ __device__
+int MachineModel::GetInstTypeCnt() const { return instTypes_size_; }
 
-int MachineModel::GetIssueTypeCnt() const { return issueTypes_.size(); }
+__host__ __device__
+int MachineModel::GetIssueTypeCnt() const { return issueTypes_size_; }
 
+__host__ __device__
 int MachineModel::GetIssueRate() const { return issueRate_; }
 
+__host__ __device__
 int16_t MachineModel::GetRegTypeCnt() const {
-  return (int16_t)registerTypes_.size();
+  return (int16_t)registerTypes_size_;
+}
+
+void MachineModel::CopyPointersToDevice(MachineModel *dev_machMdl) {
+  //Copy over the vectors into arrays on device
+  InstTypeInfo *dev_instTypes = NULL; 
+  //allocate device memory
+  size_t memSize = instTypes_size_ * sizeof(InstTypeInfo);
+  gpuErrchk(cudaMalloc((void**)&dev_instTypes, memSize));
+  //copy instTypes_ to device
+  gpuErrchk(cudaMemcpy(dev_instTypes, instTypes_, memSize,
+		       cudaMemcpyHostToDevice));
+  //update pointer dev_machMdl->instTypes_ to device pointer
+  gpuErrchk(cudaMemcpy(&(dev_machMdl->instTypes_), &dev_instTypes, 
+		       sizeof(InstTypeInfo *), cudaMemcpyHostToDevice));
+  RegTypeInfo *dev_registerTypes = NULL;
+  //allocate device memory
+  memSize = registerTypes_size_ * sizeof(RegTypeInfo);
+  gpuErrchk(cudaMalloc((void**)&dev_registerTypes, memSize));
+  //copy registerTypes_ to device
+  gpuErrchk(cudaMemcpy(dev_registerTypes, registerTypes_, memSize, 
+	               cudaMemcpyHostToDevice));
+  //update device pointer dev_machMdl->registerTypes_
+  gpuErrchk(cudaMemcpy(&dev_machMdl->registerTypes_, &dev_registerTypes, 
+		       sizeof(RegTypeInfo *), cudaMemcpyHostToDevice));
+  IssueTypeInfo *dev_issueTypes = NULL;
+  //allocate device memory
+  memSize = issueTypes_size_ * sizeof(IssueTypeInfo);
+  gpuErrchk(cudaMalloc((void**)&dev_issueTypes, memSize));
+  //copy issueTypes_ to device
+  gpuErrchk(cudaMemcpy(dev_issueTypes, issueTypes_, memSize,
+		       cudaMemcpyHostToDevice));
+  //update device pointer dev_machMdl->issueTypes_
+  gpuErrchk(cudaMemcpy(&(dev_machMdl->issueTypes_), &dev_issueTypes, 
+		       sizeof(IssueTypeInfo *), cudaMemcpyHostToDevice));
+}
+
+void MachineModel::FreeDevicePointers() {
+  cudaFree(instTypes_);
+  cudaFree(registerTypes_);
+  cudaFree(issueTypes_);
 }

@@ -91,6 +91,8 @@ enum SPILL_COST_FUNCTION {
   SCF_TARGET
 };
 
+#define MAX_SCF_TYPES 10
+
 // used to index Registers instead of pointers, faster to copy to device
 struct RegIndxTuple {
   int regType_, regNum_;
@@ -113,6 +115,9 @@ const int SCHD_STALL = -2;
 const int MAX_DEFS_PER_INSTR = 512;
 // The maximum number of register usages per instruction node.
 const int MAX_USES_PER_INSTR = 512;
+
+// function for parsing cost function names to enum values
+SPILL_COST_FUNCTION ParseSCFName(const std::string &name);
 
 // Forward declarations used to reduce the number of #includes.
 class DataDepGraph;

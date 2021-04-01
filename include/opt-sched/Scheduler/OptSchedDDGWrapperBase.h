@@ -17,7 +17,7 @@ public:
   __host__ __device__
   virtual ~OptSchedDDGWrapperBase() {}
 
-  virtual void convertSUnits() = 0;
+  virtual void convertSUnits(bool IgnoreRealEdges, bool IgnoreArtificialEdges) = 0;
 
   virtual void convertRegFiles() = 0;
 };

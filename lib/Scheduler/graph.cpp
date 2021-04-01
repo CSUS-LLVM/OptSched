@@ -1,10 +1,10 @@
 #include "opt-sched/Scheduler/graph.h"
 #include "opt-sched/Scheduler/bit_vector.h"
 #include "opt-sched/Scheduler/defines.h"
-#include "opt-sched/Scheduler/cuda_lnkd_lst.cuh"
+#include "opt-sched/Scheduler/lnkd_lst.h"
 #include "opt-sched/Scheduler/logger.h"
+#include "opt-sched/Scheduler/dev_defines.h"
 #include <cstdio>
-#include <cuda_runtime.h>
 
 using namespace llvm::opt_sched;
 
@@ -16,8 +16,21 @@ GraphNode::GraphNode(UDT_GNODES num, UDT_GNODES maxNodeCnt) {
   maxEdgLbl_ = 0;
   color_ = COL_WHITE;
 
-  scsrLst_ = new PriorityList<GraphEdge>(maxNodeCnt);
-  prdcsrLst_ = new LinkedList<GraphEdge>(maxNodeCnt);
+  scsrLst_ = new PriorityArrayList<GraphEdge *>(maxNodeCnt);
+  prdcsrLst_ = new ArrayList<GraphEdge *>(maxNodeCnt);
+
+  rcrsvScsrLst_ = NULL;
+  rcrsvPrdcsrLst_ = NULL;
+  isRcrsvScsr_ = NULL;
+  isRcrsvPrdcsr_ = NULL;
+}
+
+__host__ __device__
+GraphNode::GraphNode() {
+  scsrLblSum_ = 0;
+  prdcsrLblSum_ = 0;
+  maxEdgLbl_ = 0;
+  color_ = COL_WHITE;
 
   rcrsvScsrLst_ = NULL;
   rcrsvPrdcsrLst_ = NULL;
@@ -41,6 +54,11 @@ GraphNode::~GraphNode() {
 }
 
 __host__ __device__
+void GraphNode::CreatePrdcsrScsrLists(UDT_GNODES maxNodeCnt) {
+  scsrLst_ = new PriorityArrayList<GraphEdge*>(maxNodeCnt);
+  prdcsrLst_ = new ArrayList<GraphEdge*>(maxNodeCnt);
+}
+
 void GraphNode::DelPrdcsrLst() {
   for (GraphEdge *crntEdge = prdcsrLst_->GetFrstElmnt(); crntEdge != NULL;
        crntEdge = prdcsrLst_->GetNxtElmnt()) {
@@ -50,7 +68,6 @@ void GraphNode::DelPrdcsrLst() {
   prdcsrLst_->Reset();
 }
 
-__host__ __device__
 void GraphNode::DelScsrLst() {
   for (GraphEdge *crntEdge = scsrLst_->GetFrstElmnt(); crntEdge != NULL;
        crntEdge = scsrLst_->GetNxtElmnt()) {
@@ -60,7 +77,29 @@ void GraphNode::DelScsrLst() {
   scsrLst_->Reset();
 }
 
-__host__ __device__
+__device__
+void GraphNode::Reset() {
+  scsrLblSum_ = 0;
+  prdcsrLblSum_ = 0;
+  maxEdgLbl_ = 0;
+  color_ = COL_WHITE;
+
+  rcrsvScsrLst_ = NULL;
+  rcrsvPrdcsrLst_ = NULL;
+  isRcrsvScsr_ = NULL;
+  isRcrsvPrdcsr_ = NULL;
+
+  scsrLst_->Reset();
+  prdcsrLst_->Reset();
+
+  if (rcrsvScsrLst_)
+    rcrsvScsrLst_->Reset();
+
+  if (rcrsvPrdcsrLst_)
+    rcrsvPrdcsrLst_->Reset();
+
+}
+
 void GraphNode::DepthFirstVisit(GraphNode *tplgclOrdr[],
                                 UDT_GNODES &tplgclIndx) {
   color_ = COL_GRAY;
@@ -70,7 +109,7 @@ void GraphNode::DepthFirstVisit(GraphNode *tplgclOrdr[],
   // gets added to the very bottom of the topological sort list.
   for (GraphEdge *crntEdge = scsrLst_->GetFrstElmnt(); crntEdge != NULL;
        crntEdge = scsrLst_->GetNxtElmnt()) {
-    GraphNode *scsr = crntEdge->GetOtherNode(this);
+    GraphNode *scsr = nodes_[crntEdge->GetOtherNodeNum(this->GetNum())];
 
     if (scsr->GetColor() == COL_WHITE) {
       scsr->DepthFirstVisit(tplgclOrdr, tplgclIndx);
@@ -87,21 +126,18 @@ void GraphNode::DepthFirstVisit(GraphNode *tplgclOrdr[],
   tplgclIndx--;
 }
 
-__host__ __device__
 void GraphNode::FindRcrsvNghbrs(DIRECTION dir, DirAcycGraph *graph) {
   FindRcrsvNghbrs_(this, dir, graph);
 }
 
-__host__ __device__
 void GraphNode::AddRcrsvNghbr(GraphNode *nghbr, DIRECTION dir) {
-  LinkedList<GraphNode> *rcrsvNghbrLst = GetRcrsvNghbrLst(dir);
+  ArrayList<InstCount> *rcrsvNghbrLst = GetRcrsvNghbrLst(dir);
   BitVector *isRcrsvNghbr = GetRcrsvNghbrBitVector(dir);
 
-  rcrsvNghbrLst->InsrtElmnt(nghbr);
+  rcrsvNghbrLst->InsrtElmnt(nghbr->GetNum());
   isRcrsvNghbr->SetBit(nghbr->GetNum());
 }
 
-__host__ __device__
 void GraphNode::AllocRcrsvInfo(DIRECTION dir, UDT_GNODES nodeCnt) {
   if (dir == DIR_FRWRD) {
     if (rcrsvScsrLst_ != NULL) {
@@ -113,7 +149,7 @@ void GraphNode::AllocRcrsvInfo(DIRECTION dir, UDT_GNODES nodeCnt) {
       isRcrsvScsr_ = NULL;
     }
     assert(rcrsvScsrLst_ == NULL && isRcrsvScsr_ == NULL);
-    rcrsvScsrLst_ = new LinkedList<GraphNode>;
+    rcrsvScsrLst_ = new ArrayList<InstCount>(nodeCnt);
     isRcrsvScsr_ = new BitVector(nodeCnt);
   } else {
     if (rcrsvPrdcsrLst_ != NULL) {
@@ -125,12 +161,11 @@ void GraphNode::AllocRcrsvInfo(DIRECTION dir, UDT_GNODES nodeCnt) {
       isRcrsvPrdcsr_ = NULL;
     }
     assert(rcrsvPrdcsrLst_ == NULL && isRcrsvPrdcsr_ == NULL);
-    rcrsvPrdcsrLst_ = new LinkedList<GraphNode>;
+    rcrsvPrdcsrLst_ = new ArrayList<InstCount>(nodeCnt);
     isRcrsvPrdcsr_ = new BitVector(nodeCnt);
   }
 }
 
-__host__ __device__
 bool GraphNode::IsScsrDmntd(GraphNode *cnddtDmnnt) {
   if (cnddtDmnnt == this)
     return true;
@@ -157,7 +192,6 @@ bool GraphNode::IsScsrDmntd(GraphNode *cnddtDmnnt) {
   return true;
 }
 
-__host__ __device__
 bool GraphNode::FindScsr_(GraphNode *&crntScsr, UDT_GNODES trgtNum,
                           UDT_GLABEL trgtLbl) {
   UDT_GNODES crntNum = INVALID_VALUE;
@@ -189,10 +223,9 @@ bool GraphNode::FindScsr_(GraphNode *&crntScsr, UDT_GNODES trgtNum,
   return false;
 }
 
-__host__ __device__
 void GraphNode::FindRcrsvNghbrs_(GraphNode *root, DIRECTION dir,
                                  DirAcycGraph *graph) {
-  LinkedList<GraphEdge> *nghbrLst = (dir == DIR_FRWRD) ? scsrLst_ : prdcsrLst_;
+  ArrayList<GraphEdge *> *nghbrLst = (dir == DIR_FRWRD) ? scsrLst_ : prdcsrLst_;
 
   color_ = COL_GRAY;
 
@@ -201,7 +234,7 @@ void GraphNode::FindRcrsvNghbrs_(GraphNode *root, DIRECTION dir,
   // then gets added to the very top of the recursive neighbor list.
   for (GraphEdge *crntEdge = nghbrLst->GetFrstElmnt(); crntEdge != NULL;
        crntEdge = nghbrLst->GetNxtElmnt()) {
-    GraphNode *nghbr = crntEdge->GetOtherNode(this);
+    GraphNode *nghbr = nodes_[crntEdge->GetOtherNodeNum(this->GetNum())];
     if (nghbr->GetColor() == COL_WHITE) {
       nghbr->FindRcrsvNghbrs_(root, dir, graph);
     }
@@ -217,20 +250,24 @@ void GraphNode::FindRcrsvNghbrs_(GraphNode *root, DIRECTION dir,
     BitVector *thisBitVector = this->GetRcrsvNghbrBitVector(dir);
     if (thisBitVector && thisBitVector->GetBit(root->GetNum()) == true) {
       graph->CycleDetected();
+#ifdef __CUDA_ARCH__
+      printf("Detected a cycle between nodes %d and %d in graph\n", 
+		      root->GetNum(), this->GetNum());
+#else
       Logger::Info("Detected a cycle between nodes %d and %d in graph",
                    root->GetNum(), this->GetNum());
+#endif
     }
 
     // Add this node to the recursive neighbor list of the root node of
     // this search.
-    root->GetRcrsvNghbrLst(dir)->InsrtElmnt(this);
+    root->GetRcrsvNghbrLst(dir)->InsrtElmnt(this->GetNum());
     // Set the corresponding boolean vector entry to indicate that this
     // node is a recursive neighbor of the root node of this search.
     root->GetRcrsvNghbrBitVector(dir)->SetBit(num_);
   }
 }
 
-__host__ __device__
 bool GraphNode::IsScsrEquvlnt(GraphNode *othrNode) {
   UDT_GLABEL thisLbl = 0;
   UDT_GLABEL othrLbl = 0;
@@ -252,7 +289,6 @@ bool GraphNode::IsScsrEquvlnt(GraphNode *othrNode) {
   return true;
 }
 
-__host__ __device__
 bool GraphNode::IsPrdcsrEquvlnt(GraphNode *othrNode) {
   UDT_GLABEL thisLbl = 0;
   UDT_GLABEL othrLbl = 0;
@@ -280,51 +316,242 @@ bool GraphNode::IsPrdcsrEquvlnt(GraphNode *othrNode) {
   return true;
 }
 
-__host__ __device__
 GraphEdge *GraphNode::FindScsr(GraphNode *trgtNode) {
   GraphEdge *crntEdge;
 
   // Linear search for the target node in the current node's adjacency list.
   for (crntEdge = scsrLst_->GetFrstElmnt(); crntEdge != NULL;
        crntEdge = scsrLst_->GetNxtElmnt()) {
-    if (crntEdge->GetOtherNode(this) == trgtNode)
+    if (crntEdge->GetOtherNodeNum(this->GetNum()) == trgtNode->GetNum())
       return crntEdge;
   }
 
   return NULL;
 }
 
-__host__ __device__
 GraphEdge *GraphNode::FindPrdcsr(GraphNode *trgtNode) {
   GraphEdge *crntEdge;
 
   // Linear search for the target node in the current node's adjacency list
   for (crntEdge = prdcsrLst_->GetFrstElmnt(); crntEdge != NULL;
        crntEdge = prdcsrLst_->GetNxtElmnt())
-    if (crntEdge->GetOtherNode(this) == trgtNode) {
+    if (crntEdge->GetOtherNodeNum(this->GetNum()) == trgtNode->GetNum()) {
       return crntEdge;
     }
 
   return NULL; // not found in the neighbor list
 }
 
-__host__ __device__
 void GraphNode::PrntScsrLst(FILE *outFile) {
   for (GraphEdge *crnt = scsrLst_->GetFrstElmnt(); crnt != NULL;
        crnt = scsrLst_->GetNxtElmnt()) {
-    UDT_GNODES othrNodeNum = crnt->GetOtherNode(this)->GetNum();
+    UDT_GNODES othrNodeNum = crnt->GetOtherNodeNum(this->GetNum());
     UDT_GNODES label = crnt->label;
     fprintf(outFile, "%d,%d  ", othrNodeNum + 1, label);
   }
   fprintf(outFile, "\n");
 }
 
-__host__ __device__
 void GraphNode::LogScsrLst() {
   Logger::Info("Successor List For Node #%d", num_);
   for (GraphNode *thisScsr = GetFrstScsr(); thisScsr != NULL;
        thisScsr = GetNxtScsr()) {
     Logger::Info("%d", thisScsr->GetNum());
+  }
+}
+
+void GraphNode::CopyPointersToDevice(GraphNode *dev_node, GraphNode **dev_nodes,
+                                     InstCount instCnt) {
+  size_t memSize; 
+  InstCount *dev_elmnts;
+  // Copy rcrsvScsrLst_ to device
+  if (rcrsvScsrLst_) {
+    ArrayList<InstCount> *dev_rcrsvScsrLst;
+    memSize = sizeof(ArrayList<InstCount>);
+    gpuErrchk(cudaMallocManaged(&dev_rcrsvScsrLst, memSize));
+    gpuErrchk(cudaMemcpy(dev_rcrsvScsrLst, rcrsvScsrLst_, memSize,
+                         cudaMemcpyHostToDevice));
+    gpuErrchk(cudaMemcpy(&dev_node->rcrsvScsrLst_, &dev_rcrsvScsrLst,
+                         sizeof(PriorityArrayList<InstCount> *),
+                         cudaMemcpyHostToDevice));
+    // Copy ArrayLists array elmnts_
+    if (rcrsvScsrLst_->maxSize_ > 0) {
+      memSize = sizeof(InstCount) * rcrsvScsrLst_->maxSize_;
+      // removed managed, make sure causes no issues
+      gpuErrchk(cudaMalloc(&dev_elmnts, memSize));
+      gpuErrchk(cudaMemcpy(dev_elmnts, rcrsvScsrLst_->elmnts_, memSize, 
+			   cudaMemcpyHostToDevice));
+      gpuErrchk(cudaMemcpy(&dev_node->rcrsvScsrLst_->elmnts_, &dev_elmnts, 
+			   sizeof(InstCount *), cudaMemcpyHostToDevice));
+    }
+    memSize = sizeof(ArrayList<InstCount>);
+    gpuErrchk(cudaMemPrefetchAsync(dev_rcrsvScsrLst, memSize, 0));
+  }
+  // Copy rcrsvPrdcsrLst_ to device
+  if (rcrsvPrdcsrLst_) {
+    ArrayList<InstCount> *dev_rcrsvPrdcsrLst;
+    memSize = sizeof(ArrayList<InstCount>);
+    gpuErrchk(cudaMallocManaged(&dev_rcrsvPrdcsrLst, memSize));
+    gpuErrchk(cudaMemcpy(dev_rcrsvPrdcsrLst, rcrsvPrdcsrLst_, memSize,
+                         cudaMemcpyHostToDevice));
+    gpuErrchk(cudaMemcpy(&dev_node->rcrsvPrdcsrLst_, &dev_rcrsvPrdcsrLst,
+                         sizeof(PriorityArrayList<InstCount> *),
+                         cudaMemcpyHostToDevice));
+    // Copy ArrayLists array elmnts_
+    if (rcrsvPrdcsrLst_->maxSize_ > 0) {
+      memSize = sizeof(InstCount) * rcrsvPrdcsrLst_->maxSize_;
+      // removed managed, make sure causes no issues
+      gpuErrchk(cudaMalloc(&dev_elmnts, memSize));
+      gpuErrchk(cudaMemcpy(dev_elmnts, rcrsvPrdcsrLst_->elmnts_, memSize,
+			   cudaMemcpyHostToDevice));
+      gpuErrchk(cudaMemcpy(&dev_node->rcrsvPrdcsrLst_->elmnts_, &dev_elmnts,
+			   sizeof(InstCount *), cudaMemcpyHostToDevice));
+    }
+    memSize = sizeof(ArrayList<InstCount>);
+    gpuErrchk(cudaMemPrefetchAsync(dev_rcrsvPrdcsrLst, memSize, 0));
+  }
+  // Copy scsrLst_ to device
+  PriorityArrayList<GraphEdge *> *dev_scsrLst;
+  memSize = sizeof(PriorityArrayList<GraphEdge *>);
+  gpuErrchk(cudaMallocManaged(&dev_scsrLst, memSize));
+  gpuErrchk(cudaMemcpy(dev_scsrLst, scsrLst_, memSize, cudaMemcpyHostToDevice));
+  gpuErrchk(cudaMemcpy(&dev_node->scsrLst_, &dev_scsrLst,
+		       sizeof(PriorityArrayList<GraphEdge *> *),
+		       cudaMemcpyHostToDevice));
+  // Copy elmnts_ and keys
+  unsigned long *dev_keys;
+  GraphEdge **dev_edges;
+  GraphEdge *dev_edge;
+  if (scsrLst_->maxSize_ > 0) {
+    memSize = sizeof(unsigned long) * scsrLst_->maxSize_;
+    gpuErrchk(cudaMalloc(&dev_keys, memSize));
+    gpuErrchk(cudaMemcpy(dev_keys, scsrLst_->keys_, memSize,
+			 cudaMemcpyHostToDevice));
+    gpuErrchk(cudaMemcpy(&dev_node->scsrLst_->keys_, &dev_keys,
+			 sizeof(unsigned long *), cudaMemcpyHostToDevice));
+    memSize = sizeof(GraphEdge *) * scsrLst_->maxSize_;
+    gpuErrchk(cudaMallocManaged(&dev_edges, memSize));
+    gpuErrchk(cudaMemcpy(dev_edges, scsrLst_->elmnts_, memSize,
+			 cudaMemcpyHostToDevice));
+    gpuErrchk(cudaMemcpy(&dev_node->scsrLst_->elmnts_, &dev_edges,
+			 sizeof(GraphEdge **), cudaMemcpyHostToDevice));
+    memSize = sizeof(GraphEdge);
+    // Copy each GraphEdge to device and update its pointer in elmnts
+    for (InstCount i = 0; i < scsrLst_->size_; i++) {
+      gpuErrchk(cudaMalloc(&dev_edge, memSize));
+      gpuErrchk(cudaMemcpy(dev_edge, scsrLst_->elmnts_[i], memSize,
+			   cudaMemcpyHostToDevice));
+      gpuErrchk(cudaMemcpy(&dev_node->scsrLst_->elmnts_[i], &dev_edge,
+			   sizeof(GraphEdge *), cudaMemcpyHostToDevice));
+    }
+    memSize = sizeof(GraphEdge *) * scsrLst_->maxSize_;
+    gpuErrchk(cudaMemPrefetchAsync(dev_edges, memSize, 0));
+  }
+  memSize = sizeof(PriorityArrayList<GraphEdge *>);
+  gpuErrchk(cudaMemPrefetchAsync(dev_scsrLst, memSize, 0));
+  // Copy prdcsrLst_ to device
+  ArrayList<GraphEdge *> *dev_prdcsrLst;
+  memSize = sizeof(ArrayList<GraphEdge *>);
+  gpuErrchk(cudaMallocManaged(&dev_prdcsrLst, memSize));
+  gpuErrchk(cudaMemcpy(dev_prdcsrLst, prdcsrLst_, memSize,
+                       cudaMemcpyHostToDevice));
+  gpuErrchk(cudaMemcpy(&dev_node->prdcsrLst_, &dev_prdcsrLst,
+                       sizeof(ArrayList<GraphEdge *> *),
+                       cudaMemcpyHostToDevice));
+  // Copy elmnts_
+  if (prdcsrLst_->maxSize_ > 0) {
+    memSize = sizeof(GraphEdge *) * prdcsrLst_->maxSize_;
+    gpuErrchk(cudaMallocManaged(&dev_edges, memSize));
+    gpuErrchk(cudaMemcpy(dev_edges, prdcsrLst_->elmnts_, memSize,
+                         cudaMemcpyHostToDevice));
+    gpuErrchk(cudaMemcpy(&dev_node->prdcsrLst_->elmnts_, &dev_edges,
+                         sizeof(GraphEdge **), cudaMemcpyHostToDevice));
+    memSize = sizeof(GraphEdge);
+    // Copy each GraphEdge to device and update its pointer in elmnts
+    for (InstCount i = 0; i < prdcsrLst_->size_; i++) {
+      gpuErrchk(cudaMalloc(&dev_edge, memSize));
+      gpuErrchk(cudaMemcpy(dev_edge, prdcsrLst_->elmnts_[i], memSize,
+                           cudaMemcpyHostToDevice));
+      gpuErrchk(cudaMemcpy(&dev_node->prdcsrLst_->elmnts_[i], &dev_edge,
+                           sizeof(GraphEdge *), cudaMemcpyHostToDevice));
+    }
+    memSize = sizeof(GraphEdge *) * prdcsrLst_->maxSize_;
+    gpuErrchk(cudaMemPrefetchAsync(dev_edges, memSize, 0));
+  }
+  memSize = sizeof(ArrayList<GraphEdge *>);
+  gpuErrchk(cudaMemPrefetchAsync(dev_prdcsrLst, memSize, 0));
+  //Copy BitVector *isRcrsvScsr_
+  BitVector *dev_isRcrsvScsr;
+  unsigned long *dev_vctr;
+  if (isRcrsvScsr_) {
+    memSize = sizeof(BitVector);
+    gpuErrchk(cudaMallocManaged(&dev_isRcrsvScsr, memSize));
+    gpuErrchk(cudaMemcpy(dev_isRcrsvScsr, isRcrsvScsr_, memSize,
+		         cudaMemcpyHostToDevice));
+    gpuErrchk(cudaMemcpy(&dev_node->isRcrsvScsr_, &dev_isRcrsvScsr,
+			 sizeof(BitVector *), cudaMemcpyHostToDevice));
+    // Copy BitVector->vctr_
+    if (isRcrsvScsr_->GetUnitCnt() > 0) {
+      memSize = sizeof(unsigned long) * isRcrsvScsr_->GetUnitCnt();
+      gpuErrchk(cudaMalloc(&dev_vctr, memSize));
+      gpuErrchk(cudaMemcpy(dev_vctr, isRcrsvScsr_->vctr_, memSize,
+	 		   cudaMemcpyHostToDevice));
+      gpuErrchk(cudaMemcpy(&dev_node->isRcrsvScsr_->vctr_, &dev_vctr,
+			   sizeof(unsigned long *), cudaMemcpyHostToDevice));
+    }
+  }
+  // Copy BitVector *isRcrsvPrdcsr
+  BitVector *dev_isRcrsvPrdcsr;
+  if (isRcrsvPrdcsr_) {
+    memSize = sizeof(BitVector);
+    gpuErrchk(cudaMallocManaged(&dev_isRcrsvPrdcsr, memSize));
+    gpuErrchk(cudaMemcpy(dev_isRcrsvPrdcsr, isRcrsvPrdcsr_, memSize,
+                         cudaMemcpyHostToDevice));
+    gpuErrchk(cudaMemcpy(&dev_node->isRcrsvPrdcsr_, &dev_isRcrsvPrdcsr,
+                         sizeof(BitVector *), cudaMemcpyHostToDevice));
+    // Copy BitVector->vctr_
+    if (isRcrsvPrdcsr_->GetUnitCnt() > 0) {
+      memSize = sizeof(unsigned long) * isRcrsvPrdcsr_->GetUnitCnt();
+      gpuErrchk(cudaMalloc(&dev_vctr, memSize));
+      gpuErrchk(cudaMemcpy(dev_vctr, isRcrsvPrdcsr_->vctr_, memSize,
+                           cudaMemcpyHostToDevice));
+      gpuErrchk(cudaMemcpy(&dev_node->isRcrsvPrdcsr_->vctr_, &dev_vctr,
+                           sizeof(unsigned long *), cudaMemcpyHostToDevice));
+    }
+  }
+  //set value of nodes_ to dev_insts_
+  dev_node->nodes_ = dev_nodes;
+}
+
+void GraphNode::FreeDevicePointers() {
+  if (rcrsvScsrLst_) {
+    cudaFree(rcrsvScsrLst_->elmnts_);
+    cudaFree(rcrsvScsrLst_);
+  }
+  if (rcrsvPrdcsrLst_) {
+    cudaFree(rcrsvPrdcsrLst_->elmnts_);
+    cudaFree(rcrsvPrdcsrLst_);
+  }
+  if (scsrLst_) {
+    for (int i = 0; i < scsrLst_->size_; i++)
+      cudaFree(scsrLst_->elmnts_[i]);
+    cudaFree(scsrLst_->elmnts_);
+    cudaFree(scsrLst_->keys_);
+    cudaFree(scsrLst_);
+  }
+  if (prdcsrLst_) {
+    for (int i = 0; i < prdcsrLst_->size_; i++)
+      cudaFree(prdcsrLst_->elmnts_[i]);
+    cudaFree(prdcsrLst_->elmnts_);
+    cudaFree(prdcsrLst_);
+  }
+  if (isRcrsvScsr_) {
+    cudaFree(isRcrsvScsr_->vctr_);
+    cudaFree(isRcrsvScsr_);
+  }
+  if (isRcrsvPrdcsr_) {
+    cudaFree(isRcrsvPrdcsr_->vctr_);
+    cudaFree(isRcrsvPrdcsr_);
   }
 }
 
@@ -359,13 +586,12 @@ void DirAcycGraph::CreateEdge_(UDT_GNODES frmNodeNum, UDT_GNODES toNodeNum,
   GraphNode *toNode = nodes_[toNodeNum];
   assert(toNode != NULL);
 
-  newEdg = new GraphEdge(frmNode, toNode, label);
+  newEdg = new GraphEdge(frmNode->GetNum(), toNode->GetNum(), label);
 
   frmNode->AddScsr(newEdg);
   toNode->AddPrdcsr(newEdg);
 }
 
-__host__ __device__
 FUNC_RESULT DirAcycGraph::DepthFirstSearch() {
   if (tplgclOrdr_ == NULL)
     tplgclOrdr_ = new GraphNode *[nodeCnt_];
@@ -378,7 +604,11 @@ FUNC_RESULT DirAcycGraph::DepthFirstSearch() {
   root_->DepthFirstVisit(tplgclOrdr_, tplgclIndx);
 
   if (tplgclIndx != -1) {
+#ifdef __CUDA_ARCH__
+    printf("Invalid DAG Format: Ureachable nodes\n");
+#else
     Logger::Error("Invalid DAG Format: Ureachable nodes");
+#endif
     return RES_ERROR;
   }
 
@@ -386,7 +616,6 @@ FUNC_RESULT DirAcycGraph::DepthFirstSearch() {
   return RES_SUCCESS;
 }
 
-__host__ __device__
 FUNC_RESULT DirAcycGraph::FindRcrsvNghbrs(DIRECTION dir) {
   for (UDT_GNODES i = 0; i < nodeCnt_; i++) {
     GraphNode *node = nodes_[i];
@@ -418,7 +647,6 @@ FUNC_RESULT DirAcycGraph::FindRcrsvNghbrs(DIRECTION dir) {
     return RES_SUCCESS;
 }
 
-__host__ __device__
 void DirAcycGraph::Print(FILE *outFile) {
   fprintf(outFile, "Number of Nodes= %d    Number of Edges= %d\n", nodeCnt_,
           edgeCnt_);
@@ -429,7 +657,6 @@ void DirAcycGraph::Print(FILE *outFile) {
   }
 }
 
-__host__ __device__
 void DirAcycGraph::LogGraph() {
   Logger::Info("Number of Nodes= %d   Number of Edges= %d\n", nodeCnt_,
                edgeCnt_);

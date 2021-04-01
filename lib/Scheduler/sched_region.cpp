@@ -2,6 +2,7 @@
 #include <memory>
 #include <utility>
 
+#include "Wrapper/OptSchedDDGWrapperBasic.h"
 #include "opt-sched/Scheduler/aco.h"
 #include "opt-sched/Scheduler/bb_spill.h"
 #include "opt-sched/Scheduler/config.h"
@@ -14,18 +15,21 @@
 #include "opt-sched/Scheduler/sched_region.h"
 #include "opt-sched/Scheduler/stats.h"
 #include "opt-sched/Scheduler/utilities.h"
+#include "opt-sched/Scheduler/dev_defines.h"
 
 extern bool OPTSCHED_gPrintSpills;
 
 using namespace llvm::opt_sched;
 
-SchedRegion::SchedRegion(MachineModel *machMdl, DataDepGraph *dataDepGraph,
-                         long rgnNum, int16_t sigHashSize, LB_ALG lbAlg,
-                         SchedPriorities hurstcPrirts,
-                         SchedPriorities enumPrirts, bool vrfySched,
+SchedRegion::SchedRegion(MachineModel *machMdl, MachineModel *dev_machMdl, 
+		         DataDepGraph *dataDepGraph, long rgnNum, 
+			 int16_t sigHashSize, LB_ALG lbAlg,
+                         SchedPriorities hurstcPrirts, 
+			 SchedPriorities enumPrirts, bool vrfySched,
                          Pruning PruningStrategy, SchedulerType HeurSchedType,
                          SPILL_COST_FUNCTION spillCostFunc) {
   machMdl_ = machMdl;
+  dev_machMdl_ = dev_machMdl;
   dataDepGraph_ = dataDepGraph;
   rgnNum_ = rgnNum;
   sigHashSize_ = sigHashSize;
@@ -81,12 +85,36 @@ static bool isBbEnabled(Config &schedIni, Milliseconds rgnTimeout) {
   return true;
 }
 
+__global__
+void DevListSched(SchedRegion *dev_rgn, DataDepGraph *dev_DDG, 
+		  ListScheduler *dev_lstSchdulr, InstSchedule *dev_lstSched) {
+
+  dev_rgn->SetDepGraph(dev_DDG);
+  ((BBWithSpill *)dev_rgn)->SetRegFiles(dev_DDG->getRegFiles());
+
+  FUNC_RESULT rslt = dev_lstSchdulr->FindSchedule(dev_lstSched, dev_rgn);
+
+  if (rslt != RES_SUCCESS) {
+      printf("Device List scheduling failed!\n");
+  }
+
+  // Compute schedule costs
+  InstCount hurstcExecCost;
+  ((BBWithSpill *)(dev_rgn))->Dev_CmputNormCost_(dev_lstSched, CCM_DYNMC, hurstcExecCost, true);
+}
+
+__global__
+void Reset(DataDepGraph **dev_maxDDG) {
+  (*dev_maxDDG)->Reset();
+}
+
 FUNC_RESULT SchedRegion::FindOptimalSchedule(
     Milliseconds rgnTimeout, Milliseconds lngthTimeout, bool &isLstOptml,
     InstCount &bestCost, InstCount &bestSchedLngth, InstCount &hurstcCost,
     InstCount &hurstcSchedLngth, InstSchedule *&bestSched, bool filterByPerp,
     const BLOCKS_TO_KEEP blocksToKeep) {
-  ConstrainedScheduler *lstSchdulr = NULL;
+  ListScheduler *lstSchdulr = NULL;
+  SequentialListScheduler *seqSchdulr = NULL;
   InstSchedule *InitialSchedule = nullptr;
   InstSchedule *lstSched = NULL;
   InstSchedule *AcoSchedule = nullptr;
@@ -191,17 +219,30 @@ FUNC_RESULT SchedRegion::FindOptimalSchedule(
   // Note: Heuristic scheduler is required for the two-pass scheduler
   // to use the sequential list scheduler which inserts stalls into
   // the schedule found in the first pass.
-  if (HeuristicSchedulerEnabled || IsSecondPass()) {
+  if (HeuristicSchedulerEnabled || IsSecondPass()) { 
     Milliseconds hurstcStart = Utilities::GetProcessorTime();
     lstSched = new InstSchedule(machMdl_, dataDepGraph_, vrfySched_);
 
-    lstSchdulr = AllocHeuristicScheduler_();
-
-    rslt = lstSchdulr->FindSchedule(lstSched, this);
+    // AllocHeuristicScheduler does not work since virtualization of
+    // FindSchedule must be disabled to run scheduling on device
+    if (!IsSecondPass()){
+      lstSchdulr = new ListScheduler(dataDepGraph_, machMdl_, 
+                                     abslutSchedUprBound_, 
+                                     GetHeuristicPriorities());
+      rslt = lstSchdulr->FindSchedule(lstSched, this);
+    } else {
+      seqSchdulr = new SequentialListScheduler(dataDepGraph_, machMdl_,
+                                     abslutSchedUprBound_,
+                                     GetHeuristicPriorities());
+      rslt = seqSchdulr->FindSchedule(lstSched, this);
+    }
 
     if (rslt != RES_SUCCESS) {
       Logger::Fatal("List scheduling failed");
-      delete lstSchdulr;
+      if (lstSchdulr)
+        delete lstSchdulr;
+      if (seqSchdulr)
+        delete seqSchdulr;
       delete lstSched;
       return rslt;
     }
@@ -210,7 +251,30 @@ FUNC_RESULT SchedRegion::FindOptimalSchedule(
     stats::heuristicTime.Record(hurstcTime);
     if (hurstcTime > 0)
       Logger::Info("Heuristic_Time %d", hurstcTime);
+  }
 
+  // After the sequential scheduler in the second pass, add the artificial edges
+  // to the DDG. Some mutations were adding artificial edges which caused a
+  // conflict with the sequential scheduler. Therefore, wait until the
+  // sequential scheduler is done before adding artificial edges.
+  if (IsSecondPass()) {
+    static_cast<OptSchedDDGWrapperBasic *>(dataDepGraph_)->addArtificialEdges();
+    rslt = dataDepGraph_->UpdateSetupForSchdulng(needTransitiveClosure);
+    if (rslt != RES_SUCCESS) {
+      Logger::Info("Invalid DAG after adding artificial cluster edges");
+      return rslt;
+    }
+  }
+
+  // This must be done after SetupForSchdulng() or UpdateSetupForSchdulng() to
+  // avoid resetting lower bound values.
+  if (!BbSchedulerEnabled)
+    costLwrBound_ = CmputCostLwrBound();
+  else
+    CmputLwrBounds_(false);
+
+  // Cost calculation must be below lower bounds calculation
+  if (HeuristicSchedulerEnabled || IsSecondPass()) {
     heuristicScheduleLength = lstSched->GetCrntLngth();
     InstCount hurstcExecCost;
     // Compute cost for Heuristic list scheduler, this must be called before
@@ -246,17 +310,28 @@ FUNC_RESULT SchedRegion::FindOptimalSchedule(
 
   // Step #2: Use ACO to find a schedule if enabled and no optimal schedule is
   // yet to be found.
+  // check if region is of appropriate size to execute Dev_ACO on 
+  // Defined in aco.h
+  // TODO: move to sched.ini
+  if (AcoBeforeEnum && REGION_MIN_SIZE > 0 && 
+      dataDepGraph_->GetInstCnt() < REGION_MIN_SIZE) {
+    Logger::Info("Skipping ACO on small region (under %d)", REGION_MIN_SIZE);
+    AcoBeforeEnum = false;
+  }
+
   if (AcoBeforeEnum && !isLstOptml) {
     AcoStart = Utilities::GetProcessorTime();
     AcoSchedule = new InstSchedule(machMdl_, dataDepGraph_, vrfySched_);
 
-    rslt = runACO(AcoSchedule, lstSched);
+    rslt = runACO(AcoSchedule, lstSched, false);
     if (rslt != RES_SUCCESS) {
       Logger::Fatal("ACO scheduling failed");
       if (lstSchdulr)
         delete lstSchdulr;
       if (lstSched)
         delete lstSched;
+      if (seqSchdulr)
+        delete seqSchdulr;
       delete AcoSchedule;
       return rslt;
     }
@@ -365,7 +440,10 @@ FUNC_RESULT SchedRegion::FindOptimalSchedule(
   }
 #endif
   if (EnableEnum_() == false) {
-    delete lstSchdulr;
+    if (lstSchdulr)
+      delete lstSchdulr;
+    if (seqSchdulr)
+      delete seqSchdulr;
     return RES_FAIL;
   }
 
@@ -377,7 +455,7 @@ FUNC_RESULT SchedRegion::FindOptimalSchedule(
   InitialScheduleCost = bestCost_;
   InitialScheduleLength = bestSchedLngth_;
 
-  // Step #4: Find the optimal schedule if the heuristc and ACO was not optimal.
+  // Step #4: Find the optimal schedule if the heuristc and ACO was not optimal
   if (BbSchedulerEnabled) {
     Milliseconds enumStart = Utilities::GetProcessorTime();
     if (!isLstOptml) {
@@ -443,7 +521,7 @@ FUNC_RESULT SchedRegion::FindOptimalSchedule(
     InstSchedule *AcoAfterEnumSchedule =
         new InstSchedule(machMdl_, dataDepGraph_, vrfySched_);
 
-    FUNC_RESULT acoRslt = runACO(AcoAfterEnumSchedule, bestSched);
+    FUNC_RESULT acoRslt = runACO(AcoAfterEnumSchedule, bestSched, true);
     if (acoRslt != RES_SUCCESS) {
       Logger::Info("Running final ACO failed");
       delete AcoAfterEnumSchedule;
@@ -494,9 +572,10 @@ FUNC_RESULT SchedRegion::FindOptimalSchedule(
     bestSchedLngth_ = InitialScheduleLength;
   }
 
-  if (lstSchdulr) {
+  if (lstSchdulr)
     delete lstSchdulr;
-  }
+  if (seqSchdulr)
+    delete seqSchdulr;
   if (NULL != lstSched && bestSched != lstSched) {
     delete lstSched;
   }
@@ -719,12 +798,18 @@ bool SchedRegion::CmputUprBounds_(InstSchedule *schedule, bool useFileBounds) {
   }
 }
 
+__host__ __device__
 void SchedRegion::UpdateScheduleCost(InstSchedule *schedule) {
   InstCount crntExecCost;
+#ifdef __CUDA_ARCH__
+  ((BBWithSpill *)this)->Dev_CmputNormCost_(schedule, CCM_STTC, crntExecCost, false);
+#else
   CmputNormCost_(schedule, CCM_STTC, crntExecCost, false);
+#endif
   // no need to return anything as all results can be found in the schedule
 }
 
+__host__ __device__
 SPILL_COST_FUNCTION SchedRegion::GetSpillCostFunc() { return spillCostFunc_; }
 
 void SchedRegion::HandlEnumrtrRslt_(FUNC_RESULT rslt, InstCount trgtLngth) {
@@ -809,13 +894,130 @@ void SchedRegion::RegAlloc_(InstSchedule *&bestSched, InstSchedule *&lstSched) {
 
 void SchedRegion::InitSecondPass() { isSecondPass_ = true; }
 
+__global__
+void InitCurand(curandState_t *dev_states, unsigned long seed, int instCnt) {
+  curand_init(seed * GLOBALTID, 0, 0, &dev_states[GLOBALTID]);
+}
+
 FUNC_RESULT SchedRegion::runACO(InstSchedule *ReturnSched,
-                                InstSchedule *InitSched) {
+                                InstSchedule *InitSched, bool IsPostBB) {
   InitForSchdulng();
-  ACOScheduler *AcoSchdulr = new ACOScheduler(
-      dataDepGraph_, machMdl_, abslutSchedUprBound_, hurstcPrirts_, vrfySched_);
-  AcoSchdulr->setInitialSched(InitSched);
-  FUNC_RESULT Rslt = AcoSchdulr->FindSchedule(ReturnSched, this);
-  delete AcoSchdulr;
+  FUNC_RESULT Rslt;
+  if (DEV_ACO) {
+    // Allocate and Copy data to device for parallel ACO
+    size_t memSize;
+    // Allocate arrays for parallel ACO execution
+    Logger::Info("Allocating SchedInstruction Arrays for Parallel ACO");
+    for (int i = 0; i < dataDepGraph_->GetInstCnt(); i++) {
+      dataDepGraph_->GetInstByIndx(i)->AllocDevArraysForParallelACO(NUMTHREADS);
+    }
+    Logger::Info("Allocating Register Arrays for Parallel ACO");
+    RegisterFile *regFiles = dataDepGraph_->getRegFiles();
+    for (int i = 0; i < dataDepGraph_->GetRegTypeCnt(); i++) {
+      for (int j = 0; j < regFiles[i].GetRegCnt(); j++)
+        regFiles[i].GetReg(j)->AllocDevArrayForParallelACO(NUMTHREADS);
+    }
+    Logger::Info("Allocating BBWithSpill Arrays for Parallel ACO");
+    ((BBWithSpill*)this)->AllocDevArraysForParallelACO(NUMTHREADS);
+    // Copy DDG and its objects to device
+    Logger::Info("Copying DDG and its Instruction to device");
+    DataDepGraph *dev_DDG;
+    memSize = sizeof(DataDepGraph);
+    gpuErrchk(cudaMallocManaged(&dev_DDG, memSize));
+    gpuErrchk(cudaMemcpy(dev_DDG, dataDepGraph_, memSize,
+                         cudaMemcpyHostToDevice));
+    dataDepGraph_->CopyPointersToDevice(dev_DDG, NUMTHREADS);
+    // Copy this(BBWithSpill) to device
+    Logger::Info("Copying BBWithSpill to Device");
+    BBWithSpill *dev_rgn;
+    memSize = sizeof(BBWithSpill);
+    // Allocate device mem
+    gpuErrchk(cudaMallocManaged((void**)&dev_rgn, memSize));
+    // Copy this to device
+    gpuErrchk(cudaMemcpy(dev_rgn, this, memSize, cudaMemcpyHostToDevice));
+    dev_rgn->machMdl_ = dev_machMdl_;
+    CopyPointersToDevice(dev_rgn, NUMTHREADS);
+    // new method
+    // create an array of DeviceVectors and copy to device for use 
+    // during Dev_ACO
+    Logger::Info("Creating and Copying ready array to device");
+    DeviceVector<Choice> *ready = new DeviceVector<Choice>[NUMTHREADS];
+    DeviceVector<Choice> *dev_ready;
+    Choice *dev_elmnts;
+    // Alloc dev mem for elmnts_ for all vectors
+    memSize = dataDepGraph_->GetInstCnt() * sizeof(Choice) * NUMTHREADS;
+    gpuErrchk(cudaMalloc(&dev_elmnts, memSize));
+    // set correct allocation size and elmnts_ dev pointer
+    for (int i = 0; i < NUMTHREADS; i++) {
+      ready[i].alloc_ = dataDepGraph_->GetInstCnt();
+      ready[i].elmnts_ = &dev_elmnts[i * dataDepGraph_->GetInstCnt()];
+    }
+    // Alloc dev mem for all dev vectors
+    memSize = sizeof(DeviceVector<Choice>) * NUMTHREADS;
+    gpuErrchk(cudaMallocManaged(&dev_ready, memSize));
+    // Copy array of vectors to device
+    gpuErrchk(cudaMemcpy(dev_ready, ready, memSize, cudaMemcpyHostToDevice));
+    // remove device array reference in host copy
+    for (int i = 0; i < NUMTHREADS; i++)
+      ready[i].elmnts_ = NULL;
+    // delete host copy
+    delete[] ready;
+    // Allocate dev_states for curand RNG and run curand_init() to initialize
+    Logger::Info("Initializing states for cuRand");
+    curandState_t *dev_states;
+    memSize = sizeof(curandState_t) * NUMTHREADS;
+    gpuErrchk(cudaMalloc(&dev_states, memSize));
+    InitCurand<<<NUMBLOCKS, NUMTHREADSPERBLOCK>>>(dev_states, 
+                                                  unsigned(time(NULL)),
+                                                  dataDepGraph_->GetInstCnt());
+    Logger::Info("Creating ACOScheduler");
+    ACOScheduler *AcoSchdulr = new ACOScheduler(
+        dataDepGraph_, machMdl_, abslutSchedUprBound_, hurstcPrirts_,
+        vrfySched_, IsPostBB, (SchedRegion *)dev_rgn, dev_DDG, dev_ready,
+        dev_machMdl_, dev_states);
+    AcoSchdulr->setInitialSched(InitSched);
+    // Alloc dev arrays for parallel ACO
+    Logger::Info("Allocating ACOScheduler Arrays for Parallel ACO");
+    AcoSchdulr->AllocDevArraysForParallelACO();
+    // Copy ACOScheduler to device
+    Logger::Info("Copying ACOScheduler to device");
+    ACOScheduler *dev_AcoSchdulr;
+    memSize = sizeof(ACOScheduler);
+    gpuErrchk(cudaMallocManaged(&dev_AcoSchdulr, memSize));
+    gpuErrchk(cudaMemcpy(dev_AcoSchdulr, AcoSchdulr, memSize,
+                         cudaMemcpyHostToDevice));
+    AcoSchdulr->CopyPointersToDevice(dev_AcoSchdulr);
+    // Make sure mallocManaged memory is copied to device before kernel start
+    memSize = sizeof(DataDepGraph);
+    gpuErrchk(cudaMemPrefetchAsync(dev_DDG, memSize, 0));
+    memSize = sizeof(BBWithSpill);
+    gpuErrchk(cudaMemPrefetchAsync(dev_rgn, memSize, 0));
+
+    // FindSchedule
+    Rslt = AcoSchdulr->FindSchedule(ReturnSched, this, dev_AcoSchdulr);
+
+    dev_AcoSchdulr->FreeDevicePointers();
+    cudaFree(dev_AcoSchdulr);
+    delete AcoSchdulr;
+    cudaFree(dev_ready[0].elmnts_);
+    cudaFree(dev_ready);
+    dev_rgn->FreeDevicePointers(NUMTHREADS);
+    cudaFree(dev_rgn);
+    dev_DDG->FreeDevicePointers(NUMTHREADS);
+    cudaFree(dev_DDG);
+    cudaFree(dev_states);
+    // Ocasionally BBWithSpill deletes an empty pointer, which causes the next
+    // kernel to report an invalid argument error after execution even
+    // though the non issue error happens here. This call is to clear errors
+    // from BBWithSpill deletion.
+    cudaGetLastError();
+  } else {
+    ACOScheduler *AcoSchdulr = 
+        new ACOScheduler(dataDepGraph_, machMdl_, abslutSchedUprBound_,
+                         hurstcPrirts_, vrfySched_, IsPostBB);
+    AcoSchdulr->setInitialSched(InitSched);
+    Rslt = AcoSchdulr->FindSchedule(ReturnSched, this);
+    delete AcoSchdulr;
+  }
   return Rslt;
 }

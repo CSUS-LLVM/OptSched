@@ -25,8 +25,8 @@ typedef double pheromone_t;
 #define DEV_ACO 1
 // setting to 1 locks ACO to iterations_without_improvement iterations
 #define RUNTIME_TESTING 0
-#define REGION_MIN_SIZE 200
-#define NUMBLOCKS 40
+#define REGION_MIN_SIZE 50
+#define NUMBLOCKS 80
 #define NUMTHREADSPERBLOCK 64
 #define NUMTHREADS NUMBLOCKS * NUMTHREADSPERBLOCK
 
@@ -47,7 +47,7 @@ class ACOScheduler : public ConstrainedScheduler {
 public:
   ACOScheduler(DataDepGraph *dataDepGraph, MachineModel *machineModel,
                InstCount upperBound, SchedPriorities priorities,
-               bool vrfySched, SchedRegion *dev_rgn = NULL,
+               bool vrfySched, bool IsPostBB, SchedRegion *dev_rgn = NULL,
 	       DataDepGraph *dev_DDG = NULL,
 	       DeviceVector<Choice> *dev_ready = NULL,
 	       MachineModel *dev_MM = NULL, curandState_t *dev_states = NULL);
@@ -79,6 +79,9 @@ public:
   // Copies pheromone table to passed shared memory array
   __device__ 
   void CopyPheromonesToSharedMem(double *s_pheromone);
+  __host__ __device__
+  bool shouldReplaceSchedule(InstSchedule *OldSched, InstSchedule *NewSched,
+                             bool IsGlobal);
 
 private:
   __host__ __device__
@@ -87,10 +90,9 @@ private:
   pheromone_t &Pheromone(InstCount from, InstCount to);
   __host__ __device__
   double Score(SchedInstruction *from, Choice choice);
-
+  DCF_OPT ParseDCFOpt(const std::string &opt);
   __host__ __device__
   void PrintPheromone();
-
   __host__ __device__
   Choice SelectInstruction(DeviceVector<Choice> &ready, 
                            SchedInstruction *lastInst);
@@ -121,6 +123,7 @@ private:
   MachineModel *dev_MM_;
   // Holds state for each thread for RNG
   curandState_t *dev_states_;
+  // Used to count how many threads returned last instruction
   int returnLastInstCnt_;
 };
 
