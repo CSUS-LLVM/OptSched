@@ -1,10 +1,12 @@
 #!/usr/bin/env python3
 
+import csv
 import re
 import argparse
+import sys
 
 import analyze
-from analyze import Block
+from analyze import Block, foreach_bench
 
 
 def _block_time(block: Block):
@@ -28,11 +30,14 @@ def total_compile_time_seconds(logs):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--variant', choices=('sched', 'total'), help='Which timing variant to use')
-    parser.add_argument('logs', type=analyze.parse_logs, help='The logs to analyze')
+    parser.add_argument('--variant', choices=('sched', 'total'),
+                        help='Which timing variant to use')
+    parser.add_argument('logs', type=analyze.parse_logs,
+                        help='The logs to analyze')
     args = analyze.parse_args(parser)
 
-    if args.variant == 'total':
-        print(total_compile_time_seconds(args.logs))
-    else:
-        print(instruction_scheduling_time(args.logs))
+    fn = total_compile_time_seconds if args.variant == 'total' else instruction_scheduling_time
+    results = foreach_bench(fn, args.logs)
+    writer = csv.DictWriter(sys.stdout, fieldnames=results.keys())
+    writer.writeheader()
+    writer.writerow(results)
