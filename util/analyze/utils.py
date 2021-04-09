@@ -44,3 +44,36 @@ def count(iter):
         return len(iter)
     except:
         return sum(1 for _ in iter)
+
+
+def zipped_keep_blocks_if(*logs, pred):
+    '''
+    Given:
+      a: [blk1, blk2, blk3, ...] # of type Logs
+      b: [blk1, blk2, blk3, ...] # of type Logs
+      c: [blk1, blk2, blk3, ...] # of type Logs
+      ...
+
+    Returns:
+      [
+          (a.blk1, b.blk1, c.blk1, ...) if pred(a.blk1, b.blk1, c.blk1, ...)
+          ...
+      ]
+
+    Also supports pred(b), in which case it's all(pred(b) for b in (a.blk1, b.blk1, ...))
+    '''
+
+    try:
+        all_p = set(blks[0].uniqueid() for blks in zip(*logs) if pred(*blks))
+    except TypeError:
+        all_p = set(blks[0].uniqueid()
+                    for blks in zip(*logs) if all(pred(b) for b in blks))
+
+    filtered = tuple(log.keep_blocks_if(
+        lambda blk: blk.uniqueid() in all_p) for log in logs)
+
+    return filtered
+
+
+def sum_stat_for_all(stat, logs: Logs) -> int:
+    return sum(stat(blk) for blk in logs)

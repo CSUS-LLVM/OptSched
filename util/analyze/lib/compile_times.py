@@ -15,7 +15,7 @@ def _block_time(block: Block):
     return end - start
 
 
-def instruction_scheduling_time(logs):
+def sched_time(logs):
     return sum(_block_time(blk) for blk in logs)
 
 
@@ -35,7 +35,7 @@ if __name__ == '__main__':
     parser.add_argument('logs', help='The logs to analyze')
     args = analyze.parse_args(parser, 'logs')
 
-    fn = total_compile_time_seconds if args.variant == 'total' else instruction_scheduling_time
+    fn = total_compile_time_seconds if args.variant == 'total' else sched_time
     results = foreach_bench(fn, args.logs, combine=sum)
     writer = csv.DictWriter(sys.stdout, fieldnames=results.keys())
     writer.writeheader()
