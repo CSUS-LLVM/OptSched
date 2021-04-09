@@ -16,7 +16,7 @@ env:
 
 jobs:
   comment-triggered:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-18.04
 
     outputs:
       value: ${{ steps.value.outputs.value }}
@@ -42,7 +42,7 @@ jobs:
 
   init-report:
     needs: comment-triggered
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-18.04
     if: needs.comment-triggered.outputs.value == 'true'
 
     outputs:
@@ -59,7 +59,7 @@ jobs:
 
   ci:
     needs: comment-triggered
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-18.04
     if: needs.comment-triggered.outputs.checks_should_run == 'true'
 
     steps:
@@ -119,7 +119,7 @@ jobs:
 
   clang-format:
     needs: comment-triggered
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-18.04
     if: needs.comment-triggered.outputs.checks_should_run == 'true'
 
     steps:
@@ -139,7 +139,7 @@ jobs:
 
   clang-tidy:
     needs: comment-triggered
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-18.04
     if: needs.comment-triggered.outputs.checks_should_run == 'true'
 
     steps:
@@ -218,7 +218,7 @@ jobs:
 
   trailing-whitespace:
     needs: comment-triggered
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-18.04
     if: needs.comment-triggered.outputs.checks_should_run == 'true'
 
     steps:
@@ -238,7 +238,7 @@ jobs:
 
   west-const:
     needs: comment-triggered
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-18.04
     if: needs.comment-triggered.outputs.checks_should_run == 'true'
 
     steps:
@@ -260,7 +260,7 @@ jobs:
 
   report:
     needs: [comment-triggered, init-report, ci, clang-format, clang-tidy, trailing-whitespace, west-const]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-18.04
     if: always()
 
     steps:
