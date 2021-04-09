@@ -1,11 +1,9 @@
 #!/usr/bin/env python3
 
-import argparse
 import os
 import re
 
-import analyze.logs as logs
-import analyze.import_utils as import_utils
+from . import import_utils
 
 
 def parse(file):

@@ -1,12 +1,10 @@
 #!/usr/bin/env python3
 
-import argparse
 import os
-import re
 import pathlib
 
-import analyze.logs as logs
-import analyze.import_utils as import_utils
+from .._types import Logs
+from . import import_utils
 
 
 def parse(path):
@@ -16,7 +14,7 @@ def parse(path):
     benchmark_dirs = [x for x in benchmark_output_dir.iterdir() if x.is_dir()]
     benchmark_dirs = list(sorted(benchmark_dirs, key=lambda p: p.name))
 
-    result = logs.Logs([])
+    result = Logs([])
 
     for benchmark_dir in benchmark_dirs:
         logfiles = list(benchmark_dir.glob('*.log'))

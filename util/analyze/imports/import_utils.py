@@ -2,9 +2,10 @@ import pickle
 import json
 import itertools
 import re
+import sys
 from collections import namedtuple
 
-from analyze.logs import Logs, Benchmark, Block
+from .._types import Logs, Benchmark, Block
 
 _RE_REGION_INFO = re.compile(r'EVENT:.*ProcessDag.*"name": "(?P<name>[^"]*)"')
 

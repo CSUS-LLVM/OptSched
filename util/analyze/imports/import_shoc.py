@@ -1,12 +1,11 @@
 #!/usr/bin/env python3
 
-import argparse
 import os
 import re
 import pathlib
 
-import analyze.logs as logs
-import analyze.import_utils as import_utils
+from .._types import Logs
+from . import import_utils
 
 
 def parse(path):
@@ -17,9 +16,10 @@ def parse(path):
     benchmark_logs_dir = benchmark_output_dir / 'Logs'
     assert benchmark_logs_dir.is_dir()
 
-    benchmarks = list(sorted(benchmark_logs_dir.glob('dev?_*.err'), key=lambda p: p.name))
+    benchmarks = list(sorted(benchmark_logs_dir.glob(
+        'dev?_*.err'), key=lambda p: p.name))
 
-    result = logs.Logs([])
+    result = Logs([])
     benchname_re = re.compile(r'dev._(.*)(\.err)?')
 
     for benchmark in benchmarks:
