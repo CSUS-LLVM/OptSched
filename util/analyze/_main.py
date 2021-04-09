@@ -61,7 +61,7 @@ def parse_args(parser: argparse.ArgumentParser, args=None):
 
     add_args(firstparser, real=False)
     res, _ = firstparser.parse_known_args(args)
-    if res.benchsuite: # Don't do anything if --help is passed
+    if res.benchsuite:  # Don't do anything if --help is passed
         def log_matches(log, pattern):
             if not isinstance(pattern, dict):
                 if isinstance(pattern, str):
@@ -91,6 +91,9 @@ def parse_args(parser: argparse.ArgumentParser, args=None):
 
         parse_logs._blk_filter = blk_filter
         parse_logs._parser = FILE_PARSERS[res.benchsuite]
+    else:
+        parse_logs._blk_filter = lambda b: True
+        parse_logs._parser = lambda s: Logs([])
 
     add_args(parser, real=True)
     return parser.parse_args(args)
