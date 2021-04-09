@@ -1,7 +1,7 @@
 from .analyzer import Analyzer
 from .logs import Logs, Benchmark, Block
 
-from ._main import main, basemain
+from ._main import main, basemain, parse_logs, parse_args
 
 import sys
 
