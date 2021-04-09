@@ -37,3 +37,10 @@ def foreach_bench(analysis_f, *logs, combine=None):
         'Total': total,
         **bench_stats,
     }
+
+
+def count(iter):
+    try:
+        return len(iter)
+    except:
+        return sum(1 for _ in iter)
