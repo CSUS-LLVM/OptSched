@@ -33,7 +33,10 @@ def parse_logs(filepath: str, blk_filter: Callable[[Block], bool] = None, parser
     if parser is None:
         parser = parse_logs._parser
 
-    return parser(filepath).keep_blocks_if(blk_filter)
+    result = parser(filepath)
+    if blk_filter is True:
+        return result
+    return result.keep_blocks_if(blk_filter)
 
 
 def parse_args(parser: argparse.ArgumentParser, args=None):
@@ -54,7 +57,7 @@ def parse_args(parser: argparse.ArgumentParser, args=None):
         )
         parser.add_argument(
             '--keep-blocks-if',
-            default='{}',
+            default='true',
             type=json.loads,
             help='Keep blocks matching (JSON format)',
         )
@@ -89,7 +92,7 @@ def parse_args(parser: argparse.ArgumentParser, args=None):
             'shoc': import_shoc.parse,
         }
 
-        parse_logs._blk_filter = blk_filter
+        parse_logs._blk_filter = blk_filter if res.keep_blocks_if is not True else True
         parse_logs._parser = FILE_PARSERS[res.benchsuite]
     else:
         parse_logs._blk_filter = lambda b: True
@@ -97,5 +100,3 @@ def parse_args(parser: argparse.ArgumentParser, args=None):
 
     add_args(parser, real=True)
     return parser.parse_args(args)
-
-    return result
