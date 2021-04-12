@@ -57,7 +57,9 @@ ACOScheduler::ACOScheduler(DataDepGraph *dataDepGraph,
   bias_ratio = schedIni.GetFloat("ACO_BIAS_RATIO");
   local_decay = schedIni.GetFloat("ACO_LOCAL_DECAY");
   decay_factor = schedIni.GetFloat("ACO_DECAY_FACTOR");
-  ants_per_iteration = schedIni.GetInt("ACO_ANT_PER_ITERATION");
+  ants_per_iteration1p = schedIni.GetInt("ACO_ANT_PER_ITERATION");
+  ants_per_iteration2p = schedIni.GetInt("ACO2P_ANT_PER_ITERATION", std::to_string(ants_per_iteration1p));
+  ants_per_iteration = ants_per_iteration1p;
   print_aco_trace = schedIni.GetBool("ACO_TRACE");
   IsTwoPassEn = schedIni.GetBool("USE_TWO_PASS");
   DCFOption = ParseDCFOpt(schedIni.GetString("ACO_DUAL_COST_FN_ENABLE", "OFF"));
@@ -276,7 +278,7 @@ Choice ACOScheduler::SelectInstruction(const llvm::ArrayRef<Choice> &ready,
   return ready.back();
 }
 
-std::unique_ptr<InstSchedule> ACOScheduler::FindOneSchedule() {
+std::unique_ptr<InstSchedule> ACOScheduler::FindOneSchedule(InstCount TargetRPCost) {
   SchedInstruction *lastInst = NULL;
   std::unique_ptr<InstSchedule> schedule =
       llvm::make_unique<InstSchedule>(machMdl_, dataDepGraph_, true);
@@ -401,6 +403,15 @@ std::unique_ptr<InstSchedule> ACOScheduler::FindOneSchedule() {
       if (blah == inst)
         rdyLst_->RemoveNextPriorityInst();
       UpdtSlotAvlblty_(inst);
+
+#define STOP_CONSTRUCTION_IF_INFEASIBLE 1
+
+#if STOP_CONSTRUCTION_IF_INFEASIBLE
+      if (rgn_->getUnnormalizedIncrementalRPCost() > TargetRPCost) {
+        return nullptr;
+      }
+#endif
+
     }
     /* Logger::Info("Chose instruction %d (for some reason)", instNum); */
     schedule->AppendInst(instNum);
@@ -408,6 +419,7 @@ std::unique_ptr<InstSchedule> ACOScheduler::FindOneSchedule() {
       InitNewCycle_();
     rdyLst_->ResetIterator();
     ready.clear();
+
   }
   rgn_->UpdateScheduleCost(schedule.get());
   return schedule;
@@ -423,6 +435,7 @@ FUNC_RESULT ACOScheduler::FindSchedule(InstSchedule *schedule_out,
   heuristicImportance_ = schedIni.GetInt(
       IsFirst ? "ACO_HEURISTIC_IMPORTANCE" : "ACO2P_HEURISTIC_IMPORTANCE");
   fixed_bias = schedIni.GetInt(IsFirst ? "ACO_FIXED_BIAS" : "ACO2P_FIXED_BIAS");
+  ants_per_iteration = IsFirst ? ants_per_iteration1p : ants_per_iteration2p;
   noImprovementMax = schedIni.GetInt(IsFirst ? "ACO_STOP_ITERATIONS"
                                              : "ACO2P_STOP_ITERATIONS");
   if (DCFOption != DCF_OPT::OFF) {
@@ -443,7 +456,8 @@ FUNC_RESULT ACOScheduler::FindSchedule(InstSchedule *schedule_out,
   for (int i = 0; i < pheromone_size; i++)
     pheromone_[i] = 1;
   initialValue_ = 1;
-  std::unique_ptr<InstSchedule> heuristicSched = FindOneSchedule();
+  InstCount MaxRPTarget = std::numeric_limits<InstCount>::max();
+  std::unique_ptr<InstSchedule> heuristicSched = FindOneSchedule(MaxRPTarget);
   InstCount heuristicCost =
       heuristicSched->GetCost() + 1; // prevent divide by zero
   InstCount InitialCost = InitialSchedule ? InitialSchedule->GetCost() : 0;
@@ -469,7 +483,7 @@ FUNC_RESULT ACOScheduler::FindSchedule(InstSchedule *schedule_out,
     std::unique_ptr<InstSchedule> iterationBest;
     for (int i = 0; i < ants_per_iteration; i++) {
       CrntAntEdges.clear();
-      std::unique_ptr<InstSchedule> schedule = FindOneSchedule();
+      std::unique_ptr<InstSchedule> schedule = FindOneSchedule(i && iterationBest && rgn_->GetSpillCostFunc() != SCF_SLIL ? iterationBest->GetNormSpillCost() : MaxRPTarget);
       if (print_aco_trace)
         PrintSchedule(schedule.get());
       ++localCmp;

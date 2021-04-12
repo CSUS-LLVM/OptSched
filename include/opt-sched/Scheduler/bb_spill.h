@@ -132,6 +132,7 @@ public:
   // cost of the schedule using Scf whenever the spill cost updates
   void addRecordedCost(SPILL_COST_FUNCTION Scf);
   void storeExtraCost(InstSchedule *sched, SPILL_COST_FUNCTION Scf);
+  InstCount getUnnormalizedIncrementalRPCost();
 
   InstCount UpdtOptmlSched(InstSchedule *crntSched,
                            LengthCostEnumerator *enumrtr);

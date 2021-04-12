@@ -17,7 +17,7 @@ Last Update:  Jan. 2020
 #include <map>
 #include <memory>
 #include <utility>
-
+#include <limits>
 namespace llvm {
 namespace opt_sched {
 
@@ -78,7 +78,7 @@ private:
   Choice SelectInstruction(const llvm::ArrayRef<Choice> &ready,
                            SchedInstruction *lastInst);
   void UpdatePheromone(InstSchedule *schedule);
-  std::unique_ptr<InstSchedule> FindOneSchedule();
+  std::unique_ptr<InstSchedule> FindOneSchedule(InstCount TargetRPCost);
   llvm::SmallVector<pheromone_t, 0> pheromone_;
   pheromone_t initialValue_;
   bool use_fixed_bias;
