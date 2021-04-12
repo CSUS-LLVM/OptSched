@@ -185,14 +185,15 @@ bool ACOScheduler::shouldReplaceSchedule(InstSchedule *OldSched,
       return false;
     }
   } else {
-#if DBG_SRS
-    Logger::Info("2nd pass");
-#endif // DBG_SRS
     InstCount NewCost = NewSched->GetExecCost();
     InstCount OldCost = OldSched->GetExecCost();
     InstCount NewSpillCost = NewSched->GetNormSpillCost();
     InstCount OldSpillCost = OldSched->GetNormSpillCost();
-    return NewCost < OldCost && NewSpillCost <= OldSpillCost;
+#if DBG_SRS
+    Logger::Info("SRS2P/%sOld:%d,New:%d,OldNSC:%d,NewNSC:%d", IsGlobal ? "g/" : "",
+                 OldCost, NewCost, OldSpillCost, NewSpillCost);
+#endif // DBG_SRS
+    return (NewCost < OldCost && NewSpillCost <= OldSpillCost) || NewSpillCost < OldSpillCost;
   }
 }
 
@@ -471,6 +472,9 @@ FUNC_RESULT ACOScheduler::FindSchedule(InstSchedule *schedule_out,
       std::unique_ptr<InstSchedule> schedule = FindOneSchedule();
       if (print_aco_trace)
         PrintSchedule(schedule.get());
+      ++localCmp;
+      if (iterationBest && bestSchedule && !(!IsFirst && iterationBest->GetNormSpillCost() <= bestSchedule->GetNormSpillCost()))
+        ++localCmpRej;
       if (shouldReplaceSchedule(iterationBest.get(), schedule.get(),
                                 /*IsGlobal=*/false)) {
         iterationBest = std::move(schedule);
@@ -478,7 +482,11 @@ FUNC_RESULT ACOScheduler::FindSchedule(InstSchedule *schedule_out,
           IterAntEdges = CrntAntEdges;
       }
     }
-    UpdatePheromone(iterationBest.get());
+    ++globalCmp;
+    if (!IsFirst && iterationBest->GetNormSpillCost() <= bestSchedule->GetNormSpillCost()) {
+      UpdatePheromone(iterationBest.get());
+    }
+    else ++globalCmpRej;
     /* PrintSchedule(iterationBest); */
     /* std::cout << iterationBest->GetCost() << std::endl; */
     // TODO DRY
@@ -512,6 +520,8 @@ FUNC_RESULT ACOScheduler::FindSchedule(InstSchedule *schedule_out,
     writePheromoneGraph("iteration" + std::to_string(iterations));
     iterations++;
   }
+
+  Logger::Info("localCmp:%d,localCmpRej:%d,globalCmp:%d,globalCmpRej:%d", localCmp, localCmpRej, globalCmp, globalCmpRej);
 
   Logger::Event(IsPostBB ? "AcoPostSchedComplete" : "ACOSchedComplete", "cost",
                 bestSchedule->GetCost(), "iterations", iterations,

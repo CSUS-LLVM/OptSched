@@ -90,6 +90,8 @@ private:
   double local_decay;
   double decay_factor;
   int ants_per_iteration;
+  int ants_per_iteration1p;
+  int ants_per_iteration2p;
   int noImprovementMax;
   bool print_aco_trace;
   std::unique_ptr<InstSchedule> InitialSchedule;
@@ -99,6 +101,8 @@ private:
   pheromone_t ScRelMax;
   DCF_OPT DCFOption;
   SPILL_COST_FUNCTION DCFCostFn;
+  int localCmp=0, localCmpRej=0, globalCmp=0, globalCmpRej=0;
+
 };
 
 } // namespace opt_sched
