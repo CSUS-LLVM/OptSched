@@ -56,6 +56,7 @@ BBWithSpill::BBWithSpill(const OptSchedTarget *OST_, DataDepGraph *dataDepGraph,
   SCW_ = SCW;
   schedCostFactor_ = COST_WGHT_BASE;
   trackLiveRangeLngths_ = true;
+  NeedsComputeSLIL = (spillCostFunc == SCF_SLIL);
 
   regTypeCnt_ = OST->MM->GetRegTypeCnt();
   regFiles_ = dataDepGraph->getRegFiles();
@@ -518,7 +519,7 @@ InstCount BBWithSpill::Dev_CmputCost_(InstSchedule *sched, COST_COMP_MODE compMo
 
 __host__ __device__
 void BBWithSpill::CmputCrntSpillCost_() {
-#ifdef __CUDA_ARCH__
+#ifdef __CUDA_ARCH__ //Device version of function
   switch (GetSpillCostFunc()) {
   case SCF_PERP:
   case SCF_PRP:
@@ -541,7 +542,8 @@ void BBWithSpill::CmputCrntSpillCost_() {
     dev_crntSpillCost_[GLOBALTID] = dev_peakSpillCost_[GLOBALTID];
     break;
   }
-#else
+
+#else // Host version of function
   switch (GetSpillCostFunc()) {
   case SCF_PERP:
   case SCF_PRP:
@@ -565,7 +567,10 @@ void BBWithSpill::CmputCrntSpillCost_() {
   }
 #endif
 }
-/*****************************************************************************/
+/******************************i***********************************************/
+
+#define IS_DEBUG_REG_PRESSURE
+#define IS_DEBUG_SLIL_CORRECT
 //note: Logger::info/fatal cannot be called on device. using __CUDA_ARCH__ 
 //macro to call printf on device instead
 __host__ __device__
@@ -581,7 +586,9 @@ void BBWithSpill::UpdateSpillInfoForSchdul_(SchedInstruction *inst,
 
   defCnt = inst->GetDefs(defs);
   useCnt = inst->GetUses(uses);
-#ifdef __CUDA_ARCH__
+
+#ifdef __CUDA_ARCH__ // Device Version of function
+  bool dev_OPTSCHED_gPrintSpills = false;
 #ifdef IS_DEBUG_REG_PRESSURE
   Logger::Info("Updating reg pressure after scheduling Inst %d",
                inst->GetNum());
@@ -610,7 +617,7 @@ void BBWithSpill::UpdateSpillInfoForSchdul_(SchedInstruction *inst,
       // (Chris): The SLIL calculation below the def and use for-loops doesn't
       // consider the last use of a register. Thus, an additional increment must
       // happen here.
-      if (GetSpillCostFunc() == SCF_SLIL) {
+      if (needsSLIL()) {
         dev_sumOfLiveIntervalLengths_[GLOBALTID][regType]++;
         if (!use->IsInInterval(inst) && !use->IsInPossibleInterval(inst)) {
           ++dev_dynamicSlilLowerBound_[GLOBALTID];
@@ -660,7 +667,7 @@ void BBWithSpill::UpdateSpillInfoForSchdul_(SchedInstruction *inst,
   newSpillCost = 0;
 
 #ifdef IS_DEBUG_SLIL_CORRECT
-  if (OPTSCHED_gPrintSpills) {
+  if (dev_OPTSCHED_gPrintSpills) {
     printf("Printing live range lengths for instruction BEFORE calculation.\n");
     for (int j = 0; j < regTypeCnt_; j++) {
       printf("SLIL for regType %d %s is currently %d\n", j,
@@ -679,7 +686,7 @@ void BBWithSpill::UpdateSpillInfoForSchdul_(SchedInstruction *inst,
       dev_peakRegPressures_[GLOBALTID][i] = liveRegs;
 
     // (Chris): Compute sum of live range lengths at this point
-    if (GetSpillCostFunc() == SCF_SLIL) {
+    if (needsSLIL()) {
       dev_sumOfLiveIntervalLengths_[GLOBALTID][i] += 
 	               dev_liveRegs_[GLOBALTID][i].GetOneCnt();
       for (int j = 0; j < dev_liveRegs_[GLOBALTID][i].GetSize(); ++j) {
@@ -691,62 +698,15 @@ void BBWithSpill::UpdateSpillInfoForSchdul_(SchedInstruction *inst,
         }
       }
     }
-/*
-    // FIXME: Can this be taken out of this loop?
-    if (GetSpillCostFunc() == SCF_SLIL) {
-      accumulator = 0;
-      for (int x = 0; x < regTypeCnt_; x++)
-        accumulator += dev_sumOfLiveIntervalLengths_[GLOBALTID][x];
-      dev_slilSpillCost_[GLOBALTID] = accumulator;
-    }
-*/
-  }
-  // FIXME: Can this be taken out of this loop?
-  if (GetSpillCostFunc() == SCF_SLIL) {
-    accumulator = 0;
-    for (int x = 0; x < regTypeCnt_; x++)
-      accumulator += dev_sumOfLiveIntervalLengths_[GLOBALTID][x];
-    dev_slilSpillCost_[GLOBALTID] = accumulator;
   }
 
-  if (GetSpillCostFunc() == SCF_TARGET) {
-    //Cannot simply call on device due to polymorphism/virtual methods, 
-    //replacing with GenericTarget method for now since I am testing for CPU
-    //TODO: Add ability to calculate GCNTarget getCost when compiling for
-    //AMD GPU
-    //newSpillCost = OST->getCost(regPressures_);
-
-    accumulator = 0;
-    for (int x = 0; x < regTypeCnt_; x++)
-      accumulator += dev_regPressures_[GLOBALTID][x];
-    newSpillCost = accumulator;
-  } else if (GetSpillCostFunc() == SCF_SLIL) {
-    accumulator = 0;
-    for (int x = 0; x < regTypeCnt_; x++)
-      accumulator += dev_sumOfLiveIntervalLengths_[GLOBALTID][x];
-    dev_slilSpillCost_[GLOBALTID] = accumulator;
-  } else if (GetSpillCostFunc() == SCF_PRP) {
-    accumulator = 0;
-    for (int x = 0; x < regTypeCnt_; x++)
-      accumulator += dev_regPressures_[GLOBALTID][x];
-    newSpillCost = accumulator;
-  } else if (GetSpillCostFunc() == SCF_PEAK_PER_TYPE) {
-    for (int i = 0; i < regTypeCnt_; i++)
-      if (0 < dev_peakRegPressures_[GLOBALTID][i] - machMdl_->GetPhysRegCnt(i))
-        newSpillCost += dev_peakRegPressures_[GLOBALTID][i] - 
-		                   machMdl_->GetPhysRegCnt(i);
-  } else {
-    for (int i = 0; i < regTypeCnt_; i++) {
-      if (0 < (int)(dev_regPressures_[GLOBALTID][i] - 
-		    machMdl_->GetPhysRegCnt(i))) {
-        newSpillCost += dev_regPressures_[GLOBALTID][i] - 
-		        machMdl_->GetPhysRegCnt(i);
-      }
-    }
-  }
+  if (GetSpillCostFunc() == SCF_SLIL)
+    slilSpillCost_ = CmputCostForFunction(GetSpillCostFunc());
+  else
+    newSpillCost = CmputCostForFunction(GetSpillCostFunc());
 
 #ifdef IS_DEBUG_SLIL_CORRECT
-  if (OPTSCHED_gPrintSpills) {
+  if (dev_OPTSCHED_gPrintSpills) {
     printf("Printing live range lengths for instruction AFTER calculation.\n");
     for (int j = 0; j < regTypeCnt_; j++) {
       printf("SLIL for regType %d is currently %d\n", j,
@@ -774,7 +734,10 @@ void BBWithSpill::UpdateSpillInfoForSchdul_(SchedInstruction *inst,
     dev_schduldEntryInstCnt_[GLOBALTID]++;
   if (inst->MustBeInBBExit())
     dev_schduldExitInstCnt_[GLOBALTID]++;
-#else
+
+#else // Host Version of function
+  //debug
+  OPTSCHED_gPrintSpills = true;
 #ifdef IS_DEBUG_REG_PRESSURE
   Logger::Info("Updating reg pressure after scheduling Inst %d",
                inst->GetNum());
@@ -803,7 +766,7 @@ void BBWithSpill::UpdateSpillInfoForSchdul_(SchedInstruction *inst,
       // (Chris): The SLIL calculation below the def and use for-loops doesn't
       // consider the last use of a register. Thus, an additional increment must
       // happen here.
-      if (GetSpillCostFunc() == SCF_SLIL) {
+      if (needsSLIL()) {
         sumOfLiveIntervalLengths_[regType]++;
         if (!use->IsInInterval(inst) && !use->IsInPossibleInterval(inst)) {
           ++dynamicSlilLowerBound_;
@@ -873,7 +836,7 @@ void BBWithSpill::UpdateSpillInfoForSchdul_(SchedInstruction *inst,
       peakRegPressures_[i] = liveRegs;
 
     // (Chris): Compute sum of live range lengths at this point
-    if (GetSpillCostFunc() == SCF_SLIL) {
+    if (needsSLIL()) {
       sumOfLiveIntervalLengths_[i] += liveRegs_[i].GetOneCnt();
       for (int j = 0; j < liveRegs_[i].GetSize(); ++j) {
         if (liveRegs_[i].GetBit(j)) {
@@ -884,58 +847,12 @@ void BBWithSpill::UpdateSpillInfoForSchdul_(SchedInstruction *inst,
         }
       }
     }
-/*
-    // FIXME: Can this be taken out of this loop?
-    if (GetSpillCostFunc() == SCF_SLIL) {
-      accumulator = 0;
-      for (int x = 0; x < regTypeCnt_; x++)
-        accumulator += sumOfLiveIntervalLengths_[x];
-      slilSpillCost_ = accumulator;
-    }
-*/
   }
   
-  // FIXME: Can this be taken out of this loop?
-  if (GetSpillCostFunc() == SCF_SLIL) {
-    accumulator = 0;
-    for (int x = 0; x < regTypeCnt_; x++)
-      accumulator += sumOfLiveIntervalLengths_[x];
-    slilSpillCost_ = accumulator;
-  }
-
-  if (GetSpillCostFunc() == SCF_TARGET) {
-    //Cannot simply call on device due to polymorphism/virtual methods, 
-    //replacing with GenericTarget method for now since I am testing for CPU
-    //TODO: Add ability to calculate GCNTarget getCost when compiling for
-    //AMD GPU
-    //newSpillCost = OST->getCost(regPressures_);
-
-    accumulator = 0;
-    for (int x = 0; x < regTypeCnt_; x++)
-      accumulator += regPressures_[x];
-    newSpillCost = accumulator;
-  } else if (GetSpillCostFunc() == SCF_SLIL) {
-    accumulator = 0;
-    for (int x = 0; x < regTypeCnt_; x++)
-      accumulator += sumOfLiveIntervalLengths_[x];
-    slilSpillCost_ = accumulator;
-  } else if (GetSpillCostFunc() == SCF_PRP) {
-    accumulator = 0;
-    for (int x = 0; x < regTypeCnt_; x++)
-      accumulator += regPressures_[x];
-    newSpillCost = accumulator;
-  } else if (GetSpillCostFunc() == SCF_PEAK_PER_TYPE) {
-    for (int i = 0; i < regTypeCnt_; i++)
-      if (0 < peakRegPressures_[i] - machMdl_->GetPhysRegCnt(i))
-        newSpillCost += peakRegPressures_[i] - machMdl_->GetPhysRegCnt(i);
-
-  } else {
-    for (int i = 0; i < regTypeCnt_; i++) {
-      if (0 < (int)(regPressures_[i] - machMdl_->GetPhysRegCnt(i))) {
-        newSpillCost += regPressures_[i] - machMdl_->GetPhysRegCnt(i);
-      }
-    }
-  }
+  if (GetSpillCostFunc() == SCF_SLIL)
+    slilSpillCost_ = CmputCostForFunction(GetSpillCostFunc());
+  else
+    newSpillCost = CmputCostForFunction(GetSpillCostFunc());
 
 #ifdef IS_DEBUG_SLIL_CORRECT
   if (OPTSCHED_gPrintSpills) {
@@ -957,8 +874,7 @@ void BBWithSpill::UpdateSpillInfoForSchdul_(SchedInstruction *inst,
 
   totSpillCost_ += newSpillCost;
 
-  if (peakSpillCost_ < newSpillCost)
-    peakSpillCost_ = newSpillCost;
+  peakSpillCost_ = std::max(peakSpillCost_, newSpillCost);
 
   CmputCrntSpillCost_();
 
@@ -1354,6 +1270,9 @@ InstCount BBWithSpill::UpdtOptmlSched(InstSchedule *crntSched,
   return GetBestCost();
 }
 /*****************************************************************************/
+
+__host__ __device__
+bool BBWithSpill::needsSLIL() { return NeedsComputeSLIL; }
 
 void BBWithSpill::SetupForSchdulng_() {
   for (int i = 0; i < regTypeCnt_; i++) {

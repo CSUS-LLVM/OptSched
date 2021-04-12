@@ -217,6 +217,8 @@ public:
   __device__
   InstCount Dev_CmputNormCost_(InstSchedule *sched, COST_COMP_MODE compMode,
                            InstCount &execCost, bool trackCnflcts);
+  __host__ __device__
+  bool needsSLIL();
 
 protected:
   // (Chris)

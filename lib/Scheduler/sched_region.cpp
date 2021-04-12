@@ -16,6 +16,7 @@
 #include "opt-sched/Scheduler/stats.h"
 #include "opt-sched/Scheduler/utilities.h"
 #include "opt-sched/Scheduler/dev_defines.h"
+#include <cuda_profiler_api.h>
 
 extern bool OPTSCHED_gPrintSpills;
 
@@ -313,9 +314,10 @@ FUNC_RESULT SchedRegion::FindOptimalSchedule(
   // check if region is of appropriate size to execute Dev_ACO on 
   // Defined in aco.h
   // TODO: move to sched.ini
-  if (AcoBeforeEnum && REGION_MIN_SIZE > 0 && 
-      dataDepGraph_->GetInstCnt() < REGION_MIN_SIZE) {
-    Logger::Info("Skipping ACO on small region (under %d)", REGION_MIN_SIZE);
+  if (AcoBeforeEnum && REGION_MIN_SIZE > 0 &&
+      (dataDepGraph_->GetInstCnt() < REGION_MIN_SIZE || 
+       dataDepGraph_->GetInstCnt() > REGION_MAX_SIZE)) {
+    Logger::Info("Skipping ACO on small or large region (under %d or over %d)", REGION_MIN_SIZE, REGION_MAX_SIZE);
     AcoBeforeEnum = false;
   }
 
@@ -904,6 +906,13 @@ FUNC_RESULT SchedRegion::runACO(InstSchedule *ReturnSched,
   InitForSchdulng();
   FUNC_RESULT Rslt;
   if (DEV_ACO) {
+    //debug checking mem usage
+/*
+    size_t free, total;
+    cudaMemGetInfo( &free, &total );
+    Logger::Info("Starting dev mem allocation - memory: free = %llu, total = %llu", free, total);
+*/
+    gpuErrchk(cudaProfilerStart());
     // Allocate and Copy data to device for parallel ACO
     size_t memSize;
     // Allocate arrays for parallel ACO execution
@@ -1011,6 +1020,7 @@ FUNC_RESULT SchedRegion::runACO(InstSchedule *ReturnSched,
     // though the non issue error happens here. This call is to clear errors
     // from BBWithSpill deletion.
     cudaGetLastError();
+    gpuErrchk(cudaProfilerStart());
   } else {
     ACOScheduler *AcoSchdulr = 
         new ACOScheduler(dataDepGraph_, machMdl_, abslutSchedUprBound_,

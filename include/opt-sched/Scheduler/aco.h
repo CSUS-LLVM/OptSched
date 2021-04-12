@@ -26,7 +26,8 @@ typedef double pheromone_t;
 // setting to 1 locks ACO to iterations_without_improvement iterations
 #define RUNTIME_TESTING 0
 #define REGION_MIN_SIZE 50
-#define NUMBLOCKS 80
+#define REGION_MAX_SIZE 1000
+#define NUMBLOCKS 40
 #define NUMTHREADSPERBLOCK 64
 #define NUMTHREADS NUMBLOCKS * NUMTHREADSPERBLOCK
 

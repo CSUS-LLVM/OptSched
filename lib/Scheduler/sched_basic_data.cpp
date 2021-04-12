@@ -1239,6 +1239,14 @@ void SchedInstruction::AllocDevArraysForParallelACO(int numThreads) {
   // of prdscrCnt_ as another index in the array of arrays
   memSize = sizeof(InstCount) * prdcsrCnt_ * numThreads;
   InstCount *temp_arr;
+
+  //debug: checking dev mem usage
+/*
+  size_t free, total;
+  Logger::Info("Allocating instNum %d with %d prdcsrs", GetNum(), prdcsrCnt_);
+  cudaMemGetInfo( &free, &total );
+  Logger::Info("memory: free = %llu, cudaMalloc size = %llu", free, memSize);
+*/
   gpuErrchk(cudaMalloc(&temp_arr, memSize));
   for (int i = 0; i < numThreads; i++) {
     dev_rdyCyclePerPrdcsr_[i] = &temp_arr[i * prdcsrCnt_];
