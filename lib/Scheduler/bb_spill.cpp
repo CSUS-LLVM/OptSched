@@ -569,8 +569,7 @@ void BBWithSpill::CmputCrntSpillCost_() {
 }
 /******************************i***********************************************/
 
-#define IS_DEBUG_REG_PRESSURE
-#define IS_DEBUG_SLIL_CORRECT
+//#define IS_DEBUG_REG_PRESSURE
 //note: Logger::info/fatal cannot be called on device. using __CUDA_ARCH__ 
 //macro to call printf on device instead
 __host__ __device__
@@ -588,7 +587,6 @@ void BBWithSpill::UpdateSpillInfoForSchdul_(SchedInstruction *inst,
   useCnt = inst->GetUses(uses);
 
 #ifdef __CUDA_ARCH__ // Device Version of function
-  bool dev_OPTSCHED_gPrintSpills = false;
 #ifdef IS_DEBUG_REG_PRESSURE
   Logger::Info("Updating reg pressure after scheduling Inst %d",
                inst->GetNum());
@@ -667,7 +665,7 @@ void BBWithSpill::UpdateSpillInfoForSchdul_(SchedInstruction *inst,
   newSpillCost = 0;
 
 #ifdef IS_DEBUG_SLIL_CORRECT
-  if (dev_OPTSCHED_gPrintSpills) {
+  if (OPTSCHED_gPrintSpills) {
     printf("Printing live range lengths for instruction BEFORE calculation.\n");
     for (int j = 0; j < regTypeCnt_; j++) {
       printf("SLIL for regType %d %s is currently %d\n", j,
@@ -706,7 +704,7 @@ void BBWithSpill::UpdateSpillInfoForSchdul_(SchedInstruction *inst,
     newSpillCost = CmputCostForFunction(GetSpillCostFunc());
 
 #ifdef IS_DEBUG_SLIL_CORRECT
-  if (dev_OPTSCHED_gPrintSpills) {
+  if (OPTSCHED_gPrintSpills) {
     printf("Printing live range lengths for instruction AFTER calculation.\n");
     for (int j = 0; j < regTypeCnt_; j++) {
       printf("SLIL for regType %d is currently %d\n", j,
@@ -736,8 +734,6 @@ void BBWithSpill::UpdateSpillInfoForSchdul_(SchedInstruction *inst,
     dev_schduldExitInstCnt_[GLOBALTID]++;
 
 #else // Host Version of function
-  //debug
-  OPTSCHED_gPrintSpills = true;
 #ifdef IS_DEBUG_REG_PRESSURE
   Logger::Info("Updating reg pressure after scheduling Inst %d",
                inst->GetNum());

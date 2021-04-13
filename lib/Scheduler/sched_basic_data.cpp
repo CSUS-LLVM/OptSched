@@ -316,13 +316,18 @@ bool SchedInstruction::ApplyPreFxng(LinkedList<SchedInstruction> *tightndLst,
 __host__ __device__
 void SchedInstruction::AddDef(Register *reg) {
   if (defCnt_ >= MAX_DEFS_PER_INSTR) {
-    //Logger::Fatal("An instruction can't have more than %d defs",
-    //              MAX_DEFS_PER_INSTR);
+#ifndef __CUDA_ARCH__
+    Logger::Fatal("An instruction can't have more than %d defs",
+                  MAX_DEFS_PER_INSTR);
+#endif
   }
-  // Logger::Info("Inst %d defines reg %d of type %d and physNum %d and useCnt
-  // %d",
-  // num_, reg->GetNum(), reg->GetType(), reg->GetPhysicalNumber(),
-  // reg->GetUseCnt());
+#ifndef __CUDA_ARCH__
+/*
+  Logger::Info("Inst %d defines reg %d of type %d and physNum %d and useCnt %d",
+  GetNum(), reg->GetNum(), reg->GetType(), reg->GetPhysicalNumber(),
+  reg->GetUseCnt());
+*/
+#endif
   assert(reg != NULL);
   defs_[defCnt_].regType_ = (int)reg->GetType();
   defs_[defCnt_].regNum_ = (int)reg->GetNum();
@@ -332,12 +337,18 @@ void SchedInstruction::AddDef(Register *reg) {
 __host__ __device__
 void SchedInstruction::AddUse(Register *reg) {
   if (useCnt_ >= MAX_USES_PER_INSTR) {
-    //Logger::Fatal("An instruction can't have more than %d uses",
-    //              MAX_USES_PER_INSTR);
+#ifndef __CUDA_ARCH__
+    Logger::Fatal("An instruction can't have more than %d uses",
+                  MAX_USES_PER_INSTR);
+#endif
   }
-  // Logger::Info("Inst %d uses reg %d of type %d and physNum %d and useCnt %d",
-  // num_, reg->GetNum(), reg->GetType(), reg->GetPhysicalNumber(),
-  // reg->GetUseCnt());
+#ifndef __CUDA_ARCH__
+/*
+  Logger::Info("Inst %d uses reg %d of type %d and physNum %d and useCnt %d",
+  GetNum(), reg->GetNum(), reg->GetType(), reg->GetPhysicalNumber(),
+  reg->GetUseCnt());
+*/
+#endif
   assert(reg != NULL);
   uses_[useCnt_].regType_ = (int)reg->GetType();
   uses_[useCnt_].regNum_ = (int)reg->GetNum();
