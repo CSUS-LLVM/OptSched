@@ -32,9 +32,8 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--variant', choices=('sched', 'total'),
                         help='Which timing variant to use')
-    parser.add_argument('logs', type=analyze.parse_logs,
-                        help='The logs to analyze')
-    args = analyze.parse_args(parser)
+    parser.add_argument('logs', help='The logs to analyze')
+    args = analyze.parse_args(parser, 'logs')
 
     fn = total_compile_time_seconds if args.variant == 'total' else instruction_scheduling_time
     results = foreach_bench(fn, args.logs)

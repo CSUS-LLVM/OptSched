@@ -20,83 +20,71 @@ def __load_filepath(filepath):
         return __load_file(f)
 
 
-def parse_logs(filepath: str, blk_filter: Callable[[Block], bool] = None, parser: Callable[[str], Logs] = None) -> Logs:
+def block_filter(filter: dict) -> Callable[[Block], bool]:
+    def log_matches(log, pattern):
+        if not isinstance(pattern, dict):
+            if isinstance(pattern, str):
+                return fnmatch.fnmatchcase(str(log), pattern)
+            return log == pattern
+
+        return all(
+            k in log and log_matches(log[k], v)
+            for k, v in pattern.items()
+        )
+
+    def blk_filter_f(blk):
+        return all(
+            event in blk and all(log_matches(log, matcher)
+                                 for log in blk[event])
+            for event, matcher in filter.items()
+        )
+
+    return blk_filter_f
+
+
+def parse_args(parser: argparse.ArgumentParser, *names, args=None):
     '''
-    Parses the logfiles located at filepath according to the specified parser and blk_filter
-
-    Intended to be used as the `type=analyze.parse_logs` argument to an ArgumentParser add_argument call.
-    For that to work, you must use analyze.parse_args(parser) instead of parser.parse_args()
-    '''
-
-    if blk_filter is None:
-        blk_filter = parse_logs._blk_filter
-    if parser is None:
-        parser = parse_logs._parser
-
-    result = parser(filepath)
-    if blk_filter is True:
-        return result
-    return result.keep_blocks_if(blk_filter)
-
-
-def parse_args(parser: argparse.ArgumentParser, args=None):
-    '''
-    Parses the argument parser with additional common flags, supporting `parse_logs`
+    Parses the argument parser with additional common flags.
 
     Use parse_args(parser) instead of parser.parse_args()
+
+    Params:
+      - *names - variadic: the strings specifying which arguments should be parsed.
+                 These should be python_case, not --flag-case.
+      - args - The argv to parse from. Defaults to parsing sys.argv
     '''
 
-    firstparser = argparse.ArgumentParser(add_help=False)
+    parser.add_argument(
+        '--benchsuite',
+        required=True,
+        choices=('spec', 'plaidml', 'shoc', 'pickle'),
+        help='Select the benchmark suite which the input satisfies.',
+    )
+    parser.add_argument(
+        '--keep-blocks-if',
+        default='true',
+        type=json.loads,
+        help='Keep blocks matching (JSON format)',
+    )
 
-    def add_args(parser, real):
-        parser.add_argument(
-            '--benchsuite',
-            required=real,
-            choices=('spec', 'plaidml', 'shoc', 'pickle'),
-            help='Select the benchmark suite which the input satisfies.',
-        )
-        parser.add_argument(
-            '--keep-blocks-if',
-            default='true',
-            type=json.loads,
-            help='Keep blocks matching (JSON format)',
-        )
+    args = parser.parse_args(args)
 
-    add_args(firstparser, real=False)
-    res, _ = firstparser.parse_known_args(args)
-    if res.benchsuite:  # Don't do anything if --help is passed
-        def log_matches(log, pattern):
-            if not isinstance(pattern, dict):
-                if isinstance(pattern, str):
-                    return fnmatch.fnmatchcase(str(log), pattern)
-                return log == pattern
+    FILE_PARSERS = {
+        'pickle': __load_filepath,
+        'spec': import_cpu2006.parse,
+        'plaidml': import_plaidml.parse,
+        'shoc': import_shoc.parse,
+    }
+    parser = FILE_PARSERS[args.benchsuite]
+    blk_filter = block_filter(args.keep_blocks_if) if args.keep_blocks_if is not True else True
 
-            return all(
-                k in log and log_matches(log[k], v)
-                for k, v in pattern.items()
-            )
+    args_dict = vars(args)
 
-        def blk_filter_f(blk):
-            return all(
-                event in blk and all(log_matches(log, matcher)
-                                     for log in blk[event])
-                for event, matcher in res.keep_blocks_if.items()
-            )
+    # Go through the logs inputs and parse them.
+    for name in names:
+        result = parser(args_dict[name])
+        if blk_filter is not True:
+            result = result.keep_blocks_if(blk_filter)
+        args_dict[name] = result
 
-        blk_filter = blk_filter_f
-
-        FILE_PARSERS = {
-            'pickle': __load_filepath,
-            'spec': import_cpu2006.parse,
-            'plaidml': import_plaidml.parse,
-            'shoc': import_shoc.parse,
-        }
-
-        parse_logs._blk_filter = blk_filter if res.keep_blocks_if is not True else True
-        parse_logs._parser = FILE_PARSERS[res.benchsuite]
-    else:
-        parse_logs._blk_filter = lambda b: True
-        parse_logs._parser = lambda s: Logs([])
-
-    add_args(parser, real=True)
-    return parser.parse_args(args)
+    return args
