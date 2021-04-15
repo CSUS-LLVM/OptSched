@@ -486,7 +486,8 @@ __host__ __device__
 SchedInstruction *SchedInstruction::GetFrstScsr(InstCount *prdcsrNum,
                                                 UDT_GLABEL *ltncy,
                                                 DependenceType *depType,
-						InstCount *toNodeNum) {
+						InstCount *toNodeNum,
+                                                bool *IsArtificial) {
   GraphEdge *edge = GetFrstScsrEdge();
   if (!edge)
     return NULL;
@@ -498,6 +499,8 @@ SchedInstruction *SchedInstruction::GetFrstScsr(InstCount *prdcsrNum,
     *depType = (DependenceType)edge->label2;
   if (toNodeNum)
     *toNodeNum = edge->to;
+  if (IsArtificial)
+    *IsArtificial = edge->IsArtificial;
   return (SchedInstruction *)(nodes_[edge->to]);
 }
 
@@ -505,7 +508,8 @@ __host__ __device__
 SchedInstruction *SchedInstruction::GetNxtScsr(InstCount *prdcsrNum,
                                                UDT_GLABEL *ltncy,
                                                DependenceType *depType,
-					       InstCount *toNodeNum) {
+					       InstCount *toNodeNum,
+                                               bool *IsArtificial) {
   GraphEdge *edge = GetNxtScsrEdge();
   if (!edge)
     return NULL;
@@ -517,6 +521,8 @@ SchedInstruction *SchedInstruction::GetNxtScsr(InstCount *prdcsrNum,
     *depType = (DependenceType)edge->label2;
   if (toNodeNum)
     *toNodeNum = edge->to;
+  if (IsArtificial)
+    *IsArtificial = edge->IsArtificial;
   return (SchedInstruction *)(nodes_[edge->to]);
 }
 

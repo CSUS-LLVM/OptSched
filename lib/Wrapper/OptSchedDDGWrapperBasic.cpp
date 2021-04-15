@@ -455,7 +455,8 @@ void OptSchedDDGWrapperBasic::convertEdges(const SUnit &SU,
     else
       Latency = 1; // unit latency = ignore ilp
 
-    CreateEdge_(SU.NodeNum, I->getSUnit()->NodeNum, Latency, DepType);
+    CreateEdge_(SU.NodeNum, I->getSUnit()->NodeNum, Latency, DepType,
+                IsArtificial);
   }
 }
 
@@ -476,7 +477,7 @@ void OptSchedDDGWrapperBasic::convertSUnit(const SUnit &SU) {
   // type.
   if (InstType == INVALID_INST_TYPE) {
     if (ShouldGenerateMM)
-      MM->getMMGen()->generateInstrType(MI);
+      InstType = MM->getMMGen()->generateInstrType(MI);
     else
       InstType = MM->getDefaultInstType();
   }

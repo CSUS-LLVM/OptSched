@@ -51,12 +51,16 @@ struct GraphEdge {
   UDT_GEDGES predOrder;
   // The second node's order in the first node's successor list.
   UDT_GEDGES succOrder;
+  // Whether or not the edge is an artificial dependency meaning it isn't
+  // required to be correct
+  bool IsArtificial;
 
   // Creates an edge between two nodes with labels label and label2.
   __host__ __device__
   GraphEdge(UDT_GNODES from, UDT_GNODES to, UDT_GLABEL label = 0,
-            UDT_GLABEL label2 = 0)
-      : from(from), to(to), label(label), label2(label2) {}
+            UDT_GLABEL label2 = 0, bool IsArtificial = false)
+      : from(from), to(to), label(label), label2(label2),
+        IsArtificial(IsArtificial) {}
 
   // Returns the node on the other side of the edge from the provided node.
   // Assumes that the argument is one of the nodes on the sides of the edge.

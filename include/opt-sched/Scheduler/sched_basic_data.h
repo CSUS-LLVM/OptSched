@@ -249,14 +249,16 @@ public:
   SchedInstruction *GetFrstScsr(InstCount *prdcsrNum = NULL,
                                 UDT_GLABEL *ltncy = NULL,
                                 DependenceType *depType = NULL,
-				InstCount *toNodeNum = NULL);
+				InstCount *toNodeNum = NULL,
+                                bool *IsArtificial = nullptr);
   // Returns the next successor of this instruction node and moves the
   // successor iterator forward. Fills parameters as above.
   __host__ __device__
   SchedInstruction *GetNxtScsr(InstCount *prdcsrNum = NULL,
                                UDT_GLABEL *ltncy = NULL,
                                DependenceType *depType = NULL,
-			       InstCount *toNodeNum = NULL);
+			       InstCount *toNodeNum = NULL,
+                               bool *IsArtificial = nullptr);
 
   // Returns the last successor of this instruction node and moves the
   // successor iterator to the end of the list. If prdcsrNum is provided, this
