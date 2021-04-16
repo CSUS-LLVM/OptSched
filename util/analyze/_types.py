@@ -48,6 +48,16 @@ class Logs:
     def keep_blocks_if(self, p):
         return Logs([bench.keep_blocks_if(p) for bench in self.benchmarks])
 
+    def find_equiv(self, blk):
+        uid = blk.uniqueid()
+        return [b for b in self.benchmark(blk.info['benchmark']) if b.uniqueid() == uid]
+
+    def find_block(self, name, benchmark=None):
+        search = self
+        if benchmark is not None:
+            search = self.benchmark(benchmark)
+        return [b for b in search if b.name == name]
+
 
 class Benchmark:
     '''
@@ -77,6 +87,16 @@ class Benchmark:
     def keep_blocks_if(self, p):
         return Benchmark(self.info, [blk for blk in self.blocks if p(blk)])
 
+    def find_equiv(self, blk):
+        uid = blk.uniqueid()
+        return [b for b in self if b.uniqueid() == uid]
+
+    def find_block(self, name, benchmark=None):
+        if benchmark is not None:
+            if benchmark != self.name:
+                return []
+        return [b for b in self if b.name == name]
+
 
 class Block:
     '''
@@ -96,6 +116,9 @@ class Block:
         self.info = info
         self.raw_log = raw_log
         self.events = events
+
+        if 'PassFinished' in self:
+            self.info['pass'] = self.single('PassFinished')['num']
 
     def single(self, event_name):
         '''
@@ -132,3 +155,6 @@ class Block:
 
     def uniqueid(self):
         return frozenset(self.info.items())
+
+    def dump(self):
+        print(self.raw_log)

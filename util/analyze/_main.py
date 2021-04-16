@@ -80,11 +80,18 @@ def parse_args(parser: argparse.ArgumentParser, *names, args=None):
 
     args_dict = vars(args)
 
+    def parse_input(x):
+        if isinstance(x, str):
+            result = parser(x)
+            if blk_filter is not True:
+                result = result.keep_blocks_if(blk_filter)
+            return result
+        else:
+            assert isinstance(x, list)
+            return [parse_input(l) for l in x]
+
     # Go through the logs inputs and parse them.
     for name in names:
-        result = parser(args_dict[name])
-        if blk_filter is not True:
-            result = result.keep_blocks_if(blk_filter)
-        args_dict[name] = result
+        args_dict[name] = parse_input(args_dict[name])
 
     return args
