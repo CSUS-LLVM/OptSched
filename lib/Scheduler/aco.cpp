@@ -58,7 +58,7 @@ ACOScheduler::ACOScheduler(DataDepGraph *dataDepGraph,
   local_decay = schedIni.GetFloat("ACO_LOCAL_DECAY");
   decay_factor = schedIni.GetFloat("ACO_DECAY_FACTOR");
   ants_per_iteration1p = schedIni.GetInt("ACO_ANT_PER_ITERATION");
-  ants_per_iteration2p = schedIni.GetInt("ACO2P_ANT_PER_ITERATION", std::to_string(ants_per_iteration1p));
+  ants_per_iteration2p = schedIni.GetInt("ACO2P_ANT_PER_ITERATION", ants_per_iteration1p);
   ants_per_iteration = ants_per_iteration1p;
   print_aco_trace = schedIni.GetBool("ACO_TRACE");
   IsTwoPassEn = schedIni.GetBool("USE_TWO_PASS");
@@ -114,9 +114,13 @@ pheromone_t &ACOScheduler::Pheromone(InstCount from, InstCount to) {
   return pheromone_[(row * count_) + to];
 }
 
+
 double ACOScheduler::Score(SchedInstruction *from, Choice choice) {
+// tuneable heuristic importance is temporarily disabled
+//  return Pheromone(from, choice.inst) *
+//         pow(choice.heuristic, heuristicImportance_);
   return Pheromone(from, choice.inst) *
-         pow(choice.heuristic, heuristicImportance_);
+         choice.heuristic;
 }
 
 #define DBG_SRS 0
@@ -406,8 +410,11 @@ std::unique_ptr<InstSchedule> ACOScheduler::FindOneSchedule(InstCount TargetRPCo
 
 #define STOP_CONSTRUCTION_IF_INFEASIBLE 1
 
+//this is a bugged compile time optimization.  It causes crashes.
 #if STOP_CONSTRUCTION_IF_INFEASIBLE
       if (rgn_->getUnnormalizedIncrementalRPCost() > TargetRPCost) {
+        delete rdyLst_;
+        rdyLst_ = new ReadyList(dataDepGraph_, prirts_);
         return nullptr;
       }
 #endif
@@ -438,6 +445,7 @@ FUNC_RESULT ACOScheduler::FindSchedule(InstSchedule *schedule_out,
   ants_per_iteration = IsFirst ? ants_per_iteration1p : ants_per_iteration2p;
   noImprovementMax = schedIni.GetInt(IsFirst ? "ACO_STOP_ITERATIONS"
                                              : "ACO2P_STOP_ITERATIONS");
+  Logger::Info("ants/it:%d,stop_iter:%d",ants_per_iteration,noImprovementMax);
   if (DCFOption != DCF_OPT::OFF) {
     std::string DcfFnString =
         schedIni.GetString(IsFirst ? "ACO_DUAL_COST_FN" : "ACO2P_DUAL_COST_FN");
