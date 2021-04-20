@@ -29,6 +29,8 @@ double RandDouble(double min, double max) {
 #define MAX_DEPOSITION_MINUS_MIN (MAX_DEPOSITION - MIN_DEPOSITION)
 #define ACO_SCHED_STALLS 1
 
+#define SCALE (2<<24)
+
 //#define BIASED_CHOICES 10000000
 //#define LOCAL_DECAY 0.1
 

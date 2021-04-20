@@ -5,3 +5,5 @@ else()
 endif()
 
 add_dependencies(OptSched ${OPT_SCHED_TARGET_DEPS})
+
+target_link_libraries(OptSched -L/home/paul/ROCm/opencl/build/lib/ libamdocl64.so)

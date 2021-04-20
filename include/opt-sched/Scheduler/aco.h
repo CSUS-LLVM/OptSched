@@ -32,7 +32,7 @@ enum class DCF_OPT {
 
 struct Choice {
   SchedInstruction *inst;
-  double heuristic;  // range 1 to 2
+  pheromone_t heuristic;  // range 1 to 2
   InstCount readyOn; // number of cycles until this instruction becomes ready
 };
 
@@ -51,7 +51,7 @@ public:
 private:
   pheromone_t &Pheromone(SchedInstruction *from, SchedInstruction *to);
   pheromone_t &Pheromone(InstCount from, InstCount to);
-  double Score(SchedInstruction *from, Choice choice);
+  pheromone_t Score(SchedInstruction *from, Choice choice);
   bool shouldReplaceSchedule(InstSchedule *OldSched, InstSchedule *NewSched,
                              bool IsGlobal);
   DCF_OPT ParseDCFOpt(const std::string &opt);
