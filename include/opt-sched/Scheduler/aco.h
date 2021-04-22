@@ -24,7 +24,7 @@ typedef double pheromone_t;
 // If set to 1 ACO is run on device
 #define DEV_ACO 1
 // setting to 1 locks ACO to iterations_without_improvement iterations
-#define RUNTIME_TESTING 1
+#define RUNTIME_TESTING 0
 #define REGION_MIN_SIZE 50
 #define REGION_MAX_SIZE 1000
 #define NUMBLOCKS 40

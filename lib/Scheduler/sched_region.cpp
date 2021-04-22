@@ -1,4 +1,5 @@
 #include <algorithm>
+#include <cstdio>
 #include <memory>
 #include <utility>
 
@@ -17,10 +18,65 @@
 #include "opt-sched/Scheduler/utilities.h"
 #include "opt-sched/Scheduler/dev_defines.h"
 #include <cuda_profiler_api.h>
+#include "llvm/ADT/SmallString.h"
+#include "llvm/Support/ErrorHandling.h"
+#include "llvm/Support/FileSystem.h"
 
 extern bool OPTSCHED_gPrintSpills;
 
 using namespace llvm::opt_sched;
+namespace fs = llvm::sys::fs;
+
+static bool GetDumpDDGs() {
+  // Cache the result so that we don't have to keep looking it up.
+  // This is in a function so that the initialization is definitely delayed
+  // until after the SchedulerOptions has a chance to be initialized.
+  static bool DumpDDGs =
+      SchedulerOptions::getInstance().GetBool("DUMP_DDGS", false);
+  return DumpDDGs;
+}
+
+static std::string ComputeDDGDumpPath() {
+  std::string Path =
+      SchedulerOptions::getInstance().GetString("DDG_DUMP_PATH", "");
+
+  // debug
+  Logger::Info("Path: %s", Path);
+
+  if (GetDumpDDGs()) {
+    // Force the user to set DDG_DUMP_PATH
+    if (Path.empty())
+      llvm::report_fatal_error(
+          "DDG_DUMP_PATH must be set if trying to DUMP_DDGS.", false);
+
+    // Do some niceness to the input path to produce the actual path.
+    llvm::SmallString<32> FixedPath;
+    const std::error_code ec =
+        fs::real_path(Path, FixedPath, /* expand_tilde = */ true);
+    if (ec)
+      llvm::report_fatal_error(
+          "Unable to expand DDG_DUMP_PATH %s. " + ec.message(), false);
+    Path.assign(FixedPath.begin(), FixedPath.end());
+
+    // The path must be a directory, and it must exist.
+    if (!fs::is_directory(Path))
+      llvm::report_fatal_error(
+          "DDG_DUMP_PATH is set to a non-existent directory or non-directory " +
+              Path,
+          false);
+
+    // Force the path to be considered a directory.
+    // Note that redundant `/`s are okay in the path.
+    Path.push_back('/');
+  }
+
+  return Path;
+}
+
+static std::string GetDDGDumpPath() {
+  static std::string DDGDumpPath = ComputeDDGDumpPath();
+  return DDGDumpPath;
+}
 
 SchedRegion::SchedRegion(MachineModel *machMdl, MachineModel *dev_machMdl, 
 		         DataDepGraph *dataDepGraph, long rgnNum, 
@@ -52,6 +108,9 @@ SchedRegion::SchedRegion(MachineModel *machMdl, MachineModel *dev_machMdl,
   schedUprBound_ = INVALID_VALUE;
 
   spillCostFunc_ = spillCostFunc;
+
+  DumpDDGs_ = GetDumpDDGs();
+  DDGDumpPath_ = GetDDGDumpPath();
 }
 
 void SchedRegion::UseFileBounds_() {
@@ -86,27 +145,31 @@ static bool isBbEnabled(Config &schedIni, Milliseconds rgnTimeout) {
   return true;
 }
 
-__global__
-void DevListSched(SchedRegion *dev_rgn, DataDepGraph *dev_DDG, 
-		  ListScheduler *dev_lstSchdulr, InstSchedule *dev_lstSched) {
+static void dumpDDG(DataDepGraph *DDG, llvm::StringRef DDGDumpPath,
+                    llvm::StringRef Suffix = "") {
+  std::string Path = DDGDumpPath;
+  Path += DDG->GetDagID();
 
-  dev_rgn->SetDepGraph(dev_DDG);
-  ((BBWithSpill *)dev_rgn)->SetRegFiles(dev_DDG->getRegFiles());
-
-  FUNC_RESULT rslt = dev_lstSchdulr->FindSchedule(dev_lstSched, dev_rgn);
-
-  if (rslt != RES_SUCCESS) {
-      printf("Device List scheduling failed!\n");
+  if (!Suffix.empty()) {
+    Path += '.';
+    Path += Suffix;
   }
 
-  // Compute schedule costs
-  InstCount hurstcExecCost;
-  ((BBWithSpill *)(dev_rgn))->Dev_CmputNormCost_(dev_lstSched, CCM_DYNMC, hurstcExecCost, true);
-}
+  Path += ".ddg";
+  // DagID has a `:` in the name, which symbol is not allowed in a path name.
+  // Replace the `:` with a `.` to produce a legal path name.
+  std::replace(Path.begin(), Path.end(), ':', '.');
 
-__global__
-void Reset(DataDepGraph **dev_maxDDG) {
-  (*dev_maxDDG)->Reset();
+  Logger::Info("Writing DDG to %s", Path.c_str());
+
+  FILE *f = std::fopen(Path.c_str(), "w");
+  if (!f) {
+    Logger::Error("Unable to open the file: %s. %s", Path.c_str(),
+                  std::strerror(errno));
+    return;
+  }
+  DDG->WriteToFile(f, RES_SUCCESS, 1, 0);
+  std::fclose(f);
 }
 
 FUNC_RESULT SchedRegion::FindOptimalSchedule(
@@ -176,7 +239,7 @@ FUNC_RESULT SchedRegion::FindOptimalSchedule(
   stats::problemSize.Record(dataDepGraph_->GetInstCnt());
 
   const auto *GraphTransformations = dataDepGraph_->GetGraphTrans();
-  if (BbSchedulerEnabled || GraphTransformations->size() > 0 ||
+  if (BbSchedulerEnabled || GraphTransformations->size() > 0 || 
       spillCostFunc_ == SCF_SLIL)
     needTransitiveClosure = true;
 
@@ -184,6 +247,10 @@ FUNC_RESULT SchedRegion::FindOptimalSchedule(
   if (rslt != RES_SUCCESS) {
     Logger::Info("Invalid input DAG");
     return rslt;
+  }
+
+  if (DumpDDGs_) {
+    dumpDDG(dataDepGraph_, DDGDumpPath_);
   }
 
   // Apply graph transformations
@@ -204,17 +271,6 @@ FUNC_RESULT SchedRegion::FindOptimalSchedule(
   SetupForSchdulng_();
   CmputAbslutUprBound_();
   schedLwrBound_ = dataDepGraph_->GetSchedLwrBound();
-
-  // We can calculate lower bounds here since it is only dependent
-  // on schedLwrBound_
-  if (!BbSchedulerEnabled)
-    costLwrBound_ = CmputCostLwrBound();
-  else
-    CmputLwrBounds_(false);
-
-  // Log the lower bound on the cost, allowing tools reading the log to compare
-  // absolute rather than relative costs.
-  Logger::Info("Lower bound of cost before scheduling: %d", costLwrBound_);
 
   // Step #1: Find the heuristic schedule if enabled.
   // Note: Heuristic scheduler is required for the two-pass scheduler

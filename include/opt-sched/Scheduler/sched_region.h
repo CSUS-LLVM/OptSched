@@ -139,6 +139,11 @@ private:
   // Whether to verify the schedule after calculating it.
   bool vrfySched_;
 
+  // Whether to dump the DDGs for the blocks we schedule
+  bool DumpDDGs_;
+  // Where to dump the DDGs
+  std::string DDGDumpPath_;
+
   // The nomal heuristic scheduling results.
   InstCount hurstcCost_;
 

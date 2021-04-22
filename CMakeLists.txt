@@ -65,7 +65,6 @@ SET(OPT_SCHED_SRCS Scheduler/aco.cu
   Wrapper/OptSchedDDGWrapperBasic.cpp
   Wrapper/OptSchedGenericTarget.cpp)
 
-set_source_files_properties( Scheduler/aco.cpp PROPERTIES LANGUAGE CUDA )
 
 SET(OPT_SCHED_INCLUDE_DIRS ${CMAKE_CURRENT_SOURCE_DIR}/include)
 SET(OPT_SCHED_TARGET_DEPS "LLVMCodeGen")
