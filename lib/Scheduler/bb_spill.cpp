@@ -699,9 +699,9 @@ void BBWithSpill::UpdateSpillInfoForSchdul_(SchedInstruction *inst,
   }
 
   if (GetSpillCostFunc() == SCF_SLIL)
-    slilSpillCost_ = CmputCostForFunction(GetSpillCostFunc());
+    slilSpillCost_ = Dev_CmputCostForFunction(GetSpillCostFunc());
   else
-    newSpillCost = CmputCostForFunction(GetSpillCostFunc());
+    newSpillCost = Dev_CmputCostForFunction(GetSpillCostFunc());
 
 #ifdef IS_DEBUG_SLIL_CORRECT
   if (OPTSCHED_gPrintSpills) {
