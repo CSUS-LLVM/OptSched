@@ -40,9 +40,6 @@ static std::string ComputeDDGDumpPath() {
   std::string Path =
       SchedulerOptions::getInstance().GetString("DDG_DUMP_PATH", "");
 
-  // debug
-  Logger::Info("Path: %s", Path);
-
   if (GetDumpDDGs()) {
     // Force the user to set DDG_DUMP_PATH
     if (Path.empty())
@@ -110,7 +107,8 @@ SchedRegion::SchedRegion(MachineModel *machMdl, MachineModel *dev_machMdl,
   spillCostFunc_ = spillCostFunc;
 
   DumpDDGs_ = GetDumpDDGs();
-  DDGDumpPath_ = GetDDGDumpPath();
+  if (DumpDDGs_)
+    DDGDumpPath_ = GetDDGDumpPath();
 }
 
 void SchedRegion::UseFileBounds_() {
@@ -962,13 +960,6 @@ FUNC_RESULT SchedRegion::runACO(InstSchedule *ReturnSched,
   InitForSchdulng();
   FUNC_RESULT Rslt;
   if (DEV_ACO) {
-    //debug checking mem usage
-/*
-    size_t free, total;
-    cudaMemGetInfo( &free, &total );
-    Logger::Info("Starting dev mem allocation - memory: free = %llu, total = %llu", free, total);
-*/
-    gpuErrchk(cudaProfilerStart());
     // Allocate and Copy data to device for parallel ACO
     size_t memSize;
     // Allocate arrays for parallel ACO execution
@@ -1076,7 +1067,6 @@ FUNC_RESULT SchedRegion::runACO(InstSchedule *ReturnSched,
     // though the non issue error happens here. This call is to clear errors
     // from BBWithSpill deletion.
     cudaGetLastError();
-    gpuErrchk(cudaProfilerStart());
   } else {
     ACOScheduler *AcoSchdulr = 
         new ACOScheduler(dataDepGraph_, machMdl_, abslutSchedUprBound_,

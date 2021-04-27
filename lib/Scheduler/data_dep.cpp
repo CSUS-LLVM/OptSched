@@ -3615,35 +3615,29 @@ void DataDepGraph::CopyPointersToDevice(DataDepGraph *dev_DDG, int numThreads) {
   // Copy nodes_ to device
   SchedInstruction **dev_nodes;
   memSize = sizeof(SchedInstruction *) * instCnt_;
-  gpuErrchk(cudaMalloc(&dev_nodes, memSize));
+  gpuErrchk(cudaMallocManaged(&dev_nodes, memSize));
   gpuErrchk(cudaMemcpy(dev_nodes, nodes_, memSize, cudaMemcpyHostToDevice));
   gpuErrchk(cudaMemcpy(&dev_DDG->nodes_, &dev_nodes,
 		       sizeof(SchedInstruction **),
 	  	       cudaMemcpyHostToDevice));
   // update nodes_ values on device
   SchedInstruction *dev_inst;
-  memSize = sizeof(SchedInstruction *);
-  for (InstCount i = 0; i < instCnt_; i++) {
-    dev_inst = &dev_insts[i];
-    gpuErrchk(cudaMemcpy(&dev_DDG->nodes_[i], &dev_inst, memSize,
-			 cudaMemcpyHostToDevice));
-  }
+  for (InstCount i = 0; i < instCnt_; i++) 
+    dev_DDG->nodes_[i] = &dev_insts[i];
+  gpuErrchk(cudaMemPrefetchAsync(dev_DDG->nodes_, memSize, 0));
   // Copy tplgclOrdr_ to device
   SchedInstruction **dev_tplgclOrdr;
   memSize = sizeof(SchedInstruction *) * instCnt_;
-  gpuErrchk(cudaMalloc(&dev_tplgclOrdr, memSize));
+  gpuErrchk(cudaMallocManaged(&dev_tplgclOrdr, memSize));
   gpuErrchk(cudaMemcpy(dev_tplgclOrdr, tplgclOrdr_, memSize,
                        cudaMemcpyHostToDevice));
   gpuErrchk(cudaMemcpy(&dev_DDG->tplgclOrdr_, &dev_tplgclOrdr,
                        sizeof(SchedInstruction **),
                        cudaMemcpyHostToDevice));
   // update tplgclOrdr values on device
-  memSize = sizeof(SchedInstruction *);
-  for (InstCount i = 0; i < instCnt_; i++) {
-    dev_inst = &dev_insts[tplgclOrdr_[i]->GetNum()];
-    gpuErrchk(cudaMemcpy(&dev_DDG->tplgclOrdr_[i], &dev_inst, memSize,
-                         cudaMemcpyHostToDevice));
-  }
+  for (InstCount i = 0; i < instCnt_; i++) 
+    dev_DDG->tplgclOrdr_[i] = &dev_insts[tplgclOrdr_[i]->GetNum()];
+  gpuErrchk(cudaMemPrefetchAsync(dev_DDG->tplgclOrdr_, memSize, 0));
   // Copy RegFiles
   RegisterFile *dev_regFiles;
   memSize = sizeof(RegisterFile) * machMdl_->GetRegTypeCnt();

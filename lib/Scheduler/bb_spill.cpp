@@ -1494,6 +1494,7 @@ void BBWithSpill::CopyPointersToDevice(SchedRegion* dev_rgn, int numThreads) {
   size_t memSize;
   //copy liveRegs to device
   WeightedBitVector *dev_liveRegs;
+  WeightedBitVector *temp_bv;
   unsigned int *vctr = NULL;
   unsigned int *tmp_vctr = NULL;
   unsigned int *dev_vctr = NULL;
@@ -1519,24 +1520,32 @@ void BBWithSpill::CopyPointersToDevice(SchedRegion* dev_rgn, int numThreads) {
   memSize = regTypeCnt_ * sizeof(WeightedBitVector) * numThreads;
   // allocate dev mem
   gpuErrchk(cudaMallocManaged((void**)&dev_liveRegs, memSize));
+  temp_bv = (WeightedBitVector *)malloc(memSize);
   // Copy WBV and vctr array for each thread
-  for (int j = 0; j < numThreads; j++) {
-    memSize = regTypeCnt_ * sizeof(WeightedBitVector);
-    //copy array of WBitVectors
-    gpuErrchk(cudaMemcpy(&dev_liveRegs[j * regTypeCnt_], liveRegs_, memSize,
-                         cudaMemcpyHostToDevice));
-  }
+  memSize = regTypeCnt_ * sizeof(WeightedBitVector);
+  for (int j = 0; j < numThreads; j++) 
+    memcpy(&temp_bv[j * regTypeCnt_], liveRegs_, memSize);
+  memSize = regTypeCnt_ * sizeof(WeightedBitVector) * numThreads;
+  gpuErrchk(cudaMemcpy(dev_liveRegs, temp_bv, memSize, 
+                       cudaMemcpyHostToDevice));
+  free(temp_bv);
   // Make sure host has the array of device pointers
   memSize = regTypeCnt_ * sizeof(WeightedBitVector) * numThreads;
   gpuErrchk(cudaMemPrefetchAsync(dev_liveRegs, memSize, cudaCpuDeviceId));
+  // Copy array of vctrs for this thread
+  memSize = totUnitCnt * sizeof(unsigned int) * numThreads;
+  //allocate device mem
+  gpuErrchk(cudaMalloc((void**)&dev_vctr, memSize));
+  // prepare host array for copy to device with one cudaMemcpy call
+  tmp_vctr = (unsigned int *)malloc(memSize);
+  memSize = totUnitCnt * sizeof(unsigned int);
+  for (int j = 0; j < numThreads; j++)
+    memcpy(&tmp_vctr[j * totUnitCnt], vctr, memSize);
+  //copy vctr to device
+  memSize = totUnitCnt * sizeof(unsigned int) * numThreads;
+  gpuErrchk(cudaMemcpy(dev_vctr, tmp_vctr, memSize, cudaMemcpyHostToDevice));
+  indx = 0;
   for (int j = 0; j < numThreads; j++) {
-    // Copy array of vctrs for this thread
-    memSize = totUnitCnt * sizeof(unsigned int);
-    //allocate device mem
-    gpuErrchk(cudaMalloc((void**)&dev_vctr, memSize));
-    //copy vctr to device
-    gpuErrchk(cudaMemcpy(dev_vctr, vctr, memSize, cudaMemcpyHostToDevice));
-    indx = 0;
     for (int i = 0; i < regTypeCnt_; i++) {
       unitCnt = liveRegs_[i].GetUnitCnt();
       if (unitCnt > 0) {
@@ -1547,6 +1556,7 @@ void BBWithSpill::CopyPointersToDevice(SchedRegion* dev_rgn, int numThreads) {
     //update device pointer
     ((BBWithSpill *)dev_rgn)->dev_liveRegs_[j] = &dev_liveRegs[j * regTypeCnt_];
   }
+  free(tmp_vctr);
   // make sure managed mem is copied to device before kernel start
   memSize = regTypeCnt_ * sizeof(WeightedBitVector) * numThreads;
   gpuErrchk(cudaMemPrefetchAsync(dev_liveRegs, memSize, 0));
@@ -1569,26 +1579,34 @@ void BBWithSpill::CopyPointersToDevice(SchedRegion* dev_rgn, int numThreads) {
   }
   // allocate array for all threads
   memSize = regTypeCnt_ * sizeof(WeightedBitVector) * numThreads;
-  // allocate dev mem
+  // allocate dev mem and host mem to copy with one call
   gpuErrchk(cudaMallocManaged((void**)&dev_livePhysRegs, memSize));
+  temp_bv = (WeightedBitVector *)malloc(memSize);
   // Copy WBV and vctr array for each thread
-  for (int j = 0; j < numThreads; j++) {
-    memSize = regTypeCnt_ * sizeof(WeightedBitVector);
-    //copy array of WBitVectors
-    gpuErrchk(cudaMemcpy(&dev_livePhysRegs[j * regTypeCnt_], livePhysRegs_,
-                         memSize, cudaMemcpyHostToDevice));
-  }
+  memSize = regTypeCnt_ * sizeof(WeightedBitVector);
+  for (int j = 0; j < numThreads; j++)
+    memcpy(&temp_bv[j * regTypeCnt_], livePhysRegs_, memSize);
+  memSize = regTypeCnt_ * sizeof(WeightedBitVector) * numThreads;
+  gpuErrchk(cudaMemcpy(dev_livePhysRegs, temp_bv, memSize, 
+                       cudaMemcpyHostToDevice));
+  free(temp_bv);
   // Make sure host has the array of device pointers
   memSize = regTypeCnt_ * sizeof(WeightedBitVector) * numThreads;
   gpuErrchk(cudaMemPrefetchAsync(dev_livePhysRegs, memSize, cudaCpuDeviceId));
+  // Copy array of vctrs for this thread
+  memSize = totUnitCnt * sizeof(unsigned int) * numThreads;
+  //allocate device mem
+  gpuErrchk(cudaMalloc((void**)&dev_vctr, memSize));
+  // prepare host array for copy to device with one cudaMemcpy call
+  tmp_vctr = (unsigned int *)malloc(memSize);
+  memSize = totUnitCnt * sizeof(unsigned int);
+  for (int j = 0; j < numThreads; j++) 
+    memcpy(&tmp_vctr[j * totUnitCnt], vctr, memSize);
+  //copy vctr to device
+  memSize = totUnitCnt * sizeof(unsigned int) * numThreads;
+  gpuErrchk(cudaMemcpy(dev_vctr, tmp_vctr, memSize, cudaMemcpyHostToDevice));
+  indx = 0; 
   for (int j = 0; j < numThreads; j++) {
-    // Copy array of vctrs for this thread
-    memSize = totUnitCnt * sizeof(unsigned int);
-    //allocate device mem
-    gpuErrchk(cudaMalloc((void**)&dev_vctr, memSize));
-    //copy vctr to device
-    gpuErrchk(cudaMemcpy(dev_vctr, vctr, memSize, cudaMemcpyHostToDevice));
-    indx = 0;
     for (int i = 0; i < regTypeCnt_; i++) {
       unitCnt = livePhysRegs_[i].GetUnitCnt();
       if (unitCnt > 0) {
@@ -1600,6 +1618,7 @@ void BBWithSpill::CopyPointersToDevice(SchedRegion* dev_rgn, int numThreads) {
     ((BBWithSpill *)dev_rgn)->dev_livePhysRegs_[j] = 
                                       &dev_livePhysRegs[j * regTypeCnt_];
   }
+  free(tmp_vctr);
   // make sure managed mem is copied to device before kernel start
   memSize = regTypeCnt_ * sizeof(WeightedBitVector) * numThreads;
   gpuErrchk(cudaMemPrefetchAsync(dev_livePhysRegs, memSize, 0));

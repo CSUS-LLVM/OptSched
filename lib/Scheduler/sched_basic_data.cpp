@@ -1082,28 +1082,6 @@ void SchedInstruction::CopyPointersToDevice(SchedInstruction *dev_inst,
 		       cudaMemcpyHostToDevice));
   gpuErrchk(cudaMemcpy(&dev_inst->ltncyPerPrdcsr_, &dev_ltncyPerPrdcsr,
 		       sizeof(InstCount *), cudaMemcpyHostToDevice));
-  // Copy crtclPathFrmRcrsvScsr_
-  if (crtclPathFrmRcrsvScsr_) {
-    InstCount *dev_crtclPathFrmRcrsvScsr;
-    memSize = sizeof(InstCount) * instCnt;
-    gpuErrchk(cudaMalloc(&dev_crtclPathFrmRcrsvScsr, memSize));
-    gpuErrchk(cudaMemcpy(dev_crtclPathFrmRcrsvScsr, crtclPathFrmRcrsvScsr_,
-                         memSize, cudaMemcpyHostToDevice));
-    gpuErrchk(cudaMemcpy(&dev_inst->crtclPathFrmRcrsvScsr_,
-			 &dev_crtclPathFrmRcrsvScsr, sizeof(InstCount *), 
-			 cudaMemcpyHostToDevice));
-  }
-  // Copy crtclPathFrmRcrsvPrdcsr_
-  if (crtclPathFrmRcrsvPrdcsr_) {
-    InstCount *dev_crtclPathFrmRcrsvPrdcsr;
-    memSize = sizeof(InstCount) * instCnt;
-    gpuErrchk(cudaMalloc(&dev_crtclPathFrmRcrsvPrdcsr, memSize));
-    gpuErrchk(cudaMemcpy(dev_crtclPathFrmRcrsvPrdcsr, crtclPathFrmRcrsvPrdcsr_,
-                         memSize, cudaMemcpyHostToDevice));
-    gpuErrchk(cudaMemcpy(&dev_inst->crtclPathFrmRcrsvPrdcsr_,
-                         &dev_crtclPathFrmRcrsvPrdcsr, sizeof(InstCount *),
-                         cudaMemcpyHostToDevice));
-  }
   // Copy SchedRange
   SchedRange *dev_crntRange;
   memSize = sizeof(SchedRange);
@@ -1115,64 +1093,6 @@ void SchedInstruction::CopyPointersToDevice(SchedInstruction *dev_inst,
   // Copy sortedScsrLst_
   InstCount *dev_elmnts;
   unsigned long *dev_keys;
-  if (sortedScsrLst_) {
-    PriorityArrayList<InstCount> * dev_sortedScsrLst;
-    memSize = sizeof(PriorityArrayList<InstCount>);
-    gpuErrchk(cudaMallocManaged(&dev_sortedScsrLst, memSize));
-    gpuErrchk(cudaMemcpy(dev_sortedScsrLst, sortedScsrLst_, memSize,
-			 cudaMemcpyHostToDevice));
-    gpuErrchk(cudaMemcpy(&dev_inst->sortedScsrLst_, &dev_sortedScsrLst,
-			 sizeof(PriorityArrayList<InstCount> *),
-			 cudaMemcpyHostToDevice));
-    // Copy PriorityArrayLists arrays elmnts_ and keys_
-    if (sortedScsrLst_->maxSize_ > 0) {
-      memSize = sizeof(InstCount) * sortedScsrLst_->maxSize_;
-      // removed managed, make sure causes no issues
-      gpuErrchk(cudaMalloc(&dev_elmnts, memSize));
-      gpuErrchk(cudaMemcpy(dev_elmnts, sortedScsrLst_->elmnts_, memSize,
-			   cudaMemcpyHostToDevice));
-      gpuErrchk(cudaMemcpy(&dev_inst->sortedScsrLst_->elmnts_, &dev_elmnts,
-			   sizeof(InstCount *), cudaMemcpyHostToDevice));
-      memSize = sizeof(unsigned long) * sortedScsrLst_->maxSize_;
-      gpuErrchk(cudaMalloc(&dev_keys, memSize));
-      gpuErrchk(cudaMemcpy(dev_keys, sortedScsrLst_->keys_, memSize,
-			   cudaMemcpyHostToDevice));
-      gpuErrchk(cudaMemcpy(&dev_inst->sortedScsrLst_->keys_, &dev_keys,
-			   sizeof(unsigned long *), cudaMemcpyHostToDevice));
-    }
-    memSize = sizeof(PriorityArrayList<InstCount>);
-    gpuErrchk(cudaMemPrefetchAsync(dev_sortedScsrLst, memSize, 0));
-  }
-
-  // Copy sortedPrdcsrLst_
-  if (sortedPrdcsrLst_) {
-    PriorityArrayList<InstCount> * dev_sortedPrdcsrLst;
-    memSize = sizeof(PriorityArrayList<InstCount>);
-    gpuErrchk(cudaMallocManaged(&dev_sortedPrdcsrLst, memSize));
-    gpuErrchk(cudaMemcpy(dev_sortedPrdcsrLst, sortedPrdcsrLst_, memSize,
-                         cudaMemcpyHostToDevice));
-    gpuErrchk(cudaMemcpy(&dev_inst->sortedPrdcsrLst_, &dev_sortedPrdcsrLst,
-                         sizeof(PriorityArrayList<InstCount> *),
-                         cudaMemcpyHostToDevice));
-    // Copy PriorityArrayLists arrays elmnts_ and keys_
-    if (sortedPrdcsrLst_->maxSize_ > 0) {
-      memSize = sizeof(SchedInstruction *) * sortedPrdcsrLst_->maxSize_;
-      // removed managed, make sure causes no issues
-      gpuErrchk(cudaMalloc(&dev_elmnts, memSize));
-      gpuErrchk(cudaMemcpy(dev_elmnts, sortedPrdcsrLst_->elmnts_, memSize,
-			   cudaMemcpyHostToDevice));
-      gpuErrchk(cudaMemcpy(&dev_inst->sortedPrdcsrLst_->elmnts_, &dev_elmnts,
-			   sizeof(InstCount *), cudaMemcpyHostToDevice));
-      memSize = sizeof(unsigned long) * sortedPrdcsrLst_->maxSize_;
-      gpuErrchk(cudaMalloc(&dev_keys, memSize));
-      gpuErrchk(cudaMemcpy(dev_keys, sortedPrdcsrLst_->keys_, memSize,
-                           cudaMemcpyHostToDevice));
-      gpuErrchk(cudaMemcpy(&dev_inst->sortedPrdcsrLst_->keys_, &dev_keys,
-                           sizeof(unsigned long *), cudaMemcpyHostToDevice));
-    }
-    memSize = sizeof(PriorityArrayList<InstCount>);
-    gpuErrchk(cudaMemPrefetchAsync(dev_sortedPrdcsrLst, memSize, 0));
-  }
   GraphNode::CopyPointersToDevice((GraphNode *)dev_inst, dev_nodes, instCnt);
   // make sure managed mem is copied to device before kernel start
   memSize = sizeof(InstCount *) * numThreads;
@@ -1182,30 +1102,8 @@ void SchedInstruction::CopyPointersToDevice(SchedInstruction *dev_inst,
 }
 
 void SchedInstruction::FreeDevicePointers(int numThreads) {
-  //cudaFree(rdyCyclePerPrdcsr_);
-  //cudaFree(prevMinRdyCyclePerPrdcsr_);
   cudaFree(ltncyPerPrdcsr_);
-  if (crtclPathFrmRcrsvScsr_)
-    cudaFree(crtclPathFrmRcrsvScsr_);
-  if (crtclPathFrmRcrsvPrdcsr_)
-    cudaFree(crtclPathFrmRcrsvPrdcsr_);
   cudaFree(crntRange_);
-  if (sortedScsrLst_) {
-    if (sortedScsrLst_->maxSize_ > 0) {
-      cudaFree(sortedScsrLst_->elmnts_);
-      cudaFree(sortedScsrLst_->keys_);
-    }
-    cudaFree(sortedScsrLst_->dev_crnt_);
-    cudaFree(sortedScsrLst_);
-  }
-  if (sortedPrdcsrLst_) {
-    if (sortedPrdcsrLst_->maxSize_ > 0) {
-      cudaFree(sortedPrdcsrLst_->elmnts_);
-      cudaFree(sortedPrdcsrLst_->keys_);
-    }
-    cudaFree(sortedPrdcsrLst_->dev_crnt_);
-    cudaFree(sortedPrdcsrLst_);
-  }
   cudaFree(dev_crntSchedCycle_);
   cudaFree(dev_crntSchedSlot_);
   cudaFree(dev_lastUseCnt_);
@@ -1256,14 +1154,6 @@ void SchedInstruction::AllocDevArraysForParallelACO(int numThreads) {
   // of prdscrCnt_ as another index in the array of arrays
   memSize = sizeof(InstCount) * prdcsrCnt_ * numThreads;
   InstCount *temp_arr;
-
-  //debug: checking dev mem usage
-/*
-  size_t free, total;
-  Logger::Info("Allocating instNum %d with %d prdcsrs", GetNum(), prdcsrCnt_);
-  cudaMemGetInfo( &free, &total );
-  Logger::Info("memory: free = %llu, cudaMalloc size = %llu", free, memSize);
-*/
   gpuErrchk(cudaMalloc(&temp_arr, memSize));
   for (int i = 0; i < numThreads; i++) {
     dev_rdyCyclePerPrdcsr_[i] = &temp_arr[i * prdcsrCnt_];
