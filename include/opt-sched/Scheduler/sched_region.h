@@ -13,6 +13,7 @@ Last Update:  Jan. 2020
 #include "opt-sched/Scheduler/defines.h"
 #include "opt-sched/Scheduler/cuda_lnkd_lst.cuh"
 #include "opt-sched/Scheduler/sched_basic_data.h"
+#include "opt-sched/Scheduler/aco.h"
 // For DataDepGraph, LB_ALG.
 #include "opt-sched/Scheduler/data_dep.h"
 // For Enumerator, LengthCostEnumerator, EnumTreeNode and Pruning.

@@ -25,8 +25,11 @@ typedef double pheromone_t;
 #define DEV_ACO 1
 // setting to 1 locks ACO to iterations_without_improvement iterations
 #define RUNTIME_TESTING 1
+// Minimum region node count. Doesn't make sence to launch DEV_ACO on small rgns
 #define REGION_MIN_SIZE 50
-#define REGION_MAX_SIZE 1000
+// use edge count to approximate memory usage, using nodeCnt reflect
+// memory usage as well. Smaller node count DAGs can use more memory.
+#define REGION_MAX_EDGE_CNT 800000
 #define NUMBLOCKS 40
 #define NUMTHREADSPERBLOCK 64
 #define NUMTHREADS NUMBLOCKS * NUMTHREADSPERBLOCK

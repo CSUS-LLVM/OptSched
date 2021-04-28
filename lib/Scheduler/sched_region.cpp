@@ -368,10 +368,12 @@ FUNC_RESULT SchedRegion::FindOptimalSchedule(
   // check if region is of appropriate size to execute Dev_ACO on 
   // Defined in aco.h
   // TODO: move to sched.ini
-  if (AcoBeforeEnum && REGION_MIN_SIZE > 0 &&
-      (dataDepGraph_->GetInstCnt() < REGION_MIN_SIZE || 
-       dataDepGraph_->GetInstCnt() > REGION_MAX_SIZE)) {
-    Logger::Info("Skipping ACO on small or large region (under %d or over %d)", REGION_MIN_SIZE, REGION_MAX_SIZE);
+  if (AcoBeforeEnum && 
+      (REGION_MIN_SIZE > 0 && dataDepGraph_->GetInstCnt() < REGION_MIN_SIZE ||
+       REGION_MAX_EDGE_CNT > 0 && 
+       dataDepGraph_->GetEdgeCnt() > REGION_MAX_EDGE_CNT)) {
+    Logger::Info("Skipping ACO (under %d nodes or over %d edges)", 
+                  REGION_MIN_SIZE, REGION_MAX_EDGE_CNT);
     AcoBeforeEnum = false;
   }
 
@@ -959,6 +961,8 @@ FUNC_RESULT SchedRegion::runACO(InstSchedule *ReturnSched,
                                 InstSchedule *InitSched, bool IsPostBB) {
   InitForSchdulng();
   FUNC_RESULT Rslt;
+  // debug
+  Logger::Info("This DDG has %d edges", dataDepGraph_->GetEdgeCnt());
   if (DEV_ACO) {
     // Allocate and Copy data to device for parallel ACO
     size_t memSize;

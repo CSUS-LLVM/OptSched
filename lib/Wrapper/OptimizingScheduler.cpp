@@ -400,7 +400,6 @@ void ScheduleDAGOptSched::schedule() {
     SetupLLVMDag();
   }
   // Build LLVM DAG
-  //SetupLLVMDag();
   OST->initRegion(this, MM.get());
   // Convert graph
   auto DDG =
@@ -420,11 +419,6 @@ void ScheduleDAGOptSched::schedule() {
 
   // Prepare for device scheduling by increasing heap size and copying machMdl
   if (dev_MM == NULL) {
-    // Increase heap size to allow large DDGs to be allocated
-    //if (cudaSuccess != cudaDeviceSetLimit(cudaLimitMallocHeapSize, 512000000))
-      //Logger::Info("Error increasing heap size: %s",
-        //            cudaGetErrorString(cudaGetLastError()));
-
     // Copy MachineModel to device for use during DevListSched.
     // Allocate device memory
     gpuErrchk(cudaMallocManaged((void**)&dev_MM, sizeof(MachineModel)));

@@ -964,7 +964,7 @@ void DataDepGraph::CreateEdge(SchedInstruction *frmNode,
 
   GraphEdge *newEdg = new GraphEdge(frmNode->GetNum(), toNode->GetNum(), 
 		                    ltncy, depType);
-
+  edgeCnt_++;
   frmNode->AddScsr(newEdg);
   toNode->AddPrdcsr(newEdg);
 
@@ -1007,6 +1007,7 @@ void DataDepGraph::CreateEdge_(InstCount frmNodeNum, InstCount toNodeNum,
 #endif
     edge = new GraphEdge(frmNode->GetNum(), toNode->GetNum(), ltncy, depType,
                          IsArtificial);
+    edgeCnt_++;
     frmNode->AddScsr(edge);
     toNode->AddPrdcsr(edge);
   } else {
@@ -1375,23 +1376,6 @@ void DataDepGraph::PrintEdgeCntPerLtncyInfo() {
     totEdgeCnt += edgeCntPerLtncy_[i];
   }
   Logger::Info("Total edge count: %d", totEdgeCnt);
-}
-
-__device__
-void DataDepGraph::Reset() {
-  // Reset unused edge pool counter
-  initializedEdges_ = 0;
-  // Reset all insts that were initialized
-  for (InstCount i = 0; i < instCnt_; i++)
-    ((GraphNode)insts_[i]).Reset();
-
-  // Reset RegFiles for next region
-  for (int i = 0; i < machMdl_->GetRegTypeCnt(); i++) {
-    RegFiles[i].Reset();
-  }
-
-  wasSetupForSchduling_ = false;
-  dpthFrstSrchDone_ = false; 
 }
 
 InstCount DataDepGraph::GetRltvCrtclPath(SchedInstruction *ref,

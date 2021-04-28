@@ -160,11 +160,6 @@ protected:
 
   // An array of instructions
   SchedInstruction *insts_;
-  // An array of pointers to allocated edges
-  // used by maxDDG to reset and initialize edges without reallocating
-  GraphEdge *edges_;
-  // Keep track of how many edges are currently in use per region
-  int initializedEdges_;
 
   // The number of issue types of the machine which this graph uses.
   int16_t issuTypeCnt_;
@@ -339,9 +334,6 @@ public:
   Register *getRegByTuple(RegIndxTuple *tuple) { 
     return RegFiles[tuple->regType_].GetReg(tuple->regNum_); 
   }
-  // Resets DDG to blank state for later reinitilization
-  __device__
-  void Reset();
   // Deep Copies DDG's arrays to device and links them to device DDG pointer
   void CopyPointersToDevice(DataDepGraph *dev_DDG, int numThreads = 0);
   // Calls cudaFree on all arrays/objects that were allocated with cudaMalloc
