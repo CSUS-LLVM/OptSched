@@ -121,8 +121,8 @@ double ACOScheduler::Score(SchedInstruction *from, Choice choice) {
 // tuneable heuristic importance is temporarily disabled
 //  return Pheromone(from, choice.inst) *
 //         pow(choice.heuristic, heuristicImportance_);
-  return Pheromone(from, choice.inst) *
-         choice.heuristic;
+  double hf = heuristicImportance_ ? choice.heuristic : 1.0;
+  return Pheromone(from, choice.inst) * hf;
 }
 
 #define DBG_SRS 0
