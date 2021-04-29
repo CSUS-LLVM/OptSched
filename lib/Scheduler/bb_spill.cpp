@@ -386,12 +386,12 @@ void BBWithSpill::InitForCostCmputtn_() {
 
   for (i = 0; i < dataDepGraph_->GetInstCnt(); i++)
     dev_spillCosts_[GLOBALTID][i] = 0;
-
+/* SLIL not used on device
   for (int i = 0; i < regTypeCnt_; i++)
     dev_sumOfLiveIntervalLengths_[GLOBALTID][i] = 0;
 
   dev_dynamicSlilLowerBound_[GLOBALTID] = staticSlilLowerBound_;
-
+*/
 #else // Host version
   crntCycleNum_ = 0;
   crntSlotNum_ = 0;
@@ -1450,7 +1450,9 @@ void BBWithSpill::CmputCnflcts_(InstSchedule *sched) {
 }
 
 void BBWithSpill::AllocDevArraysForParallelACO(int numThreads) {
-  // alloc dev array for crntCycleNum_
+  // Temporarily holds large cudaMalloc arrays as theya re devided
+  InstCount *temp;
+  unsigned *u_temp;
   size_t memSize = sizeof(InstCount) * numThreads;
   cudaMalloc(&dev_crntCycleNum_, memSize);
   cudaMalloc(&dev_crntSlotNum_, memSize);
@@ -1458,8 +1460,9 @@ void BBWithSpill::AllocDevArraysForParallelACO(int numThreads) {
   cudaMalloc(&dev_crntStepNum_, memSize);
   cudaMalloc(&dev_peakSpillCost_, memSize);
   cudaMalloc(&dev_totSpillCost_, memSize);
-  cudaMalloc(&dev_slilSpillCost_, memSize);
-  cudaMalloc(&dev_dynamicSlilLowerBound_, memSize);
+  // SLIL not used on device
+  //cudaMalloc(&dev_slilSpillCost_, memSize);
+  //cudaMalloc(&dev_dynamicSlilLowerBound_, memSize);
   memSize = sizeof(int) * numThreads;
   cudaMalloc(&dev_schduldEntryInstCnt_, memSize);
   cudaMalloc(&dev_schduldExitInstCnt_, memSize);
@@ -1469,24 +1472,29 @@ void BBWithSpill::AllocDevArraysForParallelACO(int numThreads) {
   cudaMallocManaged(&dev_livePhysRegs_, memSize);
   memSize = sizeof(InstCount *) * numThreads;
   cudaMallocManaged(&dev_peakRegPressures_, memSize);
-  memSize = sizeof(InstCount) * regTypeCnt_;
+  memSize = sizeof(InstCount) * regTypeCnt_ * numThreads;
+  cudaMalloc(&temp, memSize);
   for (int i = 0; i < numThreads; i++)
-    cudaMalloc(&dev_peakRegPressures_[i], memSize);
+    dev_peakRegPressures_[i] = &temp[i];
   memSize = sizeof(unsigned *) * numThreads;
   cudaMallocManaged(&dev_regPressures_, memSize);
-  memSize = sizeof(unsigned) * regTypeCnt_;
+  memSize = sizeof(unsigned) * regTypeCnt_ * numThreads;
+  cudaMalloc(&u_temp, memSize);
   for (int i = 0; i < numThreads; i++)
-    cudaMalloc(&dev_regPressures_[i], memSize);
+    dev_regPressures_[i] = &u_temp[i];
   memSize = sizeof(InstCount *) * numThreads;
   cudaMallocManaged(&dev_spillCosts_, memSize);
-  memSize = sizeof(InstCount) * dataDepGraph_->GetInstCnt();
+  memSize = sizeof(InstCount) * dataDepGraph_->GetInstCnt() * numThreads;
+  cudaMalloc(&temp, memSize);
   for (int i = 0; i < numThreads; i++)
-    cudaMalloc(&dev_spillCosts_[i], memSize);
+    dev_spillCosts_[i] = &temp[i];
+/* SLIL not used on device
   memSize = sizeof(int *) * numThreads;
   cudaMallocManaged(&dev_sumOfLiveIntervalLengths_, memSize);
   memSize = sizeof(int) * regTypeCnt_;
   for (int i = 0; i < numThreads; i++)
     cudaMalloc(&dev_sumOfLiveIntervalLengths_[i], memSize);
+*/
 }
 
 void BBWithSpill::CopyPointersToDevice(SchedRegion* dev_rgn, int numThreads) {
@@ -1536,6 +1544,7 @@ void BBWithSpill::CopyPointersToDevice(SchedRegion* dev_rgn, int numThreads) {
   //allocate device mem
   gpuErrchk(cudaMalloc((void**)&dev_vctr, memSize));
   // prepare host array for copy to device with one cudaMemcpy call
+  // this part is a bit complex but greatly reduces cuda malloc/copy time
   tmp_vctr = (unsigned int *)malloc(memSize);
   memSize = totUnitCnt * sizeof(unsigned int);
   for (int j = 0; j < numThreads; j++)
@@ -1597,6 +1606,7 @@ void BBWithSpill::CopyPointersToDevice(SchedRegion* dev_rgn, int numThreads) {
   //allocate device mem
   gpuErrchk(cudaMalloc((void**)&dev_vctr, memSize));
   // prepare host array for copy to device with one cudaMemcpy call
+  // This section is a bit complex but greatly reduces cuda malloc/copy times
   tmp_vctr = (unsigned int *)malloc(memSize);
   memSize = totUnitCnt * sizeof(unsigned int);
   for (int j = 0; j < numThreads; j++) 
@@ -1632,27 +1642,22 @@ void BBWithSpill::CopyPointersToDevice(SchedRegion* dev_rgn, int numThreads) {
   gpuErrchk(cudaMemPrefetchAsync(dev_regPressures_, memSize, 0));
   memSize = sizeof(InstCount *) * numThreads;
   gpuErrchk(cudaMemPrefetchAsync(dev_spillCosts_, memSize, 0));
-  memSize = sizeof(int *) * numThreads;
-  gpuErrchk(cudaMemPrefetchAsync(dev_sumOfLiveIntervalLengths_, memSize, 0));
+  // SLIL not used on GPU
+  //memSize = sizeof(int *) * numThreads;
+  //gpuErrchk(cudaMemPrefetchAsync(dev_sumOfLiveIntervalLengths_, memSize, 0));
 }
 
 void BBWithSpill::UpdateSpillInfoFromDevice(BBWithSpill *dev_rgn) {
   peakRegPressures_ = dev_rgn->peakRegPressures_;
   spillCosts_ = dev_rgn->spillCosts_;
-  sumOfLiveIntervalLengths_ = dev_rgn->sumOfLiveIntervalLengths_;
+  //sumOfLiveIntervalLengths_ = dev_rgn->sumOfLiveIntervalLengths_;
   regPressures_ = dev_rgn->regPressures_;
 }
 
 void BBWithSpill::FreeDevicePointers(int numThreads) {
-  for (int i = 0; i < numThreads; i++) {
-    cudaFree(dev_peakRegPressures_[i]);
-    cudaFree(dev_regPressures_[i]);
-    cudaFree(dev_spillCosts_[i]);
-    cudaFree(dev_sumOfLiveIntervalLengths_[i]);
-    cudaFree(dev_liveRegs_[i][0].vctr_);
-    cudaFree(dev_livePhysRegs_[i][0].vctr_);
-  }
+  cudaFree(dev_liveRegs_[0][0].vctr_);
   cudaFree(dev_liveRegs_[0]);
+  cudaFree(dev_livePhysRegs_[0][0].vctr_);
   cudaFree(dev_livePhysRegs_[0]);
   cudaFree(dev_livePhysRegs_);
   cudaFree(dev_liveRegs_);
@@ -1662,15 +1667,18 @@ void BBWithSpill::FreeDevicePointers(int numThreads) {
   cudaFree(dev_crntStepNum_);
   cudaFree(dev_peakSpillCost_);
   cudaFree(dev_totSpillCost_);
-  cudaFree(dev_slilSpillCost_);
-  cudaFree(dev_dynamicSlilLowerBound_);
+  //cudaFree(dev_slilSpillCost_);
+  //cudaFree(dev_dynamicSlilLowerBound_);
   cudaFree(dev_schduldEntryInstCnt_);
   cudaFree(dev_schduldExitInstCnt_);
   cudaFree(dev_schduldInstCnt_);
   cudaFree(dev_liveRegs_);
   cudaFree(dev_livePhysRegs_);
+  cudaFree(dev_peakRegPressures_[0]);
   cudaFree(dev_peakRegPressures_);
+  cudaFree(dev_regPressures_[0]);
   cudaFree(dev_regPressures_);
+  cudaFree(dev_spillCosts_[0]);
   cudaFree(dev_spillCosts_);
-  cudaFree(dev_sumOfLiveIntervalLengths_);
+  //cudaFree(dev_sumOfLiveIntervalLengths_);
 }
