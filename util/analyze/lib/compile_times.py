@@ -36,7 +36,7 @@ if __name__ == '__main__':
     args = analyze.parse_args(parser, 'logs')
 
     fn = total_compile_time_seconds if args.variant == 'total' else instruction_scheduling_time
-    results = foreach_bench(fn, args.logs)
+    results = foreach_bench(fn, args.logs, combine=sum)
     writer = csv.DictWriter(sys.stdout, fieldnames=results.keys())
     writer.writeheader()
     writer.writerow(results)
