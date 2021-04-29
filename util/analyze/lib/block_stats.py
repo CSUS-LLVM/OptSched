@@ -11,7 +11,7 @@ def is_enumerated(blk: Block) -> bool:
 
 
 def is_optimal(blk: Block) -> bool:
-    return 'DagSolvedOptimally' in blk
+    return 'DagSolvedOptimally' in blk or 'HeuristicScheduleOptimal' in blk
 
 
 def is_timed_out(blk: Block) -> bool:
@@ -51,10 +51,10 @@ def compute_block_stats(logs: Logs):
     return {
         'num blocks': num_blocks(logs),
         'num blocks enumerated': num_enumerated(logs),
-        'num optimal and improved': utils.count(blk for blk in logs if is_optimal(blk) and is_improved(blk)),
-        'num optimal and not improved': utils.count(blk for blk in logs if is_optimal(blk) and not is_improved(blk)),
-        'num not optimal and improved': utils.count(blk for blk in logs if not is_optimal(blk) and is_improved(blk)),
-        'num not optimal and not improved': utils.count(blk for blk in logs if not is_optimal(blk) and not is_improved(blk)),
+        'num optimal and improved': utils.count(blk for blk in logs if is_optimal(blk) and is_improved(blk) and is_enumerated(blk)),
+        'num optimal and not improved': utils.count(blk for blk in logs if is_optimal(blk) and not is_improved(blk) and is_enumerated(blk)),
+        'num not optimal and improved': utils.count(blk for blk in logs if not is_optimal(blk) and is_improved(blk) and is_enumerated(blk)),
+        'num not optimal and not improved': utils.count(blk for blk in logs if not is_optimal(blk) and not is_improved(blk) and is_enumerated(blk)),
         'nodes examined': nodes_examined(logs),
     }
 

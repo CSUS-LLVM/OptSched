@@ -71,6 +71,7 @@ def compute_stats(nogt: Logs, gt: Logs):
         nogt, gt, pred=block_stats.is_enumerated)
 
     result = {
+        'num regions': utils.count(nogt),
         'nogt sched time': sched_time(nogt),
         'gt sched time': sched_time(gt),
         'nogt enum time': utils.sum_stat_for_all(enum_time_for_blk, nogt_enum),
