@@ -91,6 +91,13 @@ public:
 
   static bool isNodeSuperior(DataDepGraph &DDG, int A, int B);
 
+  struct Statistics {
+    int NumEdgesAdded = 0;
+    int NumEdgesRemoved = 0;
+  };
+  static void removeRedundantEdges(DataDepGraph &DDG, int i, int j,
+                                   Statistics &Stats);
+
 private:
   // Are multiple passes enabled.
   bool IsMultiPass;

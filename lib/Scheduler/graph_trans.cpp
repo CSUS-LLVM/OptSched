@@ -111,7 +111,7 @@ FUNC_RESULT StaticNodeSupTrans::ApplyTrans() {
   // A list of independent nodes.
   std::list<std::pair<SchedInstruction *, SchedInstruction *>> indepNodes;
   bool didAddEdge = false;
-  int NumAdded = 0;
+  Statistics stats;
   Logger::Event("GraphTransRPNodeSuperiority");
 
   // For the first pass visit all nodes. Add sets of independent nodes to a
@@ -132,14 +132,16 @@ FUNC_RESULT StaticNodeSupTrans::ApplyTrans() {
         // future passes.
         if (!didAddEdge)
           indepNodes.push_back(std::make_pair(nodeA, nodeB));
-        else
-          NumAdded++;
+        else {
+          stats.NumEdgesAdded++;
+          removeRedundantEdges(*graph, i, j, stats);
+        }
       }
     }
   }
 
   Logger::Event("GraphTransRPNodeSuperiorityFinished", "superior_edges",
-                NumAdded);
+                stats.NumEdgesAdded, "removed_edges", stats.NumEdgesRemoved);
 
   if (IsMultiPass)
     nodeMultiPass_(indepNodes);
@@ -310,4 +312,78 @@ void StaticNodeSupTrans::nodeMultiPass_(
       }
     }
   }
+}
+
+////////////////////////////////////
+// Removal of redundant edges:
+static size_t castUnsigned(int x) {
+  assert(x >= 0); // sanity check
+  return size_t(x);
+}
+
+static bool isRedundant(SchedInstruction *NodeI, SchedInstruction *NodeJ,
+                        GraphEdge &e) {
+  // If this is the edge we just added, it's not redundant
+  if (e.from == NodeI && e.to == NodeJ) {
+    return false;
+  }
+
+  const size_t From = castUnsigned(e.from->GetNum());
+  const size_t To = castUnsigned(e.to->GetNum());
+
+  return NodeJ->IsRcrsvScsr(e.to);
+}
+
+static LinkedList<GraphEdge>::iterator
+removeEdge(LinkedList<GraphEdge> &Succs, LinkedList<GraphEdge>::iterator it,
+           StaticNodeSupTrans::Statistics &stats) {
+  GraphEdge &e = *it;
+  it = Succs.RemoveAt(it);
+  e.to->RemovePredFrom(e.from);
+  DEBUG_LOG("  Deleting GraphEdge* at %p: (%zu, %zu)", (void *)&e,
+            e.from->GetNum(), e.to->GetNum());
+  delete &e;
+  ++stats.NumEdgesRemoved;
+
+  return it;
+}
+
+static void StaticNodeSupTrans::removeRedundantEdges(DataDepGraph &DDG, //
+                                                     int i, int j,
+                                                     Statistics &stats) {
+  DEBUG_LOG(" Removing redundant edges");
+  SchedInstruction *NodeI = DDG.GetInstByIndx(i);
+  SchedInstruction *NodeJ = DDG.GetInstByIndx(j);
+
+  // Check edges from I itself, since GetRecursivePredecessors() doesn't include
+  // I.
+  {
+    LinkedList<GraphEdge> &ISuccs = NodeI->GetSuccessors();
+    for (auto it = ISuccs.begin(); it != ISuccs.end();) {
+      if (isRedundant(NodeI, NodeJ, *it)) {
+        it = removeEdge(ISuccs, it, stats);
+      } else {
+        ++it;
+      }
+    }
+  }
+
+  // Check edges from a predecessor of I to a successor of J (or J itself).
+  // We don't need to explicitly check J itself in a separate step because
+  // the isRedundant() check appropriately considers edges ending at J.
+  for (GraphNode &Pred : *NodeI->GetRecursivePredecessors()) {
+    LinkedList<GraphEdge> &PSuccs = Pred.GetSuccessors();
+
+    for (auto it = PSuccs.begin(); it != PSuccs.end();) {
+      if (isRedundant(NodeI, NodeJ, *it)) {
+        it = removeEdge(PSuccs, it, stats);
+      } else {
+        ++it;
+      }
+    }
+  }
+
+  // Don't need to repeat for successors of J, as those are already considered
+  // by the prior loops. We could have checked the successors of J instead of
+  // predecessors of I, but we don't need to explicitly check both.
 }
