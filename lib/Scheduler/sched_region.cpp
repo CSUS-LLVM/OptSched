@@ -371,9 +371,10 @@ FUNC_RESULT SchedRegion::FindOptimalSchedule(
   if (AcoBeforeEnum && 
       (REGION_MIN_SIZE > 0 && dataDepGraph_->GetInstCnt() < REGION_MIN_SIZE ||
        REGION_MAX_EDGE_CNT > 0 && 
-       dataDepGraph_->GetEdgeCnt() > REGION_MAX_EDGE_CNT)) {
-    Logger::Info("Skipping ACO (under %d nodes or over %d edges)", 
-                  REGION_MIN_SIZE, REGION_MAX_EDGE_CNT);
+       dataDepGraph_->GetEdgeCnt() > REGION_MAX_EDGE_CNT) ||
+       dataDepGraph_->GetInstCnt() > 1000) {
+    Logger::Info("Skipping ACO (under %d nodes or over %d nodes)", 
+                  REGION_MIN_SIZE, 1000);
     AcoBeforeEnum = false;
   }
 
