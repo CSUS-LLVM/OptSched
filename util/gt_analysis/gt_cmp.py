@@ -71,33 +71,33 @@ def compute_stats(nogt: Logs, gt: Logs):
         nogt, gt, pred=block_stats.is_enumerated)
 
     result = {
-        'num regions': utils.count(nogt),
-        'nogt sched time': sched_time(nogt),
-        'gt sched time': sched_time(gt),
-        'nogt enum time': utils.sum_stat_for_all(enum_time_for_blk, nogt_enum),
-        'gt enum time': utils.sum_stat_for_all(enum_time_for_blk, gt_enum),
-        'nogt nodes examined': block_stats.nodes_examined(nogt_enum),
-        'gt nodes examined': block_stats.nodes_examined(gt_enum),
-        'nogt num enumerated': block_stats.num_enumerated(nogt_enum),
-        'gt num enumerated': block_stats.num_enumerated(gt_enum),
+        'Num Blocks': utils.count(nogt),
+        'Sched Time (No GT)': sched_time(nogt),
+        'Sched Time (GT)': sched_time(gt),
+        'Enum Time (No GT)': utils.sum_stat_for_all(enum_time_for_blk, nogt_enum),
+        'Enum Time (GT)': utils.sum_stat_for_all(enum_time_for_blk, gt_enum),
+        'Nodes Examined (No GT)': block_stats.nodes_examined(nogt_enum),
+        'Nodes Examined (GT)': block_stats.nodes_examined(gt_enum),
+        'Num Blocks Enum (No GT)': block_stats.num_enumerated(nogt_enum),
+        'Num Blocks Enum (GT)': block_stats.num_enumerated(gt_enum),
 
-        'nogt timeout unimproved': utils.count(blk for blk in nogt_enum
-                                               if block_stats.is_timed_out(blk)
-                                               and not block_stats.is_improved(blk)),
-        'gt timeout unimproved': utils.count(blk for blk in gt_enum
-                                             if block_stats.is_timed_out(blk)
-                                             and not block_stats.is_improved(blk)),
-        'nogt timeout improved': utils.count(blk for blk in nogt_enum
-                                             if block_stats.is_timed_out(blk)
-                                             and block_stats.is_improved(blk)),
-        'gt timeout improved': utils.count(blk for blk in gt_enum
-                                           if block_stats.is_timed_out(blk)
-                                           and block_stats.is_improved(blk)),
+        'Num Timeout Unimproved (No GT)': utils.count(blk for blk in nogt_enum
+                                                      if block_stats.is_timed_out(blk)
+                                                      and not block_stats.is_improved(blk)),
+        'Num Timeout Unimproved (GT)': utils.count(blk for blk in gt_enum
+                                                   if block_stats.is_timed_out(blk)
+                                                   and not block_stats.is_improved(blk)),
+        'Num Timeout Improved (No GT)': utils.count(blk for blk in nogt_enum
+                                                    if block_stats.is_timed_out(blk)
+                                                    and block_stats.is_improved(blk)),
+        'Num Timeout Improved (GT)': utils.count(blk for blk in gt_enum
+                                                 if block_stats.is_timed_out(blk)
+                                                 and block_stats.is_improved(blk)),
 
-        'total gt time': utils.sum_stat_for_all(total_gt_elapsed_for_blk, gt),
+        'Total GT Time': utils.sum_stat_for_all(total_gt_elapsed_for_blk, gt),
 
-        'nogt sched time (enum only)': sched_time(nogt_enum),
-        'gt sched time (enum only)': sched_time(gt_enum),
+        'Sched Time (enum only) (No GT)': sched_time(nogt_enum),
+        'Sched Time (enum only) (GT)': sched_time(gt_enum),
     }
 
     return result
