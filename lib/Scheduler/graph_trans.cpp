@@ -348,9 +348,8 @@ removeEdge(LinkedList<GraphEdge> &Succs, LinkedList<GraphEdge>::iterator it,
   return it;
 }
 
-static void StaticNodeSupTrans::removeRedundantEdges(DataDepGraph &DDG, //
-                                                     int i, int j,
-                                                     Statistics &stats) {
+void StaticNodeSupTrans::removeRedundantEdges(DataDepGraph &DDG, //
+                                              int i, int j, Statistics &stats) {
   DEBUG_LOG(" Removing redundant edges");
   SchedInstruction *NodeI = DDG.GetInstByIndx(i);
   SchedInstruction *NodeJ = DDG.GetInstByIndx(j);
