@@ -510,16 +510,6 @@ void Dev_ACO(SchedRegion *dev_rgn, DataDepGraph *dev_DDG,
             int noImprovementMax) {
   // holds cost and index of bestSched per block
   __shared__ int bestIndex, dev_iterations;
-/*
-  // Holds pointers to dev_schedules
-  __shared__ InstSchedule *dev_schedules[NUMTHREADS];
-  // Copy pointers to each schedule to shared mem for each block
-  int x = threadIdx.x;
-  while (x < NUMTHREADS) {
-    dev_schedules[x] = &dev_schedules_arr[x];
-    x += NUMTHREADSPERBLOCK;
-  }
-*/
   dev_rgn->SetDepGraph(dev_DDG);
   ((BBWithSpill *)dev_rgn)->SetRegFiles(dev_DDG->getRegFiles());
   dev_noImprovement = 0;
@@ -677,12 +667,21 @@ FUNC_RESULT ACOScheduler::FindSchedule(InstSchedule *schedule_out,
     InstSchedule *temp_schedules = (InstSchedule *)malloc(memSize);
     // An array of pointers to schedules which are copied over
     InstSchedule **host_schedules = new InstSchedule *[NUMTHREADS];
+    // Allocate one large array that will be split up between the dev arrays
+    // of all InstSchedules. Massively decrease calls to cudaMalloc/Free
+    InstCount *dev_temp;
+    size_t sizePerSched = bestSchedule->GetSizeOfDevArrays();
+    memSize = sizePerSched * NUMTHREADS * sizeof(InstCount);
+    gpuErrchk(cudaMalloc(&dev_temp, memSize));
     memSize = sizeof(InstSchedule);
+    int index = 0;
     for (int i = 0; i < NUMTHREADS; i++) {
       // Create new schedule
       host_schedules[i] = new InstSchedule(machMdl_, dataDepGraph_, true);
-      // Allocate device memory for arrays
-      host_schedules[i]->AllocateOnDevice(dev_MM_);
+      // Pass a dev array to the schedule to be divided up between the required
+      // dev arrays for InstSchedule
+      host_schedules[i]->SetDevArrayPointers(dev_MM_, 
+                                             &dev_temp[i*sizePerSched]);
       // Copy to temp_schedules array to later copy to device with 1 cudaMemcpy
       memcpy(&temp_schedules[i], host_schedules[i], memSize);
     }
@@ -747,10 +746,12 @@ FUNC_RESULT ACOScheduler::FindSchedule(InstSchedule *schedule_out,
     bestSchedule->FreeDeviceArrays();
     cudaFree(dev_bestSched);
     for (int i = 0; i < NUMTHREADS; i++) {
-      host_schedules[i]->FreeDeviceArrays();
+      //host_schedules[i]->FreeDeviceArrays();
       delete host_schedules[i];
     }
     delete[] host_schedules;
+    // delete the large array shared by all schedules
+    cudaFree(dev_temp);
     cudaFree(dev_schedules);
 
   } else { // Run ACO on cpu

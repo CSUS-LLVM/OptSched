@@ -1475,19 +1475,19 @@ void BBWithSpill::AllocDevArraysForParallelACO(int numThreads) {
   memSize = sizeof(InstCount) * regTypeCnt_ * numThreads;
   cudaMalloc(&temp, memSize);
   for (int i = 0; i < numThreads; i++)
-    dev_peakRegPressures_[i] = &temp[i];
+    dev_peakRegPressures_[i] = &temp[i * regTypeCnt_];
   memSize = sizeof(unsigned *) * numThreads;
   cudaMallocManaged(&dev_regPressures_, memSize);
   memSize = sizeof(unsigned) * regTypeCnt_ * numThreads;
   cudaMalloc(&u_temp, memSize);
   for (int i = 0; i < numThreads; i++)
-    dev_regPressures_[i] = &u_temp[i];
+    dev_regPressures_[i] = &u_temp[i * regTypeCnt_];
   memSize = sizeof(InstCount *) * numThreads;
   cudaMallocManaged(&dev_spillCosts_, memSize);
   memSize = sizeof(InstCount) * dataDepGraph_->GetInstCnt() * numThreads;
   cudaMalloc(&temp, memSize);
   for (int i = 0; i < numThreads; i++)
-    dev_spillCosts_[i] = &temp[i];
+    dev_spillCosts_[i] = &temp[i * dataDepGraph_->GetInstCnt()];
 /* SLIL not used on device
   memSize = sizeof(int *) * numThreads;
   cudaMallocManaged(&dev_sumOfLiveIntervalLengths_, memSize);

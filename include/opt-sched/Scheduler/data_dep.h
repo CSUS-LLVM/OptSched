@@ -811,6 +811,12 @@ public:
   void PrintClassData();
   // Allocates arrays on device
   void AllocateOnDevice(MachineModel *dev_machMdl);
+  // Divide up passed dev array and set the dev pointers to pieces
+  // of the passed array
+  void SetDevArrayPointers(MachineModel *dev_machMdl, InstCount *dev_temp);
+  // Returns size needed for all dev arrays for a schedule
+  // used to preallocate memory to be passed to SetDevArrayPointers
+  size_t GetSizeOfDevArrays();
   // Copies host arrays to device
   void CopyArraysToDevice();
   // Copies device arrays to host

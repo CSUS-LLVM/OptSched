@@ -3289,6 +3289,26 @@ void InstSchedule::AllocateOnDevice(MachineModel *dev_machMdl) {
   dev_machMdl_ = dev_machMdl;
 }
 
+void InstSchedule::SetDevArrayPointers(MachineModel *dev_machMdl, 
+                                       InstCount *dev_temp) {
+  dev_machMdl_ = dev_machMdl;
+  int index = 0;
+  dev_instInSlot_ = &dev_temp[index];
+  // Increment the index past the needed number of slots for dev_instInSlot_
+  index += totSlotCnt_;
+  dev_slotForInst_ = &dev_temp[index];
+  // Increment the index past needed num of slots for dev_slotForInst_
+  index += totInstCnt_;
+  dev_spillCosts_ = &dev_temp[index];
+  // Increment the index past needed num of slots for dev_spillCosts_
+  index += totInstCnt_;
+  dev_peakRegPressures_ = &dev_temp[index];
+}
+
+size_t InstSchedule::GetSizeOfDevArrays() {
+  return totSlotCnt_ + totInstCnt_ * 2 + machMdl_->GetRegTypeCnt();
+}
+
 void InstSchedule::CopyArraysToDevice() {
   size_t memSize;
   // Copy instInSlot to device

@@ -997,7 +997,6 @@ FUNC_RESULT SchedRegion::runACO(InstSchedule *ReturnSched,
     gpuErrchk(cudaMemcpy(dev_rgn, this, memSize, cudaMemcpyHostToDevice));
     dev_rgn->machMdl_ = dev_machMdl_;
     CopyPointersToDevice(dev_rgn, NUMTHREADS);
-    // new method
     // create an array of DeviceVectors and copy to device for use 
     // during Dev_ACO
     Logger::Info("Creating and Copying ready array to device");
