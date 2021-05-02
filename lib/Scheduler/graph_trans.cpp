@@ -76,33 +76,24 @@ StaticNodeSupTrans::StaticNodeSupTrans(DataDepGraph *dataDepGraph,
   IsMultiPass = IsMultiPass_;
 }
 
-static void addRPSuperiorEdge(DataDepGraph &DDG, SchedInstruction *A,
-                              SchedInstruction *B) {
+static GraphEdge *addRPSuperiorEdge(DataDepGraph &DDG, SchedInstruction *A,
+                                    SchedInstruction *B) {
   DEBUG_LOG("Node %d is superior to node %d", A->GetNum(), B->GetNum());
-  addSuperiorEdge(DDG, A, B);
+  return addSuperiorEdge(DDG, A, B);
 }
 
-bool StaticNodeSupTrans::TryAddingSuperiorEdge_(SchedInstruction *nodeA,
-                                                SchedInstruction *nodeB) {
-  // Return this flag which designates whether an edge was added.
-  bool edgeWasAdded = false;
-
+GraphEdge *StaticNodeSupTrans::TryAddingSuperiorEdge_(SchedInstruction *nodeA,
+                                                      SchedInstruction *nodeB) {
   if (nodeA->GetNodeID() > nodeB->GetNodeID())
     std::swap(nodeA, nodeB);
 
   if (NodeIsSuperior_(nodeA, nodeB)) {
-    addRPSuperiorEdge(*GetDataDepGraph_(), nodeA, nodeB);
-    edgeWasAdded = true;
+    return addRPSuperiorEdge(*GetDataDepGraph_(), nodeA, nodeB);
   } else if (NodeIsSuperior_(nodeB, nodeA)) {
-    addRPSuperiorEdge(*GetDataDepGraph_(), nodeB, nodeA);
-    // Swap nodeIDs
-    // int tmp = nodeA->GetNodeID();
-    // nodeA->SetNodeID(nodeB->GetNodeID());
-    // nodeB->SetNodeID(tmp);
-    edgeWasAdded = true;
+    return addRPSuperiorEdge(*GetDataDepGraph_(), nodeB, nodeA);
   }
 
-  return edgeWasAdded;
+  return nullptr;
 }
 
 FUNC_RESULT StaticNodeSupTrans::ApplyTrans() {
@@ -110,7 +101,6 @@ FUNC_RESULT StaticNodeSupTrans::ApplyTrans() {
   DataDepGraph *graph = GetDataDepGraph_();
   // A list of independent nodes.
   std::list<std::pair<SchedInstruction *, SchedInstruction *>> indepNodes;
-  bool didAddEdge = false;
   Statistics stats;
   Logger::Event("GraphTransRPNodeSuperiority");
 
@@ -126,15 +116,16 @@ FUNC_RESULT StaticNodeSupTrans::ApplyTrans() {
       DEBUG_LOG("Checking nodes %d:%d", i, j);
 
       if (areNodesIndependent(nodeA, nodeB)) {
-        didAddEdge = TryAddingSuperiorEdge_(nodeA, nodeB);
+        GraphEdge *edge = TryAddingSuperiorEdge_(nodeA, nodeB);
         // If the nodes are independent and no superiority was found add the
         // nodes to a list for
         // future passes.
-        if (!didAddEdge)
+        if (!edge)
           indepNodes.push_back(std::make_pair(nodeA, nodeB));
         else {
           stats.NumEdgesAdded++;
-          removeRedundantEdges(*graph, i, j, stats);
+          removeRedundantEdges(*graph, edge->from->GetNum(), edge->to->GetNum(),
+                               stats);
         }
       }
     }
@@ -327,9 +318,6 @@ static bool isRedundant(SchedInstruction *NodeI, SchedInstruction *NodeJ,
   if (e.from == NodeI && e.to == NodeJ) {
     return false;
   }
-
-  const size_t From = castUnsigned(e.from->GetNum());
-  const size_t To = castUnsigned(e.to->GetNum());
 
   return NodeJ->IsRcrsvScsr(e.to);
 }
