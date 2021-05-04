@@ -343,7 +343,9 @@ void BBWithSpill::storeExtraCost(InstSchedule *sched, SPILL_COST_FUNCTION Scf) {
 
 /*****************************************************************************/
 
-InstCount BBWithSpill::getUnnormalizedIncrementalRPCost() {return crntSpillCost_;}
+InstCount BBWithSpill::getUnnormalizedIncrementalRPCost() {
+  return crntSpillCost_;
+}
 /*****************************************************************************/
 
 void BBWithSpill::InitForSchdulng() {

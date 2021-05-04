@@ -14,10 +14,10 @@ Last Update:  Jan. 2020
 #include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/SmallSet.h"
 #include "llvm/ADT/SmallVector.h"
+#include <limits>
 #include <map>
 #include <memory>
 #include <utility>
-#include <limits>
 namespace llvm {
 namespace opt_sched {
 
@@ -32,7 +32,7 @@ enum class DCF_OPT {
 
 struct Choice {
   SchedInstruction *inst;
-  pheromone_t heuristic;  // range 1 to 2
+  pheromone_t heuristic; // range 1 to 2
   InstCount readyOn; // number of cycles until this instruction becomes ready
 };
 
@@ -101,8 +101,7 @@ private:
   pheromone_t ScRelMax;
   DCF_OPT DCFOption;
   SPILL_COST_FUNCTION DCFCostFn;
-  int localCmp=0, localCmpRej=0, globalCmp=0, globalCmpRej=0;
-
+  int localCmp = 0, localCmpRej = 0, globalCmp = 0, globalCmpRej = 0;
 };
 
 } // namespace opt_sched

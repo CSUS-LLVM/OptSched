@@ -107,9 +107,8 @@ bool ConstrainedScheduler::Initialize_(InstCount trgtSchedLngth,
       return false;
   }
 
-
-  //wipe the ready list per cycle
-  for (InstCount i = 0; i<schedUprBound_; ++i) {
+  // wipe the ready list per cycle
+  for (InstCount i = 0; i < schedUprBound_; ++i) {
     if (frstRdyLstPerCycle_[i])
       frstRdyLstPerCycle_[i]->Reset();
   }

@@ -58,7 +58,8 @@ ACOScheduler::ACOScheduler(DataDepGraph *dataDepGraph,
   local_decay = schedIni.GetFloat("ACO_LOCAL_DECAY");
   decay_factor = schedIni.GetFloat("ACO_DECAY_FACTOR");
   ants_per_iteration1p = schedIni.GetInt("ACO_ANT_PER_ITERATION");
-  ants_per_iteration2p = schedIni.GetInt("ACO2P_ANT_PER_ITERATION", ants_per_iteration1p);
+  ants_per_iteration2p =
+      schedIni.GetInt("ACO2P_ANT_PER_ITERATION", ants_per_iteration1p);
   ants_per_iteration = ants_per_iteration1p;
   print_aco_trace = schedIni.GetBool("ACO_TRACE");
   IsTwoPassEn = schedIni.GetBool("USE_TWO_PASS");
@@ -114,11 +115,10 @@ pheromone_t &ACOScheduler::Pheromone(InstCount from, InstCount to) {
   return pheromone_[(row * count_) + to];
 }
 
-
 double ACOScheduler::Score(SchedInstruction *from, Choice choice) {
-// tuneable heuristic importance is temporarily disabled
-//  return Pheromone(from, choice.inst) *
-//         pow(choice.heuristic, heuristicImportance_);
+  // tuneable heuristic importance is temporarily disabled
+  //  return Pheromone(from, choice.inst) *
+  //         pow(choice.heuristic, heuristicImportance_);
   double hf = heuristicImportance_ ? choice.heuristic : 1.0;
   return Pheromone(from, choice.inst) * hf;
 }
@@ -196,10 +196,12 @@ bool ACOScheduler::shouldReplaceSchedule(InstSchedule *OldSched,
     InstCount NewSpillCost = NewSched->GetNormSpillCost();
     InstCount OldSpillCost = OldSched->GetNormSpillCost();
 #if DBG_SRS
-    Logger::Info("SRS2P/%sOld:%d,New:%d,OldNSC:%d,NewNSC:%d", IsGlobal ? "g/" : "",
-                 OldCost, NewCost, OldSpillCost, NewSpillCost);
+    Logger::Info("SRS2P/%sOld:%d,New:%d,OldNSC:%d,NewNSC:%d",
+                 IsGlobal ? "g/" : "", OldCost, NewCost, OldSpillCost,
+                 NewSpillCost);
 #endif // DBG_SRS
-    return (NewCost < OldCost && NewSpillCost <= OldSpillCost) || NewSpillCost < OldSpillCost;
+    return (NewCost < OldCost && NewSpillCost <= OldSpillCost) ||
+           NewSpillCost < OldSpillCost;
   }
 }
 
@@ -282,7 +284,8 @@ Choice ACOScheduler::SelectInstruction(const llvm::ArrayRef<Choice> &ready,
   return ready.back();
 }
 
-std::unique_ptr<InstSchedule> ACOScheduler::FindOneSchedule(InstCount TargetRPCost) {
+std::unique_ptr<InstSchedule>
+ACOScheduler::FindOneSchedule(InstCount TargetRPCost) {
   SchedInstruction *lastInst = NULL;
   std::unique_ptr<InstSchedule> schedule =
       llvm::make_unique<InstSchedule>(machMdl_, dataDepGraph_, true);
@@ -408,17 +411,11 @@ std::unique_ptr<InstSchedule> ACOScheduler::FindOneSchedule(InstCount TargetRPCo
         rdyLst_->RemoveNextPriorityInst();
       UpdtSlotAvlblty_(inst);
 
-#define STOP_CONSTRUCTION_IF_INFEASIBLE 1
-
-//this is a bugged compile time optimization.  It causes crashes.
-#if STOP_CONSTRUCTION_IF_INFEASIBLE
       if (rgn_->getUnnormalizedIncrementalRPCost() > TargetRPCost) {
         delete rdyLst_;
         rdyLst_ = new ReadyList(dataDepGraph_, prirts_);
         return nullptr;
       }
-#endif
-
     }
     /* Logger::Info("Chose instruction %d (for some reason)", instNum); */
     schedule->AppendInst(instNum);
@@ -426,7 +423,6 @@ std::unique_ptr<InstSchedule> ACOScheduler::FindOneSchedule(InstCount TargetRPCo
       InitNewCycle_();
     rdyLst_->ResetIterator();
     ready.clear();
-
   }
   rgn_->UpdateScheduleCost(schedule.get());
   return schedule;
@@ -445,7 +441,7 @@ FUNC_RESULT ACOScheduler::FindSchedule(InstSchedule *schedule_out,
   ants_per_iteration = IsFirst ? ants_per_iteration1p : ants_per_iteration2p;
   noImprovementMax = schedIni.GetInt(IsFirst ? "ACO_STOP_ITERATIONS"
                                              : "ACO2P_STOP_ITERATIONS");
-  Logger::Info("ants/it:%d,stop_iter:%d",ants_per_iteration,noImprovementMax);
+  Logger::Info("ants/it:%d,stop_iter:%d", ants_per_iteration, noImprovementMax);
   if (DCFOption != DCF_OPT::OFF) {
     std::string DcfFnString =
         schedIni.GetString(IsFirst ? "ACO_DUAL_COST_FN" : "ACO2P_DUAL_COST_FN");
@@ -491,11 +487,16 @@ FUNC_RESULT ACOScheduler::FindSchedule(InstSchedule *schedule_out,
     std::unique_ptr<InstSchedule> iterationBest;
     for (int i = 0; i < ants_per_iteration; i++) {
       CrntAntEdges.clear();
-      std::unique_ptr<InstSchedule> schedule = FindOneSchedule(i && iterationBest && rgn_->GetSpillCostFunc() != SCF_SLIL ? iterationBest->GetNormSpillCost() : MaxRPTarget);
+      std::unique_ptr<InstSchedule> schedule = FindOneSchedule(
+          i && iterationBest && rgn_->GetSpillCostFunc() != SCF_SLIL
+              ? iterationBest->GetNormSpillCost()
+              : MaxRPTarget);
       if (print_aco_trace)
         PrintSchedule(schedule.get());
       ++localCmp;
-      if (iterationBest && bestSchedule && !(!IsFirst && iterationBest->GetNormSpillCost() <= bestSchedule->GetNormSpillCost()))
+      if (iterationBest && bestSchedule &&
+          !(!IsFirst && iterationBest->GetNormSpillCost() <=
+                            bestSchedule->GetNormSpillCost()))
         ++localCmpRej;
       if (shouldReplaceSchedule(iterationBest.get(), schedule.get(),
                                 /*IsGlobal=*/false)) {
@@ -505,10 +506,11 @@ FUNC_RESULT ACOScheduler::FindSchedule(InstSchedule *schedule_out,
       }
     }
     ++globalCmp;
-    if (IsFirst || iterationBest->GetNormSpillCost() <= bestSchedule->GetNormSpillCost()) {
+    if (IsFirst ||
+        iterationBest->GetNormSpillCost() <= bestSchedule->GetNormSpillCost()) {
       UpdatePheromone(iterationBest.get());
-    }
-    else ++globalCmpRej;
+    } else
+      ++globalCmpRej;
     /* PrintSchedule(iterationBest); */
     /* std::cout << iterationBest->GetCost() << std::endl; */
     // TODO DRY
@@ -543,7 +545,8 @@ FUNC_RESULT ACOScheduler::FindSchedule(InstSchedule *schedule_out,
     iterations++;
   }
 
-  Logger::Info("localCmp:%d,localCmpRej:%d,globalCmp:%d,globalCmpRej:%d", localCmp, localCmpRej, globalCmp, globalCmpRej);
+  Logger::Info("localCmp:%d,localCmpRej:%d,globalCmp:%d,globalCmpRej:%d",
+               localCmp, localCmpRej, globalCmp, globalCmpRej);
 
   Logger::Event(IsPostBB ? "AcoPostSchedComplete" : "ACOSchedComplete", "cost",
                 bestSchedule->GetCost(), "iterations", iterations,
