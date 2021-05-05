@@ -511,9 +511,9 @@ InstSchedule *ACOScheduler::FindOneSchedule(InstCount RPTarget,
       if (((BBWithSpill*)rgn_)->GetCrntSpillCost() > RPTarget) {
         // keep track of ants terminated
         numAntsTerminated_++;
-        rdyLst_->ResetIterator();
-        rdyLst_->Reset();
-        ready->clear();
+	delete rdyLst_;
+	delete ready;
+	rdyLst_ = new ReadyList(dataDepGraph_, prirts_); 
 	delete schedule;
         // end schedule construction
         return NULL;
@@ -546,6 +546,7 @@ InstSchedule *ACOScheduler::FindOneSchedule(InstCount RPTarget,
     inst = dataDepGraph_->GetInstByIndx(schedule->GetNxtInst(cycleNum,slotNum));
   }
 #endif
+  delete ready;
   rgn_->UpdateScheduleCost(schedule);
   return schedule;
 #endif
