@@ -509,14 +509,12 @@ InstSchedule *ACOScheduler::FindOneSchedule(InstCount RPTarget,
       // If an ant violates the RP cost constraint, terminate further
       // schedule construction
       if (((BBWithSpill*)rgn_)->GetCrntSpillCost() > RPTarget) {
-        // set schedule cost to INVALID_VALUE so it is not considered for
-        // iteration best or global best
-        schedule->SetCost(INVALID_VALUE);
         // keep track of ants terminated
         numAntsTerminated_++;
         rdyLst_->ResetIterator();
         rdyLst_->Reset();
         ready->clear();
+	delete schedule;
         // end schedule construction
         return NULL;
       }
