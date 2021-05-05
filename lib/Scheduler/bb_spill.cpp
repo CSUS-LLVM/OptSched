@@ -1449,6 +1449,15 @@ void BBWithSpill::CmputCnflcts_(InstSchedule *sched) {
   sched->SetConflictCount(cnflctCnt);
 }
 
+__host__ __device__
+InstCount BBWithSpill::GetCrntSpillCost() {
+#ifdef __CUDA_ARCH__ // Device version of function
+  return dev_crntSpillCost_[GLOBALTID];
+#else
+  return crntSpillCost_;
+#endif
+}
+
 void BBWithSpill::AllocDevArraysForParallelACO(int numThreads) {
   // Temporarily holds large cudaMalloc arrays as theya re devided
   InstCount *temp;

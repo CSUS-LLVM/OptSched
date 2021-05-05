@@ -141,7 +141,14 @@ bool ConstrainedScheduler::Initialize_(InstCount trgtSchedLngth,
   dev_crntSlotNum_[GLOBALTID] = 0;
   dev_crntRealSlotNum_[GLOBALTID] = 0;
   dev_crntCycleNum_[GLOBALTID] = 0;
+  dev_isCrntCycleBlkd_[GLOBALTID] = false;
 #else
+  //wipe the ready list per cycle
+  for (InstCount i = 0; i<schedUprBound_; ++i) {
+    if (frstRdyLstPerCycle_[i])
+      frstRdyLstPerCycle_[i]->Reset();
+  }
+
   if (!frstRdyLstPerCycle_[0])
     frstRdyLstPerCycle_[0] = new ArrayList<InstCount>(dataDepGraph_->GetInstCnt());
   frstRdyLstPerCycle_[0]->InsrtElmnt(rootInst_->GetNum());
@@ -156,6 +163,8 @@ bool ConstrainedScheduler::Initialize_(InstCount trgtSchedLngth,
   crntSlotNum_ = 0;
   crntRealSlotNum_ = 0;
   crntCycleNum_ = 0;
+  isCrntCycleBlkd_ = false;
+  consecEmptyCycles_ = 0;
 #endif
 
   InitNewCycle_();

@@ -76,7 +76,8 @@ public:
   // Finds a schedule, if passed a device side schedule, use that instead
   // of creating a new one
   __host__ __device__
-  InstSchedule *FindOneSchedule(InstSchedule *dev_schedule = NULL, 
+  InstSchedule *FindOneSchedule(InstCount RPTarget,
+                                InstSchedule *dev_schedule = NULL, 
 		                DeviceVector<Choice> *dev_ready = NULL);
   __host__ __device__
   void UpdatePheromone(InstSchedule *schedule);
@@ -86,6 +87,8 @@ public:
   __host__ __device__
   bool shouldReplaceSchedule(InstSchedule *OldSched, InstSchedule *NewSched,
                              bool IsGlobal);
+  __host__ __device__
+  InstCount GetNumAntsTerminated() { return numAntsTerminated_; }
 
 private:
   __host__ __device__
@@ -129,6 +132,8 @@ private:
   curandState_t *dev_states_;
   // Used to count how many threads returned last instruction
   int returnLastInstCnt_;
+  // Used to count how many ants are terminated early
+  int numAntsTerminated_;
 };
 
 } // namespace opt_sched

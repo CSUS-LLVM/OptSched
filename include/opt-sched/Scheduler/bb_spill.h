@@ -219,6 +219,8 @@ public:
                            InstCount &execCost, bool trackCnflcts);
   __host__ __device__
   bool needsSLIL();
+  __host__ __device__
+  InstCount GetCrntSpillCost();
 
 protected:
   // (Chris)

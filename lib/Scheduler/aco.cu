@@ -64,6 +64,7 @@ ACOScheduler::ACOScheduler(DataDepGraph *dataDepGraph,
   dev_MM_ = dev_MM;
   dev_states_ = dev_states;
   dev_pheromone_elmnts_alloced_ = false;
+  numAntsTerminated_ = 0;
 
   use_fixed_bias = schedIni.GetBool("ACO_USE_FIXED_BIAS");
   use_tournament = schedIni.GetBool("ACO_TOURNAMENT");
@@ -124,12 +125,10 @@ bool ACOScheduler::shouldReplaceSchedule(InstSchedule *OldSched,
                                          bool IsGlobal) {
   // return true if the old schedule is null (eg:there is no old schedule)
   // return false if the new schedule is is NULL
-  if (!OldSched) {
-    return true;
-  }
-  else if (!NewSched) {
-    //not likely to happen
+  if (!NewSched) {
     return false;
+  } else if (!OldSched) {
+    return true;
   }
 
   // if it is the 1st pass return the cost comparison
@@ -235,10 +234,20 @@ Choice ACOScheduler::SelectInstruction(DeviceVector<Choice> &ready,
   return ready.back();
 }
 
+// Define switch controls whether cost is calulated incrementally or at the end
+// of creating a scheudle. Device has better perf when this is disabled
+#define CALCULATE_INCREMENTAL_COST 1
+// Define switch controls whether to stop ants that violate RP constraints
+// early in order to prevent wasting processing resources on bad schedules
+// *** CALCULATE_INCREMENTAL_COST MUST BE ENABLED ***
+#define TERMINATE_BAD_ANTS 1
+
 __host__ __device__
-InstSchedule *ACOScheduler::FindOneSchedule(InstSchedule *dev_schedule, 
+InstSchedule *ACOScheduler::FindOneSchedule(InstCount RPTarget, 
+                                            InstSchedule *dev_schedule,
 		                            DeviceVector<Choice> *dev_ready) {
 #ifdef __CUDA_ARCH__ // device version of function
+  SchedInstruction *inst = NULL;
   SchedInstruction *lastInst = NULL;
   InstSchedule *schedule = dev_schedule;
   InstCount maxPriority = dev_rdyLst_->MaxPriority();
@@ -256,7 +265,6 @@ InstSchedule *ACOScheduler::FindOneSchedule(InstSchedule *dev_schedule,
 
     // there are two steps to scheduling an instruction:
     // 1)Select the instruction(if we are not waiting on another instruction)
-    SchedInstruction *inst = NULL;
     if (!waitFor) {
       // if we have not already committed to schedule an instruction
       // next then pick one. First add ready instructions.  Including
@@ -337,10 +345,30 @@ InstSchedule *ACOScheduler::FindOneSchedule(InstSchedule *dev_schedule,
       SchdulInst_(inst, dev_crntCycleNum_[GLOBALTID]);
       inst->Schedule(dev_crntCycleNum_[GLOBALTID],
                      dev_crntSlotNum_[GLOBALTID]);
+#if CALCULATE_INCREMENTAL_COST
+      // If we are calculating cost incrementally, calculate cost here
       ((BBWithSpill *)dev_rgn_)->Dev_SchdulInst(inst,
                                             dev_crntCycleNum_[GLOBALTID],
                                             dev_crntSlotNum_[GLOBALTID],
                                             false);
+#if TERMINATE_BAD_ANTS
+      // If an ant violates the RP cost constraint, terminate further
+      // schedule construction
+      if (((BBWithSpill *)dev_rgn_)->GetCrntSpillCost() > RPTarget) {
+        // set schedule cost to INVALID_VALUE so it is not considered for
+        // iteration best or global best
+        schedule->SetCost(INVALID_VALUE);
+        // keep track of ants terminated
+        atomicAdd(&numAntsTerminated_, 1);
+        dev_rdyLst_->ResetIterator();
+        dev_rdyLst_->Reset();
+        ready->clear();
+        dev_instsWithPrdcsrsSchduld_[GLOBALTID]->Reset();
+        // end schedule construction
+        return NULL;
+      }
+#endif
+#endif
       DoRsrvSlots_(inst);
       // this is annoying
       SchedInstruction *blah = dev_rdyLst_->GetNextPriorityInst();
@@ -351,14 +379,21 @@ InstSchedule *ACOScheduler::FindOneSchedule(InstSchedule *dev_schedule,
         dev_rdyLst_->RemoveNextPriorityInst();
       UpdtSlotAvlblty_(inst);
     }
-    //debug
-    //printf("Thread %d scheduled instruction %d\n", GLOBALTID, instNum);
     schedule->AppendInst(instNum);
     if (MovToNxtSlot_(inst))
       InitNewCycle_();
     dev_rdyLst_->ResetIterator();
     ready->clear();
   }
+#if !CALCULATE_INCREMENTAL_COST
+  // Calculate schedule cost here if not calculating cost incrementally
+  InstCount cycleNum, slotNum;
+  inst = dataDepGraph_->GetInstByIndx(schedule->GetFrstInst(cycleNum, slotNum));
+  while (inst != NULL) {
+    ((BBWithSpill *)dev_rgn_)->Dev_SchdulInst(inst, cycleNum, slotNum, false);
+    inst = dataDepGraph_->GetInstByIndx(schedule->GetNxtInst(cycleNum,slotNum));
+  }
+#endif
   dev_rgn_->UpdateScheduleCost(schedule);
   return schedule;
 
@@ -468,7 +503,25 @@ InstSchedule *ACOScheduler::FindOneSchedule(InstSchedule *dev_schedule,
       instNum = inst->GetNum();
       SchdulInst_(inst, crntCycleNum_);
       inst->Schedule(crntCycleNum_, crntSlotNum_);
+#if CALCULATE_INCREMENTAL_COST
       rgn_->SchdulInst(inst, crntCycleNum_, crntSlotNum_, false);
+#if TERMINATE_BAD_ANTS
+      // If an ant violates the RP cost constraint, terminate further
+      // schedule construction
+      if (((BBWithSpill*)rgn_)->GetCrntSpillCost() > RPTarget) {
+        // set schedule cost to INVALID_VALUE so it is not considered for
+        // iteration best or global best
+        schedule->SetCost(INVALID_VALUE);
+        // keep track of ants terminated
+        numAntsTerminated_++;
+        rdyLst_->ResetIterator();
+        rdyLst_->Reset();
+        ready->clear();
+        // end schedule construction
+        return NULL;
+      }
+#endif
+#endif
       DoRsrvSlots_(inst);
       // this is annoying
       SchedInstruction *blah = rdyLst_->GetNextPriorityInst();
@@ -486,6 +539,15 @@ InstSchedule *ACOScheduler::FindOneSchedule(InstSchedule *dev_schedule,
     rdyLst_->ResetIterator();
     ready->clear();
   }
+#if !CALCULATE_INCREMENTAL_COST
+  // Calculate schedule cost here if not calculating cost incrementally
+  InstCount cycleNum, slotNum;
+  inst = dataDepGraph_->GetInstByIndx(schedule->GetFrstInst(cycleNum, slotNum));
+  while (inst != NULL) {
+    rgn_->SchdulInst(inst, cycleNum, slotNum, false);
+    inst = dataDepGraph_->GetInstByIndx(schedule->GetNxtInst(cycleNum,slotNum));
+  }
+#endif
   rgn_->UpdateScheduleCost(schedule);
   return schedule;
 #endif
@@ -516,12 +578,15 @@ void Dev_ACO(SchedRegion *dev_rgn, DataDepGraph *dev_DDG,
   dev_iterations = 0;
   // Used to synchronize all launched threads
   auto threadGroup = cg::this_grid();
+  // Get RPTarget
+  InstCount RPTarget = dev_bestSched->GetSpillCost();
 
   // Start ACO
   while (dev_noImprovement < noImprovementMax) {
     // Reset schedules to post constructor state
     dev_schedules[GLOBALTID]->Initialize();
-    dev_AcoSchdulr->FindOneSchedule(dev_schedules[GLOBALTID],
+    dev_AcoSchdulr->FindOneSchedule(RPTarget,
+                                    dev_schedules[GLOBALTID],
                                     &dev_ready[GLOBALTID]);
 
     // 1 iteration best per iteration code
@@ -532,25 +597,35 @@ void Dev_ACO(SchedRegion *dev_rgn, DataDepGraph *dev_DDG,
     // find its iteration best, block #0's find blockIterationBest will be
     // handled by a warp 0 while warp 1 finds overall best
     if (GLOBALTID == 32) {
-      bestIndex = 0;
-      for (int i = 1; i < NUMTHREADS; i++) {
-        if (dev_schedules[i]->GetCost() == -1) {
-          printf("thread %d of block %d found thread %d made invalid sched\n",
-                 GLOBALTID, blockIdx.x, i);
+      bestIndex = INVALID_VALUE;
+      for (int i = 0; i < NUMTHREADS; i++) {
+        if (dev_schedules[i]->GetCost() == INVALID_VALUE) {
+          //printf("thread %d made invalid sched\n", i);
           continue;
         }
-        if (dev_AcoSchdulr->shouldReplaceSchedule(dev_schedules[bestIndex], dev_schedules[i], false)) {
+        if (bestIndex == INVALID_VALUE)
+          bestIndex = i;
+        if (bestIndex != i &&
+            dev_AcoSchdulr->shouldReplaceSchedule(dev_schedules[bestIndex], 
+                                                  dev_schedules[i], false)) {
           bestIndex = i;
         }
       }
       // place best schedule's cost and index in global mem
       globalBestIndex = bestIndex;
+      //debug
+/*
+      printf("globalBestIndex = %d\n", globalBestIndex);
+      if (globalBestIndex != INVALID_VALUE)
+        printf("Iteration best sched has RP cost %d\n", dev_schedules[globalBestIndex]->GetSpillCost());
+*/
     }
     // perform pheremone update based on selected scheme
 #if (PHER_UPDATE_SCHEME == ONE_PER_ITER)
     // Another hard sync point after iteration best selection
     threadGroup.sync();
-    dev_AcoSchdulr->UpdatePheromone(dev_schedules[globalBestIndex]);
+    if (globalBestIndex != INVALID_VALUE)
+      dev_AcoSchdulr->UpdatePheromone(dev_schedules[globalBestIndex]);
 #elif (PHER_UPDATE_SCHEME == ONE_PER_BLOCK)
     // each block finds its blockIterationBest
     if (threadIdx.x == 0) {
@@ -569,15 +644,21 @@ void Dev_ACO(SchedRegion *dev_rgn, DataDepGraph *dev_DDG,
 #elif (PHER_UPDATE_SCHEME == ALL)
     // each block loops over all schedules created by its threads and
     // updates pheromones in block level parallel
-    for (int i = blockIdx.x * NUMTHREADSPERBLOCK; i < ((blockIdx.x + 1) * NUMTHREADSPERBLOCK); i++) {
+    for (int i = blockIdx.x * NUMTHREADSPERBLOCK; 
+         i < ((blockIdx.x + 1) * NUMTHREADSPERBLOCK); i++) {
       dev_AcoSchdulr->UpdatePheromone(dev_schedules[i]);
     }
 #endif
     // 1 thread compares iteration best to overall bestsched
     if (GLOBALTID == 32) {
       // Compare to initialSched/current best
-      if (dev_AcoSchdulr->shouldReplaceSchedule(dev_bestSched, dev_schedules[globalBestIndex], true)) {
+      if (globalBestIndex != INVALID_VALUE &&
+          dev_AcoSchdulr->shouldReplaceSchedule(dev_bestSched, 
+                                                dev_schedules[globalBestIndex], 
+                                                true)) {
         dev_bestSched->Copy(dev_schedules[globalBestIndex]);
+        // update RPTarget
+        RPTarget = dev_bestSched->GetSpillCost();
         printf("New best sched found by thread %d\n", globalBestIndex);
         printf("ACO found schedule "
                "cost:%d, rp cost:%d, exec cost: %d, and "
@@ -606,8 +687,10 @@ void Dev_ACO(SchedRegion *dev_rgn, DataDepGraph *dev_DDG,
     if (threadIdx.x == 0)
       dev_iterations++;
   }
-  if (GLOBALTID == 0)
-    printf("ACO finished after %d iterations\n", dev_iterations); 
+  if (GLOBALTID == 0) {
+    printf("ACO finished after %d iterations\n", dev_iterations);
+    printf("%d ants terminated early\n", dev_AcoSchdulr->GetNumAntsTerminated());
+  }
 }
 
 FUNC_RESULT ACOScheduler::FindSchedule(InstSchedule *schedule_out,
@@ -620,12 +703,15 @@ FUNC_RESULT ACOScheduler::FindSchedule(InstSchedule *schedule_out,
   bool IsFirst = !rgn_->IsSecondPass();
   heuristicImportance_ = schedIni.GetInt(
       IsFirst ? "ACO_HEURISTIC_IMPORTANCE" : "ACO2P_HEURISTIC_IMPORTANCE");
-  dev_AcoSchdulr->heuristicImportance_ = heuristicImportance_;
+  if (dev_AcoSchdulr)
+    dev_AcoSchdulr->heuristicImportance_ = heuristicImportance_;
   fixed_bias = schedIni.GetInt(IsFirst ? "ACO_FIXED_BIAS" : "ACO2P_FIXED_BIAS");
-  dev_AcoSchdulr->fixed_bias = fixed_bias;
+  if (dev_AcoSchdulr)
+    dev_AcoSchdulr->fixed_bias = fixed_bias;
   noImprovementMax = schedIni.GetInt(IsFirst ? "ACO_STOP_ITERATIONS"
                                              : "ACO2P_STOP_ITERATIONS");
-  dev_AcoSchdulr->noImprovementMax = noImprovementMax;
+  if (dev_AcoSchdulr)
+    dev_AcoSchdulr->noImprovementMax = noImprovementMax;
 
   // compute the relative maximum score inverse
   ScRelMax = rgn_->GetHeuristicCost();
@@ -636,7 +722,8 @@ FUNC_RESULT ACOScheduler::FindSchedule(InstSchedule *schedule_out,
   for (int i = 0; i < pheromone_size; i++)
     pheromone_[i] = 1;
   initialValue_ = 1;
-  InstSchedule *heuristicSched = FindOneSchedule();
+  InstCount MaxRPTarget = std::numeric_limits<InstCount>::max();
+  InstSchedule *heuristicSched = FindOneSchedule(MaxRPTarget);
   InstCount heuristicCost =
       heuristicSched->GetCost() + 1; // prevent divide by zero
   InstCount InitialCost = InitialSchedule ? InitialSchedule->GetCost() : 0;
@@ -674,7 +761,6 @@ FUNC_RESULT ACOScheduler::FindSchedule(InstSchedule *schedule_out,
     memSize = sizePerSched * NUMTHREADS * sizeof(InstCount);
     gpuErrchk(cudaMalloc(&dev_temp, memSize));
     memSize = sizeof(InstSchedule);
-    int index = 0;
     for (int i = 0; i < NUMTHREADS; i++) {
       // Create new schedule
       host_schedules[i] = new InstSchedule(machMdl_, dataDepGraph_, true);
@@ -746,7 +832,6 @@ FUNC_RESULT ACOScheduler::FindSchedule(InstSchedule *schedule_out,
     bestSchedule->FreeDeviceArrays();
     cudaFree(dev_bestSched);
     for (int i = 0; i < NUMTHREADS; i++) {
-      //host_schedules[i]->FreeDeviceArrays();
       delete host_schedules[i];
     }
     delete[] host_schedules;
@@ -756,36 +841,29 @@ FUNC_RESULT ACOScheduler::FindSchedule(InstSchedule *schedule_out,
 
   } else { // Run ACO on cpu
     Logger::Info("Running host ACO with %d ants per iteration", NUMTHREADS);
-    // change seed on host
-    //RandomGen::SetSeed(int32_t(time(NULL)));
-    while (true) {
+    while (noImprovement < noImprovementMax) {
+      iterationBest = nullptr;
       for (int i = 0; i < NUMTHREADS; i++) {
-        InstSchedule *schedule = FindOneSchedule();
+        InstSchedule *schedule = FindOneSchedule(bestSchedule->GetSpillCost());
         if (print_aco_trace)
           PrintSchedule(schedule);
         if (shouldReplaceSchedule(iterationBest, schedule, false)) {
-          if (iterationBest && iterationBest != InitialSchedule) {
-            delete iterationBest;
-          }
+          if (iterationBest)
+            delete iterationBest;          
           iterationBest = schedule;
         } else {
-          delete schedule;
+            if (schedule)
+              delete schedule;
         }
       }
 #if !USE_ACS
-      UpdatePheromone(iterationBest);
+      if (iterationBest)
+        UpdatePheromone(iterationBest);
 #endif
-      //PrintSchedule(iterationBest); 
       if (shouldReplaceSchedule(bestSchedule, iterationBest, true)) {
-/*        TODO: Why does this crash in gromacs block #7?
-        if (bestSchedule && bestSchedule != InitialSchedule) {
-          Logger::Info("Deleting bestSchedule");
+        if (bestSchedule && bestSchedule != InitialSchedule)
           delete bestSchedule;
-        }
-*/
         bestSchedule = std::move(iterationBest);
-        //printf("ACO found schedule with spill cost %d\n",
-               //bestSchedule->GetCost());
         printf("ACO found schedule "
                "cost:%d, rp cost:%d, sched length: %d, and "
                "iteration:%d\n",
@@ -798,15 +876,15 @@ FUNC_RESULT ACOScheduler::FindSchedule(InstSchedule *schedule_out,
           noImprovement++;
 #endif
       } else {
+        delete iterationBest;
         noImprovement++;
-        if (noImprovement > noImprovementMax)
-          break;
       }
 #if USE_ACS
       UpdatePheromone(bestSchedule);
 #endif
       iterations++;
     }
+    Logger::Info("%d ants terminated early", numAntsTerminated_);
   } // End run on CPU
 
   printf("Best schedule: ");
@@ -816,6 +894,7 @@ FUNC_RESULT ACOScheduler::FindSchedule(InstSchedule *schedule_out,
     delete bestSchedule;
   if (!DEV_ACO)
     printf("ACO finished after %d iterations\n", iterations);
+
   return RES_SUCCESS;
 }
 
@@ -923,7 +1002,6 @@ void ACOScheduler::CopyPheromonesToSharedMem(double *s_pheromone) {
   }
 }
 
-// copied from Enumerator
 inline void ACOScheduler::UpdtRdyLst_(InstCount cycleNum, int slotNum) {
 #ifdef __CUDA_ARCH__ // Device version
   InstCount prevCycleNum = cycleNum - 1;
