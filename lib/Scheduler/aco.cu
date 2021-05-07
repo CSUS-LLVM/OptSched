@@ -418,6 +418,7 @@ InstSchedule *ACOScheduler::FindOneSchedule(InstCount RPTarget,
 
     // there are two steps to scheduling an instruction:
     // 1)Select the instruction(if we are not waiting on another instruction)
+    inst = NULL;
     if (!waitFor) {
       // if we have not already committed to schedule an instruction
       // next then pick one. First add ready instructions.  Including
