@@ -236,11 +236,11 @@ Choice ACOScheduler::SelectInstruction(DeviceVector<Choice> &ready,
 
 // Define switch controls whether cost is calulated incrementally or at the end
 // of creating a scheudle. Device has better perf when this is disabled
-#define CALCULATE_INCREMENTAL_COST 1
+#define CALCULATE_INCREMENTAL_COST 0
 // Define switch controls whether to stop ants that violate RP constraints
 // early in order to prevent wasting processing resources on bad schedules
 // *** CALCULATE_INCREMENTAL_COST MUST BE ENABLED ***
-#define TERMINATE_BAD_ANTS 1
+#define TERMINATE_BAD_ANTS 0
 
 __host__ __device__
 InstSchedule *ACOScheduler::FindOneSchedule(InstCount RPTarget, 
@@ -412,12 +412,12 @@ InstSchedule *ACOScheduler::FindOneSchedule(InstCount RPTarget,
   double maxPriorityInv = 1 / maxPriority;
   DeviceVector<Choice> *ready = 
       new DeviceVector<Choice>(dataDepGraph_->GetInstCnt());
+  SchedInstruction *inst = NULL;
   while (!IsSchedComplete_()) {
     UpdtRdyLst_(crntCycleNum_, crntSlotNum_);
 
     // there are two steps to scheduling an instruction:
     // 1)Select the instruction(if we are not waiting on another instruction)
-    SchedInstruction *inst = NULL;
     if (!waitFor) {
       // if we have not already committed to schedule an instruction
       // next then pick one. First add ready instructions.  Including
