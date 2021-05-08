@@ -82,6 +82,9 @@ jobs:
         path: .ccache
         key: ccache
 
+    - run: |
+        ccache -o hash_dir=false
+
     - name: Configure
       run: |
         mkdir build-ci && cd build-ci

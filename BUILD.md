@@ -177,7 +177,7 @@ mkdir build && cd build
 Run CMake:
 
 ```
-cmake .. -GNinja -DCMAKE_BUILD_TYPE=Debug -DLLVM_DIR=</path/to/install/llvm-release/lib/cmake/LLVM>
+cmake .. -GNinja -DCMAKE_BUILD_TYPE=Debug -DLLVM_DIR=</path/to/install/llvm-release>/lib/cmake/llvm -DOPTSCHED_ENABLE_AMDGPU=OFF
 ```
 
 Note: if you use `-DCMAKE_BUILD_TYPE=Debug`, make sure that you built LLVM with assertions in the previous step.
@@ -306,7 +306,7 @@ git am ../OptSched/patches/llvm6.0/llvm6-print-spilling-info.patch
 ###### Note: In debug builds, linking uses a lot of memory. Set `LLVM_PARALLEL_LINK_JOBS=2` if you have >= 32G memory, otherwise use `LLVM_PARALLEL_LINK_JOBS=1`.
 
 `
-cmake -GNinja -DLLVM_PARALLEL_LINK_JOBS=1 -DLLVM_ENABLE_PROJECTS='clang' -DCMAKE_BUILD_TYPE=Debug '-DLLVM_TARGETS_TO_BUILD=X86' -DLLVM_BUILD_TOOLS=ON -DLLVM_INCLUDE_TESTS=ON -DLLVM_OPTIMIZED_TABLEGEN=ON ../..
+cmake -GNinja -DLLVM_PARALLEL_LINK_JOBS=1 -DLLVM_ENABLE_PROJECTS='clang' -DCMAKE_BUILD_TYPE=Debug '-DLLVM_TARGETS_TO_BUILD=X86' -DLLVM_BUILD_TOOLS=ON -DLLVM_INCLUDE_TESTS=ON -DLLVM_OPTIMIZED_TABLEGEN=ON ../.. -DOPTSCHED_ENABLE_AMDGPU=OFF
 `
 
 `
@@ -318,7 +318,7 @@ ninja
 ###### Note: Debug builds use a lot of memory. The build will fail if you do not have enough. If this happens, try using Ninja to build.
 
 `
-cmake -DLLVM_ENABLE_PROJECTS='clang' -DCMAKE_BUILD_TYPE=Debug '-DLLVM_TARGETS_TO_BUILD=X86' -DLLVM_BUILD_TOOLS=ON -DLLVM_INCLUDE_TESTS=ON -DLLVM_OPTIMIZED_TABLEGEN=ON ../..
+cmake -DLLVM_ENABLE_PROJECTS='clang' -DCMAKE_BUILD_TYPE=Debug '-DLLVM_TARGETS_TO_BUILD=X86' -DLLVM_BUILD_TOOLS=ON -DLLVM_INCLUDE_TESTS=ON -DLLVM_OPTIMIZED_TABLEGEN=ON ../.. -DOPTSCHED_ENABLE_AMDGPU=OFF
 `
 
 `
@@ -336,7 +336,7 @@ _See [Building with CMake] for more build options._
 **1. Build an Xcode project**
 
 `
-cmake -G Xcode -DLLVM_ENABLE_PROJECTS='clang' -DCMAKE_BUILD_TYPE=Debug '-DLLVM_TARGETS_TO_BUILD=X86' -DLLVM_BUILD_TOOLS=ON -DLLVM_INCLUDE_TESTS=ON -DLLVM_OPTIMIZED_TABLEGEN=ON ../..
+cmake -G Xcode -DLLVM_ENABLE_PROJECTS='clang' -DCMAKE_BUILD_TYPE=Debug '-DLLVM_TARGETS_TO_BUILD=X86' -DLLVM_BUILD_TOOLS=ON -DLLVM_INCLUDE_TESTS=ON -DLLVM_OPTIMIZED_TABLEGEN=ON ../.. -DOPTSCHED_ENABLE_AMDGPU=OFF
 `
 
 This will create an Xcode project in `llvm-project/llvm/projects/build`.
