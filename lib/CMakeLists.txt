@@ -7,6 +7,7 @@ set(OPTSCHED_SRCS Scheduler/aco.cpp
   Scheduler/gen_sched.cpp
   Scheduler/graph.cpp
   Scheduler/graph_trans.cpp
+  Scheduler/graph_trans_ilp.cpp
   Scheduler/hist_table.cpp
   Scheduler/list_sched.cpp
   Scheduler/logger.cpp

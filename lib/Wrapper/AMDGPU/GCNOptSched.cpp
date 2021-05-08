@@ -49,14 +49,23 @@ ScheduleDAGOptSchedGCN::ScheduleDAGOptSchedGCN(
     : ScheduleDAGOptSched(C, std::move(S)) {}
 
 void ScheduleDAGOptSchedGCN::initSchedulers() {
-  // Add passes
-
   // SchedPasses.push_back(GCNMaxOcc);
+  // Add passes in the corresponding order that they are inserted.
+  for (const auto &Pass : PassOrder) {
+    if (Pass == "OCC") // MinRP pass
+      SchedPasses.push_back(OptSchedMaxOcc);
+    else if (Pass == "ILP") // Regular ILP Pass
+      SchedPasses.push_back(OptSchedBalanced);
+    else if (Pass == "ILP_RL") // ILP Reduced Latency Pass
+      SchedPasses.push_back(OptSchedReducedLatency);
+    else
+      llvm::report_fatal_error("Invalid value for pass order: " + Pass, false);
+  }
 
-  // First
-  SchedPasses.push_back(OptSchedMaxOcc);
-  // Second
-  SchedPasses.push_back(OptSchedBalanced);
+  // Also run the sequential scheduler with regular latencies to get the
+  // actual schedule length
+  if (CompileTimeDataPass)
+    SchedPasses.push_back(OptSchedSeqScheduler);
 }
 
 // Execute scheduling passes.
@@ -64,6 +73,8 @@ void ScheduleDAGOptSchedGCN::initSchedulers() {
 void ScheduleDAGOptSchedGCN::finalizeSchedule() {
   if (TwoPassEnabled && OptSchedEnabled) {
     initSchedulers();
+    RescheduleRegions.resize(Regions.size());
+    RescheduleRegions.set();
 
     LLVM_DEBUG(dbgs() << "Starting two pass scheduling approach\n");
     TwoPassSchedulingStarted = true;
@@ -118,9 +129,21 @@ void ScheduleDAGOptSchedGCN::runSchedPass(SchedPassStrategy S) {
     break;
   case OptSchedMaxOcc:
     scheduleOptSchedMaxOcc();
+    Logger::Event("PassFinished", "num", 1);
     break;
   case OptSchedBalanced:
+    RecordTimedOutRegions = true;
     scheduleOptSchedBalanced();
+    RecordTimedOutRegions = false;
+    Logger::Event("PassFinished", "num", 2);
+    break;
+  case OptSchedReducedLatency:
+    scheduleWithReducedLatencies();
+    Logger::Event("PassFinished", "num", 3);
+    break;
+  case OptSchedSeqScheduler:
+    scheduleWithSeqScheduler();
+    Logger::Event("PassFinished", "num", 4);
     break;
   }
 }

@@ -212,6 +212,7 @@ bool OptSchedGCNTarget::shouldKeepSchedule() {
   Logger::Info(
       "Reverting Scheduling because of a decrease in occupancy from %d to %d.",
       RegionStartingOccupancy, RegionEndingOccupancy);
+
   return false;
 }
 
