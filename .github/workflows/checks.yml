@@ -192,7 +192,8 @@ jobs:
             '-DLLVM_TARGETS_TO_BUILD=X86;AMDGPU'                                       \
             -DLLVM_TABLEGEN=$(which llvm-tblgen-7)                                     \
             -DLLVM_EXTERNAL_PROJECTS=OptSched                                          \
-            -DLLVM_EXTERNAL_OPTSCHED_SOURCE_DIR=$(cd .. && pwd)
+            -DLLVM_EXTERNAL_OPTSCHED_SOURCE_DIR=$(cd .. && pwd)                        \
+            -DOPTSCHED_ENABLE_AMDGPU=ON
 
         # Generate relevant "source" files so that clang-tidy knows where to find them.
         cmake --build . --target X86CommonTableGen intrinsics_gen AttributeCompatFuncTableGen AMDGPUCommonTableGen
