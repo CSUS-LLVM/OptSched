@@ -234,14 +234,6 @@ Choice ACOScheduler::SelectInstruction(DeviceVector<Choice> &ready,
   return ready.back();
 }
 
-// Define switch controls whether cost is calulated incrementally or at the end
-// of creating a scheudle. Device has better perf when this is disabled
-#define CALCULATE_INCREMENTAL_COST 0
-// Define switch controls whether to stop ants that violate RP constraints
-// early in order to prevent wasting processing resources on bad schedules
-// *** CALCULATE_INCREMENTAL_COST MUST BE ENABLED ***
-#define TERMINATE_BAD_ANTS 0
-
 __host__ __device__
 InstSchedule *ACOScheduler::FindOneSchedule(InstCount RPTarget, 
                                             InstSchedule *dev_schedule,
@@ -251,10 +243,13 @@ InstSchedule *ACOScheduler::FindOneSchedule(InstCount RPTarget,
   SchedInstruction *lastInst = NULL;
   InstSchedule *schedule = dev_schedule;
   InstCount maxPriority = dev_rdyLst_->MaxPriority();
+  bool IsSecondPass = dev_rgn_->IsSecondPass();
   if (maxPriority == 0)
     maxPriority = 1; // divide by 0 is bad
   Initialize_();
   ((BBWithSpill *)dev_rgn_)->Dev_InitForSchdulng();
+  __shared__ bool needsSLIL;
+  needsSLIL = ((BBWithSpill *)dev_rgn_)->needsSLIL();
 
   SchedInstruction *waitFor = NULL;
   InstCount waitUntil = 0;
@@ -345,30 +340,29 @@ InstSchedule *ACOScheduler::FindOneSchedule(InstCount RPTarget,
       SchdulInst_(inst, dev_crntCycleNum_[GLOBALTID]);
       inst->Schedule(dev_crntCycleNum_[GLOBALTID],
                      dev_crntSlotNum_[GLOBALTID]);
-#if CALCULATE_INCREMENTAL_COST
-      // If we are calculating cost incrementally, calculate cost here
-      ((BBWithSpill *)dev_rgn_)->Dev_SchdulInst(inst,
-                                            dev_crntCycleNum_[GLOBALTID],
-                                            dev_crntSlotNum_[GLOBALTID],
-                                            false);
-#if TERMINATE_BAD_ANTS
-      // If an ant violates the RP cost constraint, terminate further
-      // schedule construction
-      if (((BBWithSpill *)dev_rgn_)->GetCrntSpillCost() > RPTarget) {
-        // set schedule cost to INVALID_VALUE so it is not considered for
-        // iteration best or global best
-        schedule->SetCost(INVALID_VALUE);
-        // keep track of ants terminated
-        atomicAdd(&numAntsTerminated_, 1);
-        dev_rdyLst_->ResetIterator();
-        dev_rdyLst_->Reset();
-        ready->clear();
-        dev_instsWithPrdcsrsSchduld_[GLOBALTID]->Reset();
-        // end schedule construction
-        return NULL;
+      // In the second pass, calculate cost incrementally and terminate
+      // ants that violate the RPTarget early
+      if (IsSecondPass) {
+        ((BBWithSpill *)dev_rgn_)->Dev_SchdulInst(inst,
+                                              dev_crntCycleNum_[GLOBALTID],
+                                              dev_crntSlotNum_[GLOBALTID],
+                                              false);
+        // If an ant violates the RP cost constraint, terminate further
+        // schedule construction
+        if (((BBWithSpill *)dev_rgn_)->GetCrntSpillCost() > RPTarget) {
+          // set schedule cost to INVALID_VALUE so it is not considered for
+          // iteration best or global best
+          schedule->SetCost(INVALID_VALUE);
+          // keep track of ants terminated
+          atomicAdd(&numAntsTerminated_, 1);
+          dev_rdyLst_->ResetIterator();
+          dev_rdyLst_->Reset();
+          ready->clear();
+          dev_instsWithPrdcsrsSchduld_[GLOBALTID]->Reset();
+          // end schedule construction
+          return NULL;
+        }
       }
-#endif
-#endif
       DoRsrvSlots_(inst);
       // this is annoying
       SchedInstruction *blah = dev_rdyLst_->GetNextPriorityInst();
@@ -385,15 +379,15 @@ InstSchedule *ACOScheduler::FindOneSchedule(InstCount RPTarget,
     dev_rdyLst_->ResetIterator();
     ready->clear();
   }
-#if !CALCULATE_INCREMENTAL_COST
-  // Calculate schedule cost here if not calculating cost incrementally
-  InstCount cycleNum, slotNum;
-  inst = dataDepGraph_->GetInstByIndx(schedule->GetFrstInst(cycleNum, slotNum));
-  while (inst != NULL) {
-    ((BBWithSpill *)dev_rgn_)->Dev_SchdulInst(inst, cycleNum, slotNum, false);
-    inst = dataDepGraph_->GetInstByIndx(schedule->GetNxtInst(cycleNum,slotNum));
+  // Calculate schedule cost here in the first pass or if we are using SLIL
+  if (!IsSecondPass) {
+    InstCount cycleNum, slotNum;
+    inst = dataDepGraph_->GetInstByIndx(schedule->GetFrstInst(cycleNum, slotNum));
+    while (inst != NULL) {
+      ((BBWithSpill *)dev_rgn_)->Dev_SchdulInst(inst, cycleNum, slotNum, false);
+      inst = dataDepGraph_->GetInstByIndx(schedule->GetNxtInst(cycleNum,slotNum));
+    }
   }
-#endif
   dev_rgn_->UpdateScheduleCost(schedule);
   return schedule;
 
@@ -402,6 +396,7 @@ InstSchedule *ACOScheduler::FindOneSchedule(InstCount RPTarget,
   InstSchedule *schedule;
   schedule = new InstSchedule(machMdl_, dataDepGraph_, true);
   InstCount maxPriority = rdyLst_->MaxPriority();
+  bool IsSecondPass = rgn_->IsSecondPass();
   if (maxPriority == 0)
     maxPriority = 1; // divide by 0 is bad
   Initialize_();
@@ -504,23 +499,23 @@ InstSchedule *ACOScheduler::FindOneSchedule(InstCount RPTarget,
       instNum = inst->GetNum();
       SchdulInst_(inst, crntCycleNum_);
       inst->Schedule(crntCycleNum_, crntSlotNum_);
-#if CALCULATE_INCREMENTAL_COST
-      rgn_->SchdulInst(inst, crntCycleNum_, crntSlotNum_, false);
-#if TERMINATE_BAD_ANTS
-      // If an ant violates the RP cost constraint, terminate further
-      // schedule construction
-      if (((BBWithSpill*)rgn_)->GetCrntSpillCost() > RPTarget) {
-        // keep track of ants terminated
-        numAntsTerminated_++;
-	delete rdyLst_;
-	delete ready;
-	rdyLst_ = new ReadyList(dataDepGraph_, prirts_); 
-	delete schedule;
-        // end schedule construction
-        return NULL;
+      // In the second pass, calculate cost incrementally and terminate
+      // ants that violate the RPTarget early
+      if (IsSecondPass) {
+        rgn_->SchdulInst(inst, crntCycleNum_, crntSlotNum_, false);
+        // If an ant violates the RP cost constraint, terminate further
+        // schedule construction
+        if (((BBWithSpill*)rgn_)->GetCrntSpillCost() > RPTarget) {
+          // end schedule construction
+          // keep track of ants terminated
+          numAntsTerminated_++;
+          delete rdyLst_;
+          delete ready;
+          rdyLst_ = new ReadyList(dataDepGraph_, prirts_); 
+          delete schedule;
+          return NULL;
+        }
       }
-#endif
-#endif
       DoRsrvSlots_(inst);
       // this is annoying
       SchedInstruction *blah = rdyLst_->GetNextPriorityInst();
@@ -538,15 +533,15 @@ InstSchedule *ACOScheduler::FindOneSchedule(InstCount RPTarget,
     rdyLst_->ResetIterator();
     ready->clear();
   }
-#if !CALCULATE_INCREMENTAL_COST
-  // Calculate schedule cost here if not calculating cost incrementally
-  InstCount cycleNum, slotNum;
-  inst = dataDepGraph_->GetInstByIndx(schedule->GetFrstInst(cycleNum, slotNum));
-  while (inst != NULL) {
-    rgn_->SchdulInst(inst, cycleNum, slotNum, false);
-    inst = dataDepGraph_->GetInstByIndx(schedule->GetNxtInst(cycleNum,slotNum));
+  // Calculate schedule cost here in the first pass
+  if (!IsSecondPass) {
+    InstCount cycleNum, slotNum;
+    inst = dataDepGraph_->GetInstByIndx(schedule->GetFrstInst(cycleNum, slotNum));
+    while (inst != NULL) {
+      rgn_->SchdulInst(inst, cycleNum, slotNum, false);
+      inst = dataDepGraph_->GetInstByIndx(schedule->GetNxtInst(cycleNum,slotNum));
+    }
   }
-#endif
   delete ready;
   rgn_->UpdateScheduleCost(schedule);
   return schedule;
@@ -572,6 +567,9 @@ void Dev_ACO(SchedRegion *dev_rgn, DataDepGraph *dev_DDG,
             int noImprovementMax) {
   // holds cost and index of bestSched per block
   __shared__ int bestIndex, dev_iterations;
+  __shared__ bool needsSLIL;
+  needsSLIL = ((BBWithSpill *)dev_rgn)->needsSLIL();
+  bool IsSecondPass = dev_rgn->IsSecondPass();
   dev_rgn->SetDepGraph(dev_DDG);
   ((BBWithSpill *)dev_rgn)->SetRegFiles(dev_DDG->getRegFiles());
   dev_noImprovement = 0;
@@ -579,7 +577,13 @@ void Dev_ACO(SchedRegion *dev_rgn, DataDepGraph *dev_DDG,
   // Used to synchronize all launched threads
   auto threadGroup = cg::this_grid();
   // Get RPTarget
-  InstCount RPTarget = dev_bestSched->GetSpillCost();
+  InstCount RPTarget;
+
+  // If in second pass and not using SLIL, set RPTarget
+  if (IsSecondPass && !needsSLIL)
+    RPTarget = dev_bestSched->GetSpillCost();
+  else
+    RPTarget = INT_MAX;
 
   // Start ACO
   while (dev_noImprovement < noImprovementMax) {
@@ -588,10 +592,7 @@ void Dev_ACO(SchedRegion *dev_rgn, DataDepGraph *dev_DDG,
     dev_AcoSchdulr->FindOneSchedule(RPTarget,
                                     dev_schedules[GLOBALTID],
                                     &dev_ready[GLOBALTID]);
-
-    // 1 iteration best per iteration code
-    // make sure all threads have constructed schedules, then pick 1 iteration
-    // best schedule for pheromone update
+    // Sync threads after schedule creation
     threadGroup.sync();
     // I chose thread #32 here so in the case that we want each thread block to
     // find its iteration best, block #0's find blockIterationBest will be
@@ -599,8 +600,8 @@ void Dev_ACO(SchedRegion *dev_rgn, DataDepGraph *dev_DDG,
     if (GLOBALTID == 32) {
       bestIndex = INVALID_VALUE;
       for (int i = 0; i < NUMTHREADS; i++) {
+        // Skip invalid schedules from terminating ants early
         if (dev_schedules[i]->GetCost() == INVALID_VALUE) {
-          //printf("thread %d made invalid sched\n", i);
           continue;
         }
         if (bestIndex == INVALID_VALUE)
@@ -613,18 +614,12 @@ void Dev_ACO(SchedRegion *dev_rgn, DataDepGraph *dev_DDG,
       }
       // place best schedule's cost and index in global mem
       globalBestIndex = bestIndex;
-      //debug
-/*
-      printf("globalBestIndex = %d\n", globalBestIndex);
-      if (globalBestIndex != INVALID_VALUE)
-        printf("Iteration best sched has RP cost %d\n", dev_schedules[globalBestIndex]->GetSpillCost());
-*/
     }
     // perform pheremone update based on selected scheme
 #if (PHER_UPDATE_SCHEME == ONE_PER_ITER)
     // Another hard sync point after iteration best selection
     threadGroup.sync();
-    if (globalBestIndex != INVALID_VALUE)
+    if (globalBestIndex != INVALID_VALUE) 
       dev_AcoSchdulr->UpdatePheromone(dev_schedules[globalBestIndex]);
 #elif (PHER_UPDATE_SCHEME == ONE_PER_BLOCK)
     // each block finds its blockIterationBest
@@ -657,8 +652,9 @@ void Dev_ACO(SchedRegion *dev_rgn, DataDepGraph *dev_DDG,
                                                 dev_schedules[globalBestIndex], 
                                                 true)) {
         dev_bestSched->Copy(dev_schedules[globalBestIndex]);
-        // update RPTarget
-        RPTarget = dev_bestSched->GetSpillCost();
+        // update RPTarget if we are in second pass and not using SLIL
+        if (IsSecondPass && !needsSLIL)
+          RPTarget = dev_bestSched->GetSpillCost();
         printf("New best sched found by thread %d\n", globalBestIndex);
         printf("ACO found schedule "
                "cost:%d, rp cost:%d, exec cost: %d, and "
@@ -1189,7 +1185,6 @@ void ACOScheduler::CopyPointersToDevice(ACOScheduler *dev_ACOSchedulr) {
   dev_ACOSchedulr->leafInst_ = dev_DDG_->GetLeafInst();
   // Create an array of PriorityArrayLists, allocate dev mem for it 
   // and elmnts_ for each one, and copy it to device
-  Logger::Info("Copying ACO dev_instsWithPrdscsrsSchduld_");
   PriorityArrayList<InstCount, InstCount> *temp = 
     new PriorityArrayList<InstCount, InstCount>[NUMTHREADS];
   // Allocate elmnts_ and keys_ for all PArrayLists
@@ -1221,31 +1216,7 @@ void ACOScheduler::CopyPointersToDevice(ACOScheduler *dev_ACOSchedulr) {
   }
   delete[] temp;
 
-/* old method
-  // Create temp PriorityArrayList to copy to dev_instsWithPrdcsrsSchduld_
-  Logger::Info("Copying ACO dev_instsWithPrdscsrsSchduld_");
-  PriorityArrayList<InstCount, InstCount> *temp;
-  temp = new 
-	PriorityArrayList<InstCount, InstCount>(dataDepGraph_->GetInstCnt());
-  // Allocate and Copy PriorityArrayList for each thread
-  for (int i = 0; i < NUMTHREADS; i++) {
-    memSize = sizeof(PriorityArrayList<InstCount, InstCount>);
-    gpuErrchk(cudaMallocManaged(&dev_instsWithPrdcsrsSchduld_[i], memSize));
-    gpuErrchk(cudaMemcpy(dev_instsWithPrdcsrsSchduld_[i], temp, memSize,
-			cudaMemcpyHostToDevice));
-    // Allocate dev mem for elmnts_ and keys_
-    memSize = sizeof(InstCount) * dataDepGraph_->GetInstCnt();
-    gpuErrchk(cudaMalloc(&dev_instsWithPrdcsrsSchduld_[i]->elmnts_, memSize));
-    gpuErrchk(cudaMalloc(&dev_instsWithPrdcsrsSchduld_[i]->keys_, memSize));
-    // make sure mallocManaged memory is copied to device before kernel start
-    memSize = sizeof(PriorityArrayList<InstCount, InstCount>);
-    gpuErrchk(cudaMemPrefetchAsync(dev_instsWithPrdcsrsSchduld_[i], memSize, 0));
-  }
-  delete temp;
-*/
-
   // Copy rdyLst_
-  Logger::Info("Copying ACO rdyLst_");
   memSize = sizeof(ReadyList);
   gpuErrchk(cudaMallocManaged(&dev_ACOSchedulr->dev_rdyLst_, memSize));
   gpuErrchk(cudaMemcpy(dev_ACOSchedulr->dev_rdyLst_, rdyLst_, memSize,
