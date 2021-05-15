@@ -18,11 +18,14 @@ else()
 endif()
 
 if(NOT llvm_subproject)
+  set(llvm_version 6.0)
   if(OPTSCHED_ENABLE_AMDGPU)
-    find_package(LLVM 9.0 REQUIRED CONFIG)
-  else()
-    find_package(LLVM 6.0 REQUIRED CONFIG)
+    set(llvm_version 9.0)
   endif()
+
+  set(OPTSCHED_LLVM_VERSION ${llvm_version} CACHE STRING "The LLVM version to build OptSched with (independent build only)")
+
+  find_package(LLVM ${OPTSCHED_LLVM_VERSION} REQUIRED CONFIG)
 endif()
 
 if(NOT CMAKE_BUILD_TYPE)
