@@ -248,8 +248,6 @@ InstSchedule *ACOScheduler::FindOneSchedule(InstCount RPTarget,
     maxPriority = 1; // divide by 0 is bad
   Initialize_();
   ((BBWithSpill *)dev_rgn_)->Dev_InitForSchdulng();
-  __shared__ bool needsSLIL;
-  needsSLIL = ((BBWithSpill *)dev_rgn_)->needsSLIL();
 
   SchedInstruction *waitFor = NULL;
   InstCount waitUntil = 0;
@@ -342,27 +340,25 @@ InstSchedule *ACOScheduler::FindOneSchedule(InstCount RPTarget,
                      dev_crntSlotNum_[GLOBALTID]);
       // In the second pass, calculate cost incrementally and terminate
       // ants that violate the RPTarget early
-      if (IsSecondPass) {
-        ((BBWithSpill *)dev_rgn_)->Dev_SchdulInst(inst,
-                                              dev_crntCycleNum_[GLOBALTID],
-                                              dev_crntSlotNum_[GLOBALTID],
-                                              false);
-        // If an ant violates the RP cost constraint, terminate further
-        // schedule construction
-        if (((BBWithSpill *)dev_rgn_)->GetCrntSpillCost() > RPTarget) {
-          // set schedule cost to INVALID_VALUE so it is not considered for
-          // iteration best or global best
-          schedule->SetCost(INVALID_VALUE);
-          // keep track of ants terminated
-          atomicAdd(&numAntsTerminated_, 1);
-          dev_rdyLst_->ResetIterator();
-          dev_rdyLst_->Reset();
-          ready->clear();
-          dev_instsWithPrdcsrsSchduld_[GLOBALTID]->Reset();
-          // end schedule construction
-          return NULL;
-        }
-      }
+      ((BBWithSpill *)dev_rgn_)->Dev_SchdulInst(inst,
+                                            dev_crntCycleNum_[GLOBALTID],
+                                            dev_crntSlotNum_[GLOBALTID],
+                                            false);
+      // If an ant violates the RP cost constraint, terminate further
+      // schedule construction
+      if (((BBWithSpill *)dev_rgn_)->GetCrntSpillCost() > RPTarget) {
+        // set schedule cost to INVALID_VALUE so it is not considered for
+        // iteration best or global best
+        schedule->SetCost(INVALID_VALUE);
+        // keep track of ants terminated
+        atomicAdd(&numAntsTerminated_, 1);
+        dev_rdyLst_->ResetIterator();
+        dev_rdyLst_->Reset();
+        ready->clear();
+        dev_instsWithPrdcsrsSchduld_[GLOBALTID]->Reset();
+        // end schedule construction
+        return NULL;
+      } 
       DoRsrvSlots_(inst);
       // this is annoying
       SchedInstruction *blah = dev_rdyLst_->GetNextPriorityInst();
@@ -378,15 +374,6 @@ InstSchedule *ACOScheduler::FindOneSchedule(InstCount RPTarget,
       InitNewCycle_();
     dev_rdyLst_->ResetIterator();
     ready->clear();
-  }
-  // Calculate schedule cost here in the first pass or if we are using SLIL
-  if (!IsSecondPass) {
-    InstCount cycleNum, slotNum;
-    inst = dataDepGraph_->GetInstByIndx(schedule->GetFrstInst(cycleNum, slotNum));
-    while (inst != NULL) {
-      ((BBWithSpill *)dev_rgn_)->Dev_SchdulInst(inst, cycleNum, slotNum, false);
-      inst = dataDepGraph_->GetInstByIndx(schedule->GetNxtInst(cycleNum,slotNum));
-    }
   }
   dev_rgn_->UpdateScheduleCost(schedule);
   return schedule;
@@ -499,22 +486,18 @@ InstSchedule *ACOScheduler::FindOneSchedule(InstCount RPTarget,
       instNum = inst->GetNum();
       SchdulInst_(inst, crntCycleNum_);
       inst->Schedule(crntCycleNum_, crntSlotNum_);
-      // In the second pass, calculate cost incrementally and terminate
-      // ants that violate the RPTarget early
-      if (IsSecondPass) {
-        rgn_->SchdulInst(inst, crntCycleNum_, crntSlotNum_, false);
-        // If an ant violates the RP cost constraint, terminate further
-        // schedule construction
-        if (((BBWithSpill*)rgn_)->GetCrntSpillCost() > RPTarget) {
-          // end schedule construction
-          // keep track of ants terminated
-          numAntsTerminated_++;
-          delete rdyLst_;
-          delete ready;
-          rdyLst_ = new ReadyList(dataDepGraph_, prirts_); 
-          delete schedule;
-          return NULL;
-        }
+      rgn_->SchdulInst(inst, crntCycleNum_, crntSlotNum_, false);
+      // If an ant violates the RP cost constraint, terminate further
+      // schedule construction
+      if (((BBWithSpill*)rgn_)->GetCrntSpillCost() > RPTarget) {
+        // end schedule construction
+        // keep track of ants terminated
+        numAntsTerminated_++;
+        delete rdyLst_;
+        delete ready;
+        rdyLst_ = new ReadyList(dataDepGraph_, prirts_); 
+        delete schedule;
+        return NULL;
       }
       DoRsrvSlots_(inst);
       // this is annoying
@@ -532,15 +515,6 @@ InstSchedule *ACOScheduler::FindOneSchedule(InstCount RPTarget,
       InitNewCycle_();
     rdyLst_->ResetIterator();
     ready->clear();
-  }
-  // Calculate schedule cost here in the first pass
-  if (!IsSecondPass) {
-    InstCount cycleNum, slotNum;
-    inst = dataDepGraph_->GetInstByIndx(schedule->GetFrstInst(cycleNum, slotNum));
-    while (inst != NULL) {
-      rgn_->SchdulInst(inst, cycleNum, slotNum, false);
-      inst = dataDepGraph_->GetInstByIndx(schedule->GetNxtInst(cycleNum,slotNum));
-    }
   }
   delete ready;
   rgn_->UpdateScheduleCost(schedule);
@@ -580,7 +554,7 @@ void Dev_ACO(SchedRegion *dev_rgn, DataDepGraph *dev_DDG,
   InstCount RPTarget;
 
   // If in second pass and not using SLIL, set RPTarget
-  if (IsSecondPass && !needsSLIL)
+  if (!needsSLIL)
     RPTarget = dev_bestSched->GetSpillCost();
   else
     RPTarget = INT_MAX;
@@ -653,7 +627,7 @@ void Dev_ACO(SchedRegion *dev_rgn, DataDepGraph *dev_DDG,
                                                 true)) {
         dev_bestSched->Copy(dev_schedules[globalBestIndex]);
         // update RPTarget if we are in second pass and not using SLIL
-        if (IsSecondPass && !needsSLIL)
+        if (!needsSLIL)
           RPTarget = dev_bestSched->GetSpillCost();
         printf("New best sched found by thread %d\n", globalBestIndex);
         printf("ACO found schedule "
@@ -837,10 +811,15 @@ FUNC_RESULT ACOScheduler::FindSchedule(InstSchedule *schedule_out,
 
   } else { // Run ACO on cpu
     Logger::Info("Running host ACO with %d ants per iteration", NUMTHREADS);
+    InstCount RPTarget;
+    if (!((BBWithSpill *)rgn_)->needsSLIL())
+      RPTarget = bestSchedule->GetSpillCost();
+    else
+      RPTarget = MaxRPTarget;
     while (noImprovement < noImprovementMax) {
       iterationBest = nullptr;
       for (int i = 0; i < NUMTHREADS; i++) {
-        InstSchedule *schedule = FindOneSchedule(bestSchedule->GetSpillCost());
+        InstSchedule *schedule = FindOneSchedule(RPTarget);
         if (print_aco_trace)
           PrintSchedule(schedule);
         if (shouldReplaceSchedule(iterationBest, schedule, false)) {
@@ -860,6 +839,8 @@ FUNC_RESULT ACOScheduler::FindSchedule(InstSchedule *schedule_out,
         if (bestSchedule && bestSchedule != InitialSchedule)
           delete bestSchedule;
         bestSchedule = std::move(iterationBest);
+        if (!((BBWithSpill *)rgn_)->needsSLIL())
+          RPTarget = bestSchedule->GetSpillCost();
         printf("ACO found schedule "
                "cost:%d, rp cost:%d, sched length: %d, and "
                "iteration:%d\n",
