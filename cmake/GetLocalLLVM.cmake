@@ -44,7 +44,8 @@ function(get_local_llvm)
 
     file(RENAME ${LOCAL_LLVM_BINARY_DIR}/llvm-project-optsched ${LOCAL_LLVM_BINARY_DIR}/llvm-project)
 
-    file(TOUCH ${LOCAL_LLVM_BINARY_DIR}/llvm-project.download-finished)
+    # Touch the file. file(TOUCH ...) is CMake 3.12+, but we want to support CMake 3.10
+    file(WRITE ${LOCAL_LLVM_BINARY_DIR}/llvm-project.download-finished "")
   endif()
 
   cmake_parse_arguments(ARG "GTEST" "" "" ${ARGN})
