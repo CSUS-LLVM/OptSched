@@ -1,0 +1,269 @@
+name: Verify Build Methods
+
+on:
+  push:
+    branches: [ master ]
+  issue_comment: # On PR issue comment
+    types: [ created ]
+
+env:
+  CCACHE_BASEDIR: $GITHUB_WORKSPACE
+  CCACHE_DIR: $GITHUB_WORKSPACE/.ccache
+  CCACHE_COMPRESS: true
+  CCACHE_COMPRESSLEVEL: 6
+
+jobs:
+  comment-triggered:
+    runs-on: ubuntu-18.04
+
+    outputs:
+      value: ${{ steps.value.outputs.value }}
+      checks_should_run: ${{ steps.checks_should_run.outputs.checks_should_run }}
+
+    steps:
+    - id: value
+    # Allow triggering with a comment of `Do: Verify Build Methods`.
+    # If we are a pull_request, we have the trigger comment, and the person
+    # requesting is the one who made the PR, then we run.
+      run: >-
+        echo "::set-output name=value::${{ github.event_name == 'issue_comment'
+        && github.event.issue.pull_request != ''
+        && github.event.comment.body == 'Do: Verify Build Methods'
+        && github.event.comment.user.id == github.event.issue.user.id }}"
+
+    - id: checks_should_run
+      run: >-
+        echo "::set-output name=checks_should_run::${{
+          steps.value.outputs.value == 'true'
+          || github.event_name == 'push'
+          || github.event_name == 'pull_request' }}"
+
+  init-report:
+    needs: comment-triggered
+    runs-on: ubuntu-18.04
+    if: needs.comment-triggered.outputs.value == 'true'
+
+    outputs:
+      report: ${{ steps.report.outputs.comment-id }}
+
+    steps:
+    - name: Initialize Report
+      uses: peter-evans/create-or-update-comment@v1.4.3
+      id: report
+      with:
+        issue-number: ${{ github.event.issue.number }}
+        body: |
+          Verifying build methods work: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
+
+  # super-build: -- Done as part of the checks.yml file
+
+  manual-build:
+    needs: comment-triggered
+    runs-on: ubuntu-18.04
+    if: needs.comment-triggered.outputs.checks_should_run == 'true'
+
+    steps:
+    - name: Install dependencies
+      run: |
+        sudo apt-get install ninja-build
+        sudo apt-get install ccache
+
+    - run: |
+        git clone https://github.com/llvm/llvm-project
+        cd llvm-project && git checkout release/6.x
+
+    - uses: actions/checkout@v2
+      with:
+        fetch-depth: 0
+        path: llvm-project/llvm/projects/OptSched
+
+    - run: |
+        echo ${{ github.token }} | gh auth login --with-token
+        gh pr checkout ${{ github.event.issue.number }}
+      if: needs.comment-triggered.outputs.value == 'true'
+      working-directory: llvm-project/llvm/projects/OptSched
+
+    - name: Apply Spilling Info Patch
+      run: |
+        wget https://raw.githubusercontent.com/CSUS-LLVM/OptSched/master/patches/llvm6.0/llvm6-print-spilling-info.patch
+        cd llvm-project
+        git -c user.name="GitHub Actions" -c user.email="OptSched@example.com" am ../llvm6-print-spilling-info.patch
+
+    - name: Set up ccache
+      uses: actions/cache@v1.1.0
+      with:
+        path: .ccache
+        key: ccache-manual
+
+    - run: |
+        ccache -o hash_dir=false
+
+    - name: Configure
+      run: |
+        mkdir build && cd build
+
+        cmake ../llvm-project/llvm -GNinja                                             \
+            -DCMAKE_BUILD_TYPE=Release                                                 \
+            -DLLVM_PARALLEL_LINK_JOBS=1                                                \
+            -DCMAKE_CXX_COMPILER_LAUNCHER=ccache -DCMAKE_C_COMPILER_LAUNCHER=ccache    \
+            -DCMAKE_CXX_COMPILER=g++ -DCMAKE_C_COMPILER=gcc                            \
+            -DLLVM_ENABLE_ASSERTIONS=ON                                                \
+            -DOPTSCHED_EXTRA_DEFINITIONS='-DIS_DEBUG'                                  \
+            -DLLVM_INCLUDE_TESTS=ON                                                    \
+            -DOPTSCHED_ENABLE_AMDGPU=OFF
+
+    - name: Build
+      working-directory: build
+      run: |
+        # Zero out stats so we get an accurate report at the end.
+        ccache -z
+
+        # Build multiple times to avoid spurious problems with improperly set up CMake
+        # target dependencies by LLVM.
+        ninja || true
+        (ninja | grep -E -v '^-- Up-to-date: ') || true
+        (ninja | grep -E -v '^-- Up-to-date: ') || true
+        (ninja | grep -E -v '^-- Up-to-date: ') || true
+        (ninja | grep -E -v '^-- Up-to-date: ')
+
+    - name: Dump ccache Statistics
+      run: ccache -s
+
+    - name: Run tests
+      working-directory: build
+      run: ctest -VV
+
+  external-build:
+    needs: comment-triggered
+    runs-on: ubuntu-18.04
+    if: needs.comment-triggered.outputs.checks_should_run == 'true'
+
+    steps:
+    - name: Install dependencies
+      run: |
+        sudo apt-get install ninja-build
+        sudo apt-get install ccache
+
+    - run: |
+        git clone https://github.com/llvm/llvm-project
+        cd llvm-project && git checkout release/6.x
+
+    - name: Apply Spilling Info Patch
+      run: |
+        wget https://raw.githubusercontent.com/CSUS-LLVM/OptSched/master/patches/llvm6.0/llvm6-print-spilling-info.patch
+        cd llvm-project
+        git -c user.name="GitHub Actions" -c user.email="OptSched@example.com" am ../llvm6-print-spilling-info.patch
+
+    - name: Set up ccache
+      uses: actions/cache@v1.1.0
+      with:
+        path: .ccache
+        key: ccache-external
+
+    - run: |
+        ccache -o hash_dir=false
+
+    - name: Configure LLVM
+      run: |
+        mkdir build-llvm && cd build-llvm
+
+        cmake ../llvm-project/llvm -GNinja                                             \
+            -DCMAKE_BUILD_TYPE=Release                                                 \
+            -DLLVM_PARALLEL_LINK_JOBS=1                                                \
+            -DCMAKE_CXX_COMPILER_LAUNCHER=ccache -DCMAKE_C_COMPILER_LAUNCHER=ccache    \
+            -DCMAKE_CXX_COMPILER=g++ -DCMAKE_C_COMPILER=gcc                            \
+            -DLLVM_ENABLE_ASSERTIONS=ON                                                \
+            -DLLVM_INCLUDE_TESTS=ON                                                    \
+            -DLLVM_ENABLE_PROJECTS='clang'                                             \
+            -DCMAKE_INSTALL_PREFIX=$PWD/install
+
+    - name: Build LLVM
+      working-directory: build-llvm
+      run: |
+        # Zero out stats so we get an accurate report at the end.
+        ccache -z
+
+        # Build multiple times to avoid spurious problems with improperly set up CMake
+        # target dependencies by LLVM.
+        ninja || true
+        (ninja | grep -E -v '^-- Up-to-date: ') || true
+        (ninja | grep -E -v '^-- Up-to-date: ') || true
+        (ninja | grep -E -v '^-- Up-to-date: ') || true
+        (ninja | grep -E -v '^-- Up-to-date: ')
+
+        ninja install
+
+    # Now checkout and build OptSched
+    - uses: actions/checkout@v2
+      with:
+        fetch-depth: 0
+        path: OptSched
+
+    - run: |
+        echo ${{ github.token }} | gh auth login --with-token
+        gh pr checkout ${{ github.event.issue.number }}
+      if: needs.comment-triggered.outputs.value == 'true'
+      working-directory: OptSched
+
+    - name: Configure OptSched
+      run: |
+        mkdir build-optsched && cd build-optsched
+
+        cmake ../OptSched -GNinja                                                      \
+            -DCMAKE_BUILD_TYPE=Debug                                                   \
+            -DLLVM_DIR=../build-llvm/install/lib/cmake/llvm                            \
+            -DCMAKE_CXX_COMPILER=g++ -DCMAKE_C_COMPILER=gcc                            \
+            -DOPTSCHED_ENABLE_AMDGPU=OFF                                               \
+            -DCMAKE_INSTALL_PREFIX=$PWD/install
+
+    - name: Build OptSched
+      working-directory: build-optsched
+      run: |
+        # Zero out stats so we get an accurate report at the end.
+        ccache -z
+
+        # Build multiple times to avoid spurious problems with improperly set up CMake
+        # target dependencies by LLVM.
+        ninja || true
+        (ninja | grep -E -v '^-- Up-to-date: ') || true
+        (ninja | grep -E -v '^-- Up-to-date: ') || true
+        (ninja | grep -E -v '^-- Up-to-date: ') || true
+        (ninja | grep -E -v '^-- Up-to-date: ')
+
+        ninja install
+
+    - name: Dump ccache Statistics
+      run: ccache -s
+
+    - name: Run tests
+      working-directory: build-optsched
+      run: ctest -VV
+
+  report:
+    needs: [comment-triggered, init-report, manual-build, external-build]
+    runs-on: ubuntu-18.04
+    if: always()
+
+    steps:
+    - name: Report CI
+      if: needs.comment-triggered.outputs.value == 'true'
+      uses: peter-evans/create-or-update-comment@v1.4.3
+      with:
+        comment-id: ${{ needs.init-report.outputs.report }}
+        body: |
+          | Check | Status |
+          | ----- | ------ |
+          ${{
+            format('| Manual Build | {0}{1}{2} |',
+              needs.manual-build.result == 'success' && '&#x2714; Passed' || '',
+              needs.manual-build.result == 'failure' && '&#x274C; Failed' || '',
+              (needs.manual-build.result != 'success' && needs.manual-build.result != 'failure') && 'Skipped' || ''
+            )
+          }}
+          ${{
+            format('| External Build | {0}{1}{2} |',
+              needs.external-build.result == 'success' && '&#x2714; Passed' || '',
+              needs.external-build.result == 'failure' && '&#x274C; Failed' || '',
+              (needs.external-build.result != 'success' && needs.external-build.result != 'failure') && 'Skipped' || ''
+            )
+          }}
