@@ -507,7 +507,7 @@ FUNC_RESULT ACOScheduler::FindSchedule(InstSchedule *schedule_out,
       }
     }
     ++globalCmp;
-    if (!IsFirst && iterationBest->GetNormSpillCost() <= bestSchedule->GetNormSpillCost()) {
+    if (IsFirst || iterationBest->GetNormSpillCost() <= bestSchedule->GetNormSpillCost()) {
       UpdatePheromone(iterationBest.get());
     }
     else ++globalCmpRej;
