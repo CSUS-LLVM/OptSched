@@ -53,7 +53,7 @@ private:
 };
 
 // A list scheduler that schedules the instruction with the top heuristic value
-// Unalike ListScheduler this class considers instructions that are no ready
+// Unalike ListScheduler this class considers instructions that are ready
 // in terms of data dependencies, but not in terms of latencies.
 // If the instruction with the top heuristic is not ready in terms of latency
 // Then stalls will be inserted until it is ready
