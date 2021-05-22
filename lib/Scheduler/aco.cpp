@@ -455,7 +455,7 @@ FUNC_RESULT ACOScheduler::FindSchedule(InstSchedule *schedule_out,
   for (int i = 0; i < pheromone_size; i++)
     pheromone_[i] = 1;
   initialValue_ = 1;
-  InstCount MaxRPTarget = std::numeric_limits<InstCount>::max();
+  const InstCount MaxRPTarget = std::numeric_limits<InstCount>::max();
   std::unique_ptr<InstSchedule> heuristicSched = FindOneSchedule(MaxRPTarget);
   InstCount heuristicCost =
       heuristicSched->GetCost() + 1; // prevent divide by zero
