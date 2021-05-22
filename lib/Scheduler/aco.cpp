@@ -140,15 +140,14 @@ bool ACOScheduler::shouldReplaceSchedule(InstSchedule *OldSched,
   CmpLn += IsGlobal ? "g/" : "";
 #endif // DBG_SRS
 
-  const auto SchedCost = [this](InstSchedule* Sched) {
+  const auto SchedCost = [this](InstSchedule *Sched) {
     return !IsTwoPassEn ? Sched->GetCost() : Sched->GetNormSpillCost();
   };
 
   // return true if the old schedule is null (eg:there is no old schedule)
   // return false if the new schedule is is NULL
   if (!OldSched) {
-    SRS_DBG_LOG("SRS/Old:null, New:%d",
-                !NewSched ? -1 : SchedCost(NewSched));
+    SRS_DBG_LOG("SRS/Old:null, New:%d", !NewSched ? -1 : SchedCost(NewSched));
     return true;
   } else if (!NewSched) {
     // not likely to happen
@@ -462,6 +461,9 @@ FUNC_RESULT ACOScheduler::FindSchedule(InstSchedule *schedule_out,
       heuristicSched->GetCost() + 1; // prevent divide by zero
   InstCount InitialCost = InitialSchedule ? InitialSchedule->GetCost() : 0;
 
+  InstCount TargetNSC = InitialSchedule ? InitialSchedule->GetNormSpillCost()
+                                        : heuristicSched->GetNormSpillCost();
+
 #if USE_ACS
   initialValue_ = 2.0 / ((double)count_ * heuristicCost);
 #else
@@ -484,9 +486,7 @@ FUNC_RESULT ACOScheduler::FindSchedule(InstSchedule *schedule_out,
     for (int i = 0; i < ants_per_iteration; i++) {
       CrntAntEdges.clear();
       std::unique_ptr<InstSchedule> schedule = FindOneSchedule(
-          i && iterationBest && rgn_->GetSpillCostFunc() != SCF_SLIL
-              ? iterationBest->GetNormSpillCost()
-              : MaxRPTarget);
+          i && rgn_->GetSpillCostFunc() != SCF_SLIL ? TargetNSC : MaxRPTarget);
       if (print_aco_trace)
         PrintSchedule(schedule.get());
       ++localCmp;
@@ -502,8 +502,7 @@ FUNC_RESULT ACOScheduler::FindSchedule(InstSchedule *schedule_out,
       }
     }
     ++globalCmp;
-    if (IsFirst ||
-        iterationBest->GetNormSpillCost() <= bestSchedule->GetNormSpillCost()) {
+    if (IsFirst || iterationBest->GetNormSpillCost() <= TargetNSC) {
       UpdatePheromone(iterationBest.get());
     } else
       ++globalCmpRej;
