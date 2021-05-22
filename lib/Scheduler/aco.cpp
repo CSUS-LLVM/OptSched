@@ -8,6 +8,7 @@
 #include "llvm/ADT/STLExtras.h"
 #include <iomanip>
 #include <iostream>
+#include <limits>
 #include <sstream>
 
 using namespace llvm::opt_sched;
@@ -21,6 +22,14 @@ double RandDouble(double min, double max) {
   double rand = (double)RandomGen::GetRand32() / INT32_MAX;
   return (rand * (max - min)) + min;
 }
+
+#define DBG_SRS 0
+
+#if DBG_SRS
+#define SRS_DBG_LOG(...) Logger::Info(__VA_ARGS__)
+#else
+#define SRS_DBG_LOG(...) static_cast<void>(0)
+#endif
 
 #define USE_ACS 0
 #define TWO_STEP 1
@@ -123,8 +132,6 @@ double ACOScheduler::Score(SchedInstruction *from, Choice choice) {
   return Pheromone(from, choice.inst) * hf;
 }
 
-#define DBG_SRS 0
-
 bool ACOScheduler::shouldReplaceSchedule(InstSchedule *OldSched,
                                          InstSchedule *NewSched,
                                          bool IsGlobal) {
@@ -133,42 +140,35 @@ bool ACOScheduler::shouldReplaceSchedule(InstSchedule *OldSched,
   CmpLn += IsGlobal ? "g/" : "";
 #endif // DBG_SRS
 
+  const auto SchedCost = [this](InstSchedule* Sched) {
+    return !IsTwoPassEn ? Sched->GetCost() : Sched->GetNormSpillCost();
+  };
+
   // return true if the old schedule is null (eg:there is no old schedule)
   // return false if the new schedule is is NULL
   if (!OldSched) {
-#if DBG_SRS
-    Logger::Info("SRS/Old:null, New:%d",
-                 !NewSched ? -1
-                           : ((!IsTwoPassEn) ? NewSched->GetCost()
-                                             : NewSched->GetNormSpillCost()));
-#endif // DBG_SRS
+    SRS_DBG_LOG("SRS/Old:null, New:%d",
+                !NewSched ? -1 : SchedCost(NewSched));
     return true;
   } else if (!NewSched) {
     // not likely to happen
-#if DBG_SRS
-    Logger::Info("SRS/Old:%d, New:null", (!IsTwoPassEn)
-                                             ? OldSched->GetCost()
-                                             : OldSched->GetNormSpillCost());
-#endif // DBG_SRS
+    SRS_DBG_LOG("SRS/Old:%d, New:null", SchedCost(OldSched));
     return false;
   }
 
   // if it is the 1st pass return the cost comparison
   // if it is the 2nd pass return true if the RP cost and ILP cost is less
   if (!IsTwoPassEn || !rgn_->IsSecondPass()) {
-    InstCount NewCost =
-        (!IsTwoPassEn) ? NewSched->GetCost() : NewSched->GetNormSpillCost();
-    InstCount OldCost =
-        (!IsTwoPassEn) ? OldSched->GetCost() : OldSched->GetNormSpillCost();
+    InstCount NewCost = SchedCost(NewSched);
+    InstCount OldCost = SchedCost(OldSched);
+
 #if DBG_SRS
     CmpLn +=
         "Old:" + std::to_string(OldCost) + ", New:" + std::to_string(NewCost);
 #endif // DBG_SRS
 
     if (NewCost < OldCost) {
-#if DBG_SRS
-      Logger::Info(CmpLn.c_str());
-#endif // DBG_SRS
+      SRS_DBG_LOG(CmpLn.c_str());
       return true;
     } else if (NewCost == OldCost &&
                ((DCFOption == DCF_OPT::GLOBAL_ONLY && IsGlobal) ||
@@ -180,14 +180,12 @@ bool ACOScheduler::shouldReplaceSchedule(InstSchedule *OldSched,
 #if DBG_SRS
       CmpLn += ", OldDCF:" + std::to_string(OldDCFCost) +
                ", NewDCF:" + std::to_string(NewDCFCost);
-      Logger::Info(CmpLn.c_str());
 #endif // DBG_SRS
+      SRS_DBG_LOG(CmpLn.c_str());
       return (NewDCFCost < OldDCFCost);
 
     } else {
-#if DBG_SRS
-      Logger::Info(CmpLn.c_str());
-#endif // DBG_SRS
+      SRS_DBG_LOG(CmpLn.c_str());
       return false;
     }
   } else {
@@ -195,11 +193,9 @@ bool ACOScheduler::shouldReplaceSchedule(InstSchedule *OldSched,
     InstCount OldCost = OldSched->GetExecCost();
     InstCount NewSpillCost = NewSched->GetNormSpillCost();
     InstCount OldSpillCost = OldSched->GetNormSpillCost();
-#if DBG_SRS
-    Logger::Info("SRS2P/%sOld:%d,New:%d,OldNSC:%d,NewNSC:%d",
-                 IsGlobal ? "g/" : "", OldCost, NewCost, OldSpillCost,
-                 NewSpillCost);
-#endif // DBG_SRS
+    SRS_DBG_LOG("SRS2P/%sOld:%d,New:%d,OldNSC:%d,NewNSC:%d",
+                IsGlobal ? "g/" : "", OldCost, NewCost, OldSpillCost,
+                NewSpillCost);
     return (NewCost < OldCost && NewSpillCost <= OldSpillCost) ||
            NewSpillCost < OldSpillCost;
   }

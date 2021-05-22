@@ -343,7 +343,7 @@ void BBWithSpill::storeExtraCost(InstSchedule *sched, SPILL_COST_FUNCTION Scf) {
 
 /*****************************************************************************/
 
-InstCount BBWithSpill::getUnnormalizedIncrementalRPCost() {
+InstCount BBWithSpill::getUnnormalizedIncrementalRPCost() const {
   return crntSpillCost_;
 }
 /*****************************************************************************/
@@ -922,7 +922,7 @@ InstCount BBWithSpill::UpdtOptmlSched(InstSchedule *crntSched,
 }
 /*****************************************************************************/
 
-bool BBWithSpill::needsSLIL() { return NeedsComputeSLIL; }
+bool BBWithSpill::needsSLIL() const { return NeedsComputeSLIL; }
 
 void BBWithSpill::SetupForSchdulng_() {
   for (int i = 0; i < regTypeCnt_; i++) {

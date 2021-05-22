@@ -132,7 +132,7 @@ public:
   // cost of the schedule using Scf whenever the spill cost updates
   void addRecordedCost(SPILL_COST_FUNCTION Scf);
   void storeExtraCost(InstSchedule *sched, SPILL_COST_FUNCTION Scf);
-  InstCount getUnnormalizedIncrementalRPCost();
+  InstCount getUnnormalizedIncrementalRPCost() const;
 
   InstCount UpdtOptmlSched(InstSchedule *crntSched,
                            LengthCostEnumerator *enumrtr);
@@ -143,7 +143,7 @@ public:
                     InstCount slotNum, EnumTreeNode *trgtNode);
   void SetSttcLwrBounds(EnumTreeNode *node);
   bool ChkInstLglty(SchedInstruction *inst);
-  bool needsSLIL();
+  bool needsSLIL() const;
   void InitForSchdulng();
 
 protected:

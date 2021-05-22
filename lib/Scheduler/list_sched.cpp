@@ -182,11 +182,11 @@ SchedInstruction *StallSchedulingListScheduler::PickInst() const {
       unsigned long Heuristic = rdyLst_->CmputKey_(fIns, false, Changed);
       if (Heuristic > CurrentHeuristic) {
         futureReady->ResetIterator();
-        return NULL;
+        return nullptr;
       }
     }
     futureReady->ResetIterator();
   }
 
-  return ChkInstLglty_(inst) ? inst : NULL;
+  return ChkInstLglty_(inst) ? inst : nullptr;
 }

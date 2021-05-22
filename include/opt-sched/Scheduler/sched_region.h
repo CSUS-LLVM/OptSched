@@ -68,7 +68,7 @@ public:
   inline int GetSimSpills() { return totalSimSpills_; }
 
   // Gets the un-normalized incremental RP cost for the region(used by ACO)
-  virtual InstCount getUnnormalizedIncrementalRPCost() = 0;
+  virtual InstCount getUnnormalizedIncrementalRPCost() const = 0;
 
   // TODO(max): Document.
   virtual FUNC_RESULT
@@ -256,7 +256,7 @@ protected:
 
   virtual bool EnableEnum_() = 0;
 
-  virtual bool needsSLIL() = 0;
+  virtual bool needsSLIL() const = 0;
 
   // Prepares the region for being scheduled.
   virtual void SetupForSchdulng_() = 0;
