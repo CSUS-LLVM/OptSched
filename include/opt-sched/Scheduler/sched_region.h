@@ -73,12 +73,10 @@ public:
   // Get the number of simulated spills code added for this block.
   inline int GetSimSpills() { return totalSimSpills_; }
 
-
   // Gets the un-normalized incremental RP cost for the region(used by ACO)
   virtual InstCount getUnnormalizedIncrementalRPCost() const = 0;
   // Get schedLength for best-so-far sched
   inline InstCount getBestSchedLength() { return bestSchedLngth_; }
-
 
   // TODO(max): Document.
   virtual FUNC_RESULT
