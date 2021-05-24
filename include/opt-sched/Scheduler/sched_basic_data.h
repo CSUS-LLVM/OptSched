@@ -83,6 +83,8 @@ enum SPILL_COST_FUNCTION {
   SCF_TARGET
 };
 
+#define MAX_SCF_TYPES 10
+
 // The type of instruction signatures, used by the enumerator's history table to
 // keep track of partial schedules.
 typedef UDT_HASHKEY InstSignature;

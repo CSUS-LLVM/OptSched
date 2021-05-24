@@ -107,6 +107,12 @@ bool ConstrainedScheduler::Initialize_(InstCount trgtSchedLngth,
       return false;
   }
 
+  // wipe the ready list per cycle
+  for (InstCount i = 0; i < schedUprBound_; ++i) {
+    if (frstRdyLstPerCycle_[i])
+      frstRdyLstPerCycle_[i]->Reset();
+  }
+
   // Allocate the first entry in the array.
   if (frstRdyLstPerCycle_[0] == NULL) {
     frstRdyLstPerCycle_[0] = new LinkedList<SchedInstruction>;
@@ -126,6 +132,9 @@ bool ConstrainedScheduler::Initialize_(InstCount trgtSchedLngth,
   crntSlotNum_ = 0;
   crntRealSlotNum_ = 0;
   crntCycleNum_ = 0;
+  isCrntCycleBlkd_ = false;
+  consecEmptyCycles_ = 0;
+
   InitNewCycle_();
   rgn_->InitForSchdulng();
 

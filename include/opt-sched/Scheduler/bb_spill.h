@@ -80,6 +80,7 @@ private:
   InstCount totSpillCost_;
   InstCount slilSpillCost_;
   bool trackLiveRangeLngths_;
+  bool NeedsComputeSLIL;
 
   // Virtual Functions:
   // Given a schedule, compute the cost function value
@@ -127,6 +128,8 @@ public:
   // cost of the schedule using Scf whenever the spill cost updates
   void addRecordedCost(SPILL_COST_FUNCTION Scf);
   void storeExtraCost(InstSchedule *sched, SPILL_COST_FUNCTION Scf);
+  InstCount getUnnormalizedIncrementalRPCost() const;
+
   void CmputAndSetCostLwrBound();
   int cmputSpillCostLwrBound();
 
@@ -149,6 +152,7 @@ public:
                     InstCount slotNum, EnumTreeNode *trgtNode);
   void SetSttcLwrBounds(EnumTreeNode *node);
   bool ChkInstLglty(SchedInstruction *inst);
+  bool needsSLIL() const;
   void InitForSchdulng();
 
 protected:

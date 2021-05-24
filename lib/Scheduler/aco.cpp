@@ -8,6 +8,7 @@
 #include "llvm/ADT/STLExtras.h"
 #include <iomanip>
 #include <iostream>
+#include <limits>
 #include <sstream>
 
 using namespace llvm::opt_sched;
@@ -21,6 +22,14 @@ double RandDouble(double min, double max) {
   double rand = (double)RandomGen::GetRand32() / INT32_MAX;
   return (rand * (max - min)) + min;
 }
+
+#define DBG_SRS 0
+
+#if DBG_SRS
+#define SRS_DBG_LOG(...) Logger::Info(__VA_ARGS__)
+#else
+#define SRS_DBG_LOG(...) static_cast<void>(0)
+#endif
 
 #define USE_ACS 0
 #define TWO_STEP 1
@@ -57,7 +66,10 @@ ACOScheduler::ACOScheduler(DataDepGraph *dataDepGraph,
   bias_ratio = schedIni.GetFloat("ACO_BIAS_RATIO");
   local_decay = schedIni.GetFloat("ACO_LOCAL_DECAY");
   decay_factor = schedIni.GetFloat("ACO_DECAY_FACTOR");
-  ants_per_iteration = schedIni.GetInt("ACO_ANT_PER_ITERATION");
+  ants_per_iteration1p = schedIni.GetInt("ACO_ANT_PER_ITERATION");
+  ants_per_iteration2p =
+      schedIni.GetInt("ACO2P_ANT_PER_ITERATION", ants_per_iteration1p);
+  ants_per_iteration = ants_per_iteration1p;
   print_aco_trace = schedIni.GetBool("ACO_TRACE");
   IsTwoPassEn = schedIni.GetBool("USE_TWO_PASS");
   DCFOption = ParseDCFOpt(schedIni.GetString("ACO_DUAL_COST_FN_ENABLE", "OFF"));
@@ -113,49 +125,79 @@ pheromone_t &ACOScheduler::Pheromone(InstCount from, InstCount to) {
 }
 
 double ACOScheduler::Score(SchedInstruction *from, Choice choice) {
-  return Pheromone(from, choice.inst) *
-         pow(choice.heuristic, heuristicImportance_);
+  // tuneable heuristic importance is temporarily disabled
+  //  return Pheromone(from, choice.inst) *
+  //         pow(choice.heuristic, heuristicImportance_);
+  double hf = heuristicImportance_ ? choice.heuristic : 1.0;
+  return Pheromone(from, choice.inst) * hf;
 }
 
 bool ACOScheduler::shouldReplaceSchedule(InstSchedule *OldSched,
                                          InstSchedule *NewSched,
                                          bool IsGlobal) {
+#if DBG_SRS
+  std::string CmpLn = "SRS/";
+  CmpLn += IsGlobal ? "g/" : "";
+#endif // DBG_SRS
+
+  const auto SchedCost = [this](InstSchedule *Sched) {
+    return !IsTwoPassEn ? Sched->GetCost() : Sched->GetNormSpillCost();
+  };
+
   // return true if the old schedule is null (eg:there is no old schedule)
   // return false if the new schedule is is NULL
-  if (!OldSched)
+  if (!OldSched) {
+    SRS_DBG_LOG("SRS/Old:null, New:%d", !NewSched ? -1 : SchedCost(NewSched));
     return true;
-  else if (!NewSched)
+  } else if (!NewSched) {
+    // not likely to happen
+    SRS_DBG_LOG("SRS/Old:%d, New:null", SchedCost(OldSched));
     return false;
-
-  // if we are using the dual cost function algorithm use the DCF code
-  // DCF has 4 different behaviors:
-  // OFF - Does Nothing
-  // GLOBAL_ONLY - Only applies to comparisons of the globally best schedule
-  // GLOBAL_AND_TIGHTEN - If a schedule has a lower DCFCost it wins
-  // GLOBAL_AND_ITERATION - Rejects any schedule with a worse DCFCost
-  if ((DCFOption == DCF_OPT::GLOBAL_ONLY && IsGlobal) ||
-      DCFOption == DCF_OPT::GLOBAL_AND_TIGHTEN ||
-      DCFOption == DCF_OPT::GLOBAL_AND_ITERATION) {
-    InstCount NewDCFCost = NewSched->GetExtraSpillCost(DCFCostFn);
-    InstCount OldDCFCost = OldSched->GetExtraSpillCost(DCFCostFn);
-    if (NewDCFCost < OldDCFCost)
-      return true;
-    else if ((DCFOption == DCF_OPT::GLOBAL_ONLY && IsGlobal) ||
-             DCFOption == DCF_OPT::GLOBAL_AND_ITERATION) {
-      if (NewDCFCost > OldDCFCost)
-        return false;
-    }
   }
 
   // if it is the 1st pass return the cost comparison
   // if it is the 2nd pass return true if the RP cost and ILP cost is less
-  if (!IsTwoPassEn)
-    return NewSched->GetCost() < OldSched->GetCost();
-  else if (!rgn_->IsSecondPass())
-    return NewSched->GetNormSpillCost() < OldSched->GetNormSpillCost();
-  else
-    return (NewSched->GetNormSpillCost() <= OldSched->GetNormSpillCost()) &&
-           (NewSched->GetExecCost() < OldSched->GetExecCost());
+  if (!IsTwoPassEn || !rgn_->IsSecondPass()) {
+    InstCount NewCost = SchedCost(NewSched);
+    InstCount OldCost = SchedCost(OldSched);
+
+#if DBG_SRS
+    CmpLn +=
+        "Old:" + std::to_string(OldCost) + ", New:" + std::to_string(NewCost);
+#endif // DBG_SRS
+
+    if (NewCost < OldCost) {
+      SRS_DBG_LOG(CmpLn.c_str());
+      return true;
+    } else if (NewCost == OldCost &&
+               ((DCFOption == DCF_OPT::GLOBAL_ONLY && IsGlobal) ||
+                DCFOption == DCF_OPT::GLOBAL_AND_TIGHTEN ||
+                DCFOption == DCF_OPT::GLOBAL_AND_ITERATION)) {
+      InstCount NewDCFCost = NewSched->GetExtraSpillCost(DCFCostFn);
+      InstCount OldDCFCost = OldSched->GetExtraSpillCost(DCFCostFn);
+
+#if DBG_SRS
+      CmpLn += ", OldDCF:" + std::to_string(OldDCFCost) +
+               ", NewDCF:" + std::to_string(NewDCFCost);
+#endif // DBG_SRS
+      SRS_DBG_LOG(CmpLn.c_str());
+      return (NewDCFCost < OldDCFCost);
+
+    } else {
+      SRS_DBG_LOG(CmpLn.c_str());
+      return false;
+    }
+  } else {
+    InstCount NewCost = NewSched->GetExecCost();
+    InstCount OldCost = OldSched->GetExecCost();
+    InstCount NewSpillCost = NewSched->GetNormSpillCost();
+    InstCount OldSpillCost = OldSched->GetNormSpillCost();
+    SRS_DBG_LOG("SRS2P/%sOld:%d,New:%d,OldNSC:%d,NewNSC:%d",
+                IsGlobal ? "g/" : "", OldCost, NewCost, OldSpillCost,
+                NewSpillCost);
+    return (NewCost < OldCost && NewSpillCost <= OldSpillCost) ||
+           NewSpillCost < OldSpillCost;
+  }
 }
 
 DCF_OPT ACOScheduler::ParseDCFOpt(const std::string &opt) {
@@ -237,7 +279,8 @@ Choice ACOScheduler::SelectInstruction(const llvm::ArrayRef<Choice> &ready,
   return ready.back();
 }
 
-std::unique_ptr<InstSchedule> ACOScheduler::FindOneSchedule() {
+std::unique_ptr<InstSchedule>
+ACOScheduler::FindOneSchedule(InstCount TargetRPCost) {
   SchedInstruction *lastInst = NULL;
   std::unique_ptr<InstSchedule> schedule =
       llvm::make_unique<InstSchedule>(machMdl_, dataDepGraph_, true);
@@ -362,6 +405,12 @@ std::unique_ptr<InstSchedule> ACOScheduler::FindOneSchedule() {
       if (blah == inst)
         rdyLst_->RemoveNextPriorityInst();
       UpdtSlotAvlblty_(inst);
+
+      if (rgn_->getUnnormalizedIncrementalRPCost() > TargetRPCost) {
+        delete rdyLst_;
+        rdyLst_ = new ReadyList(dataDepGraph_, prirts_);
+        return nullptr;
+      }
     }
     /* Logger::Info("Chose instruction %d (for some reason)", instNum); */
     schedule->AppendInst(instNum);
@@ -384,8 +433,10 @@ FUNC_RESULT ACOScheduler::FindSchedule(InstSchedule *schedule_out,
   heuristicImportance_ = schedIni.GetInt(
       IsFirst ? "ACO_HEURISTIC_IMPORTANCE" : "ACO2P_HEURISTIC_IMPORTANCE");
   fixed_bias = schedIni.GetInt(IsFirst ? "ACO_FIXED_BIAS" : "ACO2P_FIXED_BIAS");
+  ants_per_iteration = IsFirst ? ants_per_iteration1p : ants_per_iteration2p;
   noImprovementMax = schedIni.GetInt(IsFirst ? "ACO_STOP_ITERATIONS"
                                              : "ACO2P_STOP_ITERATIONS");
+  Logger::Info("ants/it:%d,stop_iter:%d", ants_per_iteration, noImprovementMax);
   if (DCFOption != DCF_OPT::OFF) {
     std::string DcfFnString =
         schedIni.GetString(IsFirst ? "ACO_DUAL_COST_FN" : "ACO2P_DUAL_COST_FN");
@@ -404,10 +455,14 @@ FUNC_RESULT ACOScheduler::FindSchedule(InstSchedule *schedule_out,
   for (int i = 0; i < pheromone_size; i++)
     pheromone_[i] = 1;
   initialValue_ = 1;
-  std::unique_ptr<InstSchedule> heuristicSched = FindOneSchedule();
+  const InstCount MaxRPTarget = std::numeric_limits<InstCount>::max();
+  std::unique_ptr<InstSchedule> heuristicSched = FindOneSchedule(MaxRPTarget);
   InstCount heuristicCost =
       heuristicSched->GetCost() + 1; // prevent divide by zero
   InstCount InitialCost = InitialSchedule ? InitialSchedule->GetCost() : 0;
+
+  InstCount TargetNSC = InitialSchedule ? InitialSchedule->GetNormSpillCost()
+                                        : heuristicSched->GetNormSpillCost();
 
 #if USE_ACS
   initialValue_ = 2.0 / ((double)count_ * heuristicCost);
@@ -430,9 +485,15 @@ FUNC_RESULT ACOScheduler::FindSchedule(InstSchedule *schedule_out,
     std::unique_ptr<InstSchedule> iterationBest;
     for (int i = 0; i < ants_per_iteration; i++) {
       CrntAntEdges.clear();
-      std::unique_ptr<InstSchedule> schedule = FindOneSchedule();
+      std::unique_ptr<InstSchedule> schedule = FindOneSchedule(
+          i && rgn_->GetSpillCostFunc() != SCF_SLIL ? TargetNSC : MaxRPTarget);
       if (print_aco_trace)
         PrintSchedule(schedule.get());
+      ++localCmp;
+      if (iterationBest && bestSchedule &&
+          !(!IsFirst && iterationBest->GetNormSpillCost() <=
+                            bestSchedule->GetNormSpillCost()))
+        ++localCmpRej;
       if (shouldReplaceSchedule(iterationBest.get(), schedule.get(),
                                 /*IsGlobal=*/false)) {
         iterationBest = std::move(schedule);
@@ -440,7 +501,11 @@ FUNC_RESULT ACOScheduler::FindSchedule(InstSchedule *schedule_out,
           IterAntEdges = CrntAntEdges;
       }
     }
-    UpdatePheromone(iterationBest.get());
+    ++globalCmp;
+    if (IsFirst || iterationBest->GetNormSpillCost() <= TargetNSC) {
+      UpdatePheromone(iterationBest.get());
+    } else
+      ++globalCmpRej;
     /* PrintSchedule(iterationBest); */
     /* std::cout << iterationBest->GetCost() << std::endl; */
     // TODO DRY
@@ -474,6 +539,9 @@ FUNC_RESULT ACOScheduler::FindSchedule(InstSchedule *schedule_out,
     writePheromoneGraph("iteration" + std::to_string(iterations));
     iterations++;
   }
+
+  Logger::Info("localCmp:%d,localCmpRej:%d,globalCmp:%d,globalCmpRej:%d",
+               localCmp, localCmpRej, globalCmp, globalCmpRej);
 
   Logger::Event(IsPostBB ? "AcoPostSchedComplete" : "ACOSchedComplete", "cost",
                 bestSchedule->GetCost(), "iterations", iterations,

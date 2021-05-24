@@ -169,6 +169,8 @@ static SchedulerType parseListSchedType() {
     return SCHED_LIST;
   if (SchedTypeString == "SEQ")
     return SCHED_SEQ;
+  if (SchedTypeString == "STALLING_LIST")
+    return SCHED_STALLING_LIST;
 
   llvm::report_fatal_error(
       "Unrecognized option for HEUR_SCHED_TYPE: " + SchedTypeString, false);
@@ -863,7 +865,8 @@ void ScheduleDAGOptSched::scheduleOptSchedMinRP() {
   // Set times for the first pass
   RegionTimeout = FirstPassRegionTimeout;
   LengthTimeout = FirstPassLengthTimeout;
-  HeurSchedType = SCHED_LIST;
+  if (HeurSchedType == SCHED_SEQ)
+    HeurSchedType = SCHED_LIST;
 
   // Disable relaxed scheduling pruning since we already know what the minimum
   // length should be in the occupancy pass
