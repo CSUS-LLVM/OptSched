@@ -28,10 +28,9 @@ set_target_properties(optsched-test-depends PROPERTIES FOLDER "OptSched tests")
 
 add_lit_testsuite(check-optsched "Running the OptSched regression tests"
   ${CMAKE_CURRENT_BINARY_DIR}
-  #LIT ${LLVM_LIT}
   PARAMS ${OPTSCHED_TEST_PARAMS}
   DEPENDS ${OPTSCHED_TEST_DEPS}
-  ARGS ${OPTSCHED_TEST_EXTRA_ARGS}
+  ARGS ${OPTSCHED_TEST_EXTRA_ARGS} ${OPTSCHED_LIT_ARGS}
   )
 set_target_properties(check-optsched PROPERTIES FOLDER "OptSched tests")
 

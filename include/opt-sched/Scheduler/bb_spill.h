@@ -99,9 +99,6 @@ private:
   ConstrainedScheduler *AllocHeuristicScheduler_();
   bool EnableEnum_();
 
-  // BBWithSpill-specific Functions:
-  InstCount CmputCostLwrBound_(InstCount schedLngth);
-  InstCount CmputCostLwrBound_();
   void InitForCostCmputtn_();
   InstCount CmputDynmcCost_();
 
@@ -124,7 +121,6 @@ public:
               SchedulerType HeurSchedType);
   ~BBWithSpill();
 
-  InstCount CmputCostLwrBound();
   InstCount CmputExecCostLwrBound();
   InstCount CmputRPCostLwrBound();
 
@@ -134,9 +130,22 @@ public:
   void storeExtraCost(InstSchedule *sched, SPILL_COST_FUNCTION Scf);
   InstCount getUnnormalizedIncrementalRPCost() const;
 
-  InstCount UpdtOptmlSched(InstSchedule *crntSched,
-                           LengthCostEnumerator *enumrtr);
-  bool ChkCostFsblty(InstCount trgtLngth, EnumTreeNode *treeNode);
+  void CmputAndSetCostLwrBound();
+  int cmputSpillCostLwrBound();
+
+  void UpdtOptmlSched(InstSchedule *crntSched);
+  void UpdtOptmlSchedFrstPss(InstSchedule *crntSched, InstCount crntCost);
+  void UpdtOptmlSchedScndPss(InstSchedule *crntSched, InstCount crntCost);
+  void UpdtOptmlSchedWghtd(InstSchedule *crntSched, InstCount crntCost);
+  bool ChkCostFsblty(InstCount trgtLngth, EnumTreeNode *treeNode,
+                     InstCount &RPCost);
+  bool ChkCostFsbltyFrstPss(InstCount trgtLngth, EnumTreeNode *treeNode,
+                            InstCount crntCost, InstCount TmpSpillCost);
+  bool ChkCostFsbltyScndPss(InstCount trgtLngth, EnumTreeNode *treeNode,
+                            InstCount crntCost, InstCount TmpSpillCost);
+  bool ChkCostFsbltyWghtd(InstCount trgtLngth, EnumTreeNode *treeNode,
+                          InstCount crntCost, InstCount TmpSpillCost);
+
   void SchdulInst(SchedInstruction *inst, InstCount cycleNum, InstCount slotNum,
                   bool trackCnflcts);
   void UnschdulInst(SchedInstruction *inst, InstCount cycleNum,
