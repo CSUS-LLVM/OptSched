@@ -41,6 +41,9 @@ class Logs:
         for bench in self.benchmarks:
             yield from bench.blocks
 
+    def __len__(self):
+        return sum(len(bench) for bench in self.benchmarks)
+
     def __repr__(self):
         benchmarks = ','.join(b.name for b in self.benchmarks)
         return f'<Logs({benchmarks})>'
@@ -76,6 +79,9 @@ class Benchmark:
 
     def __iter__(self):
         return iter(self.blocks)
+
+    def __len__(self):
+        return len(self.blocks)
 
     @property
     def benchmarks(self):

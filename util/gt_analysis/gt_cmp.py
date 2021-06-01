@@ -67,41 +67,37 @@ def is_improved(before: Block, after: Block):
 
 
 def compute_stats(nogt: Logs, gt: Logs):
-    nogt_enum, gt_enum = utils.zipped_keep_blocks_if(
+    TOTAL_BLOCKS = utils.count(nogt)
+
+    nogt, gt = utils.zipped_keep_blocks_if(
         nogt, gt, pred=block_stats.is_enumerated)
 
     result = {
-        'Num Blocks': utils.count(nogt),
-        'Block Cost (No GT)': utils.sum_stat_for_all(block_stats.block_cost, nogt_enum),
-        'Block Cost (GT)': utils.sum_stat_for_all(block_stats.block_cost, gt_enum),
-        'Block Cost - Relative (No GT)': utils.sum_stat_for_all(block_stats.block_relative_cost, nogt_enum),
-        'Block Cost - Relative (GT)': utils.sum_stat_for_all(block_stats.block_relative_cost, gt_enum),
-        'Sched Time (No GT)': sched_time(nogt),
-        'Sched Time (GT)': sched_time(gt),
-        'Enum Time (No GT)': utils.sum_stat_for_all(enum_time_for_blk, nogt_enum),
-        'Enum Time (GT)': utils.sum_stat_for_all(enum_time_for_blk, gt_enum),
-        'Nodes Examined (No GT)': block_stats.nodes_examined(nogt_enum),
-        'Nodes Examined (GT)': block_stats.nodes_examined(gt_enum),
-        'Num Blocks Enum (No GT)': block_stats.num_enumerated(nogt_enum),
-        'Num Blocks Enum (GT)': block_stats.num_enumerated(gt_enum),
-
-        'Num Timeout Unimproved (No GT)': utils.count(blk for blk in nogt_enum
-                                                      if block_stats.is_timed_out(blk)
-                                                      and not block_stats.is_improved(blk)),
-        'Num Timeout Unimproved (GT)': utils.count(blk for blk in gt_enum
-                                                   if block_stats.is_timed_out(blk)
-                                                   and not block_stats.is_improved(blk)),
-        'Num Timeout Improved (No GT)': utils.count(blk for blk in nogt_enum
-                                                    if block_stats.is_timed_out(blk)
-                                                    and block_stats.is_improved(blk)),
-        'Num Timeout Improved (GT)': utils.count(blk for blk in gt_enum
-                                                 if block_stats.is_timed_out(blk)
-                                                 and block_stats.is_improved(blk)),
+        'Total Blocks in Benchsuite': TOTAL_BLOCKS,
+        'Num Blocks with GT applied': utils.count(nogt),
+        'Block Cost (No GT)': utils.sum_stat_for_all(block_stats.block_cost, nogt),
+        'Block Cost (GT)': utils.sum_stat_for_all(block_stats.block_cost, gt),
+        'Block Cost - Relative (No GT)': utils.sum_stat_for_all(block_stats.block_relative_cost, nogt),
+        'Block Cost - Relative (GT)': utils.sum_stat_for_all(block_stats.block_relative_cost, gt),
+        'Total Sched Time (No GT)': sched_time(nogt),
+        'Total Sched Time (GT)': sched_time(gt),
+        'Enum Time (No GT)': utils.sum_stat_for_all(enum_time_for_blk, nogt),
+        'Enum Time (GT)': utils.sum_stat_for_all(enum_time_for_blk, gt),
 
         'Total GT Time': utils.sum_stat_for_all(total_gt_elapsed_for_blk, gt),
 
-        'Sched Time (enum only) (No GT)': sched_time(nogt_enum),
-        'Sched Time (enum only) (GT)': sched_time(gt_enum),
+        'Num Timeout Unimproved (No GT)': utils.count(blk for blk in nogt
+                                                      if block_stats.is_timed_out(blk)
+                                                      and not block_stats.is_improved(blk)),
+        'Num Timeout Unimproved (GT)': utils.count(blk for blk in gt
+                                                   if block_stats.is_timed_out(blk)
+                                                   and not block_stats.is_improved(blk)),
+        'Num Timeout Improved (No GT)': utils.count(blk for blk in nogt
+                                                    if block_stats.is_timed_out(blk)
+                                                    and block_stats.is_improved(blk)),
+        'Num Timeout Improved (GT)': utils.count(blk for blk in gt
+                                                 if block_stats.is_timed_out(blk)
+                                                 and block_stats.is_improved(blk)),
     }
 
     return result
