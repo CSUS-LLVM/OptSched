@@ -18,6 +18,22 @@ def is_timed_out(blk: Block) -> bool:
     return 'DagTimedOut' in blk
 
 
+def block_cost_lower_bound(blk: Block) -> int:
+    return blk.single('CostLowerBound')['cost']
+
+
+def block_relative_cost(blk: Block) -> int:
+    return blk.single('BestResult')['cost']
+
+
+def block_best_length(blk: Block) -> int:
+    return blk.single('BestResult')['length']
+
+
+def block_cost(blk: Block) -> int:
+    return block_cost_lower_bound(blk) + block_relative_cost(blk)
+
+
 def cost_improvement_for_blk(blk: Block) -> int:
     if 'DagSolvedOptimally' in blk:
         return blk.single('DagSolvedOptimally')['cost_improvement']

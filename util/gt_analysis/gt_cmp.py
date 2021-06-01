@@ -72,6 +72,10 @@ def compute_stats(nogt: Logs, gt: Logs):
 
     result = {
         'Num Blocks': utils.count(nogt),
+        'Block Cost (No GT)': utils.sum_stat_for_all(block_stats.block_cost, nogt_enum),
+        'Block Cost (GT)': utils.sum_stat_for_all(block_stats.block_cost, gt_enum),
+        'Block Cost - Relative (No GT)': utils.sum_stat_for_all(block_stats.block_relative_cost, nogt_enum),
+        'Block Cost - Relative (GT)': utils.sum_stat_for_all(block_stats.block_relative_cost, gt_enum),
         'Sched Time (No GT)': sched_time(nogt),
         'Sched Time (GT)': sched_time(gt),
         'Enum Time (No GT)': utils.sum_stat_for_all(enum_time_for_blk, nogt_enum),
