@@ -287,7 +287,8 @@ public:
 
   // Copy GraphNode arrays/pointers to device
   void CopyPointersToDevice(GraphNode *dev_node, GraphNode **dev_nodes,
-		            InstCount instCnt);
+		            InstCount instCnt, std::vector<GraphEdge *> *edges,
+                            GraphEdge *dev_edges);
   // Calls cudaFree on all arrays/objects that were allocated with cudaMalloc
   void FreeDevicePointers();
 
