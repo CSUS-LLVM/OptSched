@@ -3643,7 +3643,6 @@ void DataDepGraph::CopyPointersToDevice(DataDepGraph *dev_DDG, int numThreads) {
 		       sizeof(SchedInstruction **),
 	  	       cudaMemcpyHostToDevice));
   // update nodes_ values on device
-  SchedInstruction *dev_inst;
   for (InstCount i = 0; i < instCnt_; i++) 
     dev_DDG->nodes_[i] = &dev_insts[i];
   gpuErrchk(cudaMemPrefetchAsync(dev_DDG->nodes_, memSize, 0));
@@ -3716,7 +3715,7 @@ void DataDepGraph::FreeDevicePointers(int numThreads) {
 
 void DataDepGraph::FreeDevEdges() {
   if (dev_edges_)
-    cudaFree(dev_edges)
+    cudaFree(dev_edges_);
 }
 
 /*

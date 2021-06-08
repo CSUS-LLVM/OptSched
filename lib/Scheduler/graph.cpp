@@ -366,7 +366,6 @@ void GraphNode::CopyPointersToDevice(GraphNode *dev_node, GraphNode **dev_nodes,
                                      GraphEdge *dev_edges) {
   size_t memSize;
   int index;
-  std::vector<GraphEdge *>::iterator it;
   // Copy scsrLst_ to device
   PriorityArrayList<GraphEdge *> *dev_scsrLst;
   memSize = sizeof(PriorityArrayList<GraphEdge *>);
