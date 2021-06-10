@@ -1058,6 +1058,9 @@ FUNC_RESULT SchedRegion::runACO(InstSchedule *ReturnSched,
     dev_DDG->FreeDevicePointers(NUMTHREADS);
     cudaFree(dev_DDG);
     cudaFree(dev_states);
+    // For some reason crashed OptSched to have this in the destructor
+    // so call to delete it here
+    dataDepGraph_->FreeDevEdges();
     // Ocasionally BBWithSpill deletes an empty pointer, which causes the next
     // kernel to report an invalid argument error after execution even
     // though the non issue error happens here. This call is to clear errors

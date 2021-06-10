@@ -161,6 +161,12 @@ protected:
   // An array of instructions
   SchedInstruction *insts_;
 
+  // If compiling on device, keep track of the pointers for all edges added
+  // to facilitate a fast copy of edges to device
+  std::vector<GraphEdge *> *edges_;
+  // Device array of all GraphEdges
+  GraphEdge *dev_edges_;
+
   // The number of issue types of the machine which this graph uses.
   int16_t issuTypeCnt_;
 
@@ -338,6 +344,8 @@ public:
   void CopyPointersToDevice(DataDepGraph *dev_DDG, int numThreads = 0);
   // Calls cudaFree on all arrays/objects that were allocated with cudaMalloc
   void FreeDevicePointers(int numThreads);
+  // frees the dev_edges_ array, for some reason did not work in the destructor
+  void FreeDevEdges();
 
 protected:
   // TODO(max): Get rid of this.

@@ -55,6 +55,7 @@ DataDepStruct::DataDepStruct(MachineModel *machMdl) {
   frwrdLwrBounds_ = NULL;
   bkwrdLwrBounds_ = NULL;
   includesUnpipelined_ = false;
+  edges_ = NULL;
 }
 
 __host__ __device__
@@ -64,6 +65,8 @@ DataDepStruct::~DataDepStruct() {
     delete[] frwrdLwrBounds_;
   if (bkwrdLwrBounds_ != NULL)
     delete[] bkwrdLwrBounds_;
+  if (edges_)
+    delete edges_;
 }
 
 __host__ __device__
@@ -964,6 +967,14 @@ void DataDepGraph::CreateEdge(SchedInstruction *frmNode,
 
   GraphEdge *newEdg = new GraphEdge(frmNode->GetNum(), toNode->GetNum(), 
 		                    ltncy, depType);
+  // If compiling on device, keep track of the pointers to all edges
+  if (DEV_ACO && instCnt_ >= 50) {
+    // if the edges_ vector has not been created, create it
+    if (!edges_)
+      edges_ = new std::vector<GraphEdge *>();
+    edges_->push_back(newEdg);
+  }
+
   edgeCnt_++;
   frmNode->AddScsr(newEdg);
   toNode->AddPrdcsr(newEdg);
@@ -1007,6 +1018,13 @@ void DataDepGraph::CreateEdge_(InstCount frmNodeNum, InstCount toNodeNum,
 #endif
     edge = new GraphEdge(frmNode->GetNum(), toNode->GetNum(), ltncy, depType,
                          IsArtificial);
+    // If compiling on device, keep track of the pointers to all edges
+    if (DEV_ACO && instCnt_ >= 50) {
+      // if the edges_ vector has not been created, create it
+      if (!edges_)
+        edges_ = new std::vector<GraphEdge *>();
+      edges_->push_back(edge);
+    }
     edgeCnt_++;
     frmNode->AddScsr(edge);
     toNode->AddPrdcsr(edge);
@@ -3625,7 +3643,6 @@ void DataDepGraph::CopyPointersToDevice(DataDepGraph *dev_DDG, int numThreads) {
 		       sizeof(SchedInstruction **),
 	  	       cudaMemcpyHostToDevice));
   // update nodes_ values on device
-  SchedInstruction *dev_inst;
   for (InstCount i = 0; i < instCnt_; i++) 
     dev_DDG->nodes_[i] = &dev_insts[i];
   gpuErrchk(cudaMemPrefetchAsync(dev_DDG->nodes_, memSize, 0));
@@ -3653,12 +3670,28 @@ void DataDepGraph::CopyPointersToDevice(DataDepGraph *dev_DDG, int numThreads) {
   // Also copy each RegFile's pointers
   for (InstCount i = 0; i < machMdl_->GetRegTypeCnt(); i++)
     RegFiles[i].CopyPointersToDevice(&dev_DDG->RegFiles[i]);
+  // Collect all GraphEdges into one host array, copy it to device
+  Logger::Info("Copying all edges to device");
+  memSize = sizeof(GraphEdge) * edges_->size();
+  // Will hold all host edges in one array to be copied to device in one copy
+  GraphEdge *host_edges = (GraphEdge *)malloc(memSize);
+  gpuErrchk(cudaMalloc(&dev_edges_, memSize));
+  // iterate through all pointers to edges and copy them into one host array
+  memSize = sizeof(GraphEdge);
+  for (uint i = 0; i < edges_->size(); i++)
+    memcpy(&host_edges[i], edges_->at(i), memSize);
+  // Copy host_edges to device and delete the host_edges array
+  memSize = sizeof(GraphEdge) * edges_->size();
+  gpuErrchk(cudaMemcpy(dev_edges_, host_edges, memSize, 
+                       cudaMemcpyHostToDevice));
+  free(host_edges);
   // Copy SchedInstruction/GraphNode pointers and link them to device inst
-  // and update RegFiles poitner to dev_regFiles
+  // and update RegFiles pointer to dev_regFiles
   Logger::Info("Copying SchedInstructions to device");
   for (InstCount i = 0; i < instCnt_; i++)
     insts_[i].CopyPointersToDevice(&dev_DDG->insts_[i], dev_DDG->nodes_, 
-		                   instCnt_, dev_regFiles, numThreads);
+		                   instCnt_, dev_regFiles, numThreads,
+                                   edges_, dev_edges_);
   memSize = sizeof(SchedInstruction) * instCnt_;
   gpuErrchk(cudaMemPrefetchAsync(dev_insts, memSize, 0));
   memSize = sizeof(RegisterFile) * machMdl_->GetRegTypeCnt();
@@ -3678,6 +3711,11 @@ void DataDepGraph::FreeDevicePointers(int numThreads) {
     insts_[i].FreeDevicePointers(numThreads);
   cudaFree(insts_);
   cudaFree(nodes_);
+}
+
+void DataDepGraph::FreeDevEdges() {
+  if (dev_edges_)
+    cudaFree(dev_edges_);
 }
 
 /*
