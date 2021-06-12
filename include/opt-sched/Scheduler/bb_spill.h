@@ -210,11 +210,6 @@ public:
   void AllocDevArraysForParallelACO(int numThreads);
   void CopyPointersToDevice(SchedRegion *dev_rgn, int numThreads);
   void FreeDevicePointers(int numThreads);
-/* Dead code
-  //updates spill info using the results from device
-  //list scheduling
-  void UpdateSpillInfoFromDevice(BBWithSpill *dev_rgn);
-*/
   //non virtual versions of function to be invoked on device
   __device__
   InstCount Dev_CmputNormCost_(InstSchedule *sched, COST_COMP_MODE compMode,
