@@ -169,6 +169,8 @@ static SchedulerType parseListSchedType() {
     return SCHED_LIST;
   if (SchedTypeString == "SEQ")
     return SCHED_SEQ;
+  if (SchedTypeString == "STALLING_LIST")
+    return SCHED_STALLING_LIST;
 
   llvm::report_fatal_error(
       "Unrecognized option for HEUR_SCHED_TYPE: " + SchedTypeString, false);
@@ -255,12 +257,22 @@ void ScheduleDAGOptSched::SetupLLVMDag() {
 
 // Add the two passes used for the two pass scheduling approach
 void ScheduleDAGOptSched::initSchedulers() {
-  // Add passes
+  // Add passes in the corresponding order that they are inserted.
+  for (const auto &Pass : PassOrder) {
+    if (Pass == "OCC") // MinRP pass
+      SchedPasses.push_back(OptSchedMinRP);
+    else if (Pass == "ILP") // Regular ILP Pass
+      SchedPasses.push_back(OptSchedBalanced);
+    else if (Pass == "ILP_RL") // ILP Reduced Latency Pass
+      SchedPasses.push_back(OptSchedReducedLatency);
+    else
+      llvm::report_fatal_error("Invalid value for pass order: " + Pass, false);
+  }
 
-  // First
-  SchedPasses.push_back(OptSchedMinRP);
-  // Second
-  SchedPasses.push_back(OptSchedBalanced);
+  // Also run the sequential scheduler with regular latencies to get the
+  // actual schedule length
+  if (CompileTimeDataPass)
+    SchedPasses.push_back(OptSchedSeqScheduler);
 }
 
 // schedule called for each basic block
@@ -401,7 +413,7 @@ void ScheduleDAGOptSched::schedule() {
 
   // In the second pass, ignore artificial edges before running the sequential
   // heuristic list scheduler.
-  if (SecondPass)
+  if (SecondPass && EnableMutations)
     DDG->convertSUnits(false, true);
   else
     DDG->convertSUnits(false, false);
@@ -446,8 +458,11 @@ void ScheduleDAGOptSched::schedule() {
   }
 
   // Used for two-pass-optsched to alter upper bound value.
-  if (SecondPass)
-    region->InitSecondPass();
+  if (isTwoPassEnabled()) {
+    region->initTwoPassAlg();
+    if (SecondPass)
+      region->InitSecondPass(EnableMutations);
+  }
 
   // Setup time before scheduling
   Utilities::startTime = std::chrono::high_resolution_clock::now();
@@ -465,6 +480,11 @@ void ScheduleDAGOptSched::schedule() {
     // fallbackScheduler();
     return;
   }
+
+  // If the enumerator found a schedule or the region was optimal then we do
+  // not need to consider re-scheduling this region.
+  if (RecordTimedOutRegions && (region->enumFoundSchedule() || IsEasy))
+    RescheduleRegions[RegionNumber] = false;
 
   LLVM_DEBUG(Logger::Info("OptSched succeeded."));
   OST->finalizeRegion(Sched);
@@ -565,8 +585,15 @@ void ScheduleDAGOptSched::loadOptSchedConfig() {
   // setup OptScheduler configuration options
   OptSchedEnabled = isOptSchedEnabled();
   TwoPassEnabled = isTwoPassEnabled();
+  PassOrder = schedIni.GetStringList("PASS_ORDER");
   TwoPassSchedulingStarted = false;
   SecondPass = false;
+  RecordTimedOutRegions = false;
+  LatencyPassStarted = false;
+  LatencyTarget = schedIni.GetInt("LATENCY_TARGETS");
+  LatencyDivisor = schedIni.GetInt("LATENCY_DIVISOR");
+  LatencyMinimun = schedIni.GetInt("LATENCY_MINIMUM");
+  CompileTimeDataPass = schedIni.GetBool("COMPILE_TIME_DATA_PASS");
   LatencyPrecision = fetchLatencyPrecision();
   TreatOrderAsDataDeps = schedIni.GetBool("TREAT_ORDER_DEPS_AS_DATA_DEPS");
 
@@ -764,6 +791,8 @@ bool ScheduleDAGOptSched::rpMismatch(InstSchedule *sched) {
 void ScheduleDAGOptSched::finalizeSchedule() {
   if (TwoPassEnabled && OptSchedEnabled) {
     initSchedulers();
+    RescheduleRegions.resize(Regions.size());
+    RescheduleRegions.set();
 
     LLVM_DEBUG(dbgs() << "Starting two pass scheduling approach\n");
     TwoPassSchedulingStarted = true;
@@ -812,9 +841,21 @@ void ScheduleDAGOptSched::runSchedPass(SchedPassStrategy S) {
   switch (S) {
   case OptSchedMinRP:
     scheduleOptSchedMinRP();
+    Logger::Event("PassFinished", "num", 1);
     break;
   case OptSchedBalanced:
+    RecordTimedOutRegions = true;
     scheduleOptSchedBalanced();
+    RecordTimedOutRegions = false;
+    Logger::Event("PassFinished", "num", 2);
+    break;
+  case OptSchedReducedLatency:
+    scheduleWithReducedLatencies();
+    Logger::Event("PassFinished", "num", 3);
+    break;
+  case OptSchedSeqScheduler:
+    scheduleWithSeqScheduler();
+    Logger::Event("PassFinished", "num", 4);
     break;
   }
 }
@@ -824,14 +865,17 @@ void ScheduleDAGOptSched::scheduleOptSchedMinRP() {
   // Set times for the first pass
   RegionTimeout = FirstPassRegionTimeout;
   LengthTimeout = FirstPassLengthTimeout;
-  HeurSchedType = SCHED_LIST;
+  if (HeurSchedType == SCHED_SEQ)
+    HeurSchedType = SCHED_LIST;
+
+  // Disable relaxed scheduling pruning since we already know what the minimum
+  // length should be in the occupancy pass
+  bool Temp1 = PruningStrategy.rlxd;
+  PruningStrategy.rlxd = false;
 
   schedule();
-  Logger::Event("PassFinished", "num", 1);
-  // TODO(justin): Remove once relevant scripts have been updated:
-  // get-benchmark-stats.py, get-optsched-stats.py, get-sched-length.py,
-  // plaidbench-validation-test.py
-  Logger::Info("End of first pass through\n");
+
+  PruningStrategy.rlxd = Temp1;
 }
 
 void ScheduleDAGOptSched::scheduleOptSchedBalanced() {
@@ -868,11 +912,38 @@ void ScheduleDAGOptSched::scheduleOptSchedBalanced() {
   ILPStaticNodeSup = false;
 
   schedule();
-  Logger::Event("PassFinished", "num", 2);
-  // TODO(justin): Remove once relevant scripts have been updated:
-  // get-benchmark-stats.py, get-optsched-stats.py, get-sched-length.py,
-  // plaidbench-validation-test.py
-  Logger::Info("End of second pass through");
+  SecondPass = false;
+}
+
+void ScheduleDAGOptSched::scheduleWithReducedLatencies() {
+  // We do not want to run the enumerator again for the regions that does not
+  // need re-scheduling.
+  if (!RescheduleRegions[RegionNumber + 1]) {
+    RegionNumber++;
+    return;
+  }
+
+  LatencyPassStarted = true;
+  scheduleOptSchedBalanced();
+  LatencyPassStarted = false;
+}
+
+void ScheduleDAGOptSched::scheduleWithSeqScheduler() {
+  // Setting timeouts to 0 disables the B&B enumerator
+  RegionTimeout = 0;
+  LengthTimeout = 0;
+  SecondPass = true;
+
+  LatencyPrecision = LTP_ROUGH;
+
+  HeurSchedType = SCHED_SEQ;
+
+  schedule();
+
+  // Output if the region timed out in the first ILP pass.
+  Logger::Event("FirstILPPassInfo", "TimedOut",
+                RescheduleRegions[RegionNumber + 1]);
+  SecondPass = false;
 }
 
 bool ScheduleDAGOptSched::isSimRegAllocEnabled() const {

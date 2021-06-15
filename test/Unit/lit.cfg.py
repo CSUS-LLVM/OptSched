@@ -20,5 +20,7 @@ config.suffixes = []
 config.test_exec_root = os.path.join(config.optsched_obj_root, 'unittests')
 config.test_source_root = config.test_exec_root
 
+config.excludes = ['llvm-project-optsched', 'llvm_build_dirs']
+
 # testFormat: The test format to use to interpret tests.
 config.test_format = lit.formats.GoogleTest(config.llvm_build_mode, 'Tests')

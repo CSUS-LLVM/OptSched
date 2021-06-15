@@ -15,7 +15,13 @@ namespace opt_sched {
 
 class ScheduleDAGOptSchedGCN : public ScheduleDAGOptSched {
 private:
-  enum SchedPassStrategy { GCNMaxOcc, OptSchedMaxOcc, OptSchedBalanced };
+  enum SchedPassStrategy {
+    GCNMaxOcc,
+    OptSchedMaxOcc,
+    OptSchedBalanced,
+    OptSchedReducedLatency,
+    OptSchedSeqScheduler
+  };
 
   // Vector of scheduling passes to execute.
   SmallVector<SchedPassStrategy, 4> SchedPasses;

@@ -52,6 +52,20 @@ private:
   bool ChkInstLglty_(SchedInstruction *inst) const override;
 };
 
+// A list scheduler that schedules the instruction with the top heuristic value
+// Unalike ListScheduler this class considers instructions that are ready
+// in terms of data dependencies, but not in terms of latencies.
+// If the instruction with the top heuristic is not ready in terms of latency
+// Then stalls will be inserted until it is ready
+class StallSchedulingListScheduler : public ListScheduler {
+public:
+  StallSchedulingListScheduler(DataDepGraph *dataDepGraph,
+                               MachineModel *machMdl, InstCount schedUprBound,
+                               SchedPriorities prirts);
+
+  SchedInstruction *PickInst() const;
+};
+
 } // namespace opt_sched
 } // namespace llvm
 

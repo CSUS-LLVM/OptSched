@@ -75,6 +75,7 @@ ExternalProject_Add(llvm
     -DLLVM_OPTIMIZED_TABLEGEN=ON
     -DLLVM_EXTERNAL_PROJECTS=OptSched
     -DLLVM_EXTERNAL_OPTSCHED_SOURCE_DIR=${ROOT_DIR}
+    -DOPTSCHED_ENABLE_AMDGPU=OFF
     ${OPTSCHEDSUPER_LLVM_EXTRA_CMAKE_ARGS}
   CMAKE_CACHE_DEFAULT_ARGS
     ${cache_default_args}
@@ -96,7 +97,7 @@ add_test(NAME OptSchedTests
 )
 add_test(NAME OptSched-CompileHelloWorld
   COMMAND
-    ${OPTSCHEDSUPER_LLVM_INSTALL_PREFIX}/bin/clang ${CMAKE_CURRENT_SOURCE_DIR}/helloworld.cpp
+    ${OPTSCHEDSUPER_LLVM_INSTALL_PREFIX}/bin/clang ${ROOT_DIR}/example/helloworld.cpp
     -O3
     -fplugin=${OPTSCHEDSUPER_LLVM_INSTALL_PREFIX}/lib/OptSched.so
     -mllvm -misched=optsched
