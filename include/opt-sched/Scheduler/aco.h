@@ -30,8 +30,8 @@ typedef double pheromone_t;
 // use edge count to approximate memory usage, using nodeCnt reflect
 // memory usage as well. Smaller node count DAGs can use more memory.
 #define REGION_MAX_EDGE_CNT 800000
-#define NUMBLOCKS 40
-#define NUMTHREADSPERBLOCK 64
+#define NUMBLOCKS 80
+#define NUMTHREADSPERBLOCK 32
 #define NUMTHREADS NUMBLOCKS * NUMTHREADSPERBLOCK
 
 enum class DCF_OPT {

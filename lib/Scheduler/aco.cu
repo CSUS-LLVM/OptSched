@@ -568,10 +568,9 @@ void Dev_ACO(SchedRegion *dev_rgn, DataDepGraph *dev_DDG,
                                     &dev_ready[GLOBALTID]);
     // Sync threads after schedule creation
     threadGroup.sync();
-    // I chose thread #32 here so in the case that we want each thread block to
-    // find its iteration best, block #0's find blockIterationBest will be
-    // handled by a warp 0 while warp 1 finds overall best
-    if (GLOBALTID == 32) {
+    // 1 thread selects iteration best sched
+    // TODO: Parallelize
+    if (GLOBALTID == 0) {
       bestIndex = INVALID_VALUE;
       for (int i = 0; i < NUMTHREADS; i++) {
         // Skip invalid schedules from terminating ants early
@@ -619,7 +618,7 @@ void Dev_ACO(SchedRegion *dev_rgn, DataDepGraph *dev_DDG,
     }
 #endif
     // 1 thread compares iteration best to overall bestsched
-    if (GLOBALTID == 32) {
+    if (GLOBALTID == 0) {
       // Compare to initialSched/current best
       if (globalBestIndex != INVALID_VALUE &&
           dev_AcoSchdulr->shouldReplaceSchedule(dev_bestSched, 
