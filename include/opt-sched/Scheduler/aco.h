@@ -45,6 +45,7 @@ struct Choice {
   SchedInstruction *inst;
   double heuristic; // range 1 to 2
   InstCount readyOn; // number of cycles until this instruction becomes ready
+  double Score;
 };
 
 class ACOScheduler : public ConstrainedScheduler {
@@ -101,8 +102,9 @@ private:
   __host__ __device__
   void PrintPheromone();
   __host__ __device__
-  Choice SelectInstruction(DeviceVector<Choice> &ready, 
-                           SchedInstruction *lastInst);
+  Choice SelectInstruction(DeviceVector<Choice> &ready,
+                           SchedInstruction *lastInst,
+                           double ScoreSum);
   DeviceVector<pheromone_t> pheromone_;
   // True if pheromone_.elmnts_ alloced on device
   bool dev_pheromone_elmnts_alloced_;

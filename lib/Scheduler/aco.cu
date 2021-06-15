@@ -158,80 +158,61 @@ bool ACOScheduler::shouldReplaceSchedule(InstSchedule *OldSched,
 
 __host__ __device__
 Choice ACOScheduler::SelectInstruction(DeviceVector<Choice> &ready,
-                                       SchedInstruction *lastInst) {
+                                       SchedInstruction *lastInst,
+                                       double ScoreSum) {
+
+
+  //genereate the random numbers that we will need for deciding if
+  //we are going to use the fixed bias or if we are going to use
+  //fitness porportional selection.  Generate the number used for
+  //the fitness porportional selection point
   double rand;
-#if TWO_STEP
+  pheromone_t point;
 #ifdef __CUDA_ARCH__
   rand = curand_uniform(&dev_states_[GLOBALTID]);
+  point = ScoreSum * curand_uniform(&dev_states_[GLOBALTID]);
 #else
-  rand = RandDouble(0, 1); 
+  rand = RandDouble(0, 1);
+  point = RandDouble(0, ScoreSum);
 #endif
+
+  //here we compute the chance that we will use fp selection or auto pick the best
   double choose_best_chance;
-  pheromone_t max = -1;
-  Choice maxChoice;
-  if (use_fixed_bias) {
+  if (use_fixed_bias) { //this is a non-diverging if stmt
     choose_best_chance = (1 - (double)fixed_bias / count_) * (0 < 1 - (double)fixed_bias / count_);
   } else
     choose_best_chance = bias_ratio;
-#endif
-/* currently not used
-  if (use_tournament) {
-    int POPULATION_SIZE = ready.size();
-#ifdef __CUDA_ARCH__
-    int r_pos = (int)(curand_uniform(&dev_states_[GLOBALTID]) * POPULATION_SIZE);
-    int s_pos = (int)(curand_uniform(&dev_states_[GLOBALTID]) * POPULATION_SIZE);
-#else
-    int r_pos = (int)(RandDouble(0, 1) * POPULATION_SIZE);
-    int s_pos = (int)(RandDouble(0, 1) * POPULATION_SIZE);
-    //    int t_pos = (int) (RandDouble(0, 1) *POPULATION_SIZE);
-#endif
-    Choice r = ready[r_pos];
-    Choice s = ready[s_pos];
-    //    Choice t = ready[t_pos];
-    if (print_aco_trace) {
-      printf("tournament Start \n");
-      printf("array_size: %d\n", POPULATION_SIZE);
-      printf("r:\t%d\n", r_pos);
-      printf("s:\t%d\n", s_pos);
-    }
-    if (Score(lastInst, r) >=
-        Score(lastInst, s))
-      return r.inst;
-    else
-      return s.inst;
+
+
+  //here we determine the max scoring instruction and the fp choice
+  //this code is a bit dense, but what we are doing is picking the
+  //indices of the max and fp choice instructions
+  //The only branch in this code is the branch for deciding to stay in the loop vs exit the loop
+  //this will diverge if two ants ready lists are of different sizes
+  size_t maxIndx=0, fpIndx=0;
+  pheromone_t max = -1, scoreProgress = 0;
+  bool foundFPIndx = false;
+  for (size_t i = 0; i < ready.size(); ++i) {
+    const Choice &choice = ready[i];
+
+    //code for picking the max
+    bool CurrIsMax = choice.Score > max;
+    max = CurrIsMax ? choice.Score : max;
+    maxIndx = CurrIsMax ? i : maxIndx;
+
+    //code for picking the fitness proportional choice
+    scoreProgress += choice.Score;
+    bool PastPoint = scoreProgress >= point;
+    bool SetFP = PastPoint & !foundFPIndx;
+    fpIndx = SetFP ? i : fpIndx;
+    foundFPIndx |= PastPoint;
   }
-*/
-  pheromone_t sum = 0;
-  for (auto choice : ready) {
-    sum += Score(lastInst, choice);
-#if TWO_STEP
-    if (Score(lastInst, choice) > max) {
-      max = Score(lastInst, choice);
-      maxChoice = choice;
-    }
-#endif
-  }
-#if TWO_STEP
-  if (rand < choose_best_chance)
-    return maxChoice;
-#endif
-#ifdef __CUDA_ARCH__
-  pheromone_t point = sum * curand_uniform(&dev_states_[GLOBALTID]);
-#else
-  pheromone_t point = RandDouble(0, sum);
-#endif
-  for (auto choice : ready) {
-    point -= Score(lastInst, choice);
-    if (point <= 0)
-      return choice;
-  }
-#ifdef __CUDA_ARCH__
-  //atomicAdd(&returnLastInstCnt_, 1);
-#else
-  printf("returning last instruction\n");
-#endif
-  assert(point < 0.001); // floats should not be this inaccurate
-  return ready.back();
+
+  //finally we pick whether we will return the fp choice or max score inst w/o using a branch
+  bool UseMax = rand < choose_best_chance;
+  size_t indx = UseMax ? maxIndx : fpIndx;
+  return ready[indx];
+
 }
 
 __host__ __device__
@@ -265,6 +246,7 @@ InstSchedule *ACOScheduler::FindOneSchedule(InstCount RPTarget,
 
       // convert the ready list from a custom priority queue to a std::vector,
       // much nicer for this particular scheduler
+      double ScoreSum=0;
       unsigned long heuristic;
       ready->reserve(dev_rdyLst_->GetInstCnt());
       SchedInstruction *rInst = dev_rdyLst_->GetNextPriorityInst(heuristic);
@@ -274,6 +256,8 @@ InstSchedule *ACOScheduler::FindOneSchedule(InstCount RPTarget,
           c.inst = rInst;
           c.heuristic = (double)heuristic * maxPriorityInv + 1;
           c.readyOn = 0;
+          c.Score = Score(lastInst,c);
+          ScoreSum += c.Score;
           ready->push_back(c);
         }
         rInst = dev_rdyLst_->GetNextPriorityInst(heuristic);
@@ -295,13 +279,15 @@ InstSchedule *ACOScheduler::FindOneSchedule(InstCount RPTarget,
         c.inst = fIns;
         c.heuristic = (double)heuristic * maxPriorityInv + 1;
         c.readyOn = lst->GetCrntKey();
+        c.Score = Score(lastInst,c);
+        ScoreSum += c.Score;
         ready->push_back(c);
       }
       lst->ResetIterator();
 #endif
       
       if (!ready->empty()) {
-        Choice Sel = SelectInstruction(*ready, lastInst);
+        Choice Sel = SelectInstruction(*ready, lastInst, ScoreSum);
         waitUntil = Sel.readyOn;
         inst = Sel.inst;
         if (waitUntil > dev_crntCycleNum_[GLOBALTID] || !ChkInstLglty_(inst)) {
@@ -408,6 +394,7 @@ InstSchedule *ACOScheduler::FindOneSchedule(InstCount RPTarget,
 
       // convert the ready list from a custom priority queue to a std::vector,
       // much nicer for this particular scheduler
+      double ScoreSum=0;
       unsigned long heuristic;
       ready->reserve(rdyLst_->GetInstCnt());
       SchedInstruction *rInst = rdyLst_->GetNextPriorityInst(heuristic);
@@ -417,6 +404,8 @@ InstSchedule *ACOScheduler::FindOneSchedule(InstCount RPTarget,
           c.inst = rInst;
           c.heuristic = (double)heuristic * maxPriorityInv + 1;
           c.readyOn = 0;
+          c.Score = Score(lastInst,c);
+          ScoreSum += c.Score;
           ready->push_back(c);
         }
         rInst = rdyLst_->GetNextPriorityInst(heuristic);
@@ -444,6 +433,8 @@ InstSchedule *ACOScheduler::FindOneSchedule(InstCount RPTarget,
           c.inst = fIns;
           c.heuristic = (double)heuristic * maxPriorityInv + 1;
           c.readyOn = crntCycleNum_ + fCycle;
+          c.Score = Score(lastInst,c);
+          ScoreSum += c.Score;
           ready->push_back(c);
         }
         futureReady->ResetIterator();
@@ -451,7 +442,7 @@ InstSchedule *ACOScheduler::FindOneSchedule(InstCount RPTarget,
 #endif
 
       if (!ready->empty()) {
-        Choice Sel = SelectInstruction(*ready, lastInst);
+        Choice Sel = SelectInstruction(*ready, lastInst, ScoreSum);
         waitUntil = Sel.readyOn;
         inst = Sel.inst;
         if (waitUntil > crntCycleNum_ || !ChkInstLglty_(inst)) {
