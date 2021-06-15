@@ -271,7 +271,8 @@ FUNC_RESULT SchedRegion::FindOptimalSchedule(
       // The sequential list scheduler can "find" schedules invalidated by graph
       // transformations. Delay until _after_ it.
       && !IsSeqListSched) {
-    rslt = applyGraphTransformations(BbSchedulerEnabled);
+    rslt = applyGraphTransformations(BbSchedulerEnabled, nullptr, isLstOptml,
+                                     bestSched);
 
     if (rslt != RES_SUCCESS)
       return rslt;
@@ -322,7 +323,8 @@ FUNC_RESULT SchedRegion::FindOptimalSchedule(
   if ((GraphTransPosition_ & GT_POSITION::BEFORE_HEURISTIC) != GT_POSITION::NONE
       // Run GT now that the sequential list scheduler is done.
       && IsSeqListSched) {
-    rslt = applyGraphTransformations(BbSchedulerEnabled);
+    rslt = applyGraphTransformations(BbSchedulerEnabled, nullptr, isLstOptml,
+                                     bestSched);
 
     if (rslt != RES_SUCCESS)
       return rslt;
@@ -334,6 +336,15 @@ FUNC_RESULT SchedRegion::FindOptimalSchedule(
     CmputAndSetCostLwrBound();
   else
     CmputLwrBounds_(false);
+
+  // Log the lower bound on the cost, allowing tools reading the log to compare
+  // absolute rather than relative costs.
+  Logger::Event("CostLowerBound", "cost", costLwrBound_);
+  // TODO(justin): Remove once relevant scripts have been updated:
+  // plaidbench-validation-test.py, runspec-wrapper-SLIL.py
+  Logger::Info("Lower bound of cost before scheduling: %d", costLwrBound_);
+  Logger::Info("Lower bound of spill cost before scheduling: %d",
+               SpillCostLwrBound_);
 
   // Cost calculation must be below lower bounds calculation
   if (HeuristicSchedulerEnabled || IsSecondPass()) {
@@ -416,18 +427,10 @@ FUNC_RESULT SchedRegion::FindOptimalSchedule(
   }
 #endif
 
-  // Log the lower bound on the cost, allowing tools reading the log to compare
-  // absolute rather than relative costs.
-  Logger::Event("CostLowerBound", "cost", costLwrBound_);
-  // TODO(justin): Remove once relevant scripts have been updated:
-  // plaidbench-validation-test.py, runspec-wrapper-SLIL.py
-  Logger::Info("Lower bound of cost before scheduling: %d", costLwrBound_);
-  Logger::Info("Lower bound of spill cost before scheduling: %d",
-               SpillCostLwrBound_);
-
   if (!isLstOptml && (GraphTransPosition_ & GT_POSITION::AFTER_HEURISTIC) !=
                          GT_POSITION::NONE) {
-    rslt = applyGraphTransformations(BbSchedulerEnabled);
+    rslt = applyGraphTransformations(BbSchedulerEnabled, lstSched, isLstOptml,
+                                     bestSched);
 
     if (rslt != RES_SUCCESS)
       return rslt;
@@ -1037,8 +1040,32 @@ FUNC_RESULT SchedRegion::runACO(InstSchedule *ReturnSched,
   return Rslt;
 }
 
-FUNC_RESULT SchedRegion::applyGraphTransformation(GraphTrans *GT,
-                                                  bool BbSchedulerEnabled) {
+void SchedRegion::updateBoundsAfterGraphTransformations(
+    bool BbSchedulerEnabled) {
+  const InstCount OldSchedLwrBound = schedLwrBound_;
+  const InstCount OldSchedUprBound = schedUprBound_;
+  const InstCount OldCostLwrBound = costLwrBound_;
+
+  CmputAbslutUprBound_();
+  schedLwrBound_ = dataDepGraph_->GetSchedLwrBound();
+  if (!BbSchedulerEnabled)
+    CmputAndSetCostLwrBound();
+  else
+    CmputLwrBounds_(false);
+
+  // Log the new lower bound on the cost, allowing tools reading the log to
+  // compare absolute rather than relative costs.
+  Logger::Event("CostLowerBound", "cost", costLwrBound_);
+
+  if (OldSchedLwrBound > schedLwrBound_)
+    Logger::Error("schedLwrBound got worse after graph transformations!");
+  if (OldSchedUprBound < schedUprBound_)
+    Logger::Error("schedUprBound got worse after graph transformations!");
+  if (OldCostLwrBound > costLwrBound_)
+    Logger::Error("costLwrBound got worse after graph transformations!");
+}
+
+FUNC_RESULT SchedRegion::applyGraphTransformation(GraphTrans *GT) {
   DataDepGraph *DDG = dataDepGraph_;
   FUNC_RESULT result = GT->ApplyTrans();
 
@@ -1052,17 +1079,14 @@ FUNC_RESULT SchedRegion::applyGraphTransformation(GraphTrans *GT,
     return result;
   }
 
-  CmputAbslutUprBound_();
-  schedLwrBound_ = dataDepGraph_->GetSchedLwrBound();
-  if (!BbSchedulerEnabled)
-    CmputAndSetCostLwrBound();
-  else
-    CmputLwrBounds_(false);
-
   return result;
 }
 
-FUNC_RESULT SchedRegion::applyGraphTransformations(bool BbSchedulerEnabled) {
+FUNC_RESULT
+SchedRegion::applyGraphTransformations(bool BbSchedulerEnabled,
+                                       InstSchedule *heuristicSched,
+                                       bool &isLstOptml,
+                                       InstSchedule *&bestSched) {
   FUNC_RESULT result = RES_SUCCESS;
 
   auto &GraphTransformations = *dataDepGraph_->GetGraphTrans();
@@ -1072,13 +1096,55 @@ FUNC_RESULT SchedRegion::applyGraphTransformations(bool BbSchedulerEnabled) {
   Logger::Event("GraphTransformationsStart");
 
   for (auto &GT : GraphTransformations) {
-    result = applyGraphTransformation(GT.get(), BbSchedulerEnabled);
+    result = applyGraphTransformation(GT.get());
 
     if (result != RES_SUCCESS)
       return result;
 
-    if (DumpDDGs_)
+    if (DumpDDGs_) {
+      updateBoundsAfterGraphTransformations(BbSchedulerEnabled);
       dumpDDG(dataDepGraph_, DDGDumpPath_, GT->Name());
+    }
+  }
+
+  updateBoundsAfterGraphTransformations(BbSchedulerEnabled);
+
+  // We don't change the heuristic schedule, but recompute its cost.
+  // Note that the heuristic schedule can have a schedule order invalidated by
+  // the graph transformations, but this is OKAY because:
+  //  - It's still a valid schedule for the region (i.e. before graph
+  //    transformations).
+  //  - The B&B code only compares against the cost of the heuristic schedule,
+  //    so B&B won't be messed up by the "invalid" schedule.
+  //  - The cost calculation doesn't depend on the graph structure, just the
+  //    schedule itself.
+  //  - The only part of cost calculation that _does_ depend on the graph
+  //    structure is the lower bounds, which are abstracted into a number, so it
+  //    is okay.
+  if (heuristicSched) {
+    const InstCount heuristicScheduleLength = heuristicSched->GetCrntLngth();
+    InstCount hurstcExecCost;
+    // Compute cost for Heuristic list scheduler, this must be called before
+    // calling GetCost() on the InstSchedule instance.
+    CmputNormCost_(heuristicSched, CCM_DYNMC, hurstcExecCost, true);
+    hurstcCost_ = heuristicSched->GetCost();
+
+    // Get unweighted spill cost for Heurstic list scheduler
+    HurstcSpillCost_ = heuristicSched->GetSpillCost();
+
+    // This schedule is optimal so ACO will not be run
+    // so set bestSched here.
+    if (hurstcCost_ == 0) {
+      isLstOptml = true;
+      bestSched = bestSched_ = heuristicSched;
+      bestSchedLngth_ = heuristicScheduleLength;
+      bestCost_ = hurstcCost_;
+      BestSpillCost_ = HurstcSpillCost_;
+    }
+
+    Logger::Event("HeuristicResult", "length", heuristicScheduleLength, //
+                  "spill_cost", heuristicSched->GetSpillCost(), "cost",
+                  hurstcCost_);
   }
 
   Logger::Event("GraphTransformationsFinished");
