@@ -799,8 +799,14 @@ public:
 
   __host__ __device__
   void SetSpillCosts(InstCount *spillCosts);
+  // Device version of set spill costs
+  __device__
+  void Dev_SetSpillCosts(InstCount **spillCosts);
   __host__ __device__
   void SetPeakRegPressures(InstCount *regPressures);
+  // Device version of PeakRegPressures
+  __device__
+  void Dev_SetPeakRegPressures(InstCount **regPressures);
   InstCount GetPeakRegPressures(const InstCount *&regPressures) const;
   __host__ __device__
   InstCount GetSpillCost(InstCount stepNum);

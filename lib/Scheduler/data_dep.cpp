@@ -2964,7 +2964,7 @@ void InstSchedule::Copy(InstSchedule *src) {
 __host__ __device__
 void InstSchedule::SetSpillCosts(InstCount spillCosts[]) {
 #ifdef __CUDA_ARCH__
-  totSpillCost_ = 0;
+  totSpillCost_ = 0; 
   for (InstCount i = 0; i < totInstCnt_; i++) {
     dev_spillCosts_[i] = spillCosts[i];
     totSpillCost_ += spillCosts[i];
@@ -2978,6 +2978,15 @@ void InstSchedule::SetSpillCosts(InstCount spillCosts[]) {
 #endif
 }
 
+__device__
+void InstSchedule::Dev_SetSpillCosts(InstCount **spillCosts) {
+  totSpillCost_ = 0;
+  for (InstCount i = 0; i < totInstCnt_; i++) {
+    dev_spillCosts_[i] = spillCosts[i][GLOBALTID];
+    totSpillCost_ += spillCosts[i][GLOBALTID];
+  }  
+}
+
 __host__ __device__
 void InstSchedule::SetPeakRegPressures(InstCount peakRegPressures[]) {
 #ifdef __CUDA_ARCH__
@@ -2989,6 +2998,13 @@ void InstSchedule::SetPeakRegPressures(InstCount peakRegPressures[]) {
     peakRegPressures_[i] = peakRegPressures[i];
   }
 #endif
+}
+
+__device__
+void InstSchedule::Dev_SetPeakRegPressures(InstCount **peakRegPressures) {
+  for (InstCount i = 0; i < dev_machMdl_->GetRegTypeCnt(); i++) {
+    dev_peakRegPressures_[i] = peakRegPressures[i][GLOBALTID];
+  }
 }
 
 InstCount
