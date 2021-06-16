@@ -49,7 +49,7 @@ def total_gt_elapsed_for_blk(blk: Block) -> int:
 
 def elapsed_before_enumeration_for_blk(blk: Block) -> int:
     assert 'CostLowerBound' in blk
-    return blk.single('CostLowerBound')['time']
+    return blk['CostLowerBound'][-1]['time']
 
 
 def enum_time_for_blk(blk: Block) -> int:
@@ -59,7 +59,7 @@ def enum_time_for_blk(blk: Block) -> int:
 
 
 def cost_for_blk(blk: Block) -> int:
-    return blk.single('BestResult')['cost'] + blk.single('CostLowerBound')['cost']
+    return blk.single('BestResult')['cost'] + blk['CostLowerBound'][-1]['cost']
 
 
 def is_improved(before: Block, after: Block):

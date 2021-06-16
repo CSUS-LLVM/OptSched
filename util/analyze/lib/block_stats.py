@@ -19,7 +19,7 @@ def is_timed_out(blk: Block) -> bool:
 
 
 def block_cost_lower_bound(blk: Block) -> int:
-    return blk.single('CostLowerBound')['cost']
+    return blk['CostLowerBound'][-1]['cost']
 
 
 def block_relative_cost(blk: Block) -> int:
