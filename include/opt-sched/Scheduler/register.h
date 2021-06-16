@@ -13,6 +13,7 @@ Last Update:  Jun. 2017
 #include "opt-sched/Scheduler/sched_basic_data.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/SmallVector.h"
+#include "llvm/ADT/iterator.h"
 #include <memory>
 
 using namespace llvm;
@@ -87,6 +88,8 @@ public:
   bool IsInPossibleInterval(const SchedInstruction *inst) const;
   const InstSetType &GetPossibleLiveInterval() const;
 
+  void resetLiveInterval();
+
 private:
   int16_t type_;
   int num_;
@@ -124,9 +127,74 @@ private:
 
 // Represents a file of registers of a certain type and tracks their usages.
 class RegisterFile {
+  template <bool IsConst, typename R = typename std::conditional<
+                              IsConst, const Register, Register>::type>
+  class RegisterFileIterator
+      : public llvm::iterator_facade_base<RegisterFileIterator<IsConst>,
+                                          std::random_access_iterator_tag, R> {
+
+  public:
+    RegisterFileIterator() = default;
+    explicit RegisterFileIterator(const RegisterFile &File, int Index)
+        : File(&File), Index(Index) {}
+
+    template <bool IsConst_ = IsConst,
+              typename std::enable_if<IsConst_, int>::type = 0>
+    RegisterFileIterator(RegisterFileIterator<false> Rhs) noexcept
+        : File(Rhs.File), Index(Rhs.Index) {}
+
+    bool operator==(const RegisterFileIterator &Rhs) const {
+      assert(File == Rhs.File);
+      return Index == Rhs.Index;
+    }
+
+    bool operator<(const RegisterFileIterator &Rhs) const {
+      assert(File == Rhs.File);
+      return Index < Rhs.Index;
+    }
+
+    std::ptrdiff_t operator-(const RegisterFileIterator &Rhs) const {
+      return Index - Rhs.Index;
+    }
+
+    R &operator*() const { return *File->GetReg(Index); }
+
+    RegisterFileIterator &operator++() {
+      ++Index;
+      return *this;
+    }
+
+    RegisterFileIterator &operator--() {
+      --Index;
+      return *this;
+    }
+
+    RegisterFileIterator &operator+=(std::ptrdiff_t n) {
+      Index += n;
+      return *this;
+    }
+
+    RegisterFileIterator &operator-=(std::ptrdiff_t n) {
+      Index -= n;
+      return *this;
+    }
+
+  private:
+    const RegisterFile *File = nullptr;
+    int Index = 0;
+  };
+
 public:
+  using iterator = RegisterFileIterator<false>;
+  using const_iterator = RegisterFileIterator<true>;
+
   RegisterFile();
   ~RegisterFile();
+
+  iterator begin() { return iterator(*this, 0); }
+  iterator end() { return iterator(*this, GetRegCnt()); }
+  const_iterator begin() const { return const_iterator(*this, 0); }
+  const_iterator end() const { return const_iterator(*this, GetRegCnt()); }
 
   int GetRegCnt() const;
   void SetRegCnt(int regCnt);
@@ -157,7 +225,7 @@ public:
 private:
   int16_t regType_;
   int physRegCnt_;
-  mutable SmallVector<std::unique_ptr<Register>, 8> Regs;
+  SmallVector<std::unique_ptr<Register>, 8> Regs;
 };
 
 } // namespace opt_sched

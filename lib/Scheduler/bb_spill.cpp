@@ -11,6 +11,7 @@
 #include "opt-sched/Scheduler/relaxed_sched.h"
 #include "opt-sched/Scheduler/stats.h"
 #include "opt-sched/Scheduler/utilities.h"
+#include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/ErrorHandling.h"
 #include <algorithm>
@@ -165,22 +166,25 @@ void BBWithSpill::CmputSchedUprBound_() {
 static InstCount ComputeSLILStaticLowerBound(int64_t regTypeCnt_,
                                              RegisterFile *regFiles_,
                                              DataDepGraph *dataDepGraph_) {
+  // Reset the live ranges so that we compute the lower bound correctly if we've
+  // already computed it before.
+  const auto RegFiles = llvm::makeMutableArrayRef(regFiles_, regTypeCnt_);
+  for (RegisterFile &File : RegFiles) {
+    for (Register &Reg : File) {
+      Reg.resetLiveInterval();
+    }
+  }
+
   // (Chris): To calculate a naive lower bound of the SLIL, count all the defs
   // and uses for each register.
   int naiveLowerBound = 0;
-  for (int i = 0; i < regTypeCnt_; ++i) {
-    for (int j = 0; j < regFiles_[i].GetRegCnt(); ++j) {
-      const auto &reg = regFiles_[i].GetReg(j);
-      for (const auto &instruction : reg->GetDefList()) {
-        if (reg->AddToInterval(instruction)) {
-          ++naiveLowerBound;
-        }
-      }
-      for (const auto &instruction : reg->GetUseList()) {
-        if (reg->AddToInterval(instruction)) {
-          ++naiveLowerBound;
-        }
-      }
+  for (RegisterFile &File : RegFiles) {
+    for (Register &Reg : File) {
+      const auto added_to_interval = [&](const auto &instruction) {
+        return Reg.AddToInterval(instruction);
+      };
+      naiveLowerBound += llvm::count_if(Reg.GetDefList(), added_to_interval) +
+                         llvm::count_if(Reg.GetUseList(), added_to_interval);
     }
   }
 
