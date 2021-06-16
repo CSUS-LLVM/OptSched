@@ -75,16 +75,18 @@ def compute_stats(nogt: Logs, gt: Logs):
     result = {
         'Total Blocks in Benchsuite': TOTAL_BLOCKS,
         'Num Blocks with GT applied': utils.count(nogt),
-        'Block Cost (No GT)': utils.sum_stat_for_all(block_stats.block_cost, nogt),
-        'Block Cost (GT)': utils.sum_stat_for_all(block_stats.block_cost, gt),
-        'Block Cost - Relative (No GT)': utils.sum_stat_for_all(block_stats.block_relative_cost, nogt),
-        'Block Cost - Relative (GT)': utils.sum_stat_for_all(block_stats.block_relative_cost, gt),
+        'Num Nodes Examined (opt. blocks only) (No GT)': utils.sum_stat_for_all(block_stats.nodes_examined_for_blk, nogt),
+        'Num Nodes Examined (opt. blocks only) (GT)': utils.sum_stat_for_all(block_stats.nodes_examined_for_blk, gt),
+
         'Total Sched Time (No GT)': sched_time(nogt),
         'Total Sched Time (GT)': sched_time(gt),
         'Enum Time (No GT)': utils.sum_stat_for_all(enum_time_for_blk, nogt),
         'Enum Time (GT)': utils.sum_stat_for_all(enum_time_for_blk, gt),
-
         'Total GT Time': utils.sum_stat_for_all(total_gt_elapsed_for_blk, gt),
+        'Block Cost - Relative (No GT)': utils.sum_stat_for_all(block_stats.block_relative_cost, nogt),
+        'Block Cost - Relative (GT)': utils.sum_stat_for_all(block_stats.block_relative_cost, gt),
+        'Block Cost (No GT)': utils.sum_stat_for_all(block_stats.block_cost, nogt),
+        'Block Cost (GT)': utils.sum_stat_for_all(block_stats.block_cost, gt),
 
         'Num Timeout Unimproved (No GT)': utils.count(blk for blk in nogt
                                                       if block_stats.is_timed_out(blk)
