@@ -3688,6 +3688,8 @@ void DataDepGraph::CopyPointersToDevice(DataDepGraph *dev_DDG, int numThreads) {
     RegFiles[i].CopyPointersToDevice(&dev_DDG->RegFiles[i]);
   // Collect all GraphEdges into one host array, copy it to device
   Logger::Info("Copying all edges to device");
+  // First sort the vector of edges to allow for a binary search
+  std::sort(edges_->begin(), edges_->end());
   memSize = sizeof(GraphEdge) * edges_->size();
   // Will hold all host edges in one array to be copied to device in one copy
   GraphEdge *host_edges = (GraphEdge *)malloc(memSize);

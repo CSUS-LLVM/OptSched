@@ -360,12 +360,23 @@ void GraphNode::LogScsrLst() {
   }
 }
 
+// used for bsearch
+int compareGEptr(const void * a, const void * b) {
+  if ( *(GraphEdge **)a < *(GraphEdge **)b)
+    return -1;
+  if ( *(GraphEdge **)a > *(GraphEdge **)b)
+    return 1;
+  if ( *(GraphEdge **)a == *(GraphEdge **)b)
+    return 0;
+}
+
 void GraphNode::CopyPointersToDevice(GraphNode *dev_node, GraphNode **dev_nodes,
                                      InstCount instCnt, 
                                      std::vector<GraphEdge *> *edges,
                                      GraphEdge *dev_edges) {
   size_t memSize;
   int index;
+  void *ptrToEdge;
   // Copy scsrLst_ to device
   PriorityArrayList<GraphEdge *> *dev_scsrLst;
   memSize = sizeof(PriorityArrayList<GraphEdge *>);
@@ -391,9 +402,12 @@ void GraphNode::CopyPointersToDevice(GraphNode *dev_node, GraphNode **dev_nodes,
     // update elmnts_ pointers to dev array
     for (InstCount i = 0; i < scsrLst_->size_; i++) {
       // find the matching pointer in the array of edge pointers
-      for (uint x = 0; x < edges->size(); x++)
-        if (edges->at(x) == scsrLst_->elmnts_[i])
-          index = x;
+      ptrToEdge = std::bsearch(&scsrLst_->elmnts_[i], &(*edges)[0], edges->size(),
+		               sizeof(GraphEdge *), compareGEptr);
+      if (!ptrToEdge)
+        Logger::Fatal("Failed to find matching edge in scsrLst");
+      else
+	index = ((GraphEdge **)ptrToEdge - (GraphEdge **)&(*edges)[0]);
       // set the dev_elmnts pointer to the corresponding dev_edges pointer
       dev_elmnts[i] = &dev_edges[index];
     }
@@ -421,9 +435,12 @@ void GraphNode::CopyPointersToDevice(GraphNode *dev_node, GraphNode **dev_nodes,
     // update elmnts_ pointers to dev array
     for (InstCount i = 0; i < prdcsrLst_->size_; i++) {
       // find the matching pointer in the array of edge pointers
-      for (uint x = 0; x < edges->size(); x++)
-        if (edges->at(x) == prdcsrLst_->elmnts_[i])
-          index = x;
+      ptrToEdge = std::bsearch(&prdcsrLst_->elmnts_[i], &(*edges)[0], edges->size(),
+                               sizeof(GraphEdge *), compareGEptr);
+      if (!ptrToEdge)
+        Logger::Fatal("Failed to find matching edge in prdcsrLst");
+      else
+        index = ((GraphEdge **)ptrToEdge - (GraphEdge **)&(*edges)[0]);
       // set the dev_elmnts pointer to the corresponding dev_edges pointer
       dev_elmnts[i] = &dev_edges[index];
     }
