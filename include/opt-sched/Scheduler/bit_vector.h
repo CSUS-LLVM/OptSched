@@ -307,8 +307,7 @@ inline void WeightedBitVector::Dev_Reset() {
     vctr_[i] = 0;
   }
 
-  oneCnt_ = 0;
-	
+  oneCnt_ = 0;	
   wghtedCnt_ = 0;
 }
 
