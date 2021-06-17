@@ -1187,7 +1187,7 @@ InstCount BBWithSpill::Dev_CmputCostForFunction(SPILL_COST_FUNCTION SpillCF) {
   }
   case SCF_SLIL: {
     InstCount SLILCost = 0; 
-    for (int i = 0; i < regTypeCnt_; i ++)
+    for (int i = 0; i < regTypeCnt_; i++)
       SLILCost += dev_sumOfLiveIntervalLengths_[i][GLOBALTID];
     return SLILCost;
   }
@@ -1507,8 +1507,12 @@ void BBWithSpill::CopyPointersToDevice(SchedRegion* dev_rgn, int numThreads) {
   int unitCnt, indx = 0;
   // Find totUnitCnt to determine size of vctr for all liveRegs_
   int totUnitCnt = 0;
-  for (int i = 0; i < regTypeCnt_; i++)
+  for (int i = 0; i < regTypeCnt_; i++) {
     totUnitCnt += liveRegs_[i].GetUnitCnt();
+    // set one bit, so oneCnt_ is nonzero to force reset of vctrs on device
+    if (liveRegs_[i].GetUnitCnt() > 0)
+      liveRegs_[i].SetBit(0,true,1);
+  }
   // Allocate vctr for all dev_liveRegs
   memSize = totUnitCnt * sizeof(unsigned int) * numThreads;
   gpuErrchk(cudaMalloc((void**)&dev_vctr, memSize));
@@ -1557,8 +1561,12 @@ void BBWithSpill::CopyPointersToDevice(SchedRegion* dev_rgn, int numThreads) {
   WeightedBitVector *dev_temp_livePhysRegs;
   // Find totUnitCnt to determine size of vctr for all livePhysRegs_
   totUnitCnt = 0;
-  for (int i = 0; i < regTypeCnt_; i++)
+  for (int i = 0; i < regTypeCnt_; i++) {
     totUnitCnt += livePhysRegs_[i].GetUnitCnt();
+    // set one bit, so oneCnt_ is nonzero to force reset of vctrs on device
+    if (livePhysRegs_[i].GetUnitCnt() > 0)
+      livePhysRegs_[i].SetBit(0,true,1);
+  }
   // Allocate vctr for all dev_livePhysRegs
   memSize = totUnitCnt * sizeof(unsigned int) * numThreads;
   gpuErrchk(cudaMalloc((void**)&dev_vctr, memSize));
