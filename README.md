@@ -3,7 +3,7 @@
 # OptSched - Optimizing Scheduler
 Combinatorial instruction scheduling research project at CSU Sacramento.
 
-This plugin for the [LLVM](https://llvm.org/) compiler is an optional machine scheduler. We implement an Ant Colony Optimization instruction scheduling algorithm on the GPU. The enumarating combinatorial scheduler will not work on the branch, this branch is for the ACO instruction scheduler running on the GPU.
+This plugin for the [LLVM](https://llvm.org/) compiler is an optional machine scheduler. We implement an Ant Colony Optimization instruction scheduling algorithm on the GPU. The enumarating combinatorial scheduler will not work on this branch, this branch is for the ACO instruction scheduler running on the GPU.
 
 ## Requirements
 
