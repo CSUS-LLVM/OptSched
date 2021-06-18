@@ -1,6 +1,3 @@
-***DISCLAIMER***
-This branch is under development and the instructions below will are not correct. The instructions will be updated when this branch is fully developed.
-
 [![CSUS](http://www.csus.edu/Brand/assets/Logos/Core/Primary/Stacked/Primary_Stacked_3_Color_wht_hndTN.png)](http://www.csus.edu/)
 
 # OptSched - Optimizing Scheduler
@@ -10,9 +7,10 @@ This plugin for the [LLVM](https://llvm.org/) compiler is an optional machine sc
 
 ## Requirements
 
-- Ubuntu 16.04 (recommended), or MacOS 10.14
-- CMake 3.4.3 or later
-- LLVM 6.0 or later
+- Ubuntu 18.04 or 20.04
+- CMake 3.20.4 or later
+- LLVM 7.0 or later
+- Nvidia GPU: At least Turing recommended (CC 7.5 or later)
 
 ## Building
 
