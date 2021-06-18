@@ -16,7 +16,7 @@ This plugin for the [LLVM](https://llvm.org/) compiler is an optional machine sc
 
 **See [BUILD.md](BUILD.md) for build instructions.**
 
-The OptSched plugin can be found in “llvm/lib” after building.
+The OptSched plugin can be found in “v7flang/llvm/build/lib” after building.
 
 ## Configuration files
 
