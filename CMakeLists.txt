@@ -1,7 +1,9 @@
 cmake_minimum_required(VERSION 3.20)
 
 project(OptSched LANGUAGES CXX CUDA)
-#include_directories("${CUDA_INCLUDE_DIRS}")
+
+# Allow our .cpp files to include CUDA headers:
+include_directories(${CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES})
 
 include(CTest)
 
