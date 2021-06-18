@@ -63,16 +63,34 @@ def zipped_keep_blocks_if(*logs, pred):
     Also supports pred(b), in which case it's all(pred(b) for b in (a.blk1, b.blk1, ...))
     '''
 
+    for group in zip(*logs):
+        assert len(set(g.uniqueid() for g in group)) == 1, group[0].raw_log
+
     try:
-        all_p = set(blks[0].uniqueid() for blks in zip(*logs) if pred(*blks))
+        blks = next(zip(*logs))
+        pred(*blks)
     except TypeError:
-        all_p = set(blks[0].uniqueid()
-                    for blks in zip(*logs) if all(pred(b) for b in blks))
+        old_pred = pred
+        pred = lambda *blks: all(old_pred(b) for b in blks)
 
-    filtered = tuple(log.keep_blocks_if(
-        lambda blk: blk.uniqueid() in all_p) for log in logs)
+    def zip_benchmarks_if(*benchmarks):
+        # (A[a], A[a]) -> [(a, a)]
+        return [blks for blks in zip(*benchmarks) if pred(*blks)]
 
-    return filtered
+    # L1: [A, B, C]
+    # L2: [A, B, C]
+    # benchs: [(A, A), (B, B), (C, C)]
+    benchs = zip(*[l.benchmarks for l in logs])
+
+    # Each item: (A[a], A[a]) -> [(a, a)] inside the zip.
+    # zip(*[(a, a)]) -> ([a], [a])
+    # zip(bench, ...): (A, A) zip ([a], [a]) -> [(A, [a]), (A, [a])]
+    filtered_benchs = [zip(bench, zip(*zip_benchmarks_if(*bench))) for bench in benchs]
+    # [ {(A, [a]), (A, [a])} ] -> [ (A[a], A[a]) ]
+    filtered_bench2 = [tuple(Benchmark(b.info, blks) for (b, blks) in benchs)
+                       for benchs in filtered_benchs]
+
+    return tuple(map(Logs, zip(*filtered_bench2)))
 
 
 def sum_stat_for_all(stat, logs: Logs) -> int:
