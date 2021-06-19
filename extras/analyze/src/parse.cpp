@@ -12,9 +12,9 @@
 #include <string_view>
 #include <unordered_map>
 #include <unordered_set>
+#include <utility>
 #include <vector>
 
-#include <mio/mmap.hpp>
 #include <pybind11/stl.h>
 
 #include "types.hpp"
@@ -146,6 +146,7 @@ static Event parseEvent(const std::string_view Event) {
         if (Rfl.ec == std::errc() && Rfl.ptr == Data.data() + Data.size()) {
           return Value{.Num = Number(Fl)};
         }
+        std::abort();
       }
       case Type::String:
         return Value{
@@ -194,16 +195,25 @@ static BlockEventMap parseEvents(const std::string_view BlockLog) {
                        std::make_move_iterator(Vals.end()));
 }
 
-static Block parseBlock(const std::string_view WholeFile,
+static Block parseBlock(ev::Benchmark *Bench, const std::size_t Offset,
                         const std::string_view BlockLog) {
+  std::string_view Name = ::parseName(BlockLog);
+  BlockEventMap Events = ::parseEvents(BlockLog);
+  std::string UniqueId = Bench->Name + ':' + std::string(Name);
+  auto PF = Events.find(EventId("PassFinished"));
+  if (PF != Events.end()) {
+    UniqueId +=
+        ",pass=" +
+        std::to_string(std::get<std::int64_t>(Values[PF->front().Start].Num));
+  }
   return Block{
-      .Name = ::parseName(BlockLog),
-      .Events = ::parseEvents(BlockLog),
-      .RawLog =
-          UnloadedRawLog{
-              .Offset = BlockLog.data() - WholeFile.data(),
-              .Size = BlockLog.size(),
-          },
+      .Name = std::move(Name),
+      .Events = std::move(Events),
+      .Offset = Offset,
+      .Size = BlockLog.size(),
+      .UniqueId = std::move(UniqueId),
+      .Bench = Bench,
+      .File = "", // TODO: Get this information too
   };
 }
 
@@ -227,20 +237,126 @@ static std::vector<std::string_view> split_blocks(const std::string_view file) {
   return Result;
 }
 
-void ev::defParse(py::module &Mod) {
-  Mod.def("parse_blocks", [](const std::string &path) {
-    mio::mmap_source MMap(path.c_str());
-    std::string_view File(MMap.data(), MMap.size());
-    const auto RawBlocks = ::split_blocks(File);
-    std::vector<Block> Blocks(RawBlocks.size());
-    std::transform(
-#if HAS_TBB
-        std::execution::par_unseq,
-#endif
-        RawBlocks.begin(), RawBlocks.end(), Blocks.begin(),
-        [File](std::string_view Blk) { return ::parseBlock(File, Blk); });
+namespace {
+struct BenchmarkRegion {
+  std::string BenchmarkName;
+  // The offset in the file
+  std::size_t Offset;
+};
 
-    return Blocks;
+enum class BenchmarkRE : int {
+  Spec,
+};
+} // namespace
+
+static std::shared_ptr<Benchmark> parse(std::weak_ptr<ev::Logs> Logs,
+                                        const std::string_view File,
+                                        BenchmarkRegion Bench) {
+  const auto RawBlocks = ::split_blocks(File);
+  std::vector<Block> Blocks(RawBlocks.size());
+
+  auto Result = std::make_shared<Benchmark>();
+  Result->Name = Bench.BenchmarkName;
+  Result->Logs = std::move(Logs);
+  Result->Offset = Bench.Offset;
+  Result->Size = File.size();
+
+  std::transform(
+#if HAS_TBB
+      std::execution::par_unseq,
+#endif
+      RawBlocks.begin(), RawBlocks.end(), Blocks.begin(),
+      [File, Bench = Result.get()](std::string_view Blk) {
+        return ::parseBlock(Bench, Bench->Offset + (Blk.begin() - File.begin()),
+                            Blk);
+      });
+
+  Result->Blocks = std::move(Blocks);
+
+  return Result;
+}
+
+static constexpr std::string_view SpecBenchmarkRegion = R"(  Building )";
+static const std::boyer_moore_horspool_searcher
+    SpecBenchmarkSearcher(SpecBenchmarkRegion.begin(),
+                          SpecBenchmarkRegion.end());
+static std::vector<BenchmarkRegion> splitSpecBenchmarks(std::string_view File) {
+  std::vector<BenchmarkRegion> Result;
+
+  auto B = File.begin();
+  auto E = File.end();
+  while (B != E) {
+    auto It = std::search(B, E, SpecBenchmarkSearcher);
+    if (It == E)
+      break;
+    It += SpecBenchmarkRegion.size();
+    auto EndOfName = std::find(It, E, ' ');
+
+    const auto Name = std::string_view(It, EndOfName);
+    const std::size_t Offset = It - File.begin();
+
+    Result.emplace_back(std::string(Name), Offset);
+
+    B = It;
+  }
+
+  return Result;
+}
+
+void ev::defParse(py::module &Mod) {
+  // static constexpr std::string_view BenchmarkRE
+  Mod.attr("SPEC_BENCH_RE") = (int)BenchmarkRE::Spec;
+
+  Mod.def("parse_blocks", [](const std::string &Path,
+                             // One of the RE types.
+                             int REChoice) {
+    if (REChoice != (int)BenchmarkRE::Spec) {
+      throw py::value_error("Unknown regular expression number " +
+                            std::to_string(REChoice));
+    }
+    auto Logs = std::make_shared<ev::Logs>();
+    Logs->LogFile = std::move(Path);
+    Logs->MMap = mio::mmap_source(Logs->LogFile);
+    const std::string_view File(Logs->MMap.data(), Logs->MMap.size());
+
+    const std::vector<BenchmarkRegion> BenchmarkSections =
+        [&]() -> std::vector<BenchmarkRegion> {
+      switch ((BenchmarkRE)REChoice) {
+      case BenchmarkRE::Spec:
+        return splitSpecBenchmarks(File);
+      }
+      std::abort();
+    }();
+
+    Logs->Benchmarks.reserve(BenchmarkSections.size());
+    for (std::size_t Index = 0; Index < BenchmarkSections.size(); ++Index) {
+      const std::size_t Offset = BenchmarkSections[Index].Offset;
+      const std::size_t OffsetEnd = Index + 1 < BenchmarkSections.size()
+                                        ? BenchmarkSections[Index + 1].Offset
+                                        : File.size();
+
+      const std::string_view Section = File.substr(Offset, OffsetEnd - Offset);
+
+      Logs->Benchmarks.push_back(
+          ::parse(Logs, Section, std::move(BenchmarkSections[Index])));
+    }
+
+    Logs->MMap.unmap(); // Usually we don't need this around
+    return Logs;
+  });
+  Mod.def("parse_blocks", [](const std::string &Path,
+                             // A single benchmark name for the whole logs.
+                             std::string_view BenchmarkName) {
+    auto Logs = std::make_shared<ev::Logs>();
+    Logs->LogFile = std::move(Path);
+    Logs->MMap = mio::mmap_source(Logs->LogFile);
+    const std::string_view File(Logs->MMap.data(), Logs->MMap.size());
+    Logs->Benchmarks.push_back(
+        ::parse(Logs, File, BenchmarkRegion{std::string(BenchmarkName), 0}));
+
+    Logs->MMap.unmap(); // Usually we don't need this around
+
+    return Logs;
   });
 }
 

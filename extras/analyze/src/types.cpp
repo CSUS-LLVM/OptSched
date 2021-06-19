@@ -58,10 +58,13 @@ void ev::defTypes(py::module &Mod) {
           switch (Schema->ParamTypes[Index]) {
           case Type::Number:
             std::visit([&out](auto x) { out << x; }, Val.Num);
+            break;
           case Type::String:
             out << '\'' << Val.Str << '\'';
+            break;
           case Type::Bool:
             out << std::boolalpha << Val.Bool;
+            break;
           }
         }
         out << '}';
@@ -69,23 +72,29 @@ void ev::defTypes(py::module &Mod) {
         return out.str();
       });
 
-  py::class_<BlockEvents>(Mod, "_BlockEvents")
+  py::class_<Block>(Mod, "Block")
+      .def_readonly("name", &Block::Name)
+      // .def_readonly("raw_log", &Block::RawLog)
       .def("__getitem__",
-           [](const BlockEvents &Events,
+           [](const Block &Blk,
               std::string_view EvId) -> const std::vector<Event> & {
-             auto It = Events.Events->find(EventId(EvId));
-             if (It != Events.Events->end()) {
+             auto It = Blk.Events.find(EventId(EvId));
+             if (It != Blk.Events.end()) {
                return *It;
              } else {
                throw py::key_error(std::string(EvId));
              }
-           });
-
-  py::class_<Block>(Mod, "Block")
-      .def_readonly("name", &Block::Name)
-      .def_readonly("raw_log", &Block::RawLog)
-      .def_property_readonly(
-          "events", [](const Block &Blk) { return BlockEvents(&Blk.Events); })
+           })
+      .def("get",
+           [](const Block &Blk, std::string_view EvId,
+              py::object default_) -> py::object {
+             auto It = Blk.Events.find(EventId(EvId));
+             if (It != Blk.Events.end()) {
+               return py::cast(*It);
+             } else {
+               return default_;
+             }
+           })
       .def("single",
            [](const Block &Blk, std::string_view EvId) {
              auto It = Blk.Events.find(EventId(EvId));
@@ -104,10 +113,45 @@ void ev::defTypes(py::module &Mod) {
              return Blk.Events.contains(EventId(EvId));
            })
       .def("__repr__", [](const Block &Blk) {
-        return "<Block(" + ", "s + std::to_string(Blk.Events.size()) +
-               " events>";
+        return "<Block(bench="s + Blk.Bench->Name + ", file="s + Blk.File +
+               ", "s + std::to_string(Blk.Events.size()) + " events)>";
       });
 
-  py::class_<Logs>(Mod, "Logs");
-  py::class_<Benchmark>(Mod, "Benchmark");
+  py::class_<Benchmark, std::shared_ptr<Benchmark>>(Mod, "Benchmark")
+      .def_readonly("name", &Benchmark::Name)
+      .def_readonly("blocks", &Benchmark::Blocks)
+      .def("__repr__", [](const Benchmark &Bench) {
+        return "<Benchmark(name=" + Bench.Name + ", " +
+               std::to_string(Bench.Blocks.size()) + " blocks)>";
+      });
+  py::class_<Logs, std::shared_ptr<Logs>>(Mod, "Logs")
+      .def_readonly("benchmarks", &Logs::Benchmarks)
+      .def("benchmark",
+           [](const ev::Logs &Logs, const std::string_view BenchName) {
+             auto It =
+                 std::find_if(Logs.Benchmarks.begin(), Logs.Benchmarks.end(),
+                              [BenchName](const auto &Bench) {
+                                return Bench->Name == BenchName;
+                              });
+
+             if (It == Logs.Benchmarks.end()) {
+               throw py::key_error("No benchmark `" + std::string(BenchName) +
+                                   "` in this Logs");
+             } else {
+               return It->get();
+             }
+           })
+      .def("__repr__", [](const ev::Logs &Logs) {
+        std::string Result = "<Logs(";
+        bool First = true;
+        for (const auto &Bench : Logs.Benchmarks) {
+          if (!First)
+            Result += ", ";
+          First = false;
+
+          Result += Bench->Name;
+        }
+
+        return Result + ")>";
+      });
 }

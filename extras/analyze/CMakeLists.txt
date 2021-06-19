@@ -37,6 +37,10 @@ if(TBB_FOUND)
   link_libraries(tbb)
 endif()
 
+if(CMAKE_CXX_COMPILER_ID STREQUAL GNU)
+  add_compile_options(-Wall -Wextra)
+endif()
+
 pybind11_add_module(eventanalyze src/module.cpp src/parse.cpp src/types.cpp)
 target_include_directories(eventanalyze PUBLIC include)
 target_link_libraries(eventanalyze PRIVATE mio::mio)

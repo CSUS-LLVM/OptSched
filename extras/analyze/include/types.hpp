@@ -1,15 +1,18 @@
 #pragma once
 
-#include <pybind11/pybind11.h>
-
 #include <cassert>
 #include <concepts>
+#include <cstddef>
 #include <cstdint>
 #include <deque>
+#include <memory>
 #include <string>
 #include <string_view>
 #include <variant>
 #include <vector>
+
+#include <mio/mmap.hpp>
+#include <pybind11/pybind11.h>
 
 namespace ev {
 using Number = std::variant<std::int64_t, std::uint64_t, double>;
@@ -109,30 +112,39 @@ struct EventIdEq {
 using BlockEventMap =
     std::unordered_set<std::vector<Event>, EventIdHash, EventIdEq>;
 
-struct BlockEvents {
-  const BlockEventMap *Events;
-};
-
-struct UnloadedRawLog {
-  std::size_t Offset;
-  std::size_t Size;
-};
-
-using RawLog = std::variant<UnloadedRawLog, std::string>;
+struct Logs;
+struct Benchmark;
 
 struct Block {
   std::string_view Name;
   BlockEventMap Events;
-  ev::RawLog RawLog;
+  // Offset & size into the mmapped file.
+  std::size_t Offset;
+  std::size_t Size;
+
+  std::string UniqueId;
+
+  ev::Benchmark *Bench;
+
+  std::string File; // Which file was compiled for this block
 };
 
 struct Benchmark {
   std::string Name;
   std::vector<Block> Blocks;
+  // Offset & size into the mmapped file.
+  std::size_t Offset;
+  std::size_t Size;
+
+  // Keep the memory around so that we can detect if the Logs object was
+  // destroyed, giving the Python user a good error message.
+  std::weak_ptr<ev::Logs> Logs;
 };
 
 struct Logs {
-  std::vector<Benchmark> Benchmarks;
+  std::string LogFile;
+  mio::mmap_source MMap;
+  std::vector<std::shared_ptr<Benchmark>> Benchmarks;
 };
 
 void defTypes(pybind11::module &Mod);
