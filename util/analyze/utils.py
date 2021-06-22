@@ -11,7 +11,7 @@ def sum_dicts(ds):
     return {k: sum(d[k] for d in ds) for k in ds[0].keys()}
 
 
-def foreach_bench(analysis_f, *logs, combine=None):
+def foreach_bench(analysis_f, *logs, combine=None, **kwargs):
     '''
     Repeats `analysis_f` for each benchmark in `logs`.
     Also computes the analysis for the entire thing.
@@ -25,11 +25,11 @@ def foreach_bench(analysis_f, *logs, combine=None):
     '''
 
     if combine is None:
-        combine = lambda *args: analysis_f(*logs)
+        combine = lambda *args: analysis_f(*logs, **kwargs)
 
     benchmarks = zip(*[log.benchmarks for log in logs])
 
-    bench_stats = {bench[0].name: analysis_f(*bench) for bench in benchmarks}
+    bench_stats = {bench[0].name: analysis_f(*bench, **kwargs) for bench in benchmarks}
     total = combine(bench_stats.values())
 
     return {

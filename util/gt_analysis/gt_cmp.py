@@ -67,10 +67,14 @@ def is_improved(before: Block, after: Block):
     return cost_for_blk(before) > cost_for_blk(after)
 
 
-def compute_stats(nogt: Logs, gt: Logs):
+def compute_stats(nogt: Logs, gt: Logs, *, pass_num: int):
     TOTAL_BLOCKS = utils.count(nogt)
 
     nogt_all, gt_all = nogt, gt
+
+    if pass_num is not None:
+        nogt = nogt.keep_blocks_if(lambda b: b.single('PassFinished')['num'] == pass_num)
+        gt = gt.keep_blocks_if(lambda b: b.single('PassFinished')['num'] == pass_num)
 
     NUM_PROVED_OPTIMAL_WITHOUT_ENUMERATING = utils.count(utils.zipped_keep_blocks_if(
         nogt, gt, pred=lambda a, b: block_stats.is_enumerated(a) and not block_stats.is_enumerated(b))[0])
@@ -129,9 +133,10 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('nogt')
     parser.add_argument('gt')
+    parser.add_argument('--pass-num', type=int, default=None, help='Which pass to analyze (default: all passes)')
     args = analyze.parse_args(parser, 'nogt', 'gt')
 
-    results = utils.foreach_bench(compute_stats, args.nogt, args.gt)
+    results = utils.foreach_bench(compute_stats, args.nogt, args.gt, pass_num=args.pass_num)
 
     writer = csv.DictWriter(sys.stdout,
                             fieldnames=['Benchmark'] + list(results['Total'].keys()))
