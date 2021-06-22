@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import argparse
+from typing import Tuple
 
 import analyze
 from analyze import Block, Logs, utils
@@ -67,6 +68,25 @@ def is_improved(before: Block, after: Block):
     return cost_for_blk(before) > cost_for_blk(after)
 
 
+def blk_relative_cost(nogt, gt) -> Tuple[int, int]:
+    no_sum = yes_sum = 0
+    for no, yes in zip(nogt, gt):
+        no_cost = block_stats.block_cost(no)
+        yes_cost = block_stats.block_cost(yes)
+        no_lb = block_stats.block_cost_lower_bound(no)
+        yes_lb = block_stats.block_cost_lower_bound(yes)
+        assert no_lb <= yes_lb
+
+        # relative to the tightest LB we know
+        no_rel = no_cost - yes_lb
+        yes_rel = yes_cost - yes_lb
+
+        no_sum += no_rel
+        yes_sum += yes_rel
+
+    return no_sum, yes_sum
+
+
 def compute_stats(nogt: Logs, gt: Logs, *, pass_num: int):
     TOTAL_BLOCKS = utils.count(nogt)
 
@@ -82,6 +102,8 @@ def compute_stats(nogt: Logs, gt: Logs, *, pass_num: int):
         nogt, gt, pred=block_stats.is_enumerated)
 
     nogt_opt, gt_opt = utils.zipped_keep_blocks_if(nogt, gt, pred=lambda b: 'DagSolvedOptimally' in b)
+
+    nogt_rel, gt_rel = blk_relative_cost(nogt, gt)
 
     result = {
         'Total Blocks in Benchsuite': TOTAL_BLOCKS,
@@ -101,8 +123,8 @@ def compute_stats(nogt: Logs, gt: Logs, *, pass_num: int):
         'Enum Time (opt. blocks only) (No GT)': utils.sum_stat_for_all(enum_time_for_blk, nogt_opt),
         'Enum Time (opt. blocks only) (GT)': utils.sum_stat_for_all(enum_time_for_blk, gt_opt),
 
-        'Block Cost - Relative (No GT)': utils.sum_stat_for_all(block_stats.block_relative_cost, nogt),
-        'Block Cost - Relative (GT)': utils.sum_stat_for_all(block_stats.block_relative_cost, gt),
+        'Block Cost - Relative (No GT)': nogt_rel,
+        'Block Cost - Relative (GT)': gt_rel,
         'Block Cost (No GT)': utils.sum_stat_for_all(block_stats.block_cost, nogt),
         'Block Cost (GT)': utils.sum_stat_for_all(block_stats.block_cost, gt),
 
