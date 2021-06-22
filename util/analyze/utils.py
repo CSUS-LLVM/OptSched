@@ -62,6 +62,8 @@ def zipped_keep_blocks_if(*logs, pred):
 
     Also supports pred(b), in which case it's all(pred(b) for b in (a.blk1, b.blk1, ...))
     '''
+    if not logs:
+        return []
 
     for group in zip(*logs):
         assert len(set(g.uniqueid() for g in group)) == 1, group[0].raw_log
@@ -74,23 +76,28 @@ def zipped_keep_blocks_if(*logs, pred):
         pred = lambda *blks: all(old_pred(b) for b in blks)
 
     def zip_benchmarks_if(*benchmarks):
-        # (A[a], A[a]) -> [(a, a)]
-        return [blks for blks in zip(*benchmarks) if pred(*blks)]
+        # (A[a], A[a]) -> [(a, a)] or []
+        zipped = [blks for blks in zip(*benchmarks) if pred(*blks)]
+        unzipped = list(zip(*zipped))  # [(a, a)] -> ([a], [a]); [] -> []
+        if not unzipped:  # if []: ([], [])
+            unzipped = [()] * len(benchmarks)
+        # ([a], [a]) -> (A[a], A[a])
+        return [Benchmark(bench.info, bench_blks) for bench, bench_blks in zip(benchmarks, unzipped)]
 
-    # L1: [A, B, C]
-    # L2: [A, B, C]
-    # benchs: [(A, A), (B, B), (C, C)]
+    # [(Bench.X, Bench.X), (Bench.Y, Bench.Y)]
+    result = []
+
+    # L1: [A[a], B[b], C[c]]
+    # L2: [A[a], B[b], C[c]]
+    # benchs: [(A[a], A[a]), (B[b], B[b]), ...]
     benchs = zip(*[l.benchmarks for l in logs])
+    # filtered_benchs: [(A[a], A[a]), (B[b], B[b]), ...]
+    filtered_benchs = (zip_benchmarks_if(*bench_grp) for bench_grp in benchs)
+    # [(A[a], A[a]), (B[b], B[b])] -> ([A[a], B[b], ...], [A[a], B[b], ...])
+    log_benchs = zip(*filtered_benchs)
+    new_logs = map(Logs, log_benchs)
 
-    # Each item: (A[a], A[a]) -> [(a, a)] inside the zip.
-    # zip(*[(a, a)]) -> ([a], [a])
-    # zip(bench, ...): (A, A) zip ([a], [a]) -> [(A, [a]), (A, [a])]
-    filtered_benchs = [zip(bench, zip(*zip_benchmarks_if(*bench))) for bench in benchs]
-    # [ {(A, [a]), (A, [a])} ] -> [ (A[a], A[a]) ]
-    filtered_bench2 = [tuple(Benchmark(b.info, blks) for (b, blks) in benchs)
-                       for benchs in filtered_benchs]
-
-    return tuple(map(Logs, zip(*filtered_bench2)))
+    return tuple(new_logs)
 
 
 def sum_stat_for_all(stat, logs: Logs) -> int:
