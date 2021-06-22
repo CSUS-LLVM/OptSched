@@ -119,6 +119,7 @@ class Block:
 
     def __init__(self, info, raw_log, events):
         self.name = info['name']
+        self.benchmark = info['benchmark']
         self.info = info
         self.raw_log = raw_log
         self.events = events
