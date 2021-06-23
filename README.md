@@ -1,24 +1,22 @@
-***DISCLAIMER***
-This branch is under development and the instructions below will are not correct. The instructions will be updated when this branch is fully developed.
-
 [![CSUS](http://www.csus.edu/Brand/assets/Logos/Core/Primary/Stacked/Primary_Stacked_3_Color_wht_hndTN.png)](http://www.csus.edu/)
 
 # OptSched - Optimizing Scheduler
 Combinatorial instruction scheduling research project at CSU Sacramento.
 
-This plugin for the [LLVM](https://llvm.org/) compiler is an optional machine scheduler. We implement a branch and bound instruction scheduling algorithm.
+This plugin for the [LLVM](https://llvm.org/) compiler is an optional machine scheduler. We implement an Ant Colony Optimization instruction scheduling algorithm on the GPU. The enumerating combinatorial scheduler will not work on this branch, this branch is for the ACO instruction scheduler running on the GPU.
 
 ## Requirements
 
-- Ubuntu 16.04 (recommended), or MacOS 10.14
-- CMake 3.4.3 or later
-- LLVM 6.0 or later
+- Ubuntu 18.04 or 20.04
+- CMake 3.20.4 or later
+- LLVM 7.0 or later
+- Nvidia GPU: At least Turing recommended (CC 7.5 or later)
 
 ## Building
 
 **See [BUILD.md](BUILD.md) for build instructions.**
 
-The OptSched plugin can be found in “llvm/lib” after building.
+The OptSched plugin can be found in “v7flang/llvm/build/lib” after building.
 
 ## Configuration files
 

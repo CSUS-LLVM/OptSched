@@ -1,53 +1,15 @@
-# Building OptSched with LLVM 6 and Clang
-
-### [Table of Contents]
-
-+ **[Setup]**
-
-  + **[Ubuntu][setup-ubuntu]**
-
-    + **[Update Packages][setup-ubuntu-update]**
-
-    + **[Install CMake and Git][setup-ubuntu-cmake-git]**
-
-    + **[Install Ninja (optional)][setup-ubuntu-ninja]**
-
-  + **[MacOS][setup-macos]**
-
-    + **[Install Command Line Developer Tools][setup-macos-dev-tools]**
-
-    + **[Install Homebrew (optional)][setup-macos-homebrew]**
-
-    + **[Install Cmake][setup-macos-cmake]**
-
-    + **[Install Ninja (optional)][setup-macos-ninja]**
-
-+ **[Super-build Script][super-build]**
-
-+ **[Manual Build][manual-build]**
-
-  + **[Download the Source Code][download-source]**
-
-  + **[Build LLVM, Clang and OptSched][build]**
-
-    + **[Command Line Build (Ubuntu and MacOS)][build-cli]**
-
-    + **[MacOS Xcode Build][build-xcode]**
-
-+ **[Test the Build][test]**
-
----
+# Building OptSched with LLVM 7, Clang, and Flang
 
 ## Setup
 
-###### Only Ubuntu and MacOS are known to work, but these instructions are likely to work other platforms. Please let us know if you successfully build on a different platform, so we can improve these instructions.
+###### Only Ubuntu is known to work, but these instructions are likely to work other platforms. Please let us know if you successfully build on a different platform, so we can improve these instructions.
 
 ### Ubuntu
 
-_**Attention:** Please only run these instructions on your own machine. If you are building on **Grace 2**, please skip_
-_forward to [Download the Source Code][download-source]._
+_**Attention:** Please only run these instructions on your own machine. If you are building on the **Tesla T4 machine**, please skip_
+_forward to Manual Build._
 
-###### Starting with a fresh install of [Ubuntu 16.04] is recommended.
+###### Starting with a fresh install of [Ubuntu 20.04] is recommended.
 
 #### Update Packages
 
@@ -59,11 +21,14 @@ sudo apt update && sudo apt upgrade
 
 #### Install [CMake] and [Git]
 
-`
+```
+wget -O - https://apt.kitware.com/keys/kitware-archive-latest.asc 2>/dev/null | gpg --dearmor - | sudo tee /etc/apt/trusted.gpg.d/kitware.gpg >/dev/null
+sudo apt-add-repository 'deb https://apt.kitware.com/ubuntu/ focal main'
+sudo apt-get update
 sudo apt install cmake git
-`
+```
 
-#### Install [Ninja] (optional)
+#### Install [Ninja]
 
 
 It is recommended to build LLVM using Ninja to avoid running out of memory during linking. Using Ninja should also result in faster builds.
@@ -77,164 +42,75 @@ wget -q https://github.com/ninja-build/ninja/releases/download/v1.9.0/ninja-linu
 
 ##### Using APT (Ubuntu 18.04 or later)
 
-###### Note: On Ubuntu 16.04 the version of Ninja installed by APT is too old and will not work.
-
 `
-apt install ninja
+apt install ninja-build
 `
 
-Proceed to [Download the Source Code][download-source].
-
-### MacOS
-
-#### Install Command Line Developer Tools
-
-Open `Terminal` and run
-
+#### Install Python2
 `
-xcode-select --install
+sudo apt install python2
 `
 
-and select either `Install` or `Get Xcode`, if you want to install `Xcode` and have not already.
-
-#### Install [Homebrew] (optional)
-
-Homebrew is a package manager for MacOS - it provides a simple way to install and manage software on your Mac.
-
-To install homebrew, open `Terminal` and run
-
+#### Install the latest CUDA toolkit. The last version successfully used for the project is 11.3.
+###### First check if you already have it installed:
 `
-/usr/bin/ruby -e "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install)"
+/usr/local/cuda/bin/nvcc --version
 `
+###### If already installed, skip the installation of CUDA to the optional adding of CUDA paths to your .bashrc
+###### If not installed, install the CUDA toolkit from: https://developer.nvidia.com/cuda-downloads
+###### Select Linux > x86_64 > Ubuntu > Your version of Ubuntu > deb (network) 
+###### Then follow the presented installation instructions, simply copy the presented commands
 
-#### Install [CMake]
-
-##### Using Homebrew (preferred)
-
+#### (Optional) Add the CUDA toolkit paths to your .bashrc for easier use of the tools
+###### Open .bashrc
 `
-brew install cmake
+vim ~/.bashrc
 `
+###### Paste the following at the end of the file (be sure to change version numbers to match yours), save your changes. These environmental variables will now automatically be set when you log in/turn on your machine. You can also simply copy and paste these into terminal to set the variables.
+```
+export PATH=/usr/local/cuda/bin${PATH:+:${PATH}}
+export CPATH=/usr/local/cuda-11.3/targets/x86_64-linux/include:$CPATH
+export LD_LIBRARY_PATH=/usr/local/cuda-11.3/targets/x86_64-linux/lib:$LD_LIBRARY_PATH
+```
 
-##### Using CMake Installer
-
-Visit the [CMake downloads page], and download the file ending in `Darwin-x86_64.dmg`.
-
-Open the downloaded image, and drag the `CMake` application into the `Applications` folder.
-
-#### Install [Ninja] (optional)
-
-It is recommended to build LLVM using Ninja to avoid running out of memory during linking. Using Ninja should also result in faster builds.
-
-##### Using Homebrew (preferred)
-
+#### Test CUDA compiler and driver install
+###### Reboot the machine:
 `
-brew install ninja
+sudo reboot
 `
-
-##### Downloading manually
-
-Download and install Ninja 1.9:
-
-`
-wget -q https://github.com/ninja-build/ninja/releases/download/v1.9.0/ninja-mac.zip && unzip -q ninja-mac.zip && sudo cp ninja /usr/bin && rm ninja ninja-mac.zip
-`
-
-#### Install [Xcode] (optional)
-
-If you would like to use Xcode to build LLVM, and do not already have it installed, go to the Mac App Store,
-search for `Xcode`, and click `Get`.
-
-## Super-build Script
-
-To let a script manage cloning and installing all dependencies, placing OptSched inside llvm for you.
-
-### Configure with CMake
-
-**1. Create a build directory.**
-
-`
-mkdir build && cd build
-`
-
-**2. Configure**
-
-We want to configure against the OptSched/cmake/superbuild directory.
-Use the generator you want, be it Ninja with `-GNinja`, explicitly specified makefiles with `-G'Unix Makefilex'`,
-or something else.
-
-If you have ccache installed, consider adding `-DCMAKE_CXX_COMPILER_LAUNCHER=ccache`.
-This will speed up subsequent builds. If you do so, be sure to disable the ccache `hash_dir` setting.
-
-To build OptSched inside LLVM:
-
-`
-cmake -GNinja -DCMAKE_BUILD_TYPE=Debug -DLLVM_PARALLEL_LINK_JOBS=1 ../cmake/superbuild
-`
-
-###### Note: In debug builds, linking uses a lot of memory. Set `LLVM_PARALLEL_LINK_JOBS=2` if you have >= 32G memory, otherwise use `LLVM_PARALLEL_LINK_JOBS=1`.
-
-If you also wish to build flang, add `-DOPTSCHEDSUPER_FLANG=ON`.
-The flang compiler cannot be built with ninja, so if you are using Ninja, add `-DOPTSCHEDSUPER_FLANG_COMPILER_CMAKE_GENERATOR='Unix Makefiles'`
-
-Complete command for building with flang:
-
-`
-cmake -GNinja -DCMAKE_BUILD_TYPE=Debug -DLLVM_PARALLEL_LINK_JOBS=1 -DOPTSCHEDSUPER_FLANG_COMPILER_CMAKE_GENERATOR='Unix Makefiles' -DOPTSCHEDSUPER_FLANG=ON ../cmake/superbuild
-`
-
-**3. Run the Super-build**
-
-Invoke the generator you chose.
-
-Ninja:
-
-`
-ninja
-`
-
-Make:
-
-`
-make # Consider adding -jN where N is the number of parallel compile processes you want
-`
-
-Generic:
-
-`
-cmake --build .
-`
-
-The CMake super-build script will clone, configure, and build llvm-project along with flang if specified.
-The main build directory for LLVM, where unit tests can be run, is `llvm-prefix/src/llvm-build`.
-
-The flang binaries and libraries will be installed to `flang-install` inside your build directory.
-The llvm binaries and libraries, including OptSched.so, will be installed to `llvm-install` inside your build directory.
-These directories may be changed at the configure step by specifying `-DOPTSCHEDSUPER_<Type>_INSTALL_PREFIX=/path/to/install/dir`,
-where `<Type>` is either `LLVM` or `FLANG`.
+###### note if you did not set your environmental variables, you will need to use the full path to the binary. CUDA tools are installed to /usr/local/cuda/bin by default
+```
+nvcc --version
+nvidia-smi
+```
 
 ## Manual Build
 
-To manually build this, such as if you want to place OptSched inside an existing clone of llvm.
+To manually build this, such as if you want to place OptSched inside an existing clone of flang llvm.
 
-### Download the Source Code
+**1. Set up install directory and clone the [Flang LLVM source code] from GitHub.**
 
-**1. Clone the [LLVM source code] from GitHub.**
+```
+mkdir -p v7flang/flang-install
+cd v7flang/flang-install
+FLANG_INSTALL=`pwd`
+cd ..
+git clone https://github.com/flang-compiler/llvm.git
+```
 
-`
-git clone https://github.com/llvm/llvm-project
-`
-
-**2. Checkout LLVM release 6.**
-
-`
-cd llvm-project && git checkout release/6.x
-`
-
-**3. Clone OptSched into the projects directory.**
+**2. Checkout Flang LLVM release 7.**
 
 `
-cd llvm/projects && git clone https://github.com/CSUS-LLVM/OptSched
+cd llvm && git checkout release_70
 `
+
+**3. Clone OptSched into the projects directory and checkout GPU_ACO branch.**
+
+```
+cd projects && git clone https://github.com/CSUS-LLVM/OptSched
+cd OptSched && git checkout GPU_ACO
+cd ../..
+```
 
 **4. Create a build directory.**
 
@@ -245,159 +121,88 @@ mkdir build && cd build
 **5. Apply [this patch][spilling-info-patch] to print spilling info.**
 
 `
-git am ../OptSched/patches/llvm6.0/llvm6-print-spilling-info.patch
+git am ../projects/OptSched/patches/llvm7.0/llvm7-print-spilling-info.patch
 `
 
-### Build LLVM, Clang and OptSched
-
-#### Command Line Build (Ubuntu and MacOS)
-
-###### These instructions follow after [Download the Source Code][download-source], and so assume that you are in the `llvm-project/llvm/projects/build` directory.
-
-**Using Ninja (recommended)**
-
-###### Note: In debug builds, linking uses a lot of memory. Set `LLVM_PARALLEL_LINK_JOBS=2` if you have >= 32G memory, otherwise use `LLVM_PARALLEL_LINK_JOBS=1`.
+**6. Move PointerIntPair to public from protected.**
+###### I am not sure why this is required, but the project will not build if `PointerIntPair<InstrTy*, 1, bool> I;` is in protected. Open the file in vim, move the `PointerIntPair<InstrTy*, 1, bool> I;` to public, and save your work with `:wq`
 
 `
-cmake -GNinja -DLLVM_PARALLEL_LINK_JOBS=1 -DLLVM_ENABLE_PROJECTS='clang' -DCMAKE_BUILD_TYPE=Debug '-DLLVM_TARGETS_TO_BUILD=X86' -DLLVM_BUILD_TOOLS=ON -DLLVM_INCLUDE_TESTS=ON -DLLVM_OPTIMIZED_TABLEGEN=ON ../..
+vim ../include/llvm/IR/CallSite.h
 `
 
-`
-ninja
-`
+**7. Build LLVM and OptSched using Ninja**
+###### Note: You must change the -DCMAKE_CUDA_ARCHITECTURES flag to match the Compute Capability of your GPU. The Tesla T4 is CC 7.5.The -DCMAKE_CXX_FLAGS_INIT flag must point to your CUDA install's include folder, the default directory is used here. If you want to build the device code in debug mode, replace -lineinfo with -G in the -DCMAKE_CUDA_FLAGS_INIT variable. Building LLVM in debug mode is not guaranteed to work, asserts may be outdated.
 
-**Using Make**
+```
+cmake -GNinja -DCMAKE_CUDA_ARCHITECTURES=75 -DCMAKE_CUDA_FLAGS_INIT='-lineinfo --ptxas-options=-v' -DCMAKE_CXX_FLAGS_INIT='-isystem/usr/local/cuda/include' -DCMAKE_INSTALL_PREFIX=$FLANG_INSTALL -DCMAKE_BUILD_TYPE=Release -DLLVM_TARGETS_TO_BUILD='X86;AArch64' ..
+ninja install
+#go back to the directory v7flang
+cd ../..
+```
 
-###### Note: Debug builds use a lot of memory. The build will fail if you do not have enough. If this happens, try using Ninja to build.
+**8. Install flang-driver**
+###### Note: you can modify `make -j2 install` to use as many threads as you have available, using `-j2` only uses 2 threads.
 
-`
-cmake -DLLVM_ENABLE_PROJECTS='clang' -DCMAKE_BUILD_TYPE=Debug '-DLLVM_TARGETS_TO_BUILD=X86' -DLLVM_BUILD_TOOLS=ON -DLLVM_INCLUDE_TESTS=ON -DLLVM_OPTIMIZED_TABLEGEN=ON ../..
-`
+```
+git clone https://github.com/flang-compiler/flang-driver.git
+cd flang-driver
+git checkout release_70
+mkdir build
+cd build
+cmake -DCMAKE_INSTALL_PREFIX=$FLANG_INSTALL -DLLVM_CONFIG=$FLANG_INSTALL/bin/llvm-config -DCMAKE_BUILD_TYPE=Release ..
+make -j2 install
+#get back to v7flang
+cd ../../
+```
+**9. Install flang openmp**
 
-`
-make
-`
+```
+git clone https://github.com/llvm-mirror/openmp.git
+cd openmp
+git checkout release_70
+mkdir build
+cd build
+cmake -DCMAKE_INSTALL_PREFIX=$FLANG_INSTALL -DCMAKE_CXX_COMPILER=$FLANG_INSTALL/bin/clang++ -DCMAKE_C_COMPILER=$FLANG_INSTALL/bin/clang -DCMAKE_BUILD_TYPE=Release ..
+make -j2 install
+#get back to v7flang
+cd ../..
+```
 
-_A Debug build of LLVM on a single thread will take a long time._
+**10. Build Flang**
+```
+#build libpgmath
+git clone https://github.com/flang-compiler/flang.git
+cd flang/runtime/libpgmath
+mkdir build
+cd build
+cmake -DCMAKE_INSTALL_PREFIX=$FLANG_INSTALL -DCMAKE_CXX_COMPILER=$FLANG_INSTALL/bin/clang++ -DCMAKE_C_COMPILER=$FLANG_INSTALL/bin/clang -DCMAKE_BUILD_TYPE=Release ..
+make -j2 install
+#go back to v7flang/flang
+cd ../../..
+#build Flang
+mkdir build
+cd build
+cmake -DCMAKE_INSTALL_PREFIX=$FLANG_INSTALL -DLLVM_CONFIG=$FLANG_INSTALL/bin/llvm-config -DCMAKE_CXX_COMPILER=$FLANG_INSTALL/bin/clang++ -DCMAKE_C_COMPILER=$FLANG_INSTALL/bin/clang -DCMAKE_Fortran_COMPILER=$FLANG_INSTALL/bin/flang -DCMAKE_BUILD_TYPE=Release ..
+make -j2 install
+#back out of the directory structure we just created
+cd ../../..
+```
 
-_See [Building with CMake] for more build options._
-
-#### MacOS Xcode Build
-
-###### These instructions follow after [Download the Source Code][download-source], and so assume that you are in the `llvm-project/llvm/projects` directory.
-
-**1. Build an Xcode project**
-
-`
-cmake -G Xcode -DLLVM_ENABLE_PROJECTS='clang' -DCMAKE_BUILD_TYPE=Debug '-DLLVM_TARGETS_TO_BUILD=X86' -DLLVM_BUILD_TOOLS=ON -DLLVM_INCLUDE_TESTS=ON -DLLVM_OPTIMIZED_TABLEGEN=ON ../..
-`
-
-This will create an Xcode project in `llvm-project/llvm/projects/build`.
-
-**2. Open the project in Xcode**
-
-Open Xcode, and go to `File > Open...` (or press `Cmd+O`).
-
-Navigate to `llvm-projects/llvm/projects/build` and click `Open`.
-
-**3. Create `clang` and `OptSched` schemes**
-
-Upon opening the project, Xcode will prompt you to create schemes. We want to create them manually - this will prevent you from having to sort through tons of build targets later.
-
-Press the `+` button and select `clang` from the long `Targets` dropdown list.
-
-###### Note: Typing `clang` will filter the dropdown list, making it easier to find.
-
-Repeat this step, selecting `OptSched` from the list.
-
-You should now have two schemes - `clang` and `OptSched`. Press `Close`.
-
-**4. Change the language standard to C++14**
-
-In the file navigation window on the left, scroll to the very top and select the `LLVM`
-project file, under which all other files should be listed. It has a blue icon.
-
-Just to the right of the file navigator there will be a list of all build targets.
-Select `OptSched` from this list.
-
-###### Note: Typing `OptSched` in the `Filter` box will help you locate it more easily.
-
-Click on `Build Settings` at the top of the page, and scroll down to the
-`Apple Clang - Custom Compiler Flags` section.
-
-Under `Other C++ Flags`, double-click on the long list of compiler flags to the right of `Debug`.
-From the text box that pops up, double-click on `-std=c++11` and change it to `-std=c++14`.
-
-###### Note: If you want to compile in `Release` mode, or any of the others, you will have to make the same change for that mode.
-
-**5. Build `clang` and `OptSched`**
-
-At the top left, there is a "Run" (►) button and a "Stop" (■) button. To the right of those is where you can chose your scheme.
-
-Select the `clang` scheme and then select `Product > Build` (or press `Cmd + B`).
-
-Wait for the build to complete, and repeat this with the `OptSched` scheme.
-
-## Test the Build
-
-**Super-build**
-
-Run ctest with `make test` (or `ninja test`) or by running ctest directly with `ctest .` .
-This will run the unit tests and it will do a test run of the compiler with OptSched enabled.
-
-**Unit Tests**
-
-Invoke the `check-optsched-unit` target of the build system generated by CMake.
-For `make`, that is `make check-optsched-unit`. In general, that is `cmake --build . --target check-optsched-unit`
-
-If you used the superbuild, you need to be in the `llvm-prefix/src/llvm-build` directory first.
-
-**Command Line Build**
-
-From the `llvm-project/llvm/projects/build` directory, run:
-
-`
-echo 'int main(){};' | ./bin/clang -xc - -O3 -fplugin=lib/OptSched.so -mllvm -misched=optsched -mllvm -enable-misched -mllvm -optsched-cfg=../OptSched/example/optsched-cfg -mllvm -debug-only=optsched
-`
-
-**MacOS Xcode Build**
-
-From the `llvm-project/llvm/projects/build` directory, run:
-
-`
-echo 'int main(){};' | Debug/bin/clang -xc - -O3 -fplugin=lib/OptSched.so -mllvm -misched=optsched -mllvm -enable-misched -mllvm -optsched-cfg=../OptSched/example/optsched-cfg -mllvm -debug-only=optsched
-`
-
-<!-- TODO: Show expected output of test command -->
-
-
-[table of contents]: #table-of-contents
-[setup]: #setup
-[setup-ubuntu]: #ubuntu
-[setup-ubuntu-update]: #update-packages
-[setup-ubuntu-cmake-git]: #install-cmake-and-git
-[setup-ubuntu-ninja]: #install-ninja-optional
-[setup-macos]: #macos
-[setup-macos-dev-tools]: #install-command-line-developer-tools
-[setup-macos-homebrew]: #install-homebrew-optional
-[setup-macos-cmake]: #install-cmake
-[setup-macos-ninja]: #install-ninja-optional-1
-[super-build]: #super-build-script
-[manual-build]: #manual-build
-[download-source]: #download-the-source-code
-[build]: #build-llvm-clang-and-optsched
-[build-cli]: #command-line-build-ubuntu-and-macos
-[build-xcode]: #macos-xcode-build
-[test]: #test-the-build
+**11. Add $FLANG_INSTALL to your .bashrc and add the fortran runtime to your library path. (Optional)**
+```
+echo "export FLANG_INSTALL=$FLANG_INSTALL" >> ~/.bashrc
+echo 'export LD_LIBRARY_PATH=$FLANG_INSTALL/lib:$LD_LIBRARY_PATH' >> ~/.bashrc
+```
+You now have all of the requirements to run CPU2017. Clang and Flang are located in $FLANG_INSTALL/bin (v7flang/flang-install/bin/) and the OptSched.so plugin is located at v7flang/llvm/build/lib/OptSched.so.
 
 <!-- Outside links -->
-[ubuntu 16.04]: http://releases.ubuntu.com/16.04/
+[ubuntu 20.04]: http://releases.ubuntu.com/20.04/
 [cmake]: https://cmake.org/
 [git]: https://git-scm.com/
 [homebrew]: https://brew.sh/
 [cmake downloads page]: https://cmake.org/download/
-[xcode]: https://developer.apple.com/xcode/
 [ninja]: https://ninja-build.org/
-[llvm source code]: https://github.com/llvm/llvm-project
+[flang llvm source code]: https://github.com/flang-compiler/llvm.git
 [building with cmake]: https://llvm.org/docs/CMake.html
-[spilling-info-patch]: patches/llvm6.0/llvm6-print-spilling-info.patch
+[spilling-info-patch]: patches/llvm7.0/llvm7-print-spilling-info.patch
