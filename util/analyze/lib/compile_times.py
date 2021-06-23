@@ -22,6 +22,15 @@ def sched_time(logs):
 
 _CPU2017_TIME_ELAPSED = re.compile(r"Elapsed compile for '(?P<bench>[^']+)': \S+ \((?P<elapsed>\d+)\)")
 _BACKUP_TIME_ELAPSED = re.compile(r'(?P<elapsed>\d+) total seconds elapsed')
+_PLAIDML_TIME_ELAPSED = re.compile(
+    r'Example finished, elapsed: (?P<elapsed>\S+)s \(compile\), (?P<exec>\S+)s \(execution\)')
+
+
+def plaidml_total_compile_time_seconds(logs):
+    try:
+        return sum(float(_PLAIDML_TIME_ELAPSED.search(bench.blocks[-1].raw_log)['elapsed']) for bench in logs.benchmarks)
+    except TypeError:
+        raise KeyError('Logs must contain "Example finished, elapsed:" output by the PlaidML benchmark suite')
 
 
 def total_compile_time_seconds(logs):
@@ -33,23 +42,34 @@ def total_compile_time_seconds(logs):
     if m:
         if len(m) != 1:
             logging.warning('Multiple CPU2017 elapsed time indicators. Using the first one out of: %s', m)
-        return m[0]['elapsed']
+        return int(m[0]['elapsed'])
 
     m = _BACKUP_TIME_ELAPSED.search(last_logs)
     assert m, \
         'Logs must contain "total seconds elapsed" output by the SPEC benchmark suite'
 
-    return m['elapsed']
+    return int(m['elapsed'])
+
+
+def total_compile_time_seconds_f(benchsuite):
+    return {
+        'spec': total_compile_time_seconds,
+        'plaidml': plaidml_total_compile_time_seconds
+    }[benchsuite]
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--variant', choices=('sched', 'total'),
+    parser.add_argument('--variant', choices=('sched', 'total', 'plaidml'),
                         help='Which timing variant to use')
     parser.add_argument('logs', help='The logs to analyze')
     args = analyze.parse_args(parser, 'logs')
 
-    fn = total_compile_time_seconds if args.variant == 'total' else sched_time
+    fn = {
+        'sched': sched_time,
+        'total': total_compile_time_seconds,
+        'plaidml': plaidml_total_compile_time_seconds,
+    }[args.variant]
     results = foreach_bench(fn, args.logs, combine=sum)
     writer = csv.DictWriter(sys.stdout, fieldnames=results.keys())
     writer.writeheader()

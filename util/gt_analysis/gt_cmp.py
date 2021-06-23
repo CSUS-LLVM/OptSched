@@ -8,7 +8,6 @@ from analyze import Block, Logs, utils
 from analyze.lib import block_stats, compile_times
 
 sched_time = compile_times.sched_time
-total_compile_time_seconds = compile_times.total_compile_time_seconds
 
 
 def blocks_enumerated_optimally(blocks):
@@ -87,9 +86,7 @@ def blk_relative_cost(nogt, gt) -> Tuple[int, int]:
     return no_sum, yes_sum
 
 
-def compute_stats(nogt: Logs, gt: Logs, *, pass_num: int):
-    TOTAL_BLOCKS = utils.count(nogt)
-
+def compute_stats(nogt: Logs, gt: Logs, *, pass_num: int, total_compile_time_seconds):
     nogt_all, gt_all = nogt, gt
 
     if pass_num is not None:
@@ -106,7 +103,7 @@ def compute_stats(nogt: Logs, gt: Logs, *, pass_num: int):
     nogt_rel, gt_rel = blk_relative_cost(nogt, gt)
 
     result = {
-        'Total Blocks in Benchsuite': TOTAL_BLOCKS,
+        'Total Blocks in Benchsuite': utils.count(nogt_all),
         'Num Blocks enumerated with & without GT': utils.count(nogt),
         'Num Blocks proved optimal just by GT': NUM_PROVED_OPTIMAL_WITHOUT_ENUMERATING,
 
@@ -158,7 +155,11 @@ if __name__ == "__main__":
     parser.add_argument('--pass-num', type=int, default=None, help='Which pass to analyze (default: all passes)')
     args = analyze.parse_args(parser, 'nogt', 'gt')
 
-    results = utils.foreach_bench(compute_stats, args.nogt, args.gt, pass_num=args.pass_num)
+    results = utils.foreach_bench(
+        compute_stats, args.nogt, args.gt,
+        pass_num=args.pass_num,
+        total_compile_time_seconds=compile_times.total_compile_time_seconds_f(args.benchsuite),
+    )
 
     writer = csv.DictWriter(sys.stdout,
                             fieldnames=['Benchmark'] + list(results['Total'].keys()))
