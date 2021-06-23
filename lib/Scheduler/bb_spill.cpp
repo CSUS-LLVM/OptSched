@@ -180,7 +180,7 @@ static InstCount ComputeSLILStaticLowerBound(int64_t regTypeCnt_,
   int naiveLowerBound = 0;
   for (RegisterFile &File : RegFiles) {
     for (Register &Reg : File) {
-      const auto added_to_interval = [&](const auto &instruction) {
+      const auto added_to_interval = [&](const SchedInstruction *instruction) {
         return Reg.AddToInterval(instruction);
       };
       naiveLowerBound += llvm::count_if(Reg.GetDefList(), added_to_interval) +

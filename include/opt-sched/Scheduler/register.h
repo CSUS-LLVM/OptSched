@@ -140,7 +140,7 @@ class RegisterFile {
 
     template <bool IsConst_ = IsConst,
               typename std::enable_if<IsConst_, int>::type = 0>
-    RegisterFileIterator(RegisterFileIterator<false> Rhs) noexcept
+    RegisterFileIterator(const RegisterFileIterator<false> &Rhs) noexcept
         : File(Rhs.File), Index(Rhs.Index) {}
 
     bool operator==(const RegisterFileIterator &Rhs) const {
