@@ -24,6 +24,18 @@ _CPU2017_TIME_ELAPSED = re.compile(r"Elapsed compile for '(?P<bench>[^']+)': \S+
 _BACKUP_TIME_ELAPSED = re.compile(r'(?P<elapsed>\d+) total seconds elapsed')
 _PLAIDML_TIME_ELAPSED = re.compile(
     r'Example finished, elapsed: (?P<elapsed>\S+)s \(compile\), (?P<exec>\S+)s \(execution\)')
+_SHOC_TIME_ELAPSED = re.compile(r'Finished compiling; total ns = (?P<elapsed>\d+)')
+
+
+def shoc_total_compile_time_seconds(logs):
+    try:
+        elapsed = sum(int(m['elapsed'])
+                   for bench in logs.benchmarks
+                   for blk in bench
+                   for m in _SHOC_TIME_ELAPSED.finditer(blk.raw_log))
+        return float(elapsed) * 1e-9
+    except TypeError:
+        raise KeyError('Logs must contain "Finished compiling; total ns = " output by the modified SHOC benchmark suite')
 
 
 def plaidml_total_compile_time_seconds(logs):
@@ -54,7 +66,8 @@ def total_compile_time_seconds(logs):
 def total_compile_time_seconds_f(benchsuite):
     return {
         'spec': total_compile_time_seconds,
-        'plaidml': plaidml_total_compile_time_seconds
+        'plaidml': plaidml_total_compile_time_seconds,
+        'shoc': shoc_total_compile_time_seconds,
     }[benchsuite]
 
 
@@ -69,6 +82,7 @@ if __name__ == '__main__':
         'sched': sched_time,
         'total': total_compile_time_seconds,
         'plaidml': plaidml_total_compile_time_seconds,
+        'shoc': shoc_total_compile_time_seconds,
     }[args.variant]
     results = foreach_bench(fn, args.logs, combine=sum)
     writer = csv.DictWriter(sys.stdout, fieldnames=results.keys())
