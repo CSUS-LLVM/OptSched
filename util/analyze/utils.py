@@ -74,6 +74,15 @@ def zipped_keep_blocks_if(*logs, pred):
     except TypeError:
         old_pred = pred
         pred = lambda *blks: all(old_pred(b) for b in blks)
+    except StopIteration:
+        # There was nothing in zip(*logs)...
+        old_pred = pred
+        def new_pred(*blks):
+            try:
+                return old_pred(*blks)
+            except TypeError:
+                return all(old_pred(b) for b in blks)
+        pred = new_pred
 
     def zip_benchmarks_if(*benchmarks):
         # (A[a], A[a]) -> [(a, a)] or []
