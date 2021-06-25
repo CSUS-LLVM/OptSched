@@ -518,7 +518,7 @@ InstSchedule *ACOScheduler::FindOneSchedule(InstCount RPTarget,
 #endif
 }
 
-// Reduce to only index of best schedule per block in output array
+// Reduce to only index of best schedule per 2 blocks in output array
 __inline__ __device__
 void reduceToBestSchedPerBlock(InstSchedule **dev_schedules, int *blockBestIndex, ACOScheduler *dev_AcoSchdulr) {
   __shared__ int sBestIndex[NUMTHREADSPERBLOCK];
@@ -542,6 +542,65 @@ void reduceToBestSchedPerBlock(InstSchedule **dev_schedules, int *blockBestIndex
 
   if (threadIdx.x == 0)
     blockBestIndex[blockIdx.x] = sBestIndex[0];
+}
+
+// 1 block only to allow proper synchronization
+// reduce to only one best index. At the end of this function globalBestIndex
+// should be in blockBestIndex[0]
+__inline__ __device__
+void reduceToBestSched(InstSchedule **dev_schedules, int *blockBestIndex, ACOScheduler *dev_AcoSchdulr) {
+  __shared__ int sBestIndex[NUMBLOCKS/4];
+  uint tid = threadIdx.x;
+  int index, sBestIndex1, sBestIndex2;
+/*
+  //debug
+  if (threadIdx.x == 0) {
+    printf("\nInput: ");
+    for (int i = 0; i < NUMBLOCKS/2; i++)
+      printf("%d, ", blockBestIndex[i]);
+    printf("\n\n");
+  }
+  __syncthreads();
+*/
+  while (tid < NUMBLOCKS/4) {
+    if (dev_AcoSchdulr->shouldReplaceSchedule(dev_schedules[blockBestIndex[tid * 2]], 
+                                              dev_schedules[blockBestIndex[tid * 2 + 1]], false))
+      sBestIndex[tid] = blockBestIndex[tid * 2 + 1];
+    else
+      sBestIndex[tid] = blockBestIndex[tid * 2];
+
+    tid += blockDim.x;
+  }
+  __syncthreads();
+/*
+  //debug
+  if (threadIdx.x == 0) {
+    printf("\nAfter load to smem: ");
+    for (int i = 0; i < NUMBLOCKS/4; i++)
+      printf("%d, ", sBestIndex[i]);
+    printf("\n\n");
+  }
+  __syncthreads();
+*/
+  for (uint s = 1; s < NUMBLOCKS/4; s *= 2) {
+    tid = threadIdx.x;
+    while (tid < NUMBLOCKS/4) {
+      index = 2 * s * tid;
+
+      if (index < NUMBLOCKS/4) {
+        sBestIndex1 = sBestIndex[index];
+        sBestIndex2 = sBestIndex[index + s];
+        if (dev_AcoSchdulr->shouldReplaceSchedule(
+            dev_schedules[sBestIndex1],
+            dev_schedules[sBestIndex2], false))
+          sBestIndex[index] = sBestIndex2;
+      }
+      tid += blockDim.x;
+    }
+    __syncthreads();
+  }
+  if (threadIdx.x == 0)
+    blockBestIndex[0] = sBestIndex[0];
 }
 
 // default pheromone update scheme, one iteration best schedule is used to
@@ -591,10 +650,24 @@ void Dev_ACO(SchedRegion *dev_rgn, DataDepGraph *dev_DDG,
     // Sync threads after schedule creation
     threadGroup.sync();
     globalBestIndex = INVALID_VALUE;
-    if (GLOBALTID < NUMTHREADS/2) {
+    // reduce dev_schedules to 1 best schedule per block
+    if (GLOBALTID < NUMTHREADS/2)
       reduceToBestSchedPerBlock(dev_schedules, blockBestIndex, dev_AcoSchdulr);
-    }
+
     threadGroup.sync();
+
+    // one block to reduce blockBest schedules to one best schedule
+    if (blockIdx.x == 0)
+      reduceToBestSched(dev_schedules, blockBestIndex, dev_AcoSchdulr);
+
+    threadGroup.sync();    
+
+    if (GLOBALTID == 0 && 
+        dev_schedules[blockBestIndex[0]]->GetCost() != INVALID_VALUE)
+      globalBestIndex = blockBestIndex[0];
+
+    
+/*
     if (GLOBALTID == 0) {
       bestIndex = INVALID_VALUE;
       for (int i = 0; i < NUMBLOCKS/2; i++) {
@@ -612,6 +685,7 @@ void Dev_ACO(SchedRegion *dev_rgn, DataDepGraph *dev_DDG,
       }
       globalBestIndex = bestIndex;
     }
+*/
 /*
     // 1 thread selects iteration best sched
     // TODO: Parallelize
@@ -633,7 +707,14 @@ void Dev_ACO(SchedRegion *dev_rgn, DataDepGraph *dev_DDG,
       // place best schedule's cost and index in global mem
       //globalBestIndex = bestIndex;
       //debug
-      printf("Parallel found best sched = %d and linear found best sched = %d\n", globalBestIndex, bestIndex);
+      printf("\nParallel found best sched = %d and linear found best sched = %d\n", globalBestIndex, bestIndex);
+      if (globalBestIndex != bestIndex) {
+        printf("**** Parallel Reduction Incorrect *****\n");
+        if (globalBestIndex != -1 && bestIndex != -1) {
+          printf("Parallel chosen has spill cost: %d exec cost: %d\n", dev_schedules[globalBestIndex]->GetNormSpillCost(), dev_schedules[globalBestIndex]->GetExecCost());
+          printf("Serial chosen has spill cost: %d exec cost: %d\n", dev_schedules[bestIndex]->GetNormSpillCost(), dev_schedules[bestIndex]->GetExecCost());
+        }
+      }
     }
 */
     // perform pheremone update based on selected scheme
