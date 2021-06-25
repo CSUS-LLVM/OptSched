@@ -4,4 +4,5 @@ add_optsched_unittest(OptSchedBasicTests
   LinkedListTest.cpp
   LoggerTest.cpp
   UtilitiesTest.cpp
+  simple_machine_model_test.cpp
   )

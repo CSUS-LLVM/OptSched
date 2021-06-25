@@ -11,11 +11,16 @@
 
 using namespace llvm::opt_sched;
 
-MachineModel::MachineModel(const string &modelFile) {
-  SpecsBuffer buf;
-  char buffer[MAX_NAMESIZE];
+using std::string;
+using std::vector;
 
+MachineModel::MachineModel(const std::string &modelFile) {
+  SpecsBuffer buf;
   buf.Load(modelFile.c_str());
+}
+
+MachineModel::MachineModel(SpecsBuffer &buf) {
+  char buffer[MAX_NAMESIZE];
 
   buf.ReadSpec("MODEL_NAME:", buffer);
   mdlName_ = buffer;
@@ -197,7 +202,7 @@ bool MachineModel::IsFloat(InstType instTypeCode) const {
   return instTypes_[instTypeCode].name[0] == 'f';
 }
 
-void MachineModel::AddInstType(InstTypeInfo &instTypeInfo) {
+void MachineModel::AddInstType(InstTypeInfo instTypeInfo) {
   // If this new instruction type is unpipelined notify the model
   if (!instTypeInfo.pipelined)
     includesUnpipelined_ = true;
@@ -205,7 +210,7 @@ void MachineModel::AddInstType(InstTypeInfo &instTypeInfo) {
   instTypes_.push_back(std::move(instTypeInfo));
 }
 
-void MachineModel::addIssueType(IssueTypeInfo &IssueTypeInfo) {
+void MachineModel::addIssueType(IssueTypeInfo IssueTypeInfo) {
   issueTypes_.push_back(std::move(IssueTypeInfo));
 }
 

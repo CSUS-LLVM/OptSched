@@ -96,6 +96,7 @@ protected:
 class SpecsBuffer : public InputBuffer {
 public:
   SpecsBuffer();
+  explicit SpecsBuffer(char *buf, long size);
   void ReadSpec(const char *const title, char *value);
   void readLine(char *value, int maxPieceCnt);
   void readLstElmnt(char *value);
