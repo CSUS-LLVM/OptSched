@@ -144,8 +144,7 @@ InstCount DataDepStruct::CmputAbslutUprBound_() {
   return schedUprBound_;
 }
 
-DataDepGraph::DataDepGraph(MachineModel *machMdl, LATENCY_PRECISION ltncyPrcsn)
-    : DataDepStruct(machMdl) {
+DataDepGraph::DataDepGraph(MachineModel *machMdl) : DataDepStruct(machMdl) {
   int i;
 
   type_ = DGT_FULL;
@@ -154,7 +153,6 @@ DataDepGraph::DataDepGraph(MachineModel *machMdl, LATENCY_PRECISION ltncyPrcsn)
   weight_ = 1.0;
   outptDags_ = ODG_ALL;
   maxOutptDagSize_ = 1000;
-  ltncyPrcsn_ = ltncyPrcsn;
   includesCall_ = false;
   includesUnpipelined_ = false;
 

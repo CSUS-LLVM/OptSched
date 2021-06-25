@@ -173,7 +173,7 @@ class DataDepGraph : public llvm::opt_sched::OptSchedDDGWrapperBase,
                      public DirAcycGraph,
                      public DataDepStruct {
 public:
-  DataDepGraph(MachineModel *machMdl, LATENCY_PRECISION ltncyPcsn);
+  DataDepGraph(MachineModel *machMdl);
   virtual ~DataDepGraph();
 
   // Reads the data dependence graph from a text file.
@@ -367,7 +367,6 @@ protected:
   int entryInstCnt_;
   int exitInstCnt_;
 
-  LATENCY_PRECISION ltncyPrcsn_;
   int edgeCntPerLtncy_[MAX_LATENCY_VALUE + 1];
 
   // Tracks all registers in the scheduling region. Each RegisterFile
