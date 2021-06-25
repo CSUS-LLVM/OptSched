@@ -3,6 +3,8 @@
 #include "opt-sched/Scheduler/logger.h"
 #include "opt-sched/Scheduler/utilities.h"
 
+#include <iostream>
+
 using namespace llvm::opt_sched;
 
 ReadyList::ReadyList(DataDepGraph *dataDepGraph, SchedPriorities prirts) {
