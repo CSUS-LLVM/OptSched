@@ -1,5 +1,6 @@
 #include "ddg.h"
 
+#include "gtest/gtest-spi.h"
 #include "gtest/gtest.h"
 
 using namespace llvm::opt_sched;
@@ -110,5 +111,53 @@ dep 5 0 "other" 0
                                               &Model);
 
   EXPECT_EQ(7, DDG->GetNodeCnt());
+}
+
+TEST(SimpleDDG, VirtualFunctionsFailWell) {
+  static std::shared_ptr<DataDepGraph> DDG = makeDDG(R"(
+dag 3 "Simple"
+{
+dag_id fake:3
+dag_weight 1.000000
+compiler LLVM
+dag_lb -1
+dag_ub -1
+nodes
+node 0 "Inst"
+    sched_order 0
+    issue_cycle 0
+node 1 "artificial"  "__optsched_entry"
+node 2 "artificial"
+dependencies
+dep 0 1 "other" 0
+dep 1 2 "other" 0
+}
+  )");
+
+  EXPECT_FATAL_FAILURE(DDG->convertRegFiles(),
+                       "Unsupported operation convertRegFiles");
+  EXPECT_FATAL_FAILURE(DDG->convertSUnits(true, true),
+                       "Unsupported operation convertSUnits");
+}
+
+TEST(SimpleDDG, MakeInvalidDDGFailsWell) {
+  EXPECT_NONFATAL_FAILURE(makeDDG(R"(
+dag 3 "Simple"
+{
+dag_id fake:3
+dag_weight 1.000000
+compiler LLVM
+dag_lb -1
+dag_ub -1
+nodes
+node 0 "Inst"
+    sched_order 0
+    issue_cycle 0
+node 1 "artificial"  "__optsched_entry"
+node 2 "artificial"
+dependencies
+}
+  )"),
+                          "parse DDG");
 }
 } // namespace

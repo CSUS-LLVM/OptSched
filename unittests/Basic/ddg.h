@@ -20,7 +20,7 @@ makeDDG(const std::string &DDG,
       FAIL() << "Unsupported operation convertSUnits()";
     }
     void convertRegFiles() override {
-      FAIL() << "Unsupported operation convertRegFile()";
+      FAIL() << "Unsupported operation convertRegFiles()";
     }
   };
 
