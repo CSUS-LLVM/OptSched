@@ -337,6 +337,16 @@ void DataDepGraph::SetDynmcLwrBounds() {
   }
 }
 
+FUNC_RESULT DataDepGraph::ReadFromString(const std::string &Str) {
+  char *BufData = new char[Str.size() + 1];
+  std::copy_n(Str.data(), Str.size() + 1, BufData);
+  SpecsBuffer Buf;
+  Buf.SetBuf(BufData, Str.size() + 1);
+
+  bool EndReached = false;
+  return ReadFrmFile(&Buf, EndReached);
+}
+
 FUNC_RESULT DataDepGraph::ReadFrmFile(SpecsBuffer *buf,
                                       bool &endOfFileReached) {
   int pieceCnt;

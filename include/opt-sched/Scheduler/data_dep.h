@@ -178,6 +178,7 @@ public:
 
   // Reads the data dependence graph from a text file.
   FUNC_RESULT ReadFrmFile(SpecsBuffer *buf, bool &endOfFileReached);
+  FUNC_RESULT ReadFromString(const std::string &Str);
   // Continues reading until the end of the current graph definition,
   // discarding the data.
   FUNC_RESULT SkipGraph(SpecsBuffer *buf, bool &endOfFileReached);
