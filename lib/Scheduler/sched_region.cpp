@@ -279,7 +279,7 @@ FUNC_RESULT SchedRegion::FindOptimalSchedule(
   }
 
   SetupForSchdulng_();
-  CmputAbslutUprBound_();
+  CalculateUpperBounds(BbSchedulerEnabled);
   schedLwrBound_ = dataDepGraph_->GetSchedLwrBound();
 
   // Step #1: Find the heuristic schedule if enabled.
@@ -332,10 +332,7 @@ FUNC_RESULT SchedRegion::FindOptimalSchedule(
 
   // This must be done after SetupForSchdulng() or UpdateSetupForSchdulng() to
   // avoid resetting lower bound values.
-  if (!BbSchedulerEnabled)
-    CmputAndSetCostLwrBound();
-  else
-    CmputLwrBounds_(false);
+  CalculateLowerBounds(BbSchedulerEnabled);
 
   // Log the lower bound on the cost, allowing tools reading the log to compare
   // absolute rather than relative costs.
@@ -1046,23 +1043,36 @@ void SchedRegion::updateBoundsAfterGraphTransformations(
   const InstCount OldSchedUprBound = schedUprBound_;
   const InstCount OldCostLwrBound = costLwrBound_;
 
-  CmputAbslutUprBound_();
-  schedLwrBound_ = dataDepGraph_->GetSchedLwrBound();
-  if (!BbSchedulerEnabled)
-    CmputAndSetCostLwrBound();
-  else
-    CmputLwrBounds_(false);
+  // Only recalculate if we've already computed them.
+  // If not, we'll already compute these bounds later on before scheduling.
+  if (IsUpperBoundSet_)
+    CalculateUpperBounds(BbSchedulerEnabled);
+  if (IsLowerBoundSet_) {
+    CalculateLowerBounds(BbSchedulerEnabled);
 
-  // Log the new lower bound on the cost, allowing tools reading the log to
-  // compare absolute rather than relative costs.
-  Logger::Event("CostLowerBound", "cost", costLwrBound_);
+    // Log the new lower bound on the cost, allowing tools reading the log to
+    // compare absolute rather than relative costs.
+    Logger::Event("CostLowerBound", "cost", costLwrBound_);
+  }
 
-  if (OldSchedLwrBound > schedLwrBound_)
+  // Some validation to try to catch bugs
+  if (OldSchedLwrBound > schedLwrBound_) {
     Logger::Error("schedLwrBound got worse after graph transformations!");
-  if (OldSchedUprBound < schedUprBound_)
-    Logger::Error("schedUprBound got worse after graph transformations!");
-  if (OldCostLwrBound > costLwrBound_)
+    // Probably a bug, but still take the most accurate value
+    schedLwrBound_ = OldSchedLwrBound;
+  }
+  if (OldSchedUprBound < schedUprBound_) {
+    Logger::Error(
+        "schedUprBound got worse after graph transformations! (%d -> %d)",
+        OldSchedUprBound, schedUprBound_);
+    // Probably a bug, but still take the most accurate value
+    schedUprBound_ = OldSchedUprBound;
+  }
+  if (OldCostLwrBound > costLwrBound_) {
     Logger::Error("costLwrBound got worse after graph transformations!");
+    // Probably a bug, but still take the most accurate value
+    costLwrBound_ = OldCostLwrBound;
+  }
 }
 
 FUNC_RESULT SchedRegion::applyGraphTransformation(GraphTrans *GT) {
@@ -1150,4 +1160,18 @@ SchedRegion::applyGraphTransformations(bool BbSchedulerEnabled,
   Logger::Event("GraphTransformationsFinished");
 
   return result;
+}
+
+void SchedRegion::CalculateUpperBounds(bool BbSchedulerEnabled) {
+  IsUpperBoundSet_ = true;
+  CmputAbslutUprBound_();
+}
+
+void SchedRegion::CalculateLowerBounds(bool BbSchedulerEnabled) {
+  IsLowerBoundSet_ = true;
+  schedLwrBound_ = dataDepGraph_->GetSchedLwrBound();
+  if (!BbSchedulerEnabled)
+    CmputAndSetCostLwrBound();
+  else
+    CmputLwrBounds_(false);
 }

@@ -253,6 +253,11 @@ protected:
   // The best schedule found so far (may be heuristic or enumerator generated)
   InstSchedule *bestSched_;
 
+  void CalculateUpperBounds(bool BbSchedulerEnabled);
+  void CalculateLowerBounds(bool BbSchedulerEnabled);
+
+  bool IsLowerBoundSet_ = false;
+  bool IsUpperBoundSet_ = false;
   // TODO(max): Document.
   InstCount schedLwrBound_;
   // TODO(max): Document.
