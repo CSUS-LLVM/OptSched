@@ -315,7 +315,24 @@ static bool isRedundant(SchedInstruction *NodeI, SchedInstruction *NodeJ,
   const size_t From = castUnsigned(e.from->GetNum());
   const size_t To = castUnsigned(e.to->GetNum());
 
-  return NodeJ->IsRcrsvScsr(e.to) && e.label <= DistanceTable[{From, To}];
+  const size_t I = castUnsigned(NodeI->GetNum());
+  const size_t J = castUnsigned(NodeJ->GetNum());
+
+  // If this edge is not (I, J) and there is a path through From -> (I, J) -> To
+  // which is at least as long as this edge's weight, then this edge is
+  // redundant.
+  // This is because this path implies that this edge is a transitive edge and
+  // the length condition shows that this edge doesn't affect the critical path
+  // distances.
+
+  // Note: DistanceTable[{I, J}] should always be 0 at this point, but with
+  // resource edges, this may not necessarily be true.
+  // Note: we don't need to saturate at MaxLatency because it doesn't affect the
+  // answer.
+  const int DistThroughIJ =
+      DistanceTable[{From, I}] + DistanceTable[{I, J}] + DistanceTable[{J, To}];
+
+  return NodeJ->IsRcrsvScsr(e.to) && e.label <= DistThroughIJ;
 }
 
 static LinkedList<GraphEdge>::iterator
