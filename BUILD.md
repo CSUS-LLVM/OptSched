@@ -131,6 +131,13 @@ git am ../projects/OptSched/patches/llvm7.0/llvm7-print-spilling-info.patch
 vim ../include/llvm/IR/CallSite.h
 `
 
+**6.1 Disable use of posix_spawn() to allow kernel profiling with NCU.**
+###### Without this change, the clone() system call is used to create new processes which is not supported by NCU. Open the file specified below, and change the macro `#ifdef HAVE_POSIX_SPAWN` to `#ifdef HAVE_POSIX_SPAWN_NO` in the three places it appears in the file and save your work. This variable will not be defined and posix_spawn() will be disabled allowing fork+exec to be used instead.
+
+`
+vim ../lib/Support/Unix/Program.inc
+`
+
 **7. Build LLVM and OptSched using Ninja**
 ###### Note: You must change the -DCMAKE_CUDA_ARCHITECTURES flag to match the Compute Capability of your GPU. The Tesla T4 is CC 7.5.The -DCMAKE_CXX_FLAGS_INIT flag must point to your CUDA install's include folder, the default directory is used here. If you want to build the device code in debug mode, replace -lineinfo with -G in the -DCMAKE_CUDA_FLAGS_INIT variable. Building LLVM in debug mode is not guaranteed to work, asserts may be outdated.
 
