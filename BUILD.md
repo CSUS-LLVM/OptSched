@@ -7,7 +7,7 @@
 ### Ubuntu
 
 _**Attention:** Please only run these instructions on your own machine. If you are building on the **Tesla T4 machine**, please skip_
-_forward to Manual Build._
+_forward to adding CUDA toolkit paths to your .bashrc._
 
 ###### Starting with a fresh install of [Ubuntu 20.04] is recommended.
 
@@ -61,7 +61,7 @@ sudo apt install python2
 ###### Select Linux > x86_64 > Ubuntu > Your version of Ubuntu > deb (network) 
 ###### Then follow the presented installation instructions, simply copy the presented commands
 
-#### (Optional) Add the CUDA toolkit paths to your .bashrc for easier use of the tools
+#### (Required) Add the CUDA toolkit paths to your .bashrc for easier use of the tools and to allow cmake to find NVCC and cuda includes.
 ###### Open .bashrc
 `
 vim ~/.bashrc
@@ -74,7 +74,7 @@ export LD_LIBRARY_PATH=/usr/local/cuda-11.3/targets/x86_64-linux/lib:$LD_LIBRARY
 ```
 
 #### Test CUDA compiler and driver install
-###### Reboot the machine:
+###### Reboot the machine if you installed the CUDA toolkit:
 `
 sudo reboot
 `
