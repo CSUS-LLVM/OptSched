@@ -121,7 +121,7 @@ mkdir build && cd build
 **5. Apply [this patch][spilling-info-patch] to print spilling info.**
 
 `
-git am ../projects/OptSched/patches/llvm7.0/llvm7-print-spilling-info.patch
+git am ../projects/OptSched/patches/llvm7.0/flang-llvm7-print-spilling-info.patch
 `
 
 **6. Move PointerIntPair to public from protected.**
