@@ -166,7 +166,6 @@ bool ACOScheduler::shouldReplaceSchedule(InstSchedule *OldSched,
       return true;
     else
       return false;
-      //return NewSpillCost <= OldSpillCost && NewCost < OldCost;
   }
 }
 
