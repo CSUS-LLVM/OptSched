@@ -603,11 +603,6 @@ void BBWithSpill::UpdateSpillInfoForSchdul_(SchedInstruction *inst,
       // happen here.
       if (needsSLIL()) {
         dev_sumOfLiveIntervalLengths_[regType][GLOBALTID]++;
-/*
-        if (!use->IsInInterval(inst) && !use->IsInPossibleInterval(inst)) {
-          ++dev_dynamicSlilLowerBound_[GLOBALTID];
-        }
-*/
       }
 
       dev_liveRegs_[regType][GLOBALTID].SetBit(regNum, false, use->GetWght());
@@ -675,16 +670,6 @@ void BBWithSpill::UpdateSpillInfoForSchdul_(SchedInstruction *inst,
     if (needsSLIL()) {
       dev_sumOfLiveIntervalLengths_[i][GLOBALTID] += 
 	               dev_liveRegs_[i][GLOBALTID].GetOneCnt();
-/*
-      for (int j = 0; j < dev_liveRegs_[i][GLOBALTID].GetSize(); ++j) {
-        if (dev_liveRegs_[i][GLOBALTID].GetBit(j)) {
-          const Register *reg = regFiles_[i].GetReg(j);
-          if (!reg->IsInInterval(inst) && !reg->IsInPossibleInterval(inst)) {
-            ++dev_dynamicSlilLowerBound_[GLOBALTID];
-          }
-        }
-      }
-*/
     }
   }
 
