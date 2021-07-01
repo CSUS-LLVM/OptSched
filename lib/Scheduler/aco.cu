@@ -131,6 +131,13 @@ bool ACOScheduler::shouldReplaceSchedule(InstSchedule *OldSched,
     return true;
   }
 
+  // return false if new schedule is invalid
+  // return true if old schedule is invalid
+  if (NewSched->GetCost() == INVALID_VALUE)
+    return false;
+  if (OldSched->GetCost() == INVALID_VALUE)
+    return true;
+
   // if it is the 1st pass return the cost comparison
   // if it is the 2nd pass return true if the RP cost and ILP cost is less
 #ifdef __CUDA_ARCH__
@@ -152,7 +159,13 @@ bool ACOScheduler::shouldReplaceSchedule(InstSchedule *OldSched,
     InstCount OldCost = OldSched->GetExecCost();
     InstCount NewSpillCost = NewSched->GetNormSpillCost();
     InstCount OldSpillCost = OldSched->GetNormSpillCost();
-    return NewCost < OldCost && NewSpillCost <= OldSpillCost;
+    // Lower Spill Cost always wins
+    if (NewSpillCost < OldSpillCost)
+      return true;
+    else if (NewSpillCost == OldSpillCost && NewCost < OldCost)
+      return true;
+    else
+      return false;
   }
 }
 
@@ -513,6 +526,84 @@ InstSchedule *ACOScheduler::FindOneSchedule(InstCount RPTarget,
 #endif
 }
 
+// Reduce to only index of best schedule per 2 blocks in output array
+__inline__ __device__
+void reduceToBestSchedPerBlock(InstSchedule **dev_schedules, int *blockBestIndex, ACOScheduler *dev_AcoSchdulr) {
+  __shared__ int sdata[NUMTHREADSPERBLOCK];
+  uint gtid = GLOBALTID;
+  uint tid = threadIdx.x;
+  int blockSize = NUMTHREADSPERBLOCK;
+  
+  // load candidate schedules into smem
+  if (dev_AcoSchdulr->shouldReplaceSchedule(dev_schedules[gtid * 2], dev_schedules[gtid * 2 + 1], false))
+    sdata[tid] = gtid * 2 + 1;
+  else
+    sdata[tid] = gtid * 2;
+  __syncthreads();
+
+  // do reduction on indexes in shared mem
+  for (uint s = 1; s < blockDim.x; s*=2) {
+    if (tid%(2*s) == 0) {
+      if (dev_AcoSchdulr->shouldReplaceSchedule(
+          dev_schedules[sdata[tid]], 
+          dev_schedules[sdata[tid + s]], false))
+        sdata[tid] = sdata[tid + s];
+    }
+    __syncthreads();
+  }
+
+  if (tid == 0)
+    blockBestIndex[blockIdx.x] = sdata[0];
+
+}
+
+// 1 block only to allow proper synchronization
+// reduce to only one best index. At the end of this function globalBestIndex
+// should be in blockBestIndex[0]
+__inline__ __device__
+void reduceToBestSched(InstSchedule **dev_schedules, int *blockBestIndex, ACOScheduler *dev_AcoSchdulr) {
+  __shared__ int sBestIndex[NUMBLOCKS/4];
+  uint tid = threadIdx.x;
+  int index, sBestIndex1, sBestIndex2;
+  
+  // Load best indices into shared mem, reduce by half while doing so
+  // If there are more than 64 schedules in blockBestIndex, some threads
+  // will have to load in more than one value
+  while (tid < NUMBLOCKS/4) {
+    if (dev_AcoSchdulr->shouldReplaceSchedule(dev_schedules[blockBestIndex[tid * 2]], 
+                                              dev_schedules[blockBestIndex[tid * 2 + 1]], false))
+      sBestIndex[tid] = blockBestIndex[tid * 2 + 1];
+    else
+      sBestIndex[tid] = blockBestIndex[tid * 2];
+
+    tid += blockDim.x;
+  }
+  __syncthreads();
+
+  // reduce in smem
+  for (uint s = 1; s < NUMBLOCKS/4; s *= 2) {
+    tid = threadIdx.x;
+    // if there are more than 32 schedules in smem, a thread
+    // may reduce more than once per loop
+    while (tid < NUMBLOCKS/4) {
+      index = 2 * s * tid;
+
+      if (index < NUMBLOCKS/4) {
+        sBestIndex1 = sBestIndex[index];
+        sBestIndex2 = sBestIndex[index + s];
+        if (dev_AcoSchdulr->shouldReplaceSchedule(
+            dev_schedules[sBestIndex1],
+            dev_schedules[sBestIndex2], false))
+          sBestIndex[index] = sBestIndex2;
+      }
+      tid += blockDim.x;
+    }
+    __syncthreads();
+  }
+  if (threadIdx.x == 0)
+    blockBestIndex[0] = sBestIndex[0];
+}
+
 // default pheromone update scheme, one iteration best schedule is used to
 // update pheromones every iteration
 #define ONE_PER_ITER 0
@@ -523,13 +614,13 @@ InstSchedule *ACOScheduler::FindOneSchedule(InstCount RPTarget,
 // select which pheromone update scheme to use
 #define PHER_UPDATE_SCHEME ONE_PER_ITER
 
-__device__ int globalBestCost, globalBestIndex, dev_noImprovement;
+__device__ int globalBestIndex, dev_noImprovement;
 
 __global__
 void Dev_ACO(SchedRegion *dev_rgn, DataDepGraph *dev_DDG,
             ACOScheduler *dev_AcoSchdulr, InstSchedule **dev_schedules,
             DeviceVector<Choice> *dev_ready, InstSchedule *dev_bestSched,
-            int noImprovementMax) {
+            int noImprovementMax, int *blockBestIndex) {
   // holds cost and index of bestSched per block
   __shared__ int bestIndex, dev_iterations;
   __shared__ bool needsSLIL;
@@ -559,26 +650,23 @@ void Dev_ACO(SchedRegion *dev_rgn, DataDepGraph *dev_DDG,
                                     &dev_ready[GLOBALTID]);
     // Sync threads after schedule creation
     threadGroup.sync();
-    // 1 thread selects iteration best sched
-    // TODO: Parallelize
-    if (GLOBALTID == 0) {
-      bestIndex = INVALID_VALUE;
-      for (int i = 0; i < NUMTHREADS; i++) {
-        // Skip invalid schedules from terminating ants early
-        if (dev_schedules[i]->GetCost() == INVALID_VALUE) {
-          continue;
-        }
-        if (bestIndex == INVALID_VALUE)
-          bestIndex = i;
-        if (bestIndex != i &&
-            dev_AcoSchdulr->shouldReplaceSchedule(dev_schedules[bestIndex], 
-                                                  dev_schedules[i], false)) {
-          bestIndex = i;
-        }
-      }
-      // place best schedule's cost and index in global mem
-      globalBestIndex = bestIndex;
-    }
+    globalBestIndex = INVALID_VALUE;
+    // reduce dev_schedules to 1 best schedule per block
+    if (GLOBALTID < NUMTHREADS/2)
+      reduceToBestSchedPerBlock(dev_schedules, blockBestIndex, dev_AcoSchdulr);
+
+    threadGroup.sync();
+
+    // one block to reduce blockBest schedules to one best schedule
+    if (blockIdx.x == 0)
+      reduceToBestSched(dev_schedules, blockBestIndex, dev_AcoSchdulr);
+
+    threadGroup.sync();    
+
+    if (GLOBALTID == 0 && 
+        dev_schedules[blockBestIndex[0]]->GetCost() != INVALID_VALUE)
+      globalBestIndex = blockBestIndex[0];
+
     // perform pheremone update based on selected scheme
 #if (PHER_UPDATE_SCHEME == ONE_PER_ITER)
     // Another hard sync point after iteration best selection
@@ -760,6 +848,10 @@ FUNC_RESULT ACOScheduler::FindSchedule(InstSchedule *schedule_out,
     gpuErrchk(cudaMalloc((void**)&dev_bestSched, memSize));
     gpuErrchk(cudaMemcpy(dev_bestSched, bestSchedule, memSize,
                          cudaMemcpyHostToDevice));
+    // Create a global mem array for device to use in parallel reduction
+    int *dev_blockBestIndex;
+    memSize = (NUMBLOCKS/2) * sizeof(int);
+    gpuErrchk(cudaMalloc(&dev_blockBestIndex, memSize));
     // Make sure managed memory is copied to device before kernel start
     memSize = sizeof(ACOScheduler);
     gpuErrchk(cudaMemPrefetchAsync(dev_AcoSchdulr, memSize, 0));
@@ -770,7 +862,7 @@ FUNC_RESULT ACOScheduler::FindSchedule(InstSchedule *schedule_out,
     // of void pointers to host memory locations of the arguments
     dim3 gridDim(NUMBLOCKS);
     dim3 blockDim(NUMTHREADSPERBLOCK);
-    void *dArgs[7];
+    void *dArgs[8];
     dArgs[0] = (void*)&dev_rgn_;
     dArgs[1] = (void*)&dev_DDG_;
     dArgs[2] = (void*)&dev_AcoSchdulr;
@@ -778,6 +870,7 @@ FUNC_RESULT ACOScheduler::FindSchedule(InstSchedule *schedule_out,
     dArgs[4] = (void*)&dev_ready_;
     dArgs[5] = (void*)&dev_bestSched;
     dArgs[6] = (void*)&noImprovementMax;
+    dArgs[7] = (void*)&dev_blockBestIndex;
     gpuErrchk(cudaLaunchCooperativeKernel((void*)Dev_ACO, gridDim, blockDim, 
                                           dArgs));
     cudaDeviceSynchronize();
