@@ -588,7 +588,7 @@ void reduceToBestSched(InstSchedule **dev_schedules, int *blockBestIndex, ACOSch
     while (tid < NUMBLOCKS/4) {
       index = 2 * s * tid;
 
-      if (index < NUMBLOCKS/4) {
+      if (index + s < NUMBLOCKS/4) {
         sBestIndex1 = sBestIndex[index];
         sBestIndex2 = sBestIndex[index + s];
         if (dev_AcoSchdulr->shouldReplaceSchedule(
