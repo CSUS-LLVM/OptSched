@@ -46,4 +46,16 @@ if(OPTSCHED_ENABLE_AMDGPU)
   endif()
 endif()
 
-add_dependencies(OptSched ${OPT_SCHED_TARGET_DEPS})
+function(add_optsched_library name)
+  if(LLVM_VERSION VERSION_LESS 8.0)
+    add_llvm_loadable_module(${name} OBJECT ${ARGN})
+  else()
+    add_llvm_library(${name} MODULE OBJECT ${ARGN})
+  endif()
+endfunction()
+
+add_optsched_library(OptSched
+  ${OPTSCHED_SRCS}
+  LINK_LIBS ${OPTSCHED_LINK_LIBS}
+)
+add_dependencies(OptSched ${OPTSCHED_TARGET_DEPS})

@@ -225,7 +225,7 @@ bool HistEnumTreeNode::DoesDominate_(EnumTreeNode *node,
 
     if (othrHstry != NULL) {
       othrHstry->SetLwrBounds_(othrLwrBounds, othrLastInsts, othrTime,
-                              minTimeToExmn, enumrtr);
+                               minTimeToExmn, enumrtr);
     }
 
     CmputNxtAvlblCycles_(enumrtr, instsPerType, nxtAvlblCycles);
@@ -237,14 +237,15 @@ bool HistEnumTreeNode::DoesDominate_(EnumTreeNode *node,
 
       // If an inst. is scheduled after its static lower bound then its
       // successors will potentially be pushed down and should be checked.
-      if (inst != NULL && (cycleNum > inst->GetLwrBound(DIR_FRWRD) || shft > 0)) {
+      if (inst != NULL &&
+          (cycleNum > inst->GetLwrBound(DIR_FRWRD) || shft > 0)) {
         UDT_GLABEL ltncy;
         DependenceType depType;
 
         // Examine all the unscheduled successors of this instruction to see if
         // any of them is pushed down.
         for (SchedInstruction *scsr = inst->GetFrstScsr(NULL, &ltncy, &depType);
-            scsr != NULL; scsr = inst->GetNxtScsr(NULL, &ltncy, &depType)) {
+             scsr != NULL; scsr = inst->GetNxtScsr(NULL, &ltncy, &depType)) {
           if (scsr->IsSchduld() == false) {
             InstCount nxtAvlblCycle = nxtAvlblCycles[scsr->GetIssueType()];
             InstCount num = scsr->GetNum();
