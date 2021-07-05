@@ -16,7 +16,7 @@ env:
 
 jobs:
   comment-triggered:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-18.04
 
     outputs:
       value: ${{ steps.value.outputs.value }}
@@ -42,7 +42,7 @@ jobs:
 
   init-report:
     needs: comment-triggered
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-18.04
     if: needs.comment-triggered.outputs.value == 'true'
 
     outputs:
@@ -59,7 +59,7 @@ jobs:
 
   ci:
     needs: comment-triggered
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-18.04
     if: needs.comment-triggered.outputs.checks_should_run == 'true'
 
     steps:
@@ -81,6 +81,9 @@ jobs:
       with:
         path: .ccache
         key: ccache
+
+    - run: |
+        ccache -o hash_dir=false
 
     - name: Configure
       run: |
@@ -119,7 +122,7 @@ jobs:
 
   clang-format:
     needs: comment-triggered
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-18.04
     if: needs.comment-triggered.outputs.checks_should_run == 'true'
 
     steps:
@@ -139,7 +142,7 @@ jobs:
 
   clang-tidy:
     needs: comment-triggered
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-18.04
     if: needs.comment-triggered.outputs.checks_should_run == 'true'
 
     steps:
@@ -189,7 +192,8 @@ jobs:
             '-DLLVM_TARGETS_TO_BUILD=X86;AMDGPU'                                       \
             -DLLVM_TABLEGEN=$(which llvm-tblgen-7)                                     \
             -DLLVM_EXTERNAL_PROJECTS=OptSched                                          \
-            -DLLVM_EXTERNAL_OPTSCHED_SOURCE_DIR=$(cd .. && pwd)
+            -DLLVM_EXTERNAL_OPTSCHED_SOURCE_DIR=$(cd .. && pwd)                        \
+            -DOPTSCHED_ENABLE_AMDGPU=ON
 
         # Generate relevant "source" files so that clang-tidy knows where to find them.
         cmake --build . --target X86CommonTableGen intrinsics_gen AttributeCompatFuncTableGen AMDGPUCommonTableGen
@@ -218,7 +222,7 @@ jobs:
 
   trailing-whitespace:
     needs: comment-triggered
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-18.04
     if: needs.comment-triggered.outputs.checks_should_run == 'true'
 
     steps:
@@ -238,7 +242,7 @@ jobs:
 
   west-const:
     needs: comment-triggered
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-18.04
     if: needs.comment-triggered.outputs.checks_should_run == 'true'
 
     steps:
@@ -260,7 +264,7 @@ jobs:
 
   report:
     needs: [comment-triggered, init-report, ci, clang-format, clang-tidy, trailing-whitespace, west-const]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-18.04
     if: always()
 
     steps:

@@ -22,6 +22,8 @@
 
     + **[Install Ninja (optional)][setup-macos-ninja]**
 
++ **[External Build][external-build]**
+
 + **[Super-build Script][super-build]**
 
 + **[Manual Build][manual-build]**
@@ -35,6 +37,8 @@
     + **[MacOS Xcode Build][build-xcode]**
 
 + **[Test the Build][test]**
+
++ **[Tips][tips]**
 
 ---
 
@@ -143,6 +147,49 @@ wget -q https://github.com/ninja-build/ninja/releases/download/v1.9.0/ninja-mac.
 
 If you would like to use Xcode to build LLVM, and do not already have it installed, go to the Mac App Store,
 search for `Xcode`, and click `Get`.
+
+## External Build
+
+In this method, LLVM is built separately, with its location passed to OptSched.
+This can help reduce rebuilds by restricting it to rebuilding OptSched only, rather than all of LLVM.
+Additionally, it allows you to do things such as build OptSched with debug info, but leave off LLVM's debug info.
+
+### Build LLVM
+
+See the [Manual Build on downloading LLVM and building clang and llvm][manual-build].
+Follow those steps, except do not clone OptSched inside of LLVM.
+Simply build LLVM just with the spilling info patch.
+
+Additionally, add a `-DCMAKE_INSTALL_PREFIX=/path/to/install/llvm-release` to the `cmake ...` command,
+and also run `ninja install` or `make install` after building.
+Remember that `CMAKE_INSTALL_PREFIX`; it will be passed to CMake when building OptSched itself.
+
+### Build OptSched
+
+Clone OptSched to a fresh directory, and make a build directory for OptSched:
+
+```
+git clone https://github.com/CSUS-LLVM/OptSched
+cd OptSched
+mkdir build && cd build
+```
+
+Run CMake:
+
+```
+cmake .. -GNinja -DCMAKE_BUILD_TYPE=Debug -DLLVM_DIR=</path/to/install/llvm-release>/lib/cmake/llvm -DOPTSCHED_ENABLE_AMDGPU=OFF
+```
+
+Note: if you use `-DCMAKE_BUILD_TYPE=Debug`, make sure that you built LLVM with assertions in the previous step.
+If you did not build LLVM with assertions, use `-DCMAKE_BUILD_TYPE=Release`.
+
+Build:
+
+```
+ninja
+# Or if you left off -GNinja, use Make:
+make -j6 # or however many CPUs you have
+```
 
 ## Super-build Script
 
@@ -259,7 +306,7 @@ git am ../OptSched/patches/llvm6.0/llvm6-print-spilling-info.patch
 ###### Note: In debug builds, linking uses a lot of memory. Set `LLVM_PARALLEL_LINK_JOBS=2` if you have >= 32G memory, otherwise use `LLVM_PARALLEL_LINK_JOBS=1`.
 
 `
-cmake -GNinja -DLLVM_PARALLEL_LINK_JOBS=1 -DLLVM_ENABLE_PROJECTS='clang' -DCMAKE_BUILD_TYPE=Debug '-DLLVM_TARGETS_TO_BUILD=X86' -DLLVM_BUILD_TOOLS=ON -DLLVM_INCLUDE_TESTS=ON -DLLVM_OPTIMIZED_TABLEGEN=ON ../..
+cmake -GNinja -DLLVM_PARALLEL_LINK_JOBS=1 -DLLVM_ENABLE_PROJECTS='clang' -DCMAKE_BUILD_TYPE=Debug '-DLLVM_TARGETS_TO_BUILD=X86' -DLLVM_BUILD_TOOLS=ON -DLLVM_INCLUDE_TESTS=ON -DLLVM_OPTIMIZED_TABLEGEN=ON ../.. -DOPTSCHED_ENABLE_AMDGPU=OFF
 `
 
 `
@@ -271,7 +318,7 @@ ninja
 ###### Note: Debug builds use a lot of memory. The build will fail if you do not have enough. If this happens, try using Ninja to build.
 
 `
-cmake -DLLVM_ENABLE_PROJECTS='clang' -DCMAKE_BUILD_TYPE=Debug '-DLLVM_TARGETS_TO_BUILD=X86' -DLLVM_BUILD_TOOLS=ON -DLLVM_INCLUDE_TESTS=ON -DLLVM_OPTIMIZED_TABLEGEN=ON ../..
+cmake -DLLVM_ENABLE_PROJECTS='clang' -DCMAKE_BUILD_TYPE=Debug '-DLLVM_TARGETS_TO_BUILD=X86' -DLLVM_BUILD_TOOLS=ON -DLLVM_INCLUDE_TESTS=ON -DLLVM_OPTIMIZED_TABLEGEN=ON ../.. -DOPTSCHED_ENABLE_AMDGPU=OFF
 `
 
 `
@@ -289,7 +336,7 @@ _See [Building with CMake] for more build options._
 **1. Build an Xcode project**
 
 `
-cmake -G Xcode -DLLVM_ENABLE_PROJECTS='clang' -DCMAKE_BUILD_TYPE=Debug '-DLLVM_TARGETS_TO_BUILD=X86' -DLLVM_BUILD_TOOLS=ON -DLLVM_INCLUDE_TESTS=ON -DLLVM_OPTIMIZED_TABLEGEN=ON ../..
+cmake -G Xcode -DLLVM_ENABLE_PROJECTS='clang' -DCMAKE_BUILD_TYPE=Debug '-DLLVM_TARGETS_TO_BUILD=X86' -DLLVM_BUILD_TOOLS=ON -DLLVM_INCLUDE_TESTS=ON -DLLVM_OPTIMIZED_TABLEGEN=ON ../.. -DOPTSCHED_ENABLE_AMDGPU=OFF
 `
 
 This will create an Xcode project in `llvm-project/llvm/projects/build`.
@@ -370,6 +417,24 @@ echo 'int main(){};' | Debug/bin/clang -xc - -O3 -fplugin=lib/OptSched.so -mllvm
 
 <!-- TODO: Show expected output of test command -->
 
+## Tips
+
+### Slow Compile Times
+
+**CCache**
+
+Are your compile times slow because you keep finding you have to rebuild files (e.g. all of LLVM)?
+Use ccache. To do this, install `ccache` (`sudo apt-get install ccache`) and add the following arguments to your `cmake` command:
+
+```
+-DCMAKE_CXX_COMPILER_LAUNCHER=ccache -DCMAKE_C_COMPILER_LAUNCHER=ccache
+```
+
+Also, you probably want to configure ccache to not hash the directory: `ccache -o hash_dir=false`.
+
+With CCache enabled, if the compiler would be building a file with no changes from before, it will instead
+use the cached file.
+
 
 [table of contents]: #table-of-contents
 [setup]: #setup
@@ -382,6 +447,7 @@ echo 'int main(){};' | Debug/bin/clang -xc - -O3 -fplugin=lib/OptSched.so -mllvm
 [setup-macos-homebrew]: #install-homebrew-optional
 [setup-macos-cmake]: #install-cmake
 [setup-macos-ninja]: #install-ninja-optional-1
+[external-build]: #external-build
 [super-build]: #super-build-script
 [manual-build]: #manual-build
 [download-source]: #download-the-source-code
@@ -389,6 +455,7 @@ echo 'int main(){};' | Debug/bin/clang -xc - -O3 -fplugin=lib/OptSched.so -mllvm
 [build-cli]: #command-line-build-ubuntu-and-macos
 [build-xcode]: #macos-xcode-build
 [test]: #test-the-build
+[tips]: #tips
 
 <!-- Outside links -->
 [ubuntu 16.04]: http://releases.ubuntu.com/16.04/
