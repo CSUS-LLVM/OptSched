@@ -723,7 +723,7 @@ void Dev_ACO(SchedRegion *dev_rgn, DataDepGraph *dev_DDG,
           // allow the same number of iterations every time
           atomicAdd(&dev_noImprovement, 1);
 #endif
-        if (dev_bestSched && dev_bestSched->GetCost == 0) {
+        if (dev_bestSched && dev_bestSched->GetCost() == 0) {
           dev_iterations++;
           break;
         }
