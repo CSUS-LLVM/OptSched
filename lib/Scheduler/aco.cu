@@ -722,8 +722,8 @@ void Dev_ACO(SchedRegion *dev_rgn, DataDepGraph *dev_DDG,
           // for testing compile times disable resetting dev_noImprovement to
           // allow the same number of iterations every time
           atomicAdd(&dev_noImprovement, 1);
-#endif  
-        if (bestSchedule && bestSchedule->GetCost() == 0) {
+#endif
+        if (dev_bestSched && dev_bestSched->GetCost == 0) {
           dev_iterations++;
           break;
         }
