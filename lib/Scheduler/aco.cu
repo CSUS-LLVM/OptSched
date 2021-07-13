@@ -615,6 +615,7 @@ void reduceToBestSched(InstSchedule **dev_schedules, int *blockBestIndex, ACOSch
 #define PHER_UPDATE_SCHEME ONE_PER_ITER
 
 __device__ int globalBestIndex, dev_noImprovement;
+__device__ bool lowerBoundSchedFound;
 
 __global__
 void Dev_ACO(SchedRegion *dev_rgn, DataDepGraph *dev_DDG,
@@ -624,13 +625,13 @@ void Dev_ACO(SchedRegion *dev_rgn, DataDepGraph *dev_DDG,
   // holds cost and index of bestSched per block
   __shared__ int bestIndex, dev_iterations;
   __shared__ bool needsSLIL;
-  __device__ bool lowerBoundSchedFound;
   needsSLIL = ((BBWithSpill *)dev_rgn)->needsSLIL();
   bool IsSecondPass = dev_rgn->IsSecondPass();
   dev_rgn->SetDepGraph(dev_DDG);
   ((BBWithSpill *)dev_rgn)->SetRegFiles(dev_DDG->getRegFiles());
   dev_noImprovement = 0;
   dev_iterations = 0;
+  lowerBoundSchedFound = false;
   // Used to synchronize all launched threads
   auto threadGroup = cg::this_grid();
   // Get RPTarget
@@ -724,6 +725,8 @@ void Dev_ACO(SchedRegion *dev_rgn, DataDepGraph *dev_DDG,
           // allow the same number of iterations every time
           atomicAdd(&dev_noImprovement, 1);
 #endif
+        // if a schedule is found with the cost at the lower bound
+        // exit the loop after the current iteration is finished
         if (dev_bestSched && dev_bestSched->GetCost() == 0) {
           lowerBoundSchedFound = true;
         }
