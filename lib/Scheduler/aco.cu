@@ -942,6 +942,8 @@ FUNC_RESULT ACOScheduler::FindSchedule(InstSchedule *schedule_out,
           // Disable resetting noImp to lock iterations to 10
           noImprovement++;
 #endif
+        if (bestSchedule && bestSchedule->GetCost() == 0)
+          break;
       } else {
         delete iterationBest;
         noImprovement++;
