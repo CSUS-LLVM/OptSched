@@ -624,6 +624,7 @@ void Dev_ACO(SchedRegion *dev_rgn, DataDepGraph *dev_DDG,
   // holds cost and index of bestSched per block
   __shared__ int bestIndex, dev_iterations;
   __shared__ bool needsSLIL;
+  __device__ bool lowerBoundSchedFound;
   needsSLIL = ((BBWithSpill *)dev_rgn)->needsSLIL();
   bool IsSecondPass = dev_rgn->IsSecondPass();
   dev_rgn->SetDepGraph(dev_DDG);
@@ -642,7 +643,7 @@ void Dev_ACO(SchedRegion *dev_rgn, DataDepGraph *dev_DDG,
     RPTarget = INT_MAX;
 
   // Start ACO
-  while (dev_noImprovement < noImprovementMax) {
+  while (dev_noImprovement < noImprovementMax && !lowerBoundSchedFound) {
     // Reset schedules to post constructor state
     dev_schedules[GLOBALTID]->Initialize();
     dev_AcoSchdulr->FindOneSchedule(RPTarget,
@@ -724,8 +725,7 @@ void Dev_ACO(SchedRegion *dev_rgn, DataDepGraph *dev_DDG,
           atomicAdd(&dev_noImprovement, 1);
 #endif
         if (dev_bestSched && dev_bestSched->GetCost() == 0) {
-          dev_iterations++;
-          break;
+          lowerBoundSchedFound = true;
         }
       } else {
         atomicAdd(&dev_noImprovement, 1);
