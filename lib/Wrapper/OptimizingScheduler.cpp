@@ -473,7 +473,7 @@ void ScheduleDAGOptSched::schedule() {
   }
 
   // Setup time before scheduling
-  Utilities::startTime = std::chrono::high_resolution_clock::now();
+  Utilities::startTime = std::chrono::steady_clock::now();
   // Schedule region.
   Rslt = region->FindOptimalSchedule(CurrentRegionTimeout, CurrentLengthTimeout,
                                      IsEasy, NormBestCost, BestSchedLngth,

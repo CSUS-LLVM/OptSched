@@ -22,7 +22,7 @@ uint16_t clcltBitsNeededToHoldNum(uint64_t value);
 Milliseconds GetProcessorTime();
 // Returns a reference to an object that is supposed to initialized with the
 // start time of the process
-extern std::chrono::high_resolution_clock::time_point startTime;
+extern std::chrono::steady_clock::time_point startTime;
 } // namespace Utilities
 
 inline uint16_t Utilities::clcltBitsNeededToHoldNum(uint64_t value) {
@@ -36,7 +36,7 @@ inline uint16_t Utilities::clcltBitsNeededToHoldNum(uint64_t value) {
 }
 
 inline Milliseconds Utilities::GetProcessorTime() {
-  auto currentTime = std::chrono::high_resolution_clock::now();
+  auto currentTime = std::chrono::steady_clock::now();
   std::chrono::duration<double, std::milli> elapsed = currentTime - startTime;
   return elapsed.count();
 }
