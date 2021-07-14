@@ -23,6 +23,12 @@ Milliseconds GetProcessorTime();
 // Returns a reference to an object that is supposed to initialized with the
 // start time of the process
 extern std::chrono::steady_clock::time_point startTime;
+
+template <typename F> Milliseconds timeFn(F &&fn) {
+  const Milliseconds Start = GetProcessorTime();
+  fn();
+  return GetProcessorTime() - Start;
+}
 } // namespace Utilities
 
 inline uint16_t Utilities::clcltBitsNeededToHoldNum(uint64_t value) {

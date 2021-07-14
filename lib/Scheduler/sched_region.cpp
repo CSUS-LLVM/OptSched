@@ -332,11 +332,13 @@ FUNC_RESULT SchedRegion::FindOptimalSchedule(
 
   // This must be done after SetupForSchdulng() or UpdateSetupForSchdulng() to
   // avoid resetting lower bound values.
-  CalculateLowerBounds(BbSchedulerEnabled);
+  const Milliseconds LbElapsedTime =
+      Utilities::timeFn([&] { CalculateLowerBounds(BbSchedulerEnabled); });
 
   // Log the lower bound on the cost, allowing tools reading the log to compare
   // absolute rather than relative costs.
-  Logger::Event("CostLowerBound", "cost", costLwrBound_);
+  Logger::Event("CostLowerBound", "cost", costLwrBound_, "elapsed",
+                LbElapsedTime);
   // TODO(justin): Remove once relevant scripts have been updated:
   // plaidbench-validation-test.py, runspec-wrapper-SLIL.py
   Logger::Info("Lower bound of cost before scheduling: %d", costLwrBound_);
@@ -368,7 +370,8 @@ FUNC_RESULT SchedRegion::FindOptimalSchedule(
     FinishHurstc_();
 
     Logger::Event("HeuristicResult", "length", heuristicScheduleLength, //
-                  "spill_cost", lstSched->GetSpillCost(), "cost", hurstcCost_);
+                  "spill_cost", lstSched->GetSpillCost(), "cost", hurstcCost_,
+                  "elapsed", hurstcTime);
     // TODO(justin): Remove once relevant scripts have been updated:
     // get-sched-length.py, runspec-wrapper-SLIL.py
     Logger::Info(
@@ -1048,11 +1051,13 @@ void SchedRegion::updateBoundsAfterGraphTransformations(
   if (IsUpperBoundSet_)
     CalculateUpperBounds(BbSchedulerEnabled);
   if (IsLowerBoundSet_) {
-    CalculateLowerBounds(BbSchedulerEnabled);
+    const Milliseconds LbElapsedTime =
+        Utilities::timeFn([&] { CalculateLowerBounds(BbSchedulerEnabled); });
 
     // Log the new lower bound on the cost, allowing tools reading the log to
     // compare absolute rather than relative costs.
-    Logger::Event("CostLowerBound", "cost", costLwrBound_);
+    Logger::Event("CostLowerBound", "cost", costLwrBound_, "elapsed",
+                  LbElapsedTime);
   }
 
   // Some validation to try to catch bugs
