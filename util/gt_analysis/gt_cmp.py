@@ -4,7 +4,7 @@ import argparse
 from typing import Tuple
 
 import analyze
-from analyze import Block, Logs, utils
+from analyze import Block, Logs, utils, ioutils
 from analyze.lib import block_stats, compile_times
 
 sched_time = compile_times.sched_time
@@ -153,6 +153,7 @@ if __name__ == "__main__":
     parser.add_argument('nogt')
     parser.add_argument('gt')
     parser.add_argument('--pass-num', type=int, default=None, help='Which pass to analyze (default: all passes)')
+    ioutils.add_output_format_arg(parser)
     args = analyze.parse_args(parser, 'nogt', 'gt')
 
     results = utils.foreach_bench(
@@ -161,8 +162,4 @@ if __name__ == "__main__":
         total_compile_time_seconds=compile_times.total_compile_time_seconds_f(args.benchsuite),
     )
 
-    writer = csv.DictWriter(sys.stdout,
-                            fieldnames=['Benchmark'] + list(results['Total'].keys()))
-    writer.writeheader()
-    for bench, bench_res in results.items():
-        writer.writerow({'Benchmark': bench, **bench_res})
+    args.format(sys.stdout, results)

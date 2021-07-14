@@ -75,14 +75,14 @@ def parse_args(parser: argparse.ArgumentParser, *names, args=None):
         'plaidml': import_plaidml.parse,
         'shoc': import_shoc.parse,
     }
-    parser = FILE_PARSERS[args.benchsuite]
+    fileparser = FILE_PARSERS[args.benchsuite]
     blk_filter = block_filter(args.keep_blocks_if) if args.keep_blocks_if is not True else True
 
     args_dict = vars(args)
 
     def parse_input(x):
         if isinstance(x, str):
-            result = parser(x)
+            result = fileparser(x)
             if blk_filter is not True:
                 result = result.keep_blocks_if(blk_filter)
             return result
@@ -93,5 +93,9 @@ def parse_args(parser: argparse.ArgumentParser, *names, args=None):
     # Go through the logs inputs and parse them.
     for name in names:
         args_dict[name] = parse_input(args_dict[name])
+
+    if hasattr(parser, '__analyze_post_process_parse_args__'):
+        for argname, postprocess in getattr(parser, '__analyze_post_process_parse_args__').items():
+            args_dict[argname] = postprocess(args_dict[argname])
 
     return args

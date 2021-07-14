@@ -2,6 +2,7 @@
 
 from typing import *
 import argparse
+from analyze import ioutils
 import analyze
 from analyze import Block, Logs, utils
 
@@ -82,12 +83,9 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(
         description='Computes the block stats for the logs')
     parser.add_argument('logs', help='The logs to analyze')
+    ioutils.add_output_format_arg(parser)
     args = analyze.parse_args(parser, 'logs')
 
     results = utils.foreach_bench(compute_block_stats, args.logs)
 
-    writer = csv.DictWriter(sys.stdout,
-                            fieldnames=['Benchmark'] + list(results['Total'].keys()))
-    writer.writeheader()
-    for bench, bench_res in results.items():
-        writer.writerow({'Benchmark': bench, **bench_res})
+    args.format(result)
