@@ -113,6 +113,10 @@ def compute_stats(nogt: Logs, gt: Logs, *, pass_num: int, total_compile_time_sec
         'Total Sched Time (GT)': sched_time(gt),
         'Enum Time (No GT)': utils.sum_stat_for_all(enum_time_for_blk, nogt),
         'Enum Time (GT)': utils.sum_stat_for_all(enum_time_for_blk, gt),
+        'Lower Bound Time (No GT)': compile_times.first_lower_bound_time(nogt),
+        'Lower Bound Time (GT)': compile_times.first_lower_bound_time(gt),
+        'Heuristic Time (No GT)': compile_times.heuristic_time(nogt),
+        'Heuristic Time (GT)': compile_times.heuristic_time(gt),
         'Total GT Time': utils.sum_stat_for_all(total_gt_elapsed_for_blk, gt),
 
         'Total Sched Time (opt. blks only) (No GT)': sched_time(nogt_opt),

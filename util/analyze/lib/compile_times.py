@@ -20,6 +20,22 @@ def sched_time(logs):
     return sum(_block_time(blk) for blk in logs)
 
 
+def heuristic_time_for_blk(blk: Block) -> int:
+    return blk.single('HeuristicResult')['elapsed']
+
+
+def heuristic_time(logs):
+    return sum(heuristic_time_for_blk(b) for b in logs)
+
+
+def first_lower_bound_time_for_blk(blk: Block) -> int:
+    return blk['CostLowerBound'][0]['elapsed']
+
+
+def first_lower_bound_time(logs):
+    return sum(first_lower_bound_time_for_blk(blk) for blk in logs)
+
+
 _CPU2017_TIME_ELAPSED = re.compile(r"Elapsed compile for '(?P<bench>[^']+)': \S+ \((?P<elapsed>\d+)\)")
 _BACKUP_TIME_ELAPSED = re.compile(r'(?P<elapsed>\d+) total seconds elapsed')
 _PLAIDML_TIME_ELAPSED = re.compile(
@@ -30,9 +46,9 @@ _SHOC_TIME_ELAPSED = re.compile(r'Finished compiling; total ns = (?P<elapsed>\d+
 def shoc_total_compile_time_seconds(logs):
     try:
         elapsed = sum(int(m['elapsed'])
-                   for bench in logs.benchmarks
-                   for blk in bench
-                   for m in _SHOC_TIME_ELAPSED.finditer(blk.raw_log))
+                      for bench in logs.benchmarks
+                      for blk in bench
+                      for m in _SHOC_TIME_ELAPSED.finditer(blk.raw_log))
         return float(elapsed) * 1e-9
     except TypeError:
         raise KeyError('Logs must contain "Finished compiling; total ns = " output by the modified SHOC benchmark suite')
