@@ -1,5 +1,6 @@
 import argparse
 import csv
+from io import StringIO
 
 
 class _Writer:
@@ -26,14 +27,18 @@ class _CSVWriter(_Writer):
         if fieldnames is None:
             fieldnames = ['Benchmark', *data['Total'].keys()]
 
-        self.__csv_writer = csv.DictWriter(f, fieldnames=fieldnames)
+        self.__f = f
+        self.__mem_file = StringIO()
+        self.__csv_writer = csv.DictWriter(self.__mem_file, fieldnames=fieldnames)
         self.__csv_writer.writeheader()
 
     def _benchdata(self, data):
         self.__csv_writer.writerow(data)
 
     def _finish(self):
-        pass
+        self.__mem_file.seek(0)
+        transposed = zip(*csv.reader(self.__mem_file))
+        csv.writer(self.__f).writerows(transposed)
 
 
 class _HumanWriter(_Writer):
