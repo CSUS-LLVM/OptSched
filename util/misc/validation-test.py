@@ -337,9 +337,9 @@ if __name__ == "__main__":
 
     parser.add_argument('-q', '--quiet', action='store_true',
                         help='Only print mismatch info, and only if there are mismatches')
-    parser.add_argument('--no-summarize-largest-cost-difference', action='store_false',
+    parser.add_argument('--no-summarize-largest-cost-difference', action='store_true',
                         help='Do not summarize the mismatches with the biggest difference in cost')
-    parser.add_argument('--no-summarize-smallest-mismatches', action='store_false',
+    parser.add_argument('--no-summarize-smallest-mismatches', action='store_true',
                         help='Do not summarize the mismatches with the smallest region size')
 
     parser.add_argument('--num-largest-cost-mismatches-print', type=int, default=10,
