@@ -284,6 +284,7 @@ def main(first, second,
         print(dedent(f'''\
             {index}:
             Block Name: {mismatch.dag_id}
+            Benchmark: {mismatch.benchmark}
             Num Instructions: {mismatch.region_size}
             Length: {mismatch.lengths[0]} --> {mismatch.lengths[1]}
             Difference in cost: {cost_diff}
