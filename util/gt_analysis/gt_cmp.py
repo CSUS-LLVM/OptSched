@@ -86,6 +86,40 @@ def blk_relative_cost(nogt, gt) -> Tuple[int, int]:
     return no_sum, yes_sum
 
 
+RP_GT_FINISHED = 'GraphTransRPNodeSuperiorityFinished'
+ILP_GT_FINISHED = 'GraphTransILPNodeSuperiorityFinished'
+RP_ILP_GT_FINISHED = 'GraphTransOccupancyPreservingILPNodeSuperiorityFinished'
+
+
+def _edges_added_for_blk(blk: Block, fin_id: str) -> int:
+    if fin_id not in blk:
+        return 0
+    return sum(ev['superior_edges'] for ev in blk[fin_id])
+
+
+def edges_added_for_blk(blk: Block) -> int:
+    return _edges_added_for_blk(blk, RP_GT_FINISHED) + _edges_added_for_blk(blk, ILP_GT_FINISHED) + _edges_added_for_blk(blk, RP_ILP_GT_FINISHED)
+
+
+def _edges_removed_for_blk(blk: Block, fin_id: str) -> int:
+    if fin_id not in blk:
+        return 0
+    try:
+        return sum(ev['removed_edges'] for ev in blk[fin_id])
+    except KeyError:
+        return 0
+
+
+def edges_removed_for_blk(blk: Block) -> int:
+    return _edges_removed_for_blk(blk, RP_GT_FINISHED) + _edges_removed_for_blk(blk, ILP_GT_FINISHED) + _edges_removed_for_blk(blk, RP_ILP_GT_FINISHED)
+
+
+def edges_rp_rejected_for_blk(blk: Block) -> int:
+    if RP_ILP_GT_FINISHED not in blk:
+        return 0
+    return sum(ev['failed_rp'] for ev in blk[RP_ILP_GT_FINISHED])
+
+
 def compute_stats(nogt: Logs, gt: Logs, *, pass_num: int, total_compile_time_seconds):
     nogt_all, gt_all = nogt, gt
 
@@ -109,6 +143,7 @@ def compute_stats(nogt: Logs, gt: Logs, *, pass_num: int, total_compile_time_sec
 
         'Total Compile Time (s) (all benchsuite) (No GT)': total_compile_time_seconds(nogt_all),
         'Total Compile Time (s) (all benchsuite) (GT)': total_compile_time_seconds(gt_all),
+
         'Total Sched Time (No GT)': sched_time(nogt),
         'Total Sched Time (GT)': sched_time(gt),
         'Enum Time (No GT)': utils.sum_stat_for_all(enum_time_for_blk, nogt),
@@ -118,11 +153,23 @@ def compute_stats(nogt: Logs, gt: Logs, *, pass_num: int, total_compile_time_sec
         'Heuristic Time (No GT)': compile_times.heuristic_time(nogt),
         'Heuristic Time (GT)': compile_times.heuristic_time(gt),
         'Total GT Time': utils.sum_stat_for_all(total_gt_elapsed_for_blk, gt),
+        'Edges Added': utils.sum_stat_for_all(edges_added_for_blk, gt),
+        'Edges Removed': utils.sum_stat_for_all(edges_removed_for_blk, gt),
+        'Edges Rejected by RP': utils.sum_stat_for_all(edges_rp_rejected_for_blk, gt),
 
         'Total Sched Time (opt. blks only) (No GT)': sched_time(nogt_opt),
         'Total Sched Time (opt. blks only) (GT)': sched_time(gt_opt),
         'Enum Time (opt. blocks only) (No GT)': utils.sum_stat_for_all(enum_time_for_blk, nogt_opt),
         'Enum Time (opt. blocks only) (GT)': utils.sum_stat_for_all(enum_time_for_blk, gt_opt),
+
+        'Lower Bound Time (opt. blocks only) (No GT)': compile_times.first_lower_bound_time(nogt_opt),
+        'Lower Bound Time (opt. blocks only) (GT)': compile_times.first_lower_bound_time(gt_opt),
+        'Heuristic Time (opt. blocks only) (No GT)': compile_times.heuristic_time(nogt_opt),
+        'Heuristic Time (opt. blocks only) (GT)': compile_times.heuristic_time(gt_opt),
+        'Total GT Time (opt. blocks only)': utils.sum_stat_for_all(total_gt_elapsed_for_blk, gt_opt),
+        'Edges Added (opt. blocks only)': utils.sum_stat_for_all(edges_added_for_blk, gt_opt),
+        'Edges Removed (opt. blocks only)': utils.sum_stat_for_all(edges_removed_for_blk, gt_opt),
+        'Edges Rejected by RP (opt. blocks only)': utils.sum_stat_for_all(edges_rp_rejected_for_blk, gt_opt),
 
         'Block Cost - Relative (No GT)': nogt_rel,
         'Block Cost - Relative (GT)': gt_rel,
