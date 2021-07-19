@@ -28,6 +28,14 @@ def heuristic_time(logs):
     return sum(heuristic_time_for_blk(b) for b in logs)
 
 
+def first_heuristic_time_for_blk(blk: Block) -> int:
+    return blk['HeuristicResult'][0]['elapsed']
+
+
+def first_heuristic_time(logs):
+    return sum(first_heuristic_time_for_blk(b) for b in logs)
+
+
 def first_lower_bound_time_for_blk(blk: Block) -> int:
     return blk['CostLowerBound'][0]['elapsed']
 
