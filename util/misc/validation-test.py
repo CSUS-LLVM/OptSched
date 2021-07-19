@@ -125,7 +125,7 @@ def extract_dag_info(logs: Logs) -> Dict[str, List[List[DagInfo]]]:
             is_optimal = best_result['optimal']
         except KeyError:
             try:
-                best_result = block.single('HeuristicResult')
+                best_result = block['HeuristicResult'][-1]
                 is_optimal = best_result['cost'] == 0 or \
                     'INFO: Marking SLIL list schedule as optimal due to zero PERP.' in block.raw_log
             except KeyError:
@@ -138,7 +138,7 @@ def extract_dag_info(logs: Logs) -> Dict[str, List[List[DagInfo]]]:
             benchmark=block.benchmark,
             num_instructions=block.single('ProcessDag')['num_instructions'],
             pass_num=pass_num(block),
-            lower_bound=block.single('CostLowerBound')['cost'],
+            lower_bound=block['CostLowerBound'][-1]['cost'],
             relative_cost=best_result['cost'],
             length=best_result['length'],
             is_optimal=is_optimal,
