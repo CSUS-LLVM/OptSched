@@ -232,7 +232,7 @@ ScheduleDAGOptSched::ScheduleDAGOptSched(
 }
 
 ScheduleDAGOptSched::~ScheduleDAGOptSched() {
-  if (dev_MM) {
+  if (DEV_ACO && dev_MM) {
     dev_MM->FreeDevicePointers();
     cudaFree(dev_MM);
   }
@@ -418,7 +418,7 @@ void ScheduleDAGOptSched::schedule() {
   addGraphTransformations(BDDG);
 
   // Prepare for device scheduling by increasing heap size and copying machMdl
-  if (dev_MM == NULL) {
+  if (DEV_ACO && dev_MM == NULL) {
     // Copy MachineModel to device for use during DevListSched.
     // Allocate device memory
     gpuErrchk(cudaMallocManaged((void**)&dev_MM, sizeof(MachineModel)));
