@@ -33,18 +33,22 @@ def main(outdir: Path, optsched_cfg: Path, labels: List[str], withs: List[Dict[s
         logfiles.append(logfile)
 
     if validate_cmd:
-        subprocess.run(validate_cmd + ' ' + shlex.join(logfiles), cwd=outdir,
-                       check=True, stdout=subprocess.STDOUT, stderr=subprocess.STDERR)
+        val_cmd = shlex.split(validate_cmd, comments=True)
+        if not validate_cmd.endswith('#'):
+            val_cmd += logfiles
+        subprocess.run(val_cmd, cwd=outdir, check=True, stdout=subprocess.STDOUT, stderr=subprocess.STDERR)
 
     if not analyze_files:
         analyze_files = [None] * len(analyze_cmds)
 
     for analyze_cmd, outfile in zip(analyze_cmds, analyze_files):
-        result = subprocess.run(analyze_cmd + ' ' + shlex.join(logfiles), cwd=outdir,
-                                capture_output=True, encoding='utf-8')
+        analyze_run = shlex.split(analyze_cmd, comments=True)
+        if not analyze_cmd.endswith('#'):
+            analyze_run += logfiles
+        result = subprocess.run(analyze_run, cwd=outdir, capture_output=True, encoding='utf-8')
         if result.returncode != 0:
             print(
-                f'Analysis command {shlex.join(analyze_cmd)} failed with error code: {result.returncode}', file=sys.stderr)
+                f'Analysis command {shlex.join(analyze_run)} failed with error code: {result.returncode}', file=sys.stderr)
 
         print(result.stdout)
         print(result.stderr, file=sys.stderr)
@@ -78,9 +82,9 @@ if __name__ == '__main__':
     parser.add_argument('--git-state', help='The path to a git repository to snapshot its state in our <outdir>.')
 
     parser.add_argument('--validate', default=VALIDATE_CMD,
-                        help='The command (single string) to run after all runs to validate that the runs were correct. Defaults to the env variable VALIDATE_CMD. The output log files will be passed to the command, one additional arg for each run.')
+                        help='The command (single string) to run after all runs to validate that the runs were correct. Defaults to the env variable VALIDATE_CMD. The output log files will be passed to the command, one additional arg for each run. To skip this, end the command with a bash comment #')
     parser.add_argument('--analyze', nargs='*', default=[ANALYZE_CMD] if ANALYZE_CMD else [],
-                        help='The commands (each a single string) to run after all runs to analyze the runs and produce output. Defaults to the single command from the env variable ANALYZE_CMD. The output log files will be passed to each command, one additional arg for each run.')
+                        help='The commands (each a single string) to run after all runs to analyze the runs and produce output. Defaults to the single command from the env variable ANALYZE_CMD. The output log files will be passed to each command, one additional arg for each run. To skip this, end the command with a bash comment #')
     parser.add_argument('--analyze-files', nargs='*', default=[],
                         help='The filenames to place the stdout of each analyze command.')
 
