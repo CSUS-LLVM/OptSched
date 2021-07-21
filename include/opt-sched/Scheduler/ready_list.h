@@ -21,6 +21,50 @@ Last Update:  Sept. 2013
 namespace llvm {
 namespace opt_sched {
 
+struct PriorityEntry {
+  uint16_t Width;
+  uint16_t Offset;
+};
+
+class KeysHelper {
+  public:
+  KeysHelper(SchedPriorities Prirts) : Priorities(Prirts), Entries{} {};
+  KeysHelper() : KeysHelper(SchedPriorities{}) {};
+
+  // pre-compute region info
+  void initForRegion(DataDepGraph *DDG);
+
+  // compute key
+  HeurType computeKey(SchedInstruction *Inst, bool IncludeDynamic) const;
+  HeurType computeKey(const uint64_t *Values) const;
+
+  // get information about a keys layout
+  PriorityEntry getPriorityEntry(int16_t Indx) const { return Entries[Indx]; }
+
+  //get the max key size and value
+  HeurType getKeySizeInBits() const { return KeysSz; }
+  HeurType getMaxValue() const { return MaxValue; }
+
+  private:
+  // private member variables
+  // scheduling priorities used for this KeysHelper
+  SchedPriorities Priorities;
+
+  // width and offset info for each priority
+  PriorityEntry Entries[MAX_SCHED_PRIRTS];
+
+  // pre-computed size of all keys for this region
+  uint16_t KeysSz = 0;
+
+  // pre-computed max key value;
+  HeurType MaxValue = 0;
+  HeurType MaxNID = 0;
+  HeurType MaxISO = 0;
+
+  // Field to store if this KeyHelper was initialized
+  bool WasInitialized = false;
+};
+
 // A priority list of instruction that are ready to schedule at a given point
 // during the scheduling process.
 class ReadyList {
@@ -90,6 +134,9 @@ private:
   // An ordered vector of priorities
   SchedPriorities prirts_;
 
+  // The KeysHelper for the key computations
+  KeysHelper KHelper;
+
   // The priority list containing the actual instructions.
   PriorityList<SchedInstruction> prirtyLst_;
 
@@ -100,36 +147,13 @@ private:
   llvm::SmallVector<KeyedEntry<SchedInstruction, unsigned long> *, 0>
       keyedEntries_;
 
-  // Is there a priority scheme that needs to be changed dynamically
-  //    bool isDynmcPrirty_;
-
-  // The maximum values for each part of the priority key.
-  InstCount maxUseCnt_;
-  InstCount maxCrtclPath_;
-  InstCount maxScsrCnt_;
-  InstCount maxLtncySum_;
-  InstCount maxNodeID_;
-  InstCount maxInptSchedOrder_;
-
-  unsigned long maxPriority_;
-
   // The number of bits for each part of the priority key.
   int16_t useCntBits_;
-  int16_t crtclPathBits_;
-  int16_t scsrCntBits_;
-  int16_t ltncySumBits_;
-  int16_t nodeID_Bits_;
-  int16_t inptSchedOrderBits_;
+  int16_t LUCOffset;
 
   // Adds instructions at the bottom of a given list which have not been added
   // to the ready list already.
   void AddLatestSubList_(LinkedList<SchedInstruction> *lst);
-
-  // Calculates a new priority key given an existing key of size keySize by
-  // appending bitCnt bits holding the value val, assuming val < maxVal.
-  static void AddPrirtyToKey_(unsigned long &key, int16_t &keySize,
-                              int16_t bitCnt, unsigned long val,
-                              unsigned long maxVal);
 };
 
 } // namespace opt_sched
