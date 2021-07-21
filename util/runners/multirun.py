@@ -89,7 +89,7 @@ if __name__ == '__main__':
     main(
         outdir=Path(args.outdir),
         optsched_cfg=Path(args.optsched_cfg),
-        labels=args.labels,
+        labels=args.labels.split(','),
         withs=[runwith.parse_withs(with_) for with_ in getattr(args, 'with', [])],
         cmd=args.cmd if args.cmd != '-' else RUN_CMD,
         append_logs=args.append,
