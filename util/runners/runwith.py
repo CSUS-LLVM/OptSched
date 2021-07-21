@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
-import subprocess
 import argparse
 import os
 import re
-import shutil
 import shlex
+import shutil
+import subprocess
 from pathlib import Path
-from typing import Callable, Dict, List, Iterable, Optional
+from typing import Callable, Dict, Iterable, List, Optional
 
 # %% Setup
 
@@ -92,6 +92,8 @@ def run_cmd(cmd: List[str], outdir: Path, label: str, logmode='w'):
         if code != 0:
             raise subprocess.CalledProcessError(code, cmd)
 
+    return logfile
+
 
 def get_git_state(git_state: Optional[str]) -> str:
     if not git_state:
@@ -117,7 +119,7 @@ def main(outdir: Path, optsched_cfg: Path, label: str, with_: Dict[str, str], cm
         edit_file(sched_ini, lambda f: edit_sched_ini(f, with_))
     save_sched_ini(outdir, sched_ini, label)
 
-    run_cmd(cmd, outdir, label, logmode='a' if append_logs else 'w')
+    return run_cmd(cmd, outdir, label, logmode='a' if append_logs else 'w')
 
 
 def parse_withs(withs: List[str]) -> Dict[str, str]:
