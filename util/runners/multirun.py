@@ -36,7 +36,7 @@ def main(outdir: Path, optsched_cfg: Path, labels: List[str], withs: List[Dict[s
         val_cmd = shlex.split(validate_cmd, comments=True)
         if not validate_cmd.endswith('#'):
             val_cmd += logfiles
-        subprocess.run(val_cmd, cwd=outdir, check=True, stdout=subprocess.STDOUT, stderr=subprocess.STDERR)
+        subprocess.run(val_cmd, cwd=outdir, check=True)
 
     if not analyze_files:
         analyze_files = [None] * len(analyze_cmds)
