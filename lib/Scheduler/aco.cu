@@ -932,10 +932,13 @@ FUNC_RESULT ACOScheduler::FindSchedule(InstSchedule *schedule_out,
         if (!((BBWithSpill *)rgn_)->needsSLIL())
           RPTarget = bestSchedule->GetSpillCost();
         printf("ACO found schedule "
-               "cost:%d, rp cost:%d, sched length: %d, and "
-               "iteration:%d\n",
-               bestSchedule->GetCost(), bestSchedule->GetSpillCost(),
-               bestSchedule->GetCrntLngth(), iterations);
+               "cost:%d, rp cost:%d, exec cost: %d, and "
+               "iteration:%d"
+               " (sched length: %d, abs rp cost: %d, rplb: %d)\n",
+               bestSchedule->GetCost(), bestSchedule->GetNormSpillCost(),
+               bestSchedule->GetExecCost(), iterations,
+               bestSchedule->GetCrntLngth(), bestSchedule->GetSpillCost(),
+               rgn_->GetRPCostLwrBound());
 #if !RUNTIME_TESTING
           noImprovement = 0;
 #else
