@@ -26,7 +26,7 @@ def main(outdir: Path, optsched_cfg: Path, labels: List[str], withs: List[Dict[s
             optsched_cfg=optsched_cfg,
             label=label,
             with_=with_,
-            cmd=cmd,
+            cmd=[arg.replace('{{label}}', label) for arg in cmd],
             append_logs=append_logs,
             git_state=git_state,
         )
@@ -68,7 +68,7 @@ if __name__ == '__main__':
                         help='The path to the optsched config to use. Defaults to the env variable OPTSCHEDCFG if it exists, else is required. The sched.ini is expected to be there')
     parser.add_argument('-o', '--outdir', required=True, help='The path to place the output files at')
     parser.add_argument('-L', '--labels', required=True,
-                        help='Comma separated labels to use for these runs. Must be equal to the number of --with flags')
+                        help='Comma separated labels to use for these runs. Must be equal to the number of --with flags. Any parts of the run command <cmd> will have the string {{label}} replaced with the label for the run.')
     parser.add_argument('--with', nargs='*', action='append', metavar='KEY=VALUE',
                         help="The sched.ini settings to set for each run. Each run's settings should have a new --with flag.")
     parser.add_argument(
