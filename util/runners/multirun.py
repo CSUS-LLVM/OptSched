@@ -36,7 +36,7 @@ def main(outdir: Path, optsched_cfg: Path, labels: List[str], withs: List[Dict[s
         val_cmd = shlex.split(validate_cmd, comments=True)
         if not validate_cmd.endswith('#'):
             val_cmd += logfiles
-        subprocess.run(val_cmd, cwd=outdir, check=True)
+        subprocess.run(shlex.join(val_cmd), cwd=outdir, check=True, shell=True)
 
     if not analyze_files:
         analyze_files = [None] * len(analyze_cmds)
@@ -45,7 +45,7 @@ def main(outdir: Path, optsched_cfg: Path, labels: List[str], withs: List[Dict[s
         analyze_run = shlex.split(analyze_cmd, comments=True)
         if not analyze_cmd.endswith('#'):
             analyze_run += logfiles
-        result = subprocess.run(analyze_run, cwd=outdir, capture_output=True, encoding='utf-8')
+        result = subprocess.run(shlex.join(analyze_run), cwd=outdir, capture_output=True, encoding='utf-8', shell=True)
         if result.returncode != 0:
             print(
                 f'Analysis command {shlex.join(analyze_run)} failed with error code: {result.returncode}', file=sys.stderr)
