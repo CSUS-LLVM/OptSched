@@ -100,6 +100,10 @@ ACOScheduler::ACOScheduler(DataDepGraph *dataDepGraph,
   */
   int pheromone_size = (count_ + 1) * count_;
   pheromone_.resize(pheromone_size);
+
+  //construct the ACOReadyList member
+  ReadyLs = ACOReadyList(count_);
+
   InitialSchedule = nullptr;
 }
 
@@ -284,18 +288,20 @@ ACOScheduler::FindOneSchedule(InstCount TargetRPCost) {
   SchedInstruction *lastInst = NULL;
   std::unique_ptr<InstSchedule> schedule =
       llvm::make_unique<InstSchedule>(machMdl_, dataDepGraph_, true);
-  InstCount maxPriority = rdyLst_->MaxPriority();
+
+  // The MaxPriority that we are getting from the ready list represents the maximum possible heuristic/key value that we can have
+  // I want to move all the heuristic computation stuff to another class for code tidiness reasons.
+  HeurType maxPriority = rdyLst_->MaxPriority();
   if (maxPriority == 0)
     maxPriority = 1; // divide by 0 is bad
   Initialize_();
-  rgn_->InitForSchdulng();
 
   SchedInstruction *waitFor = NULL;
   InstCount waitUntil = 0;
   double maxPriorityInv = 1 / maxPriority;
   llvm::SmallVector<Choice, 0> ready;
   while (!IsSchedComplete_()) {
-    UpdtRdyLst_(crntCycleNum_, crntSlotNum_);
+    UpdtRdyLst_(crntCycleNum_, crntSlotNum_);//rm me
 
     // there are two steps to scheduling an instruction:
     // 1)Select the instruction(if we are not waiting on another instruction)
@@ -398,6 +404,7 @@ ACOScheduler::FindOneSchedule(InstCount TargetRPCost) {
       rgn_->SchdulInst(inst, crntCycleNum_, crntSlotNum_, false);
       DoRsrvSlots_(inst);
       // this is annoying
+      // remove me
       SchedInstruction *blah = rdyLst_->GetNextPriorityInst();
       while (blah != NULL && blah != inst) {
         blah = rdyLst_->GetNextPriorityInst();
@@ -405,6 +412,10 @@ ACOScheduler::FindOneSchedule(InstCount TargetRPCost) {
       if (blah == inst)
         rdyLst_->RemoveNextPriorityInst();
       UpdtSlotAvlblty_(inst);
+
+      // new readylist update
+      UpdateACOReadyList(inst);
+
 
       if (rgn_->getUnnormalizedIncrementalRPCost() > TargetRPCost) {
         delete rdyLst_;
@@ -594,6 +605,25 @@ void ACOScheduler::UpdatePheromone(InstSchedule *schedule) {
 #endif
   if (print_aco_trace)
     PrintPheromone();
+}
+
+void ACOScheduler::UpdateACOReadyList(SchedInstruction *Inst) {
+  InstCount prdcsrNum, scsrRdyCycle;
+  InstCount InstId = Inst->GetNum();
+
+  // Notify each successor of this instruction that it has been scheduled.
+  for (SchedInstruction *crntScsr = Inst->GetFrstScsr(&prdcsrNum);
+       crntScsr != NULL; crntScsr = Inst->GetNxtScsr(&prdcsrNum)) {
+    bool wasLastPrdcsr =
+        crntScsr->PrdcsrSchduld(prdcsrNum, crntCycleNum_, scsrRdyCycle);
+
+    if (wasLastPrdcsr) {
+      // Add this successor to the first-ready list of the future cycle
+      // in which we now know it will become ready
+      //HeurType HeurWOLuc = 
+      ReadyLs.addInstructionToReadyList(ACOReadyListEntry{InstId, scsrRdyCycle,100,1.5});
+    }
+  }
 }
 
 // copied from Enumerator

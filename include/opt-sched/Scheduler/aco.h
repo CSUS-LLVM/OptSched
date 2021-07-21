@@ -10,6 +10,7 @@ Last Update:  Jan. 2020
 #define OPTSCHED_ACO_H
 
 #include "opt-sched/Scheduler/gen_sched.h"
+#include "opt-sched/Scheduler/simplified_aco_ds.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/SmallSet.h"
@@ -19,8 +20,6 @@ Last Update:  Jan. 2020
 #include <utility>
 namespace llvm {
 namespace opt_sched {
-
-typedef double pheromone_t;
 
 enum class DCF_OPT {
   OFF,
@@ -77,8 +76,11 @@ private:
   Choice SelectInstruction(const llvm::ArrayRef<Choice> &ready,
                            SchedInstruction *lastInst);
   void UpdatePheromone(InstSchedule *schedule);
+  void UpdateACOReadyList(SchedInstruction *Inst);
   std::unique_ptr<InstSchedule> FindOneSchedule(InstCount TargetRPCost);
   llvm::SmallVector<pheromone_t, 0> pheromone_;
+  //new ds representations
+  ACOReadyList ReadyLs;
   pheromone_t initialValue_;
   bool use_fixed_bias;
   int count_;

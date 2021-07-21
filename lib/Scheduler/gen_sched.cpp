@@ -61,9 +61,11 @@ void ConstrainedScheduler::ResetRsrvSlots_() {
 
 ConstrainedScheduler::ConstrainedScheduler(DataDepGraph *dataDepGraph,
                                            MachineModel *machMdl,
-                                           InstCount schedUprBound)
+                                           InstCount schedUprBound,
+                                           bool ACOEn)
     : InstScheduler(dataDepGraph, machMdl, schedUprBound) {
   dataDepGraph_ = dataDepGraph;
+  IsACO = ACOEn;
 
   // Allocate the array of first-ready lists - one list per cycle.
   assert(schedUprBound_ > 0);
