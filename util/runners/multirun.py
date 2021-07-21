@@ -86,8 +86,8 @@ if __name__ == '__main__':
                         help='The command (single string) to run after all runs to validate that the runs were correct. Defaults to the env variable VALIDATE_CMD. The output log files will be passed to the command, one additional arg for each run. To skip this, end the command with a bash comment #')
     parser.add_argument('--analyze', nargs='*', default=[ANALYZE_CMD] if ANALYZE_CMD else [],
                         help='The commands (each a single string) to run after all runs to analyze the runs and produce output. Defaults to the single command from the env variable ANALYZE_CMD. The output log files will be passed to each command, one additional arg for each run. To skip this, end the command with a bash comment #')
-    parser.add_argument('--analyze-files', nargs='*', default=[],
-                        help='The filenames to place the stdout of each analyze command.')
+    parser.add_argument('--analyze-files',
+                        help='The filenames to place the stdout of each analyze command, comma separated.')
 
     args = parser.parse_args()
 
@@ -101,5 +101,5 @@ if __name__ == '__main__':
         git_state=args.git_state,
         validate_cmd=args.validate,
         analyze_cmds=args.analyze,
-        analyze_files=args.analyze_files,
+        analyze_files=args.analyze_files.split(',') if args.analyze_files else [],
     )
