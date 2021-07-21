@@ -153,7 +153,7 @@ if __name__ == '__main__':
         outdir=Path(args.outdir),
         optsched_cfg=Path(args.optsched_cfg),
         label=args.label,
-        with_=parse_withs(getattr(args, 'with', [])),
+        with_=parse_withs(getattr(args, 'with') if getattr(args, 'with') is not None else []),
         cmd=args.cmd if args.cmd != '-' else RUN_CMD,
         append_logs=args.append,
         git_state=args.git_state,
