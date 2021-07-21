@@ -65,6 +65,7 @@ if __name__ == '__main__':
     RUN_CMD = shlex.split(RUN_CMD) if RUN_CMD else RUN_CMD
     VALIDATE_CMD = os.getenv('VALIDATE_CMD')
     ANALYZE_CMD = os.getenv('ANALYZE_CMD')
+    RUNNER_GIT_REPO = os.getenv('RUNNER_GIT_REPO')
 
     parser = argparse.ArgumentParser(description='Run the commands with the sched.ini settings')
     parser.add_argument('-c', '--optsched-cfg',
@@ -80,7 +81,8 @@ if __name__ == '__main__':
         'cmd', nargs='+', help='The command (with args) to run. Use - to default to the environment variable RUN_CMD.')
     parser.add_argument('--append', action='store_true',
                         help='Allow a <label>.log file to exist, appending to it if so')
-    parser.add_argument('--git-state', help='The path to a git repository to snapshot its state in our <outdir>.')
+    parser.add_argument('--git-state', default=RUNNER_GIT_REPO,
+                        help='The path to a git repository to snapshot its state in our <outdir>. Defaults to the environment variable RUNNER_GIT_REPO if set. If not present, no git status will be generated.')
 
     parser.add_argument('--validate', default=VALIDATE_CMD,
                         help='The command (single string) to run after all runs to validate that the runs were correct. Defaults to the env variable VALIDATE_CMD. The output log files will be passed to the command, one additional arg for each run. To skip this, end the command with a bash comment #')
