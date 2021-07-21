@@ -65,7 +65,7 @@ if __name__ == '__main__':
     parser.add_argument('-c', '--optsched-cfg',
                         required=OPTSCHEDCFG is None,
                         default=OPTSCHEDCFG,
-                        help='The path to the optsched config to use. Defaults to the env variable OPTSCHEDENV if it exists, else is required. The sched.ini is expected to be there')
+                        help='The path to the optsched config to use. Defaults to the env variable OPTSCHEDCFG if it exists, else is required. The sched.ini is expected to be there')
     parser.add_argument('-o', '--outdir', required=True, help='The path to place the output files at')
     parser.add_argument('-L', '--labels', required=True,
                         help='Comma separated labels to use for these runs. Must be equal to the number of --with flags')
