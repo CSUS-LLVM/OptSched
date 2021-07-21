@@ -14,7 +14,7 @@ from typing import Callable, Dict, Iterable, List, Optional
 class InvalidSchedIniSettingError(Exception):
     def __init__(self, message: str, keys: List[str]):
         self.keys = keys
-        super().__init__(f'{message}: {keys=}')
+        super().__init__(f'{message}: keys={keys}')
 
 
 class LogFileExistsError(FileExistsError):
@@ -25,7 +25,7 @@ class GitStateChangedError(Exception):
     def __init__(self, message: str, old: Path, new: Path):
         self.old = old
         self.new = new
-        super().__init__(f'{message}: {old=}, {new=}')
+        super().__init__(f'{message}: old={old}, new={new}')
 
 
 def setup_outdir(outdir: Path, optsched_cfg: Path, keys: Iterable[str], git_state: str):
