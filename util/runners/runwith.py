@@ -87,7 +87,7 @@ def run_cmd(cmd: List[str], outdir: Path, label: str, logmode='w'):
             f'File already exists. Either use a fresh output directory, or specify that we should append to the file: {logfile}')
 
     with open(outdir / f'{label}.log', logmode) as f:
-        proc = subprocess.Popen(cmd, stdout=f, stderr=f)
+        proc = subprocess.Popen(cmd, stdout=f, stderr=f, cwd=outdir)
         code = proc.wait()
         if code != 0:
             raise subprocess.CalledProcessError(code, cmd)
