@@ -30,7 +30,8 @@ class GitStateChangedError(Exception):
 
 def setup_outdir(outdir: Path, optsched_cfg: Path, keys: Iterable[str], git_state: str):
     outdir.mkdir(parents=True, exist_ok=True)
-    shutil.copytree(optsched_cfg, outdir / 'optsched-cfg', dirs_exist_ok=True)
+    if not (outdir / 'optsched-cfg').exists():
+        shutil.copytree(optsched_cfg, outdir / 'optsched-cfg')
 
     if git_state:
         p: Path = outdir / 'git.status'
