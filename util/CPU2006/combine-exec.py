@@ -6,7 +6,8 @@ import re
 import sys
 import argparse
 from contextlib import ExitStack
-from typing import Iterable, List, Tuple
+from typing import Dict, Iterable, List, Tuple
+from collections import Counter
 from openpyxl import Workbook
 from openpyxl.utils import get_column_letter
 
@@ -25,28 +26,33 @@ def is_blank_row(row: List[str]) -> bool:
 
 
 def merge_tables(str_tables: Iterable[str]) -> str:
-    data = dict()
+    data: Dict[str, List[List[str]]] = dict()
     tables = [list(csv.reader(table.splitlines())) for table in str_tables]
 
     for row in tables[0]:
         if row:
-            data[row[0]] = row
+            data.setdefault(row[0], []).append(row)
 
     for table in tables:
+        nth: Dict[str, int] = Counter()
         for row in table:
             if not is_blank_row(row):
+                index = nth[row[0]]
                 if row[0] in data:
-                    if not is_blank_row(data[row[0]]) and data[row[0]] != row:
-                        raise DuplicateDataError(data[row[0]], row, f'Duplicate data for {row[0]}.')
-                data[row[0]] = row
+                    if not is_blank_row(data[row[0]][index]) and data[row[0]][index] != row:
+                        raise DuplicateDataError(data[row[0]][index], row, f'Duplicate data for {row[0]}.')
+                data[row[0]][index] = row
+                nth[row[0]] += 1
 
     out = StringIO()
     writer = csv.writer(out)
+    nth: Dict[str, int] = Counter()
     for row in tables[0]:
         if not row:
             continue
-        best_row = data[row[0]]
-        writer.writerow(best_row)
+        index = nth[row[0]]
+        writer.writerow(data[row[0]][index])
+        nth[row[0]] += 1
 
     return out.getvalue()
 
@@ -64,7 +70,6 @@ def extract_tables(contents: str) -> Iterable[Tuple[str, str]]:
 def main(files, out: str):
     wb = Workbook()
     files = [f.read() for f in files]
-    xy = list(extract_tables(files[0]))
     tbls = map(extract_tables, files)
     for tbl_group in zip(*tbls):
         assert len(set(name for name, _ in tbl_group)) == 1
