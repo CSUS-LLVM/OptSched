@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+: ${SPECTUNE:=base}
+set -e
+runcpu "-config=$CFGFILE" "--tune=$SPECTUNE" -a scrub all
+runcpu "-config=$CFGFILE" "--tune=$SPECTUNE" -a build "$@"
