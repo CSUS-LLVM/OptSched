@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 : ${SPECTUNE:=base}
+: ${SPECITERNUM:=3}
 set -e
-runcpu "-config=$CFGFILE" "--tune=$SPECTUNE" -n 3 -a scrub all
-runcpu "-config=$CFGFILE" "--tune=$SPECTUNE" -n 3 -a run "$@"
+runcpu "-config=$CFGFILE" "--tune=$SPECTUNE" -n "$SPECITERNUM" -a scrub all
+runcpu "-config=$CFGFILE" "--tune=$SPECTUNE" -n "$SPECITERNUM" -a run "$@"
