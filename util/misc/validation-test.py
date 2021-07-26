@@ -126,6 +126,15 @@ def pass_num(block) -> int:
     return block.get('PassFinished', DEFAULT_PASS)[0]['num']
 
 
+def try_first(block: Block, *event_ids):
+    for index, event_id in enumerate(event_ids):
+        try:
+            return block[event_id]
+        except KeyError:
+            if index == len(event_ids) - 1:
+                raise
+
+
 def extract_dag_info(logs: Logs) -> Dict[str, List[List[DagInfo]]]:
     dags = {}
 
@@ -145,13 +154,10 @@ def extract_dag_info(logs: Logs) -> Dict[str, List[List[DagInfo]]]:
 
     for block in blocks:
         try:
-            try:
-                best_result = block.single('BestResult')
-                is_optimal = best_result['optimal']
-            except KeyError:
-                best_result = block['HeuristicResult'][-1]
-                is_optimal = best_result['cost'] == 0 or \
-                    'INFO: Marking SLIL list schedule as optimal due to zero PERP.' in block.raw_log
+            best_result = try_first(block, 'BestResult', 'HeuristicResult')[-1]
+            best_result_info = try_first(block, 'DagSolvedOptimally', 'DagTimedOut', 'HeuristicResult')[-1]
+            is_optimal = best_result.get('optimal', False) or best_result['cost'] == 0 or  \
+                'INFO: Marking SLIL list schedule as optimal due to zero PERP.' in block.raw_log
 
             target_occ = block.single('TargetOccupancy')['target'] if 'TargetOccupancy' in block else None
 
@@ -164,7 +170,7 @@ def extract_dag_info(logs: Logs) -> Dict[str, List[List[DagInfo]]]:
                 relative_cost=best_result['cost'],
                 length=best_result['length'],
                 is_optimal=is_optimal,
-                spill_cost=best_result['spill_cost'],
+                spill_cost=best_result_info['spill_cost'],
                 target_occupancy=target_occ,
             ))
         except Exception as ex:
