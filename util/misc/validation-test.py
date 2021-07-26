@@ -12,6 +12,12 @@ import argparse
 import analyze
 from analyze import Logs
 
+# Some reference point to compute occupancies against.
+# This would ideally be the maximum possible occupancy so that the .cost property will never be negative
+OCCUPANCY_REFERENCE_POINT = 10
+
+SPILL_COST_WEIGHT = 0
+
 
 @dataclass
 class DagInfo:
@@ -24,10 +30,20 @@ class DagInfo:
     relative_cost: int
     length: int
     is_optimal: bool
+    # Spill cost is not absolute for SCF = TARGET. By recording the baseline, we can adjust the costs.
+    target_occupancy: Optional[int]
+    spill_cost: int
 
     @property
     def cost(self):
-        return self.lower_bound + self.relative_cost
+        cost = self.lower_bound + self.relative_cost
+        if self.target_occupancy is not None:
+            # TargetOcc - SC is a "complement"-like operation, meaning that it undoes itself.
+            actual_occupancy = self.target_occupancy - self.spill_cost
+            absolute_spill_cost = OCCUPANCY_REFERENCE_POINT - actual_occupancy
+            cost += SPILL_COST_WEIGHT * absolute_spill_cost
+
+        return cost
 
 
 class MismatchKind(Enum):
@@ -133,6 +149,8 @@ def extract_dag_info(logs: Logs) -> Dict[str, List[List[DagInfo]]]:
                 print(block.raw_log)
                 exit(2)
 
+        target_occ = block.single('TargetOccupancy')['target'] if 'TargetOccupancy' in block else None
+
         dags.setdefault(block.name, []).append(DagInfo(
             id=block.name,
             benchmark=block.benchmark,
@@ -142,6 +160,8 @@ def extract_dag_info(logs: Logs) -> Dict[str, List[List[DagInfo]]]:
             relative_cost=best_result['cost'],
             length=best_result['length'],
             is_optimal=is_optimal,
+            spill_cost=best_result['spill_cost'],
+            target_occupancy=target_occ,
         ))
 
     for k, block_passes in dags.items():
@@ -338,6 +358,8 @@ if __name__ == "__main__":
 
     parser.add_argument('-q', '--quiet', action='store_true',
                         help='Only print mismatch info, and only if there are mismatches')
+    parser.add_argument('--scw', '--spill-cost-weight', type=int, required=True,
+                        help='The weight of the spill cost in the cost calculation. Only relevant if the reported spill costs are not absolute (e.g. SCF = TARGET); put any value otherwise.', dest='spill_cost_weight', metavar='SCW')
     parser.add_argument('--no-summarize-largest-cost-difference', action='store_true',
                         help='Do not summarize the mismatches with the biggest difference in cost')
     parser.add_argument('--no-summarize-smallest-mismatches', action='store_true',
@@ -358,6 +380,7 @@ if __name__ == "__main__":
     NUM_SMALLEST_BLOCKS_PRINT = args.num_smallest_mismatches_print
     MISSING_LOWER_BOUND_DUMP_COUNT = args.missing_lb_dump_count
     MISSING_LOWER_BOUND_DUMP_LINES = args.missing_lb_dump_lines
+    SPILL_COST_WEIGHT = args.spill_cost_weight
 
     main(
         args.first, args.second,
