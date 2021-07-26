@@ -10,13 +10,21 @@ from textwrap import dedent
 import argparse
 
 import analyze
-from analyze import Logs
+from analyze import Logs, Block
 
 # Some reference point to compute occupancies against.
 # This would ideally be the maximum possible occupancy so that the .cost property will never be negative
 OCCUPANCY_REFERENCE_POINT = 10
 
 SPILL_COST_WEIGHT = 0
+
+
+class BlockProcessingError(Exception):
+    block: Block
+
+    def __init__(self, message: str, block: Block):
+        self.block = block
+        super().__init__(f'{message}:\n{block.raw_log}')
 
 
 @dataclass
@@ -137,32 +145,30 @@ def extract_dag_info(logs: Logs) -> Dict[str, List[List[DagInfo]]]:
 
     for block in blocks:
         try:
-            best_result = block.single('BestResult')
-            is_optimal = best_result['optimal']
-        except KeyError:
             try:
+                best_result = block.single('BestResult')
+                is_optimal = best_result['optimal']
+            except KeyError:
                 best_result = block['HeuristicResult'][-1]
                 is_optimal = best_result['cost'] == 0 or \
                     'INFO: Marking SLIL list schedule as optimal due to zero PERP.' in block.raw_log
-            except KeyError:
-                print('ERROR: unable to extract BestResult or HeuristicResult from block', file=sys.stderr)
-                print(block.raw_log)
-                exit(2)
 
-        target_occ = block.single('TargetOccupancy')['target'] if 'TargetOccupancy' in block else None
+            target_occ = block.single('TargetOccupancy')['target'] if 'TargetOccupancy' in block else None
 
-        dags.setdefault(block.name, []).append(DagInfo(
-            id=block.name,
-            benchmark=block.benchmark,
-            num_instructions=block.single('ProcessDag')['num_instructions'],
-            pass_num=pass_num(block),
-            lower_bound=block['CostLowerBound'][-1]['cost'],
-            relative_cost=best_result['cost'],
-            length=best_result['length'],
-            is_optimal=is_optimal,
-            spill_cost=best_result['spill_cost'],
-            target_occupancy=target_occ,
-        ))
+            dags.setdefault(block.name, []).append(DagInfo(
+                id=block.name,
+                benchmark=block.benchmark,
+                num_instructions=block.single('ProcessDag')['num_instructions'],
+                pass_num=pass_num(block),
+                lower_bound=block['CostLowerBound'][-1]['cost'],
+                relative_cost=best_result['cost'],
+                length=best_result['length'],
+                is_optimal=is_optimal,
+                spill_cost=best_result['spill_cost'],
+                target_occupancy=target_occ,
+            ))
+        except Exception as ex:
+            raise BlockProcessingError('Failed when processing block', block) from ex
 
     for k, block_passes in dags.items():
         # Safe to modify dags while iterating because we use .items() to get a copy
