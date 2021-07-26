@@ -2,7 +2,6 @@
 #include "opt-sched/Scheduler/config.h"
 #include "opt-sched/Scheduler/data_dep.h"
 #include "opt-sched/Scheduler/random.h"
-#include "opt-sched/Scheduler/ready_list.h"
 #include "opt-sched/Scheduler/register.h"
 #include "opt-sched/Scheduler/sched_region.h"
 #include "llvm/ADT/STLExtras.h"
@@ -57,7 +56,6 @@ ACOScheduler::ACOScheduler(DataDepGraph *dataDepGraph,
   VrfySched_ = vrfySched;
   this->IsPostBB = IsPostBB;
   prirts_ = priorities;
-  rdyLst_ = new ReadyList(dataDepGraph_, priorities);
   count_ = dataDepGraph->GetInstCnt();
   Config &schedIni = SchedulerOptions::getInstance();
 
@@ -101,13 +99,15 @@ ACOScheduler::ACOScheduler(DataDepGraph *dataDepGraph,
   int pheromone_size = (count_ + 1) * count_;
   pheromone_.resize(pheromone_size);
 
-  //construct the ACOReadyList member
+  //construct the ACOReadyList member and a key helper
   ReadyLs = ACOReadyList(count_);
+  KHelper = KeysHelper(priorities);
+  KHelper.initForRegion(dataDepGraph);
 
   InitialSchedule = nullptr;
 }
 
-ACOScheduler::~ACOScheduler() { delete rdyLst_; }
+ACOScheduler::~ACOScheduler() {}
 
 // Pheromone table lookup
 // -1 means no instruction, so e.g. pheromone(-1, 10) gives pheromone on path
@@ -128,12 +128,12 @@ pheromone_t &ACOScheduler::Pheromone(InstCount from, InstCount to) {
   return pheromone_[(row * count_) + to];
 }
 
-double ACOScheduler::Score(SchedInstruction *from, Choice choice) {
+pheromone_t ACOScheduler::Score(InstCount FromId, InstCount ToId, HeurType ToHeuristic) {
   // tuneable heuristic importance is temporarily disabled
-  //  return Pheromone(from, choice.inst) *
-  //         pow(choice.heuristic, heuristicImportance_);
-  double hf = heuristicImportance_ ? choice.heuristic : 1.0;
-  return Pheromone(from, choice.inst) * hf;
+  // double Hf = pow(ToHeuristic, heuristicImportance_);
+  pheromone_t HeurScore = ToHeuristic * MaxPriorityInv + 1;
+  pheromone_t Hf = heuristicImportance_ ? HeurScore : 1.0;
+  return Pheromone(FromId, ToId) * Hf;
 }
 
 bool ACOScheduler::shouldReplaceSchedule(InstSchedule *OldSched,
@@ -218,37 +218,29 @@ DCF_OPT ACOScheduler::ParseDCFOpt(const std::string &opt) {
                            false);
 }
 
-Choice ACOScheduler::SelectInstruction(const llvm::ArrayRef<Choice> &ready,
-                                       SchedInstruction *lastInst) {
+InstCount ACOScheduler::SelectInstruction(SchedInstruction *lastInst) {
+
+  //compute the choose bese chance (0 if TWO_STEP is off)
+  double choose_best_chance = 0;
 #if TWO_STEP
-  double choose_best_chance;
   if (use_fixed_bias)
     choose_best_chance = fmax(0, 1 - (double)fixed_bias / count_);
   else
     choose_best_chance = bias_ratio;
-
-  if (RandDouble(0, 1) < choose_best_chance) {
-    if (print_aco_trace)
-      std::cerr << "choose_best, use fixed bias: " << use_fixed_bias << "\n";
-    pheromone_t max = -1;
-    Choice maxChoice;
-    for (auto &choice : ready) {
-      if (Score(lastInst, choice) > max) {
-        max = Score(lastInst, choice);
-        maxChoice = choice;
-      }
-    }
-    return maxChoice;
-  }
 #endif
+
+  if (RandDouble(0, 1) < choose_best_chance)
+    return MaxScoringInst;
+
+  // tournament code in case it is ever used again
   if (use_tournament) {
-    int POPULATION_SIZE = ready.size();
+    int POPULATION_SIZE = ReadyLs.getReadyListSize();
     int r_pos = (int)(RandDouble(0, 1) * POPULATION_SIZE);
     int s_pos = (int)(RandDouble(0, 1) * POPULATION_SIZE);
     //    int t_pos = (int) (RandDouble(0, 1) *POPULATION_SIZE);
-    Choice r = ready[r_pos];
-    Choice s = ready[s_pos];
-    //    Choice t = ready[t_pos];
+    pheromone_t r = *ReadyLs.getInstScoreAtIndex(r_pos);
+    pheromone_t s = *ReadyLs.getInstScoreAtIndex(s_pos);
+    //    pheromone_t t = *ReadyLs.getInstScoreAtIndex(t_pos);
     if (print_aco_trace) {
       std::cerr << "tournament Start \n";
       std::cerr << "array_size:" << POPULATION_SIZE << "\n";
@@ -256,31 +248,27 @@ Choice ACOScheduler::SelectInstruction(const llvm::ArrayRef<Choice> &ready,
       std::cerr << "s:\t" << s_pos << "\n";
       //        std::cerr<<"t:\t"<<t_pos<<"\n";
 
-      std::cerr << "Score r" << Score(lastInst, r) << "\n";
-      std::cerr << "Score s" << Score(lastInst, s) << "\n";
-      //         std::cerr<<"Score t"<<Score(lastInst, t)<<"\n";
+      std::cerr << "Score r" << r << "\n";
+      std::cerr << "Score s" << s << "\n";
+      //         std::cerr<<"Score t"<<t<<"\n";
     }
-    if (Score(lastInst, r) >=
-        Score(lastInst, s)) //&& Score(lastInst, r) >= Score(lastInst, t))
+    if (r >= s) //&& r >= t)
       return r;
-    //     else if (Score(lastInst, s) >= Score(lastInst, r) && Score(lastInst,
-    //     s) >= Score(lastInst, t))
+    //     else if (s >= r && s >= t)
     //         return s;
     else
       return s;
   }
-  pheromone_t sum = 0;
-  for (auto choice : ready)
-    sum += Score(lastInst, choice);
-  pheromone_t point = RandDouble(0, sum);
-  for (auto choice : ready) {
-    point -= Score(lastInst, choice);
-    if (point <= 0)
-      return choice;
+
+  pheromone_t Point = RandDouble(0, ReadyLs.ScoreSum);
+  for (InstCount I = 0; I < ReadyLs.getReadyListSize(); ++I) {
+    Point -= *ReadyLs.getInstScoreAtIndex(I);
+    if (Point <= 0)
+      return I;
   }
   std::cerr << "returning last instruction" << std::endl;
-  assert(point < 0.001); // floats should not be this inaccurate
-  return ready.back();
+  assert(Point < 0.001); // floats should not be this inaccurate
+  return ReadyLs.getReadyListSize();
 }
 
 std::unique_ptr<InstSchedule>
@@ -291,78 +279,34 @@ ACOScheduler::FindOneSchedule(InstCount TargetRPCost) {
 
   // The MaxPriority that we are getting from the ready list represents the maximum possible heuristic/key value that we can have
   // I want to move all the heuristic computation stuff to another class for code tidiness reasons.
-  HeurType maxPriority = rdyLst_->MaxPriority();
-  if (maxPriority == 0)
-    maxPriority = 1; // divide by 0 is bad
+  HeurType MaxPriority = KHelper.getMaxValue();
+  if (MaxPriority == 0)
+    MaxPriority = 1; // divide by 0 is bad
   Initialize_();
 
   SchedInstruction *waitFor = NULL;
   InstCount waitUntil = 0;
-  double maxPriorityInv = 1 / maxPriority;
-  llvm::SmallVector<Choice, 0> ready;
+  MaxPriorityInv = 1 / (pheromone_t)MaxPriority;
+
+  // initialize the aco ready list so that the start instruction is ready
+  // The luc component is 0 since the root inst uses no instructions
+  InstCount RootId = rootInst_->GetNum();
+  HeurType RootHeuristic = KHelper.computeKey(rootInst_, true);
+  ACOReadyListEntry InitialRoot{RootId, 0, RootHeuristic, Score(-1, RootId, RootHeuristic)};
+  ReadyLs.addInstructionToReadyList(InitialRoot);
+
   while (!IsSchedComplete_()) {
-    UpdtRdyLst_(crntCycleNum_, crntSlotNum_);//rm me
 
     // there are two steps to scheduling an instruction:
     // 1)Select the instruction(if we are not waiting on another instruction)
     SchedInstruction *inst = NULL;
-    if (!waitFor) {
-      // if we have not already committed to schedule an instruction
-      // next then pick one. First add ready instructions.  Including
-      //"illegal" e.g. blocked instructions
+    if (waitFor) {
 
-      // convert the ready list from a custom priority queue to a std::vector,
-      // much nicer for this particular scheduler
-      ready.reserve(rdyLst_->GetInstCnt());
-      unsigned long heuristic;
-      SchedInstruction *rInst = rdyLst_->GetNextPriorityInst(heuristic);
-      while (rInst != NULL) {
-        if (ACO_SCHED_STALLS || ChkInstLglty_(rInst)) {
-          Choice c;
-          c.inst = rInst;
-          c.heuristic = (double)heuristic * maxPriorityInv + 1;
-          c.readyOn = 0;
-          ready.push_back(c);
-          if (IsDbg && lastInst)
-            LastHeu[std::make_pair(lastInst->GetNum(), rInst->GetNum())] =
-                c.heuristic;
-        }
-        rInst = rdyLst_->GetNextPriorityInst(heuristic);
-      }
-      rdyLst_->ResetIterator();
-
-#if ACO_SCHED_STALLS
-      // add all instructions that are waiting due to latency to the choices
-      // list
-      for (InstCount fCycle = 1; fCycle < dataDepGraph_->GetMaxLtncy() &&
-                                 crntCycleNum_ + fCycle < schedUprBound_;
-           ++fCycle) {
-        LinkedList<SchedInstruction> *futureReady =
-            frstRdyLstPerCycle_[crntCycleNum_ + fCycle];
-        if (!futureReady)
-          continue;
-
-        for (SchedInstruction *fIns = futureReady->GetFrstElmnt(); fIns;
-             fIns = futureReady->GetNxtElmnt()) {
-          bool changed;
-          unsigned long heuristic = rdyLst_->CmputKey_(fIns, false, changed);
-          Choice c;
-          c.inst = fIns;
-          c.heuristic = (double)heuristic * maxPriorityInv + 1;
-          c.readyOn = crntCycleNum_ + fCycle;
-          ready.push_back(c);
-          if (IsDbg && lastInst)
-            LastHeu[std::make_pair(lastInst->GetNum(), fIns->GetNum())] =
-                c.heuristic;
-        }
-        futureReady->ResetIterator();
-      }
-#endif
-
-      if (!ready.empty()) {
-        Choice Sel = SelectInstruction(ready, lastInst);
-        waitUntil = Sel.readyOn;
-        inst = Sel.inst;
+      if (ReadyLs.getReadyListSize()) {
+        InstCount SelIndx = SelectInstruction(lastInst);
+        waitUntil = *ReadyLs.getInstReadyOnAtIndex(SelIndx);
+        InstCount InstId = *ReadyLs.getInstIdAtIndex(SelIndx);
+        inst = dataDepGraph_->GetInstByIndx(InstId);
         if (waitUntil > crntCycleNum_ || !ChkInstLglty_(inst)) {
           waitFor = inst;
           inst = NULL;
@@ -380,6 +324,8 @@ ACOScheduler::FindOneSchedule(InstCount TargetRPCost) {
           CrntAntEdges.insert(
               std::make_pair(lastInst->GetNum(), inst->GetNum()));
         }
+
+        //save the last instruction scheduled
         lastInst = inst;
       }
     }
@@ -395,7 +341,7 @@ ACOScheduler::FindOneSchedule(InstCount TargetRPCost) {
 
     // boilerplate, mostly copied from ListScheduler, try not to touch it
     InstCount instNum;
-    if (inst == NULL) {
+    if (!inst) {
       instNum = SCHD_STALL;
     } else {
       instNum = inst->GetNum();
@@ -404,22 +350,13 @@ ACOScheduler::FindOneSchedule(InstCount TargetRPCost) {
       rgn_->SchdulInst(inst, crntCycleNum_, crntSlotNum_, false);
       DoRsrvSlots_(inst);
       // this is annoying
-      // remove me
-      SchedInstruction *blah = rdyLst_->GetNextPriorityInst();
-      while (blah != NULL && blah != inst) {
-        blah = rdyLst_->GetNextPriorityInst();
-      }
-      if (blah == inst)
-        rdyLst_->RemoveNextPriorityInst();
       UpdtSlotAvlblty_(inst);
 
       // new readylist update
       UpdateACOReadyList(inst);
 
-
       if (rgn_->getUnnormalizedIncrementalRPCost() > TargetRPCost) {
-        delete rdyLst_;
-        rdyLst_ = new ReadyList(dataDepGraph_, prirts_);
+        ReadyLs.clearReadyList();
         return nullptr;
       }
     }
@@ -427,8 +364,6 @@ ACOScheduler::FindOneSchedule(InstCount TargetRPCost) {
     schedule->AppendInst(instNum);
     if (MovToNxtSlot_(inst))
       InitNewCycle_();
-    rdyLst_->ResetIterator();
-    ready.clear();
   }
   rgn_->UpdateScheduleCost(schedule.get());
   return schedule;
@@ -558,7 +493,7 @@ FUNC_RESULT ACOScheduler::FindSchedule(InstSchedule *schedule_out,
                 bestSchedule->GetCost(), "iterations", iterations,
                 "improvement", InitialCost - bestSchedule->GetCost());
   PrintSchedule(bestSchedule.get());
-  schedule_out->Copy(bestSchedule.release());
+  schedule_out->Copy(bestSchedule.get());
 
   Logger::Info("ACO finished after %d iterations", iterations);
   return RES_SUCCESS;
@@ -620,36 +555,44 @@ void ACOScheduler::UpdateACOReadyList(SchedInstruction *Inst) {
     if (wasLastPrdcsr) {
       // Add this successor to the first-ready list of the future cycle
       // in which we now know it will become ready
-      //HeurType HeurWOLuc = 
-      ReadyLs.addInstructionToReadyList(ACOReadyListEntry{InstId, scsrRdyCycle,100,1.5});
+      HeurType HeurWOLuc = KHelper.computeKey(Inst, false);
+      ReadyLs.addInstructionToReadyList(ACOReadyListEntry{InstId, scsrRdyCycle, HeurWOLuc, 0});
     }
   }
+
+  // Make sure the scores are valid.  The scheduling of an instruction may
+  // have increased another instruction's LUC Score
+  pheromone_t MaxScore = -1;
+  InstCount MaxScoreIndx = 0;
+  ReadyLs.ScoreSum = 0;
+  PriorityEntry LUCEntry = KHelper.getPriorityEntry(LSH_LUC);
+  for (InstCount I = 0; I < ReadyLs.getReadyListSize(); ++I) {
+    //we first get the heuristic without the LUC component, add the LUC
+    //LUC component, and then compute the score
+    HeurType Heur = *ReadyLs.getInstHeuristicAtIndex(I);
+    if (LUCEntry.Width) {
+      HeurType LUCVal = Inst->CmputLastUseCnt();
+      LUCVal <<= LUCEntry.Offset;
+      Heur &= LUCVal;
+    }
+
+    // compute the score
+    InstCount CandidateId = *ReadyLs.getInstIdAtIndex(I);
+    pheromone_t IScore = Score(InstId, CandidateId, Heur);
+    ReadyLs.ScoreSum += IScore;
+    *ReadyLs.getInstScoreAtIndex(I) = IScore;
+    if(IScore > MaxScore) {
+      MaxScoreIndx = I;
+      MaxScore = IScore;
+    }
+  }
+  MaxScoringInst = MaxScore;
 }
 
 // copied from Enumerator
 inline void ACOScheduler::UpdtRdyLst_(InstCount cycleNum, int slotNum) {
-  InstCount prevCycleNum = cycleNum - 1;
-  LinkedList<SchedInstruction> *lst1 = NULL;
-  LinkedList<SchedInstruction> *lst2 = frstRdyLstPerCycle_[cycleNum];
-
-  if (slotNum == 0 && prevCycleNum >= 0) {
-    // If at the begining of a new cycle other than the very first cycle, then
-    // we also have to include the instructions that might have become ready in
-    // the previous cycle due to a zero latency of the instruction scheduled in
-    // the very last slot of that cycle [GOS 9.8.02].
-    lst1 = frstRdyLstPerCycle_[prevCycleNum];
-
-    if (lst1 != NULL) {
-      rdyLst_->AddList(lst1);
-      lst1->Reset();
-      CleanupCycle_(prevCycleNum);
-    }
-  }
-
-  if (lst2 != NULL) {
-    rdyLst_->AddList(lst2);
-    lst2->Reset();
-  }
+  assert(false); // do not use this function with aco
+  // it is only implemented b/c it is a pure virtual in ConstrainedScheduler
 }
 
 void ACOScheduler::PrintPheromone() {

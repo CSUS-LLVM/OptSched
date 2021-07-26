@@ -126,7 +126,8 @@ inline pheromone_t *ACOReadyList::getInstScoreAtIndex(InstCount Indx) const {
 }
 
 inline void ACOReadyList::clearReadyList() {
-  CurrentSize=0;
+  CurrentSize = 0;
+  ScoreSum = 0;
 }
 
 } // namespace opt_sched

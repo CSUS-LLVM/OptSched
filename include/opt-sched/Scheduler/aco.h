@@ -11,6 +11,7 @@ Last Update:  Jan. 2020
 
 #include "opt-sched/Scheduler/gen_sched.h"
 #include "opt-sched/Scheduler/simplified_aco_ds.h"
+#include "opt-sched/Scheduler/ready_list.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/SmallSet.h"
@@ -49,7 +50,7 @@ public:
 private:
   pheromone_t &Pheromone(SchedInstruction *from, SchedInstruction *to);
   pheromone_t &Pheromone(InstCount from, InstCount to);
-  pheromone_t Score(SchedInstruction *from, Choice choice);
+  pheromone_t Score(InstCount FromId, InstCount ToId, HeurType ToHeuristic);
   bool shouldReplaceSchedule(InstSchedule *OldSched, InstSchedule *NewSched,
                              bool IsGlobal);
   DCF_OPT ParseDCFOpt(const std::string &opt);
@@ -72,15 +73,17 @@ private:
                             llvm::SetVector<SchedInstruction *> &Visited);
 
   // pheromone Graph Debugging end
-
-  Choice SelectInstruction(const llvm::ArrayRef<Choice> &ready,
-                           SchedInstruction *lastInst);
+  InstCount SelectInstruction(SchedInstruction *lastInst);
   void UpdatePheromone(InstSchedule *schedule);
   void UpdateACOReadyList(SchedInstruction *Inst);
   std::unique_ptr<InstSchedule> FindOneSchedule(InstCount TargetRPCost);
   llvm::SmallVector<pheromone_t, 0> pheromone_;
   //new ds representations
   ACOReadyList ReadyLs;
+  KeysHelper KHelper;
+  pheromone_t MaxPriorityInv;
+  InstCount MaxScoringInst;
+
   pheromone_t initialValue_;
   bool use_fixed_bias;
   int count_;

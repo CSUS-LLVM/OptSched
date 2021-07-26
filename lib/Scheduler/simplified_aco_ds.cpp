@@ -52,7 +52,7 @@ ACOReadyList::ACOReadyList(InstCount RegionSize) {
   InstrBase = IntAllocation;
   ReadyOnBase = IntAllocation + CurrentCapacity;
   HeurBase = HeurAllocation;
-  ScoreBase = ScoreBase;
+  ScoreBase = ScoreAllocation;
 }
 
 ACOReadyList::ACOReadyList(const ACOReadyList &Other) {
@@ -71,7 +71,7 @@ ACOReadyList::ACOReadyList(const ACOReadyList &Other) {
   InstrBase = IntAllocation;
   ReadyOnBase = IntAllocation + CurrentCapacity;
   HeurBase = HeurAllocation;
-  ScoreBase = ScoreBase;
+  ScoreBase = ScoreAllocation;
 
   // copy the allocation's entries
   for (InstCount I = 0; I < CurrentSize; ++I) {
@@ -103,7 +103,7 @@ ACOReadyList &ACOReadyList::operator=(const ACOReadyList &Other) {
   InstrBase = IntAllocation;
   ReadyOnBase = IntAllocation + CurrentCapacity;
   HeurBase = HeurAllocation;
-  ScoreBase = ScoreBase;
+  ScoreBase = ScoreAllocation;
 
   // copy over the allocation's entries
   for (InstCount I = 0; I < CurrentSize; ++I) {
