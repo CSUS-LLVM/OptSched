@@ -113,6 +113,7 @@ HeurType KeysHelper::computeKey(SchedInstruction *Inst, bool IncludeDynamic) con
     Key <<= Entries[Heur].Width;
     Key |= PriorityValue;
   }
+  return Key;
 }
 
 HeurType KeysHelper::computeKey(const uint64_t *Values) const {
