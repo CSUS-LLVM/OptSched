@@ -52,7 +52,7 @@ ACOScheduler::ACOScheduler(DataDepGraph *dataDepGraph,
                            MachineModel *machineModel, InstCount upperBound,
                            SchedPriorities priorities, bool vrfySched,
                            bool IsPostBB)
-    : ConstrainedScheduler(dataDepGraph, machineModel, upperBound) {
+    : ConstrainedScheduler(dataDepGraph, machineModel, upperBound, true) {
   VrfySched_ = vrfySched;
   this->IsPostBB = IsPostBB;
   prirts_ = priorities;
@@ -274,6 +274,7 @@ InstCount ACOScheduler::SelectInstruction(SchedInstruction *lastInst) {
 std::unique_ptr<InstSchedule>
 ACOScheduler::FindOneSchedule(InstCount TargetRPCost) {
   SchedInstruction *lastInst = NULL;
+  ACOReadyListEntry LastInstInfo;
   std::unique_ptr<InstSchedule> schedule =
       llvm::make_unique<InstSchedule>(machMdl_, dataDepGraph_, true);
 
@@ -300,18 +301,25 @@ ACOScheduler::FindOneSchedule(InstCount TargetRPCost) {
     // there are two steps to scheduling an instruction:
     // 1)Select the instruction(if we are not waiting on another instruction)
     SchedInstruction *inst = NULL;
-    if (waitFor) {
+    if (!waitFor) {
+      // If an instruction is ready select it
+      assert(ReadyLs.getReadyListSize()); // we should always have something in the rl
 
-      if (ReadyLs.getReadyListSize()) {
-        InstCount SelIndx = SelectInstruction(lastInst);
-        waitUntil = *ReadyLs.getInstReadyOnAtIndex(SelIndx);
-        InstCount InstId = *ReadyLs.getInstIdAtIndex(SelIndx);
-        inst = dataDepGraph_->GetInstByIndx(InstId);
-        if (waitUntil > crntCycleNum_ || !ChkInstLglty_(inst)) {
-          waitFor = inst;
-          inst = NULL;
-        }
+      // select the instruction and get info on it
+      InstCount SelIndx = SelectInstruction(lastInst);
+      LastInstInfo = ReadyLs.removeInstructionAtIndex(SelIndx);
+      waitUntil = LastInstInfo.ReadyOn;
+      InstCount InstId = LastInstInfo.InstId;
+      inst = dataDepGraph_->GetInstByIndx(InstId);
+      ReadyLs.ScoreSum -= LastInstInfo.Score;
+
+      // potentially wait on the current instruction
+      if (waitUntil > crntCycleNum_ || !ChkInstLglty_(inst)) {
+        waitFor = inst;
+        inst = NULL;
       }
+
+      //
       if (inst != NULL) {
 #if USE_ACS
         // local pheromone decay
@@ -555,8 +563,8 @@ void ACOScheduler::UpdateACOReadyList(SchedInstruction *Inst) {
     if (wasLastPrdcsr) {
       // Add this successor to the first-ready list of the future cycle
       // in which we now know it will become ready
-      HeurType HeurWOLuc = KHelper.computeKey(Inst, false);
-      ReadyLs.addInstructionToReadyList(ACOReadyListEntry{InstId, scsrRdyCycle, HeurWOLuc, 0});
+      HeurType HeurWOLuc = KHelper.computeKey(crntScsr, false);
+      ReadyLs.addInstructionToReadyList(ACOReadyListEntry{crntScsr->GetNum(), scsrRdyCycle, HeurWOLuc, 0});
     }
   }
 
@@ -570,14 +578,15 @@ void ACOScheduler::UpdateACOReadyList(SchedInstruction *Inst) {
     //we first get the heuristic without the LUC component, add the LUC
     //LUC component, and then compute the score
     HeurType Heur = *ReadyLs.getInstHeuristicAtIndex(I);
+    InstCount CandidateId = *ReadyLs.getInstIdAtIndex(I);
     if (LUCEntry.Width) {
-      HeurType LUCVal = Inst->CmputLastUseCnt();
+      SchedInstruction *ScsrInst = dataDepGraph_->GetInstByIndx(CandidateId);
+      HeurType LUCVal = ScsrInst->CmputLastUseCnt();
       LUCVal <<= LUCEntry.Offset;
       Heur &= LUCVal;
     }
 
     // compute the score
-    InstCount CandidateId = *ReadyLs.getInstIdAtIndex(I);
     pheromone_t IScore = Score(InstId, CandidateId, Heur);
     ReadyLs.ScoreSum += IScore;
     *ReadyLs.getInstScoreAtIndex(I) = IScore;
