@@ -1,0 +1,49 @@
+From 84ad382227da24c727fc60c998c4f0c61a5afe0f Mon Sep 17 00:00:00 2001
+From: Austin Kerbow <amkerbow@gmail.com>
+Date: Sun, 25 Nov 2018 20:43:22 -0800
+Subject: [PATCH] Load plugins in-process.
+
+---
+ src/driver/AmdCompiler.cpp | 15 +++++++++++++++
+ 1 file changed, 15 insertions(+)
+
+diff --git a/src/driver/AmdCompiler.cpp b/src/driver/AmdCompiler.cpp
+index 8d34644..e4a4ebd 100644
+--- a/src/driver/AmdCompiler.cpp
++++ b/src/driver/AmdCompiler.cpp
+@@ -368,6 +368,7 @@ class AMDGPUCompiler : public Compiler {
+   ArgStringList GetJobArgsFitered(const Command& job);
+   // Parse -mllvm options
+   bool ParseLLVMOptions(const std::vector<std::string>& options);
++  bool LoadPlugins(const std::vector<std::string>& plugins);
+   bool PrepareCompiler(CompilerInstance& clang, const Command& job);
+   bool PrepareAssembler(AssemblerInvocation &Opts, const Command& job);
+   bool ExecuteCompiler(CompilerInstance& clang, BackendAction action);
+@@ -772,6 +773,19 @@ bool AMDGPUCompiler::ParseLLVMOptions(const std::vector<std::string>& options) {
+   return true;
+ }
+ 
++bool AMDGPUCompiler::LoadPlugins(const std::vector<std::string>& plugins) {
++  if (plugins.empty()) { return true; }
++  // Load any requested plugins.
++  for (const auto &path : plugins) {
++    std::string error;
++    if (llvm::sys::DynamicLibrary::LoadLibraryPermanently(path.c_str(), &error)) {
++      diags.Report(diag::err_fe_unable_to_load_plugin) << path << error;
++      return false;
++    }
++  }
++  return true;
++}
++
+ void AMDGPUCompiler::ResetOptionsToDefault() {
+   cl::ResetAllOptionOccurrences();
+   for (auto SC : cl::getRegisteredSubcommands()) {
+@@ -791,6 +805,7 @@ bool AMDGPUCompiler::PrepareCompiler(CompilerInstance& clang, const Command& job
+     const_cast<const char**>(args.data()),
+     const_cast<const char**>(args.data()) + args.size(),
+     clang.getDiagnostics())) { return false; }
++  if (!LoadPlugins(clang.getFrontendOpts().Plugins)) { return false; }
+   if (!ParseLLVMOptions(clang.getFrontendOpts().LLVMArgs)) { return false; }
+   return true;
+ }
