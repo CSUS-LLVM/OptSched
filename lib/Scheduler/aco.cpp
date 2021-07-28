@@ -268,7 +268,7 @@ InstCount ACOScheduler::SelectInstruction(SchedInstruction *lastInst) {
   }
   std::cerr << "returning last instruction" << std::endl;
   assert(Point < 0.001); // floats should not be this inaccurate
-  return ReadyLs.getReadyListSize();
+  return ReadyLs.getReadyListSize() - 1;
 }
 
 std::unique_ptr<InstSchedule>
@@ -293,8 +293,11 @@ ACOScheduler::FindOneSchedule(InstCount TargetRPCost) {
   // The luc component is 0 since the root inst uses no instructions
   InstCount RootId = rootInst_->GetNum();
   HeurType RootHeuristic = KHelper.computeKey(rootInst_, true);
-  ACOReadyListEntry InitialRoot{RootId, 0, RootHeuristic, Score(-1, RootId, RootHeuristic)};
+  pheromone_t RootScore = Score(-1, RootId, RootHeuristic);
+  ACOReadyListEntry InitialRoot{RootId, 0, RootHeuristic, RootScore};
   ReadyLs.addInstructionToReadyList(InitialRoot);
+  ReadyLs.ScoreSum = RootScore;
+  MaxScoringInst = 0;
 
   while (!IsSchedComplete_()) {
 
@@ -311,7 +314,6 @@ ACOScheduler::FindOneSchedule(InstCount TargetRPCost) {
       waitUntil = LastInstInfo.ReadyOn;
       InstCount InstId = LastInstInfo.InstId;
       inst = dataDepGraph_->GetInstByIndx(InstId);
-      ReadyLs.ScoreSum -= LastInstInfo.Score;
 
       // potentially wait on the current instruction
       if (waitUntil > crntCycleNum_ || !ChkInstLglty_(inst)) {
@@ -595,7 +597,7 @@ void ACOScheduler::UpdateACOReadyList(SchedInstruction *Inst) {
       MaxScore = IScore;
     }
   }
-  MaxScoringInst = MaxScore;
+  MaxScoringInst = MaxScoreIndx;
 }
 
 // copied from Enumerator

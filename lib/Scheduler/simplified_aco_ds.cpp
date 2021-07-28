@@ -230,7 +230,7 @@ void ACOReadyList::addInstructionToReadyList(const ACOReadyListEntry &Entry) {
 // then we decrement the Ready List's CurrentSize
 // This function has undefined behavior if CurrentSize == 0
 ACOReadyListEntry ACOReadyList::removeInstructionAtIndex(InstCount Indx) {
-  assert(CurrentSize != 0);
+  assert(CurrentSize <= 0 || Indx >= CurrentSize || Indx < 0);
   ACOReadyListEntry E{InstrBase[Indx], ReadyOnBase[Indx], HeurBase[Indx], ScoreBase[Indx]};
   InstCount EndIndx = --CurrentSize;
   InstrBase[Indx] = InstrBase[EndIndx];
