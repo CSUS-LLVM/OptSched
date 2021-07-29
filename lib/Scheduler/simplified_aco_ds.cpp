@@ -182,7 +182,7 @@ void ACOReadyList::addInstructionToReadyList(const ACOReadyListEntry &Entry) {
     // The expansion formula is to make the new allocation 1.5 times the size of the old one
     // consider making this formula more aggressive
     int NewCap = OldCap + OldCap/2 + 1;
-    InstCount *NewIntFallback = new InstCount[NewCap];
+    InstCount *NewIntFallback = new InstCount[2*NewCap];
     HeurType *NewHeurFallback = new HeurType[NewCap];
     pheromone_t *NewScoreFallback = new pheromone_t[NewCap];
 
