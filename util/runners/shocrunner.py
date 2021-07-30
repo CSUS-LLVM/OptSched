@@ -36,4 +36,8 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
 
-    main(shocdriver=args.shocdriver, outdir=args.outdir, shoc_args={'-s': args.shoc_problem_size})
+    main(
+        shocdriver=Path(args.shocdriver),
+        outdir=Path(args.outdir),
+        shoc_args={'-s': args.shoc_problem_size},
+    )
