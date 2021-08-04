@@ -88,4 +88,4 @@ if __name__ == '__main__':
 
     results = utils.foreach_bench(compute_block_stats, args.logs)
 
-    args.format(result)
+    args.format(results)
