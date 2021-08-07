@@ -1,3 +1,4 @@
+from typing import Iterable
 from ._types import *
 
 
@@ -77,6 +78,7 @@ def zipped_keep_blocks_if(*logs, pred):
     except StopIteration:
         # There was nothing in zip(*logs)...
         old_pred = pred
+
         def new_pred(*blks):
             try:
                 return old_pred(*blks)
@@ -111,3 +113,18 @@ def zipped_keep_blocks_if(*logs, pred):
 
 def sum_stat_for_all(stat, logs: Logs) -> int:
     return sum(stat(blk) for blk in logs)
+
+
+def average(xs: Iterable[int], count=None) -> float:
+    try:
+        size = count if count is not None else len(xs)
+        return sum(xs) / size if size else 0.0
+    except TypeError:
+        pass
+
+    acc = 0
+    num = 0
+    for x in xs:
+        acc += x
+        num += 1
+    return acc / num if num else 0.0
