@@ -25,7 +25,7 @@ class argfile:
 
 class SpillStat(enum.Enum):
     RAW = re.compile(r'GREEDY RA: Number of spilled live ranges: ([0-9]+)')
-    WEIGHTED = re.compile(r'SC in Function \S+ ([0-9])+')
+    WEIGHTED = re.compile(r'SC in Function \S+ ([0-9]+)')
 
 
 def sum_stat(infile: IO, r: re.Match) -> int:
@@ -49,7 +49,8 @@ def raw_main(argv: List[str]) -> None:
 
     args = parser.parse_args(argv)
 
-    with argfile(sys.stdin, args.file, 'r') as infile, argfile(sys.stdout, args.output, 'w') as outfile:
+    with argfile(sys.stdin, args.file, 'r') as infile, \
+            argfile(sys.stdout, args.output, 'w') as outfile:
         main(infile, outfile, SpillStat[args.which.upper()])
 
 
