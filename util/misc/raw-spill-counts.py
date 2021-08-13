@@ -3,39 +3,42 @@ import argparse
 import enum
 import re
 import sys
-from typing import IO, List
+from typing import Callable, IO, List
 from pathlib import Path
+from contextlib import contextmanager
 
 
-class argfile:
-    def __init__(self, default: IO, filename: Path, mode: str = 'r'):
-        self.__file = default if filename == '-' else open(filename, mode)
-        self.__should_close = filename != '-'
-
-    def __enter__(self) -> IO:
-        return self.__file
-
-    def __exit__(self, exc_type, exc_value, exc_traceback):
-        self.close()
-
-    def close(self):
-        if self.__should_close:
-            self.__file.close()
+@contextmanager
+def argfile(filename: str, mode: str):
+    if filename == '-':
+        yield sys.stdin if mode == 'r' else sys.stdout
+    else:
+        with open(filename, mode) as f:
+            yield f
 
 
 class SpillStat(enum.Enum):
-    RAW = re.compile(r'GREEDY RA: Number of spilled live ranges: ([0-9]+)')
-    WEIGHTED = re.compile(r'SC in Function \S+ ([0-9]+)')
+    RAW = re.compile(r'Function: (?P<name>\S*?)\nGREEDY RA: Number of spilled live ranges: (?P<value>\d+)')
+    WEIGHTED = re.compile(r'SC in Function (?P<name>\S*?) (?P<value>-?\d+)')
 
 
-def sum_stat(infile: IO, r: re.Match) -> int:
-    return sum(
-        sum(int(x) for x in r.findall(line)) for line in infile
-    )
+def _sum_stat(s, r: re.Match, fn_filter: Callable[[str, int], bool]) -> int:
+    return sum(int(m['value']) for m in r.finditer(s) if fn_filter(m['name'], int(m['value'])))
 
 
-def main(infile: IO, outfile: IO, which: SpillStat = SpillStat.RAW):
-    spill_count = sum_stat(infile, which.value)
+def sum_stat(infile: IO, r: re.Match, *, fn_filter: Callable[[str, int], bool] = lambda k, v: True) -> int:
+    try:
+        pos = infile.tell()
+        return _sum_stat(infile.read(), r, fn_filter)
+    except MemoryError:
+        infile.seek(pos)
+        return sum(
+            _sum_stat(line, r, fn_filter) for line in infile
+        )
+
+
+def main(infile: IO, outfile: IO, which: SpillStat = SpillStat.RAW, *, fn_filter: Callable[[str, int], bool] = lambda k, v: True):
+    spill_count = sum_stat(infile, which.value, fn_filter=fn_filter)
     print(spill_count, file=outfile)
 
 
@@ -43,15 +46,23 @@ def raw_main(argv: List[str]) -> None:
     parser = argparse.ArgumentParser(description='Extract spill counts')
     parser.add_argument('--which', default='raw', choices=('weighted', 'raw'),
                         help='Whether to extract weighted or raw spills only. Default: raw')
+    parser.add_argument('--hot-only', help='A file with a space-separated list of functions to consider in the count')
     parser.add_argument('-o', '--output', default='-',
                         help='Where to output the information to, - for stdout. Defaults to stdout')
     parser.add_argument('file', help='The file to process, - for stdin.')
 
     args = parser.parse_args(argv)
 
-    with argfile(sys.stdin, args.file, 'r') as infile, \
-            argfile(sys.stdout, args.output, 'w') as outfile:
-        main(infile, outfile, SpillStat[args.which.upper()])
+    if args.hot_only:
+        content = Path(args.hot_only).read_text()
+        hot_fns = set(content.split())
+        def fn_filter(k, v): return k in hot_fns
+    else:
+        def fn_filter(k, v): return True
+
+    with argfile(args.file, 'r') as infile, \
+            argfile(args.output, 'w') as outfile:
+        main(infile, outfile, SpillStat[args.which.upper()], fn_filter=fn_filter)
 
 
 if __name__ == '__main__':
