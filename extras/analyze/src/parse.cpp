@@ -1,10 +1,13 @@
 #include "parse.hpp"
 
 #include <algorithm>
+#include <array>
 #include <cassert>
 #include <charconv>
 #include <deque>
 #include <execution>
+#include <filesystem>
+#include <fstream>
 #include <iostream>
 #include <mutex>
 #include <ranges>
@@ -22,15 +25,37 @@
 using namespace std::literals;
 using namespace ev;
 namespace py = pybind11;
+namespace fs = std::filesystem;
 
 thread_local std::deque<Value> Values;
 thread_local std::unordered_set<std::string> Strings;
+
+// Read a whole file in at once
+std::string slurp(const fs::path &Path) {
+  // Open first to help ensure that we get the correct file size
+  std::ifstream File(Path);
+
+  std::string Result;
+  Result.resize(fs::file_size(Path));
+
+  File.read(Result.data(), Result.size());
+  // In case there's anything left over
+  while (File) {
+    static constexpr std::size_t BufSize = 1024;
+    std::array<char, BufSize> Buffer;
+    File.read(Buffer.data(), Buffer.size());
+    Result.insert(Result.end(), Buffer.begin(), Buffer.end());
+  }
+
+  return Result;
+}
 
 static constexpr std::string_view RegionNameEv =
     R"("event_id": "ProcessDag", "name": ")";
 static const std::boyer_moore_horspool_searcher
     BlockNameSearcher(RegionNameEv.begin(), RegionNameEv.end());
 
+// Extracts the name of the block
 static std::string_view parseName(const std::string_view BlockLog) {
   auto It = std::search(BlockLog.begin(), BlockLog.end(), BlockNameSearcher);
   It += RegionNameEv.size();
@@ -39,7 +64,8 @@ static std::string_view parseName(const std::string_view BlockLog) {
   return std::string_view(It, End);
 }
 
-static EventSchema parse_event_schema(
+// Parses out an EventSchema, which is shared for all events of that EventId.
+static EventSchema parseEventSchema(
     EventId Id,
     const std::vector<std::pair<std::string_view, std::string_view>> &Init) {
   EventSchema Result;
@@ -64,11 +90,14 @@ static EventSchema parse_event_schema(
   return Result;
 }
 
+// Schemas are globally loaded.
+// This static/thread_local dance is to make it appropriately thread safe but
+// still fast.
 static std::unordered_set<EventSchema, EventIdHash, EventIdEq> MasterSchemas;
 static std::mutex MasterSchemaMutex;
 thread_local std::unordered_set<EventSchema, EventIdHash, EventIdEq> Schemas;
 
-static void update_schema_structures(EventId Id, EventSchema schema) {
+static void updateSchemaStructures(EventId Id, EventSchema schema) {
   std::scoped_lock Lock(MasterSchemaMutex);
   if (MasterSchemas.find(Id) == MasterSchemas.end())
     MasterSchemas.emplace_hint(MasterSchemas.end(), std::move(schema));
@@ -112,8 +141,8 @@ static Event parseEvent(const std::string_view Event) {
 
   auto It = Schemas.find(Id);
   if (It == Schemas.end()) {
-    auto Sch = ::parse_event_schema(Id, Result);
-    ::update_schema_structures(Id, std::move(Sch));
+    auto Sch = ::parseEventSchema(Id, Result);
+    ::updateSchemaStructures(Id, std::move(Sch));
     It = Schemas.find(Id);
   }
 
@@ -195,8 +224,7 @@ static BlockEventMap parseEvents(const std::string_view BlockLog) {
                        std::make_move_iterator(Vals.end()));
 }
 
-static Block parseBlock(ev::Benchmark *Bench, const std::size_t Offset,
-                        const std::string_view BlockLog) {
+static Block parseBlock(ev::Benchmark *Bench, const std::string_view BlockLog) {
   std::string_view Name = ::parseName(BlockLog);
   BlockEventMap Events = ::parseEvents(BlockLog);
   std::string UniqueId = Bench->Name + ':' + std::string(Name);
@@ -209,15 +237,14 @@ static Block parseBlock(ev::Benchmark *Bench, const std::size_t Offset,
   return Block{
       .Name = std::move(Name),
       .Events = std::move(Events),
-      .Offset = Offset,
-      .Size = BlockLog.size(),
+      .RawLog = BlockLog,
       .UniqueId = std::move(UniqueId),
       .Bench = Bench,
       .File = "", // TODO: Get this information too
   };
 }
 
-static std::vector<std::string_view> split_blocks(const std::string_view file) {
+static std::vector<std::string_view> splitBlocks(const std::string_view file) {
   static constexpr std::string_view RegionDelimiter =
       "********** Opt Scheduling **********";
   const std::boyer_moore_horspool_searcher searcher(RegionDelimiter.begin(),
@@ -252,23 +279,21 @@ enum class BenchmarkRE : int {
 static std::shared_ptr<Benchmark> parse(std::weak_ptr<ev::Logs> Logs,
                                         const std::string_view File,
                                         BenchmarkRegion Bench) {
-  const auto RawBlocks = ::split_blocks(File);
+  const auto RawBlocks = ::splitBlocks(File);
   std::vector<Block> Blocks(RawBlocks.size());
 
   auto Result = std::make_shared<Benchmark>();
   Result->Name = Bench.BenchmarkName;
   Result->Logs = std::move(Logs);
-  Result->Offset = Bench.Offset;
-  Result->Size = File.size();
+  Result->RawLog = File;
 
   std::transform(
 #if HAS_TBB
       std::execution::par_unseq,
 #endif
       RawBlocks.begin(), RawBlocks.end(), Blocks.begin(),
-      [File, Bench = Result.get()](std::string_view Blk) {
-        return ::parseBlock(Bench, Bench->Offset + (Blk.begin() - File.begin()),
-                            Blk);
+      [Bench = Result.get()](std::string_view Blk) {
+        return ::parseBlock(Bench, Blk);
       });
 
   Result->Blocks = std::move(Blocks);
@@ -307,7 +332,7 @@ void ev::defParse(py::module &Mod) {
   // static constexpr std::string_view BenchmarkRE
   Mod.attr("SPEC_BENCH_RE") = (int)BenchmarkRE::Spec;
 
-  Mod.def("parse_blocks", [](const std::string &Path,
+  Mod.def("parse_blocks", [](const fs::path &Path,
                              // One of the RE types.
                              int REChoice) {
     if (REChoice != (int)BenchmarkRE::Spec) {
@@ -316,8 +341,8 @@ void ev::defParse(py::module &Mod) {
     }
     auto Logs = std::make_shared<ev::Logs>();
     Logs->LogFile = std::move(Path);
-    Logs->MMap = mio::mmap_source(Logs->LogFile);
-    const std::string_view File(Logs->MMap.data(), Logs->MMap.size());
+    Logs->RawLog = ::slurp(Logs->LogFile);
+    const std::string_view File = Logs->RawLog;
 
     const std::vector<BenchmarkRegion> BenchmarkSections =
         [&]() -> std::vector<BenchmarkRegion> {
@@ -341,20 +366,18 @@ void ev::defParse(py::module &Mod) {
           ::parse(Logs, Section, std::move(BenchmarkSections[Index])));
     }
 
-    Logs->MMap.unmap(); // Usually we don't need this around
     return Logs;
   });
-  Mod.def("parse_blocks", [](const std::string &Path,
+  Mod.def("parse_blocks", [](const fs::path &Path,
                              // A single benchmark name for the whole logs.
                              std::string_view BenchmarkName) {
     auto Logs = std::make_shared<ev::Logs>();
     Logs->LogFile = std::move(Path);
-    Logs->MMap = mio::mmap_source(Logs->LogFile);
-    const std::string_view File(Logs->MMap.data(), Logs->MMap.size());
+    Logs->RawLog = ::slurp(Logs->LogFile);
+    const std::string_view File = Logs->RawLog;
+
     Logs->Benchmarks.push_back(
         ::parse(Logs, File, BenchmarkRegion{std::string(BenchmarkName), 0}));
-
-    Logs->MMap.unmap(); // Usually we don't need this around
 
     return Logs;
   });

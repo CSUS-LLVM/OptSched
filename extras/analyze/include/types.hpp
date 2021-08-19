@@ -5,13 +5,13 @@
 #include <cstddef>
 #include <cstdint>
 #include <deque>
+#include <filesystem>
 #include <memory>
 #include <string>
 #include <string_view>
 #include <variant>
 #include <vector>
 
-#include <mio/mmap.hpp>
 #include <pybind11/pybind11.h>
 
 namespace ev {
@@ -99,9 +99,7 @@ struct Benchmark;
 struct Block {
   std::string_view Name;
   BlockEventMap Events;
-  // Offset & size into the mmapped file.
-  std::size_t Offset;
-  std::size_t Size;
+  std::string_view RawLog;
 
   std::string UniqueId;
 
@@ -113,9 +111,7 @@ struct Block {
 struct Benchmark {
   std::string Name;
   std::vector<Block> Blocks;
-  // Offset & size into the mmapped file.
-  std::size_t Offset;
-  std::size_t Size;
+  std::string_view RawLog;
 
   // Keep the memory around so that we can detect if the Logs object was
   // destroyed, giving the Python user a good error message.
@@ -123,8 +119,8 @@ struct Benchmark {
 };
 
 struct Logs {
-  std::string LogFile;
-  mio::mmap_source MMap;
+  std::filesystem::path LogFile;
+  std::string RawLog;
   std::vector<std::shared_ptr<Benchmark>> Benchmarks;
 };
 

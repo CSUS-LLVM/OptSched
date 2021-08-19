@@ -27,7 +27,7 @@ void ev::defTypes(py::module &Mod) {
              switch (Schema->ParamTypes[Index]) {
              case Type::Number:
                return std::visit(
-                   []<typename T>(T x)->py::object {
+                   []<typename T>(T x) -> py::object {
                      if constexpr (std::same_as<T, double>)
                        return py::float_(x);
                      else
@@ -74,7 +74,7 @@ void ev::defTypes(py::module &Mod) {
 
   py::class_<Block>(Mod, "Block")
       .def_readonly("name", &Block::Name)
-      // .def_readonly("raw_log", &Block::RawLog)
+      .def_readonly("raw_log", &Block::RawLog)
       .def("__getitem__",
            [](const Block &Blk,
               std::string_view EvId) -> const std::vector<Event> & {
@@ -119,6 +119,7 @@ void ev::defTypes(py::module &Mod) {
 
   py::class_<Benchmark, std::shared_ptr<Benchmark>>(Mod, "Benchmark")
       .def_readonly("name", &Benchmark::Name)
+      .def_readonly("raw_log", &Benchmark::RawLog)
       .def_readonly("blocks", &Benchmark::Blocks)
       .def("__repr__", [](const Benchmark &Bench) {
         return "<Benchmark(name=" + Bench.Name + ", " +
@@ -126,6 +127,7 @@ void ev::defTypes(py::module &Mod) {
       });
   py::class_<Logs, std::shared_ptr<Logs>>(Mod, "Logs")
       .def_readonly("benchmarks", &Logs::Benchmarks)
+      .def_readonly("raw_log", &Logs::RawLog)
       .def("benchmark",
            [](const ev::Logs &Logs, const std::string_view BenchName) {
              auto It =
