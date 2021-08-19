@@ -18,8 +18,7 @@
 #include <utility>
 #include <vector>
 
-#include <pybind11/stl.h>
-
+#include "py.hpp"
 #include "types.hpp"
 
 using namespace std::literals;

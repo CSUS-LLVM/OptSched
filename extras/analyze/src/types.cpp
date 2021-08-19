@@ -2,9 +2,8 @@
 
 #include <sstream>
 
-#include <pybind11/stl.h>
-
 #include "parse.hpp"
+#include "py.hpp"
 
 using namespace std::literals;
 namespace py = pybind11;

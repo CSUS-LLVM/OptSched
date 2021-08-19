@@ -12,7 +12,7 @@
 #include <variant>
 #include <vector>
 
-#include <pybind11/pybind11.h>
+#include "py.hpp"
 
 namespace ev {
 using Number = std::variant<std::int64_t, std::uint64_t, double>;
