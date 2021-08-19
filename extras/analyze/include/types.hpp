@@ -41,7 +41,6 @@ struct EventSchema {
   std::vector<Type> ParamTypes;
 
   bool operator==(const EventSchema &) const = default;
-  bool operator==(EventId Rhs) const { return Id == Rhs; }
 };
 
 struct Event {
@@ -49,9 +48,20 @@ struct Event {
   const std::deque<Value> *Values;
   std::size_t Start; // Indices into values.
   std::size_t End;
-
-  bool operator==(EventId Rhs) const { return Id == Rhs; }
 };
+
+inline EventId getId(EventId Id) { return Id; }
+
+template <typename T>
+requires requires(const T &It) {
+  { It.Id } -> std::convertible_to<EventId>;
+}
+EventId getId(const T &It) { return It.Id; }
+
+template <typename T> EventId getId(const std::vector<T> &Vec) {
+  assert(!Vec.empty());
+  return getId(Vec.front());
+}
 
 struct EventIdHash {
   using is_transparent = void;
@@ -64,48 +74,19 @@ struct EventIdHash {
     return (*this)(Id.Value);
   }
 
-  std::size_t operator()(const EventSchema &Schema) const noexcept {
-    return (*this)(Schema.Id);
-  }
-
-  std::size_t operator()(const std::vector<Event> &Events) const noexcept {
-    assert(!Events.empty());
-    return (*this)(Events.front());
-  }
-
-  std::size_t operator()(const Event &Event) const noexcept {
-    return (*this)(Event.Id);
+  template <typename T> std::size_t operator()(const T &It) const noexcept {
+    return (*this)(getId(It));
   }
 };
 
 struct EventIdEq {
   using is_transparent = void;
 
+  bool operator()(EventId Lhs, EventId Rhs) const { return Lhs == Rhs; }
+
   template <typename T, typename U>
   bool operator()(const T &Lhs, const U &Rhs) const {
-    return Lhs == Rhs;
-  }
-
-  template <typename T, typename U>
-  bool operator()(const T &Lhs, const std::vector<U> &Rhs) const {
-    assert(!Rhs.empty());
-    return (*this)(Lhs, Rhs.front());
-  }
-
-  template <typename T, typename U>
-  bool operator()(const std::vector<T> &Lhs, const U &Rhs) const {
-    assert(!Lhs.empty());
-    return (*this)(Lhs.front(), Rhs);
-  }
-
-  template <typename T, typename U>
-  bool operator()(const std::vector<T> &Lhs, const std::vector<U> &Rhs) const {
-    assert(!Lhs.empty() && !Rhs.empty());
-    return (*this)(Lhs.front(), Rhs.front());
-  }
-
-  bool operator()(const Event &Lhs, const Event &Rhs) const {
-    return (*this)(Lhs.Id, Rhs.Id);
+    return getId(Lhs) == getId(Rhs);
   }
 };
 
