@@ -307,11 +307,6 @@ void StaticNodeSupTrans::nodeMultiPass_(
 
 ////////////////////////////////////
 // Removal of redundant edges:
-static size_t castUnsigned(int x) {
-  assert(x >= 0); // sanity check
-  return size_t(x);
-}
-
 static bool isRedundant(SchedInstruction *NodeI, SchedInstruction *NodeJ,
                         GraphEdge &e) {
   // If this is the edge we just added, it's not redundant
