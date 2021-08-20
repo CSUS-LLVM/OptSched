@@ -14,6 +14,8 @@
 
 #include "py.hpp"
 
+#include <mio/mmap.hpp>
+
 namespace ev {
 using Number = std::variant<std::int64_t, std::uint64_t, double>;
 
@@ -118,7 +120,8 @@ struct Benchmark {
 
 struct Logs {
   std::filesystem::path LogFile;
-  std::string RawLog;
+  mio::mmap_source MMap;
+  std::string_view RawLog;
   std::vector<std::shared_ptr<Benchmark>> Benchmarks;
 };
 

@@ -4,11 +4,8 @@
 #include <array>
 #include <cassert>
 #include <charconv>
-#include <deque>
 #include <execution>
 #include <filesystem>
-#include <fstream>
-#include <iostream>
 #include <mutex>
 #include <ranges>
 #include <string>
@@ -25,28 +22,6 @@ using namespace std::literals;
 using namespace ev;
 namespace py = pybind11;
 namespace fs = std::filesystem;
-
-// Read a whole file in at once
-std::string slurp(const fs::path &Path) {
-  // Open first to help ensure that we get the correct file size
-  std::ifstream File(Path);
-
-  std::string Result;
-  Result.resize(fs::file_size(Path));
-
-  File.read(Result.data(), Result.size());
-  // In case there's anything left over
-  while (File) {
-    static constexpr std::size_t BufSize = 1024;
-    std::array<char, BufSize> Buffer;
-    File.read(Buffer.data(), Buffer.size());
-    Result.insert(Result.end(), Buffer.begin(), Buffer.end());
-  }
-
-  Result.erase(Result.find('\0'), Result.size());
-
-  return Result;
-}
 
 static constexpr std::string_view RegionNameEv =
     R"("event_id": "ProcessDag", "name": ")";
@@ -331,7 +306,8 @@ void ev::defParse(py::module &Mod) {
     }
     auto Logs = std::make_shared<ev::Logs>();
     Logs->LogFile = std::move(Path);
-    Logs->RawLog = ::slurp(Logs->LogFile);
+    Logs->MMap = mio::mmap_source(Logs->LogFile.string());
+    Logs->RawLog = std::string_view(Logs->MMap.data(), Logs->MMap.size());
     const std::string_view File = Logs->RawLog;
 
     const std::vector<BenchmarkRegion> BenchmarkSections =
@@ -363,7 +339,8 @@ void ev::defParse(py::module &Mod) {
                              std::string_view BenchmarkName) {
     auto Logs = std::make_shared<ev::Logs>();
     Logs->LogFile = std::move(Path);
-    Logs->RawLog = ::slurp(Logs->LogFile);
+    Logs->MMap = mio::mmap_source(Logs->LogFile.string());
+    Logs->RawLog = std::string_view(Logs->MMap.data(), Logs->MMap.size());
     const std::string_view File = Logs->RawLog;
 
     Logs->Benchmarks.push_back(

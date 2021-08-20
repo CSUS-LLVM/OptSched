@@ -7,6 +7,13 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 include(FetchContent)
 
 FetchContent_Declare(
+  mio
+  GIT_REPOSITORY https://github.com/mandreyel/mio.git
+  GIT_TAG        3f86a95c0784d73ce6815237ec33ed25f233b643
+)
+FetchContent_MakeAvailable(mio)
+
+FetchContent_Declare(
   pybind11
   GIT_REPOSITORY https://github.com/pybind/pybind11.git
   GIT_TAG        v2.6.2
@@ -38,3 +45,4 @@ file(GLOB_RECURSE sources CONFIGURE_DEPENDS "src/*.cpp")
 pybind11_add_module(eventanalyze ${sources})
 target_include_directories(eventanalyze PUBLIC include)
 target_compile_features(eventanalyze PUBLIC cxx_std_20)
+target_link_libraries(eventanalyze PRIVATE mio::mio)
