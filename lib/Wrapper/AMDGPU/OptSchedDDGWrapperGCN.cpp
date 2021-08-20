@@ -29,7 +29,7 @@ namespace {
 
 std::unique_ptr<SubRegSet>
 createSubRegSet(unsigned Reg, const MachineRegisterInfo &MRI, int16_t Type) {
-  return llvm::make_unique<SubRegSet>(
+  return std::make_unique<SubRegSet>(
       MRI.getMaxLaneMaskForVReg(Reg).getNumLanes(), Type);
 }
 

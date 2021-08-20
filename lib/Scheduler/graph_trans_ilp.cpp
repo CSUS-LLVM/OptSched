@@ -158,7 +158,7 @@ StaticNodeSupILPTrans::DataAlloc::DataAlloc(DataDepGraph &DDG)
       SuperiorNodesList(
           createSuperiorNodesList(wrapAs2D(SuperiorArray, DDG.GetNodeCnt()))),
       AddedEdges(), Stats(),
-      Data_(llvm::make_unique<Data>(Data{
+      Data_(std::make_unique<Data>(Data{
           DDG,
           wrapAs2D(this->DistanceTable, DDG.GetNodeCnt()),
           wrapAs2D(this->SuperiorArray, DDG.GetNodeCnt()),

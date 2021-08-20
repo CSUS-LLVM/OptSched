@@ -146,7 +146,7 @@ static bool isBbEnabled(Config &schedIni, Milliseconds rgnTimeout) {
 
 static void dumpDDG(DataDepGraph *DDG, llvm::StringRef DDGDumpPath,
                     llvm::StringRef Suffix = "") {
-  std::string Path = DDGDumpPath;
+  std::string Path(DDGDumpPath);
   Path += DDG->GetDagID();
 
   if (!Suffix.empty()) {

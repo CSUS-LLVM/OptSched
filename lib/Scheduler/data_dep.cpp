@@ -197,7 +197,7 @@ DataDepGraph::DataDepGraph(MachineModel *machMdl, LATENCY_PRECISION ltncyPrcsn)
   entryInstCnt_ = 0;
   exitInstCnt_ = 0;
 
-  RegFiles = llvm::make_unique<RegisterFile[]>(machMdl_->GetRegTypeCnt());
+  RegFiles = std::make_unique<RegisterFile[]>(machMdl_->GetRegTypeCnt());
 }
 
 DataDepGraph::~DataDepGraph() {

@@ -199,7 +199,7 @@ static InstCount ComputeSLILStaticLowerBound(int64_t regTypeCnt_,
     // between the recursive successor list of this instruction and the
     // recursive predecessors of the dependent instruction.
     auto recSuccBV = inst->GetRcrsvNghbrBitVector(DIR_FRWRD);
-    for (Register *def : inst->GetDefs()) {
+    for (opt_sched::Register *def : inst->GetDefs()) {
       for (const auto &dependentInst : def->GetUseList()) {
         auto recPredBV = const_cast<SchedInstruction *>(dependentInst)
                              ->GetRcrsvNghbrBitVector(DIR_BKWRD);
@@ -225,14 +225,15 @@ static InstCount ComputeSLILStaticLowerBound(int64_t regTypeCnt_,
   // based on the instructions that use more than one register (defined by
   // different instructions).
   int commonUseLowerBound = closureLowerBound;
-  std::vector<std::pair<const SchedInstruction *, Register *>> usedInsts;
+  std::vector<std::pair<const SchedInstruction *, opt_sched::Register *>>
+      usedInsts;
   for (int i = 0; i < dataDepGraph_->GetInstCnt(); ++i) {
     const auto &inst = dataDepGraph_->GetInstByIndx(i);
 
     // Get a list of instructions that define the registers, in array form.
     usedInsts.clear();
     llvm::transform(inst->GetUses(), std::back_inserter(usedInsts),
-                    [&](Register *reg) {
+                    [&](opt_sched::Register *reg) {
                       assert(reg->GetDefList().size() == 1 &&
                              "Number of defs for register is not 1!");
                       return std::make_pair(*(reg->GetDefList().begin()), reg);
@@ -477,7 +478,7 @@ void BBWithSpill::UpdateSpillInfoForSchdul_(SchedInstruction *inst,
 #endif
 
   // Update Live regs after uses
-  for (Register *use : inst->GetUses()) {
+  for (opt_sched::Register *use : inst->GetUses()) {
     regType = use->GetType();
     regNum = use->GetNum();
     physRegNum = use->GetPhysicalNumber();
@@ -519,7 +520,7 @@ void BBWithSpill::UpdateSpillInfoForSchdul_(SchedInstruction *inst,
   }
 
   // Update Live regs after defs
-  for (Register *def : inst->GetDefs()) {
+  for (opt_sched::Register *def : inst->GetDefs()) {
     regType = def->GetType();
     regNum = def->GetNum();
     physRegNum = def->GetPhysicalNumber();
@@ -575,7 +576,7 @@ void BBWithSpill::UpdateSpillInfoForSchdul_(SchedInstruction *inst,
       sumOfLiveIntervalLengths_[i] += liveRegs_[i].GetOneCnt();
       for (int j = 0; j < liveRegs_[i].GetSize(); ++j) {
         if (liveRegs_[i].GetBit(j)) {
-          const Register *reg = regFiles_[i].GetReg(j);
+          const opt_sched::Register *reg = regFiles_[i].GetReg(j);
           if (!reg->IsInInterval(inst) && !reg->IsInPossibleInterval(inst)) {
             ++dynamicSlilLowerBound_;
           }
@@ -636,7 +637,7 @@ void BBWithSpill::UpdateSpillInfoForUnSchdul_(SchedInstruction *inst) {
     for (int i = 0; i < regTypeCnt_; ++i) {
       for (int j = 0; j < liveRegs_[i].GetSize(); ++j) {
         if (liveRegs_[i].GetBit(j)) {
-          const Register *reg = regFiles_[i].GetReg(j);
+          const opt_sched::Register *reg = regFiles_[i].GetReg(j);
           sumOfLiveIntervalLengths_[i]--;
           if (!reg->IsInInterval(inst) && !reg->IsInPossibleInterval(inst)) {
             --dynamicSlilLowerBound_;
@@ -649,7 +650,7 @@ void BBWithSpill::UpdateSpillInfoForUnSchdul_(SchedInstruction *inst) {
   }
 
   // Update Live regs
-  for (Register *def : inst->GetDefs()) {
+  for (opt_sched::Register *def : inst->GetDefs()) {
     regType = def->GetType();
     regNum = def->GetNum();
     physRegNum = def->GetPhysicalNumber();
@@ -674,7 +675,7 @@ void BBWithSpill::UpdateSpillInfoForUnSchdul_(SchedInstruction *inst) {
     //}
   }
 
-  for (Register *use : inst->GetUses()) {
+  for (opt_sched::Register *use : inst->GetUses()) {
     regType = use->GetType();
     regNum = use->GetNum();
     physRegNum = use->GetPhysicalNumber();
@@ -1091,8 +1092,8 @@ bool BBWithSpill::ChkInstLglty(SchedInstruction *inst) {
   /*
   int16_t regType;
   int defCnt, physRegNum;
-  Register **defs;
-  Register *def, *liveDef;
+  opt_sched::Register **defs;
+  opt_sched::Register *def, *liveDef;
 
 #ifdef IS_DEBUG_CHECK
   Logger::Info("Checking inst %d %s", inst->GetNum(), inst->GetOpCode());
@@ -1111,7 +1112,7 @@ bool BBWithSpill::ChkInstLglty(SchedInstruction *inst) {
   }
 
   // Update Live regs
-  for (Register *def : inst->GetDefs()) {
+  for (opt_sched::Register *def : inst->GetDefs()) {
     regType = def->GetType();
     physRegNum = def->GetPhysicalNumber();
 
