@@ -1,0 +1,149 @@
+name: Check LLVM Versions
+
+on:
+  push:
+    branches: [ master ]
+  issue_comment: # On PR issue comment
+    types: [ created ]
+
+jobs:
+  comment-triggered:
+    runs-on: ubuntu-20.04
+
+    outputs:
+      value: ${{ steps.value.outputs.value }}
+      checks_should_run: ${{ steps.checks_should_run.outputs.checks_should_run }}
+
+    steps:
+    - id: value
+    # Allow triggering with a comment of `Do: Check LLVM Versions`.
+    # If we are a pull_request, we have the trigger comment, and the person
+    # requesting is the one who made the PR, then we run.
+      run: >-
+        echo "::set-output name=value::${{ github.event_name == 'issue_comment'
+        && github.event.issue.pull_request != ''
+        && github.event.comment.body == 'Do: Check LLVM Versions'
+        && github.event.comment.user.id == github.event.issue.user.id }}"
+
+    - id: checks_should_run
+      run: >-
+        echo "::set-output name=checks_should_run::${{
+          steps.value.outputs.value == 'true'
+          || github.event_name == 'push'
+          || github.event_name == 'pull_request' }}"
+
+  init-report:
+    needs: comment-triggered
+    runs-on: ubuntu-20.04
+    if: needs.comment-triggered.outputs.value == 'true'
+
+    outputs:
+      report: ${{ steps.report.outputs.comment-id }}
+
+    steps:
+    - name: Initialize Report
+      uses: peter-evans/create-or-update-comment@v1.4.3
+      id: report
+      with:
+        issue-number: ${{ github.event.issue.number }}
+        body: |
+          Checking LLVM versions: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
+
+  check-llvm-versions:
+    needs: comment-triggered
+    runs-on: ubuntu-${{ matrix.os }}
+    if: needs.comment-triggered.outputs.checks_should_run == 'true'
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - llvm: 7
+            llvm-ver: 7.1
+            os: 18.04
+            ubuntu: bionic
+          - llvm: 8
+            llvm-ver: 8.0
+            os: 18.04
+            ubuntu: bionic
+          - llvm: 9
+            llvm-ver: 9.0
+            os: 20.04
+            ubuntu: focal
+          - llvm: 10
+            llvm-ver: 10.0
+            os: 20.04
+            ubuntu: focal
+          - llvm: 11
+            llvm-ver: 11.1
+            os: 20.04
+            ubuntu: focal
+          - llvm: 12
+            llvm-ver: 12.0
+            os: 20.04
+            ubuntu: focal
+          - llvm: 13
+            llvm-ver: 13.0
+            os: 20.04
+            ubuntu: focal
+
+    steps:
+    - name: Install dependencies
+      run: |
+        # Setup LLVM GPG Key
+        wget -O - https://apt.llvm.org/llvm-snapshot.gpg.key | sudo apt-key add -
+
+        sudo add-apt-repository "deb http://apt.llvm.org/${{ matrix.ubuntu }}/ llvm-toolchain-${{ matrix.ubuntu }}-${{ matrix.llvm }} main"
+        sudo apt-get update
+
+        sudo apt-get install clang++-${{ matrix.llvm }} llvm-${{ matrix.llvm }} ninja-build
+
+    - uses: actions/checkout@v2
+      with:
+        fetch-depth: 0
+
+    - run: |
+        echo ${{ github.token }} | gh auth login --with-token
+        gh pr checkout ${{ github.event.issue.number }}
+      if: needs.comment-triggered.outputs.value == 'true'
+
+    - name: Configure OptSched
+      run: |
+        mkdir build-optsched && cd build-optsched
+
+        cmake .. -GNinja                                                               \
+            -DCMAKE_BUILD_TYPE=Release                                                 \
+            -DOPTSCHED_LLVM_VERSION=${{ matrix.llvm-ver }}                                 \
+            -DCMAKE_CXX_COMPILER=g++ -DCMAKE_C_COMPILER=gcc                            \
+            -DOPTSCHED_ENABLE_AMDGPU=OFF                                               \
+            -DCMAKE_INSTALL_PREFIX=$PWD/install
+
+    - name: Build OptSched
+      working-directory: build-optsched
+      run: ninja
+
+    - name: Run tests
+      working-directory: build-optsched
+      run: ctest -VV
+
+  report:
+    needs: [comment-triggered, init-report, check-llvm-versions]
+    runs-on: ubuntu-20.04
+    if: always()
+
+    steps:
+    - name: Report CI
+      if: needs.comment-triggered.outputs.value == 'true'
+      uses: peter-evans/create-or-update-comment@v1.4.3
+      with:
+        comment-id: ${{ needs.init-report.outputs.report }}
+        body: |
+          | Check | Status |
+          | ----- | ------ |
+          ${{
+            format('| Check LLVM Versions | {0}{1}{2} |',
+              needs.check-llvm-versions.result == 'success' && '&#x2714; Passed' || '',
+              needs.check-llvm-versions.result == 'failure' && '&#x274C; Failed' || '',
+              (needs.check-llvm-versions.result != 'success' && needs.check-llvm-versions.result != 'failure') && 'Skipped' || ''
+            )
+          }}
