@@ -43,6 +43,8 @@ std::string slurp(const fs::path &Path) {
     Result.insert(Result.end(), Buffer.begin(), Buffer.end());
   }
 
+  Result.erase(Result.find('\0'), Result.size());
+
   return Result;
 }
 
