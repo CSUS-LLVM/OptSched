@@ -100,29 +100,18 @@ void ev::defTypes(py::module &Mod) {
                throw py::key_error(std::string(EvId));
              }
            })
-      .def("get",
-           [](const Block &Blk, std::string_view EvId,
-              py::object default_) -> py::object {
-             auto It = Blk.Events.find(EventId(EvId));
-             if (It != Blk.Events.end()) {
-               return py::cast(*It);
-             } else {
-               return default_;
+      .def("_event_names",
+           [](const Block &Blk) {
+             std::vector<std::string_view> Names;
+             Names.reserve(Blk.Events.size());
+
+             for (const auto &Events : Blk.Events) {
+               Names.push_back(ev::getId(Events).Value);
              }
+
+             return Names;
            })
-      .def("single",
-           [](const Block &Blk, std::string_view EvId) {
-             auto It = Blk.Events.find(EventId(EvId));
-             if (It != Blk.Events.end()) {
-               if (It->size() != 1) {
-                 throw std::invalid_argument("Multiple events for " +
-                                             std::string(EvId));
-               }
-               return It->front();
-             } else {
-               throw py::key_error(std::string(EvId));
-             }
-           })
+      .def_readonly("uniqueid", &Block::UniqueId)
       .def("__contains__",
            [](const Block &Blk, std::string_view EvId) {
              return Blk.Events.contains(EventId(EvId));
@@ -187,6 +176,7 @@ void ev::defTypes(py::module &Mod) {
                return It->get();
              }
            })
+      .def("__iter__", [](py::handle Logs) { return Logs.attr("benchmarks"); })
       .def("__repr__", [](const ev::Logs &Logs) {
         std::string Result = "<Logs(";
         bool First = true;

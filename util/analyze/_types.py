@@ -1,3 +1,17 @@
+def merge_logs(lhs, rhs):
+    '''
+    Merges the logs from the rhs into the lhs.
+
+    The rhs must have different benchmarks from the lhs
+    '''
+    in_both = set(lhs.benchmarks) & set(rhs.benchmarks)
+    if in_both:
+        raise ValueError(
+            'Cannot merge Logs which share common benchmarks', in_both)
+
+    lhs.benchmarks += rhs.benchmarks
+
+
 class Logs:
     '''
     Abstracts a log file as a collection of benchmarks
@@ -8,21 +22,6 @@ class Logs:
 
     def __init__(self, benchmarks):
         self.benchmarks = benchmarks
-
-    def merge(self, rhs):
-        '''
-        Merges the logs from the rhs into this.
-
-        The rhs must have different benchmarks from this Logs
-        '''
-        in_both = set(self.benchmarks) & set(rhs.benchmarks)
-        if in_both:
-            raise ValueError(
-                'Cannot merge Logs which share common benchmarks', in_both)
-
-        self.benchmarks += rhs.benchmarks
-
-        return self
 
     def benchmark(self, name):
         '''
@@ -103,7 +102,7 @@ class Block:
 
         raises AssertionError if there is not exactly one event with the specified name
         '''
-        result = self.events[event_name]
+        result = self[event_name]
         if len(result) != 1:
             raise AssertionError(f'Multiple events for {event_name}')
 

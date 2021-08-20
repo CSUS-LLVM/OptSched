@@ -7,6 +7,7 @@ import sys
 from typing import Callable
 
 from ._types import Block, Logs
+from . import _cpp_types
 from .imports import *
 
 
@@ -99,8 +100,11 @@ def parse_args(parser: argparse.ArgumentParser, *names, args=None):
         else:
             mod = __import__('eventanalyze')
 
+        _cpp_types.load_module(mod)
+
         def parse(file):
-            return mod.parse_blocks(file, mod.SPEC_BENCH_RE)
+            return _cpp_types.parse_blocks(file, mod.SPEC_BENCH_RE)
+
         return parse
 
     FILE_PARSERS = {
