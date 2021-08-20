@@ -45,9 +45,7 @@ struct EventSchema {
 
 struct Event {
   EventId Id;
-  const std::deque<Value> *Values;
-  std::size_t Start; // Indices into values.
-  std::size_t End;
+  std::vector<Value> Values;
 };
 
 inline EventId getId(EventId Id) { return Id; }

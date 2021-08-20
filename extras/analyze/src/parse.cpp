@@ -26,9 +26,6 @@ using namespace ev;
 namespace py = pybind11;
 namespace fs = std::filesystem;
 
-thread_local std::deque<Value> Values;
-thread_local std::unordered_set<std::string> Strings;
-
 // Read a whole file in at once
 std::string slurp(const fs::path &Path) {
   // Open first to help ensure that we get the correct file size
@@ -68,13 +65,12 @@ static EventSchema parseEventSchema(
     EventId Id,
     const std::vector<std::pair<std::string_view, std::string_view>> &Init) {
   EventSchema Result;
-  Result.Id = EventId(*Strings.insert(std::string(Id.Value)).first);
+  Result.Id = EventId(Id.Value);
   Result.ParamTypes.reserve(Init.size() - 1);
   Result.Parameters.reserve(Init.size() - 1);
 
   for (std::size_t Index = 0; Index < Init.size() - 1; ++Index) {
-    Result.Parameters.push_back(
-        *Strings.insert(std::string(Init[Index + 1].first)).first);
+    Result.Parameters.push_back(Init[Index + 1].first);
     assert(!Init[Index + 1].second.empty());
     if (Init[Index + 1].second.front() == '"') {
       Result.ParamTypes.push_back(Type::String);
@@ -148,7 +144,8 @@ static Event parseEvent(const std::string_view Event) {
   Id = It->Id; // Update to the non-dangling Id.
 
   assert(It->ParamTypes.size() == Result.size() - 1);
-  std::size_t start = Values.size();
+  std::vector<Value> Values;
+
   for (std::size_t Index = 0; Index < Result.size() - 1; ++Index) {
     const std::string_view Data = Result[Index + 1].second;
     Values.push_back([&]() -> Value {
@@ -177,23 +174,15 @@ static Event parseEvent(const std::string_view Event) {
         std::abort();
       }
       case Type::String:
-        return Value{
-            .Str = *Strings.insert(std::string(Data.substr(1, Data.size() - 2)))
-                        .first};
+        return Value{.Str = Data.substr(1, Data.size() - 2)};
       case Type::Bool:
         return Value{.Bool = Data == "true"sv};
       }
       std::abort();
     }());
   }
-  std::size_t iend = Values.size();
 
-  return ev::Event{
-      .Id = Id,
-      .Values = &Values,
-      .Start = start,
-      .End = iend,
-  };
+  return ev::Event{.Id = Id, .Values = std::move(Values)};
 }
 
 static constexpr std::string_view EventTag = R"(EVENT: {)";
@@ -231,7 +220,7 @@ static Block parseBlock(ev::Benchmark *Bench, const std::string_view BlockLog) {
   if (PF != Events.end()) {
     UniqueId +=
         ",pass=" +
-        std::to_string(std::get<std::int64_t>(Values[PF->front().Start].Num));
+        std::to_string(std::get<std::int64_t>(PF->front().Values.front().Num));
   }
   return Block{
       .Name = std::move(Name),

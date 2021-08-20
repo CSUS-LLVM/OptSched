@@ -1,5 +1,6 @@
 #include "types.hpp"
 
+#include <span>
 #include <sstream>
 
 #include "parse.hpp"
@@ -7,6 +8,21 @@
 
 using namespace std::literals;
 namespace py = pybind11;
+
+namespace {
+template <typename T>
+const T &index_into(std::span<const T> Span, std::int64_t index) {
+  if (index < 0) {
+    // Negative index indexes from the end
+    index += Span.size();
+  }
+  if (index < 0 || static_cast<std::uint64_t>(index) >= Span.size()) {
+    throw py::index_error("Index out of bounds: " + std::to_string(index) +
+                          "/" + std::to_string(Span.size()));
+  }
+  return Span[index];
+}
+} // namespace
 
 void ev::defTypes(py::module &Mod) {
   py::class_<Event>(Mod, "_Event")
@@ -22,7 +38,7 @@ void ev::defTypes(py::module &Mod) {
                                std::find(Schema->Parameters.begin(),
                                          Schema->Parameters.end(), Property));
 
-             const Value Val = (*Event.Values)[Event.Start + Index];
+             const Value Val = Event.Values[Index];
              switch (Schema->ParamTypes[Index]) {
              case Type::Number:
                return std::visit(
@@ -53,7 +69,7 @@ void ev::defTypes(py::module &Mod) {
           if (Index != 0)
             out << ", ";
           out << '\'' << Schema->Parameters[Index] << "': ";
-          const Value Val = (*Event.Values)[Event.Start + Index];
+          const Value Val = Event.Values[Index];
           switch (Schema->ParamTypes[Index]) {
           case Type::Number:
             std::visit([&out](auto x) { out << x; }, Val.Num);
@@ -116,16 +132,45 @@ void ev::defTypes(py::module &Mod) {
                ", "s + std::to_string(Blk.Events.size()) + " events)>";
       });
 
+  struct BenchmarkBlocks {
+    std::span<const Block> Blocks;
+  };
+
+  py::class_<BenchmarkBlocks>(Mod, "_Blocks")
+      .def("__getitem__",
+           [](const BenchmarkBlocks &Blocks, std::int64_t index) {
+             return ::index_into(Blocks.Blocks, index);
+           })
+      .def("__len__",
+           [](const BenchmarkBlocks &Blocks) { return Blocks.Blocks.size(); });
+
   py::class_<Benchmark, std::shared_ptr<Benchmark>>(Mod, "Benchmark")
       .def_readonly("name", &Benchmark::Name)
       .def_readonly("raw_log", &Benchmark::RawLog)
-      .def_readonly("blocks", &Benchmark::Blocks)
+      .def_property_readonly(
+          "blocks",
+          [](const Benchmark &Bench) { return BenchmarkBlocks{Bench.Blocks}; })
       .def("__repr__", [](const Benchmark &Bench) {
         return "<Benchmark(name=" + Bench.Name + ", " +
                std::to_string(Bench.Blocks.size()) + " blocks)>";
       });
+
+  struct LogsBenchmarks {
+    std::span<const std::shared_ptr<Benchmark>> Benchmarks;
+  };
+  py::class_<LogsBenchmarks>(Mod, "_Benchmarks")
+      .def("__getitem__",
+           [](const LogsBenchmarks &Benchmarks, std::int64_t index) {
+             return ::index_into(Benchmarks.Benchmarks, index);
+           })
+      .def("__len__", [](const LogsBenchmarks &Benchmarks) {
+        return Benchmarks.Benchmarks.size();
+      });
+
   py::class_<Logs, std::shared_ptr<Logs>>(Mod, "Logs")
-      .def_readonly("benchmarks", &Logs::Benchmarks)
+      .def_property_readonly(
+          "benchmarks",
+          [](const ev::Logs &Logs) { return LogsBenchmarks{Logs.Benchmarks}; })
       .def_readonly("raw_log", &Logs::RawLog)
       .def("benchmark",
            [](const ev::Logs &Logs, const std::string_view BenchName) {
