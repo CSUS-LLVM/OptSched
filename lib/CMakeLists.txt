@@ -58,4 +58,5 @@ add_optsched_library(OptSched
   ${OPTSCHED_SRCS}
   LINK_LIBS ${OPTSCHED_LINK_LIBS}
 )
+target_compile_features(OptSched PUBLIC cxx_std_14) # We need >= C++14
 add_dependencies(OptSched ${OPTSCHED_TARGET_DEPS})

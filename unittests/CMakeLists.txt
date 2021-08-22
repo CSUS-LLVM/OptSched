@@ -10,6 +10,7 @@ endfunction()
 
 # All unit test targets depend on OptSched
 add_library(UnitTest.OptSched STATIC $<TARGET_OBJECTS:obj.OptSched>)
+target_compile_features(UnitTest.OptSched PUBLIC cxx_std_14)
 link_libraries(UnitTest.OptSched)
 
 add_subdirectory(Basic)
