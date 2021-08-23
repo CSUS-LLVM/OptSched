@@ -5,14 +5,53 @@ import shlex
 import subprocess
 import sys
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Tuple
+import json
+import itertools
+import functools
 
 from runners import runwith
 
 # %% Setup
 
 
-def main(outdir: Path, optsched_cfg: Path, labels: List[str], withs: List[Dict[str, str]], cmd: List[str], append_logs: bool = False, git_state: Optional[str] = None, validate_cmd: Optional[str] = None, analyze_cmds: List[str] = [], analyze_files: List[str] = []):
+def expand_matrix(matrix: List[Dict[str, Dict[str, str]]]) -> Tuple[List[Dict[str, str]], List[str]]:
+    withs = []
+    labels = []
+    from pprint import pprint
+
+    def merge_dict(a: dict, b: dict) -> dict:
+        assert not (a.keys() & b.keys())
+        a = a.copy()
+        a.update(b)
+        return a
+
+    for setting in itertools.product(*matrix):
+        withs_setting = functools.reduce(merge_dict, (obj[opt] for opt, obj in zip(setting, matrix)))
+        label = '-'.join(setting)
+
+        withs.append(withs_setting)
+        labels.append(label)
+
+    return withs, labels
+
+
+def main(outdir: Path, optsched_cfg: Path, labels: List[str], withs: List[str], cmd: List[str], append_logs: bool = False, git_state: Optional[str] = None, validate_cmd: Optional[str] = None, analyze_cmds: List[str] = [], analyze_files: List[str] = [], matrix: List[Path] = []):
+    if withs is not None:
+        withs: List[Dict[str, str]] = [runwith.parse_withs(with_) for with_ in withs]
+    else:
+        assert matrix
+        assert not labels
+
+        withs = []
+        labels = []
+
+        for matrix_path in matrix:
+            matrix_json = json.loads(matrix_path.read_text())
+            new_withs, new_labels = expand_matrix(matrix_json)
+            withs += new_withs
+            labels += new_labels
+
     assert len(labels) == len(withs)
     assert not analyze_files or len(analyze_files) == len(analyze_cmds)
 
@@ -73,10 +112,12 @@ if __name__ == '__main__':
                         default=OPTSCHEDCFG,
                         help='The path to the optsched config to use. Defaults to the env variable OPTSCHEDCFG if it exists, else is required. The sched.ini is expected to be there')
     parser.add_argument('-o', '--outdir', required=True, help='The path to place the output files at')
-    parser.add_argument('-L', '--labels', required=True,
+    parser.add_argument('-L', '--labels', default='',
                         help='Comma separated labels to use for these runs. Must be equal to the number of --with flags. Any parts of the run command <cmd> will have the string {{label}} replaced with the label for the run.')
     parser.add_argument('--with', nargs='*', action='append', metavar='KEY=VALUE',
                         help="The sched.ini settings to set for each run. Each run's settings should have a new --with flag.")
+    parser.add_argument('--matrix', type=Path, action='append', metavar='MATRIX.json',
+                        help='A json file containing a matrix of configuration values to act as-if their product was specified via --with and --labels')
     parser.add_argument(
         'cmd', nargs='+', help='The command (with args) to run. Use - to default to the environment variable RUN_CMD.')
     parser.add_argument('--append', action='store_true',
@@ -96,8 +137,9 @@ if __name__ == '__main__':
     main(
         outdir=Path(args.outdir),
         optsched_cfg=Path(args.optsched_cfg),
-        labels=args.labels.split(','),
-        withs=[runwith.parse_withs(with_) for with_ in getattr(args, 'with', [])],
+        labels=list(filter(bool, args.labels.split(','))),
+        withs=getattr(args, 'with'),
+        matrix=args.matrix,
         cmd=args.cmd if args.cmd != '-' else RUN_CMD,
         append_logs=args.append,
         git_state=args.git_state,
