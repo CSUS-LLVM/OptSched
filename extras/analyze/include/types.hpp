@@ -54,11 +54,13 @@ struct Event {
 
 inline EventId getId(EventId Id) { return Id; }
 
+// clang-format off
 template <typename T>
 requires requires(const T &It) {
   { It.Id } -> std::convertible_to<EventId>;
 }
 EventId getId(const T &It) { return It.Id; }
+// clang-format on
 
 template <typename T> EventId getId(const std::vector<T> &Vec) {
   assert(!Vec.empty());

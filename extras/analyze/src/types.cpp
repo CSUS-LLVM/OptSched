@@ -42,7 +42,9 @@ void ev::defTypes(py::module &Mod) {
              switch (Schema->ParamTypes[Index]) {
              case Type::Number:
                return std::visit(
+                   // clang-format off
                    []<typename T>(T x) -> py::object {
+                     // clang-format on
                      if constexpr (std::same_as<T, double>)
                        return py::float_(x);
                      else
