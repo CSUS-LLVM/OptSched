@@ -10,8 +10,6 @@
 #include <ranges>
 #include <string>
 #include <string_view>
-#include <unordered_map>
-#include <unordered_set>
 #include <utility>
 #include <vector>
 
@@ -65,9 +63,9 @@ static EventSchema parseEventSchema(
 // Schemas are globally loaded.
 // This static/thread_local dance is to make it appropriately thread safe but
 // still fast.
-static std::unordered_set<EventSchema, EventIdHash, EventIdEq> MasterSchemas;
+static absl::flat_hash_set<EventSchema, EventIdHash, EventIdEq> MasterSchemas;
 static std::mutex MasterSchemaMutex;
-thread_local std::unordered_set<EventSchema, EventIdHash, EventIdEq> Schemas;
+thread_local absl::flat_hash_set<EventSchema, EventIdHash, EventIdEq> Schemas;
 
 static void updateSchemaStructures(EventId Id, EventSchema schema) {
   std::scoped_lock Lock(MasterSchemaMutex);
@@ -167,7 +165,7 @@ static const std::boyer_moore_horspool_searcher
     EventTagSearcher(EventTag.begin(), EventTag.end());
 
 static BlockEventMap parseEvents(const std::string_view BlockLog) {
-  std::unordered_map<EventId, std::vector<Event>, EventIdHash, EventIdEq>
+  absl::flat_hash_map<EventId, std::vector<Event>, EventIdHash, EventIdEq>
       Result;
 
   const auto E = BlockLog.end();
@@ -205,7 +203,9 @@ static Block parseBlock(ev::Benchmark *Bench, const std::string_view BlockLog) {
       .RawLog = BlockLog,
       .UniqueId = std::move(UniqueId),
       .Bench = Bench,
-      .File = "", // TODO: Get this information too
+      // Extracting file info costs quite a bit of time, and we never use it
+      // anyway.
+      .File = "",
   };
 }
 

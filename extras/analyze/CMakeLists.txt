@@ -3,6 +3,7 @@ cmake_minimum_required(VERSION 3.20.3)
 project(EventAnalyze)
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
 include(FetchContent)
 
@@ -19,6 +20,14 @@ FetchContent_Declare(
   GIT_TAG        v2.6.2
 )
 FetchContent_MakeAvailable(pybind11)
+
+FetchContent_Declare(
+  abseil
+  GIT_REPOSITORY https://github.com/abseil/abseil-cpp.git
+  GIT_TAG        f39e6ad4753e06d4a0d6a9bf6310478757479984
+)
+set(BUILD_TESTING OFF)
+FetchContent_MakeAvailable(abseil)
 
 FetchContent_Declare(
   FindTBB
@@ -45,4 +54,4 @@ file(GLOB_RECURSE sources CONFIGURE_DEPENDS "src/*.cpp")
 pybind11_add_module(eventanalyze ${sources})
 target_include_directories(eventanalyze PUBLIC include)
 target_compile_features(eventanalyze PUBLIC cxx_std_20)
-target_link_libraries(eventanalyze PRIVATE mio::mio)
+target_link_libraries(eventanalyze PRIVATE mio::mio absl::base absl::flat_hash_map)

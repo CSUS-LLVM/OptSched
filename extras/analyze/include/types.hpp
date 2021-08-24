@@ -14,6 +14,8 @@
 
 #include "py.hpp"
 
+#include <absl/container/flat_hash_map.h>
+#include <absl/container/flat_hash_set.h>
 #include <mio/mmap.hpp>
 
 namespace ev {
@@ -91,7 +93,7 @@ struct EventIdEq {
 };
 
 using BlockEventMap =
-    std::unordered_set<std::vector<Event>, EventIdHash, EventIdEq>;
+    absl::flat_hash_set<std::vector<Event>, EventIdHash, EventIdEq>;
 
 struct Logs;
 struct Benchmark;
