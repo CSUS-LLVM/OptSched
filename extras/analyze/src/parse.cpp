@@ -60,6 +60,8 @@ static EventSchema parseEventSchema(
   return Result;
 }
 
+#include <iostream>
+
 // Schemas are globally loaded.
 // This static/thread_local dance is to make it appropriately thread safe but
 // still fast.
@@ -92,22 +94,34 @@ static Event parseEvent(const std::string_view Event) {
         Event.find_first_not_of(" \t\n", Event.find(':', KeyE + 1) + 1);
     if (ValF == std::string_view::npos)
       break;
-    const auto ValE = Event[ValF] == '"'
-                          ? Event.find('"', ValF + 1) + 1
-                          : Event.find_first_of(",} \t\n", ValF + 1);
+    const auto ValE = [&] {
+      if (Event[ValF] == '"') {
+        // Find the end of the string
+        return Event.find('"', ValF
+                                   // start after the open quote
+                                   + 1)
+               // include the end quote
+               + 1;
+      } else {
+        // Find the end of the number/bool/etc; either the next whitespace, the
+        // separating comma, or the end of the JSON object:
+        return Event.find_first_of(",} \t\n", ValF + 1);
+      }
+    }();
     if (ValE == std::string_view::npos)
       break;
     std::string_view Val = Event.substr(ValF, ValE - ValF);
 
     Result.emplace_back(Key, Val);
-    Begin = Event.find_first_of(",}", ValE + 1);
+    // Find the start of the next element (if there is a next)
+    Begin = Event.find_first_of(",}", ValE);
     if (Begin == std::string_view::npos)
       break;
     Begin += 1;
   }
 
   assert(Result[0].first == "event_id"sv);
-  EventId Id(Result[0].second);
+  EventId Id(Result[0].second.substr(1, Result[0].second.size() - 2));
 
   auto It = Schemas.find(Id);
   if (It == Schemas.end()) {
