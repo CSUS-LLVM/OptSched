@@ -141,6 +141,12 @@ void ev::defTypes(py::module &Mod) {
       .def_property_readonly(
           "blocks",
           [](const Benchmark &Bench) { return BenchmarkBlocks{Bench.Blocks}; })
+      .def_property_readonly("info",
+                             [](const Benchmark &Bench) -> py::dict {
+                               using namespace pybind11::literals;
+
+                               return py::dict("name"_a = Bench.Name);
+                             })
       .def("__repr__", [](const Benchmark &Bench) {
         return "<Benchmark(name=" + Bench.Name + ", " +
                std::to_string(Bench.Blocks.size()) + " blocks)>";

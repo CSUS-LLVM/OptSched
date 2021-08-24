@@ -62,6 +62,10 @@ def _make_classes(cpp):
         def raw_log(self):
             return self.__cpp.raw_log
 
+        @property
+        def info(self):
+            return self.__cpp.info
+
         # Inherit __iter__
 
         # Inherit .benchmarks
