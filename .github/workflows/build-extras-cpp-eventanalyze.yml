@@ -72,9 +72,17 @@ jobs:
 
           cmake --build build -j 2
 
+      - name: Bundle Shared Objects
+        run: |
+          cd build
+
+          # Copy the shared object dependencies of this Python module to the current directory
+          ldd eventanalyze.*.so | sed -E 's/^.*=> (\S+).*$|(\S+) .*$/\1/g' | xargs -I {} cp {} .
+          chmod +x lib*.so*
+
       - name: Upload Artifact
         uses: actions/upload-artifact@v2
         with:
           name: Python-${{ github.event.inputs.python-version }} ${{ github.event.inputs.build_type }} Module
-          path: build/eventanalyze.*.so
+          path: build/*.so*
           if-no-files-found: error
