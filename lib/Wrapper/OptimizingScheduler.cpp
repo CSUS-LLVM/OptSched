@@ -303,7 +303,8 @@ void ScheduleDAGOptSched::schedule() {
     return;
   }
 
-  if (!OptSchedEnabled || !scheduleSpecificRegion(RegionName, schedIni)) {
+  if (!OptSchedEnabled || !scheduleSpecificRegion(RegionName, schedIni) ||
+      NumRegionInstrs > MaxRegionInstrs) {
     LLVM_DEBUG(dbgs() << "Skipping region " << RegionName << "\n");
     ScheduleDAGMILive::schedule();
     return;
@@ -604,6 +605,9 @@ void ScheduleDAGOptSched::loadOptSchedConfig() {
   CompileTimeDataPass = schedIni.GetBool("COMPILE_TIME_DATA_PASS");
   LatencyPrecision = fetchLatencyPrecision();
   TreatOrderAsDataDeps = schedIni.GetBool("TREAT_ORDER_DEPS_AS_DATA_DEPS");
+
+  MaxRegionInstrs =
+      schedIni.GetInt("MAX_REGION_LENGTH", static_cast<unsigned>(-1));
 
   UseLLVMScheduler = false;
   // should we print spills for the current function

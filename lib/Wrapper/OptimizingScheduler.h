@@ -149,6 +149,10 @@ protected:
   // timout per block
   bool IsTimeoutPerInst;
 
+  // The maximum number of instructions to schedule with our scheduler.
+  // Beyond that, it uses the heuristic scheduler.
+  unsigned MaxRegionInstrs;
+
   // The maximum number of instructions that a block can contain to be
   // Treat data dependencies of type ORDER as data dependencies
   bool TreatOrderAsDataDeps;
