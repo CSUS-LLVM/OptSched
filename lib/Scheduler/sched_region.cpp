@@ -332,8 +332,8 @@ FUNC_RESULT SchedRegion::FindOptimalSchedule(
 
   // This must be done after SetupForSchdulng() or UpdateSetupForSchdulng() to
   // avoid resetting lower bound values.
-  const Milliseconds LbElapsedTime =
-      Utilities::timeFn([&] { CalculateLowerBounds(BbSchedulerEnabled); });
+  const Milliseconds LbElapsedTime = Utilities::countMillisToExecute(
+      [&] { CalculateLowerBounds(BbSchedulerEnabled); });
 
   // Log the lower bound on the cost, allowing tools reading the log to compare
   // absolute rather than relative costs.
@@ -1051,8 +1051,8 @@ void SchedRegion::updateBoundsAfterGraphTransformations(
   if (IsUpperBoundSet_)
     CalculateUpperBounds(BbSchedulerEnabled);
   if (IsLowerBoundSet_) {
-    const Milliseconds LbElapsedTime =
-        Utilities::timeFn([&] { CalculateLowerBounds(BbSchedulerEnabled); });
+    const Milliseconds LbElapsedTime = Utilities::countMillisToExecute(
+        [&] { CalculateLowerBounds(BbSchedulerEnabled); });
 
     // Log the new lower bound on the cost, allowing tools reading the log to
     // compare absolute rather than relative costs.

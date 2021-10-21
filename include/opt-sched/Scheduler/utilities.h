@@ -24,7 +24,8 @@ Milliseconds GetProcessorTime();
 // start time of the process
 extern std::chrono::steady_clock::time_point startTime;
 
-template <typename F> Milliseconds timeFn(F &&fn) {
+// Executes the function, returning the number of milliseconds it took to do so.
+template <typename F> Milliseconds countMillisToExecute(F &&fn) {
   const Milliseconds Start = GetProcessorTime();
   fn();
   return GetProcessorTime() - Start;
