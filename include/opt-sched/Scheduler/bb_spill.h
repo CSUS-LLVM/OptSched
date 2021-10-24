@@ -118,7 +118,7 @@ public:
               SchedPriorities hurstcPrirts, SchedPriorities enumPrirts,
               bool vrfySched, Pruning PruningStrategy, bool SchedForRPOnly,
               bool enblStallEnum, int SCW, SPILL_COST_FUNCTION spillCostFunc,
-              SchedulerType HeurSchedType);
+              SchedulerType HeurSchedType, GT_POSITION GraphTransPosition);
   ~BBWithSpill();
 
   InstCount CmputExecCostLwrBound();

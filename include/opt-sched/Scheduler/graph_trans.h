@@ -91,6 +91,13 @@ public:
 
   static bool isNodeSuperior(DataDepGraph &DDG, int A, int B);
 
+  struct Statistics {
+    int NumEdgesAdded = 0;
+    int NumEdgesRemoved = 0;
+  };
+  static void removeRedundantEdges(DataDepGraph &DDG, int i, int j,
+                                   Statistics &Stats);
+
 private:
   // Are multiple passes enabled.
   bool IsMultiPass;
@@ -103,8 +110,9 @@ private:
 
   // Check if there is superiority involving nodes A and B. If yes, choose which
   // edge to add.
-  // Returns true if a superior edge was added.
-  bool TryAddingSuperiorEdge_(SchedInstruction *nodeA, SchedInstruction *nodeB);
+  // Returns the added edge if added, else nullptr
+  GraphEdge *TryAddingSuperiorEdge_(SchedInstruction *nodeA,
+                                    SchedInstruction *nodeB);
 
   // Keep trying to find superior nodes until none can be found or there are no
   // more independent nodes.

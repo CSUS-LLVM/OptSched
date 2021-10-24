@@ -39,6 +39,31 @@ enum class BLOCKS_TO_KEEP {
   ALL
 };
 
+// Where to perform graph transformations; flag enum
+enum class GT_POSITION : uint32_t {
+  NONE = 0x0,
+  // Run on all blocks before the heuristic
+  BEFORE_HEURISTIC = 0x1,
+  // Run only if the heuristic scheduler doesn't prove the schedule optimal
+  AFTER_HEURISTIC = 0x2,
+};
+
+inline GT_POSITION operator|(GT_POSITION lhs, GT_POSITION rhs) {
+  return (GT_POSITION)((uint32_t)lhs | (uint32_t)rhs);
+}
+
+inline GT_POSITION operator&(GT_POSITION lhs, GT_POSITION rhs) {
+  return (GT_POSITION)((uint32_t)lhs & (uint32_t)rhs);
+}
+
+inline GT_POSITION &operator|=(GT_POSITION &lhs, GT_POSITION rhs) {
+  return lhs = lhs | rhs;
+}
+
+inline GT_POSITION &operator&=(GT_POSITION &lhs, GT_POSITION rhs) {
+  return lhs = lhs & rhs;
+}
+
 class ListScheduler;
 
 class SchedRegion {
@@ -48,7 +73,8 @@ public:
               int16_t sigHashSize, LB_ALG lbAlg, SchedPriorities hurstcPrirts,
               SchedPriorities enumPrirts, bool vrfySched,
               Pruning PruningStrategy, SchedulerType HeurSchedType,
-              SPILL_COST_FUNCTION spillCostFunc = SCF_PERP);
+              SPILL_COST_FUNCTION spillCostFunc,
+              GT_POSITION GraphTransPosition);
   // Destroys the region. Must be overriden by child classes.
   virtual ~SchedRegion() {}
 
@@ -205,6 +231,9 @@ private:
   // TODO(max): Document.
   int16_t sigHashSize_;
 
+  // Where to apply graph transformations
+  GT_POSITION GraphTransPosition_;
+
   // The pruning technique to use for this region.
   Pruning prune_;
 
@@ -224,6 +253,11 @@ protected:
   // The best schedule found so far (may be heuristic or enumerator generated)
   InstSchedule *bestSched_;
 
+  void CalculateUpperBounds(bool BbSchedulerEnabled);
+  void CalculateLowerBounds(bool BbSchedulerEnabled);
+
+  bool IsLowerBoundSet_ = false;
+  bool IsUpperBoundSet_ = false;
   // TODO(max): Document.
   InstCount schedLwrBound_;
   // TODO(max): Document.
@@ -243,6 +277,8 @@ protected:
   InstCount crntCycleNum_;
   // TODO(max): Document.
   InstCount crntSlotNum_;
+
+  bool needsTransitiveClosure(Milliseconds rgnTimeout) const;
 
   // protected accessors:
   SchedulerType GetHeuristicSchedulerType() const { return HeurSchedType_; }
@@ -324,6 +360,13 @@ protected:
 
   FUNC_RESULT runACO(InstSchedule *ReturnSched, InstSchedule *InitSched,
                      bool IsPostBB);
+
+  FUNC_RESULT applyGraphTransformations(bool BbScheduleEnabled,
+                                        InstSchedule *heuristicSched,
+                                        bool &isLstOptml,
+                                        InstSchedule *&bestSched);
+  FUNC_RESULT applyGraphTransformation(GraphTrans *GT);
+  void updateBoundsAfterGraphTransformations(bool BbSchedulerEnabled);
 };
 
 } // namespace opt_sched

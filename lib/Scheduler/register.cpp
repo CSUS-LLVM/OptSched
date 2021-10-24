@@ -125,6 +125,11 @@ const Register::InstSetType &Register::GetPossibleLiveInterval() const {
   return possibleLiveIntervalSet_;
 }
 
+void Register::resetLiveInterval() {
+  liveIntervalSet_.clear();
+  possibleLiveIntervalSet_.clear();
+}
+
 Register::Register(int16_t type, int num, int physicalNumber) {
   type_ = type;
   num_ = num;

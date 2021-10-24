@@ -16,6 +16,7 @@
 #include "opt-sched/Scheduler/sched_region.h"
 #include "llvm/ADT/BitVector.h"
 #include "llvm/ADT/SmallString.h"
+#include "llvm/ADT/StringRef.h"
 #include "llvm/CodeGen/MachineScheduler.h"
 #include "llvm/Support/Debug.h"
 #include <chrono>
@@ -148,6 +149,10 @@ protected:
   // timout per block
   bool IsTimeoutPerInst;
 
+  // The maximum number of instructions to schedule with our scheduler.
+  // Beyond that, it uses the heuristic scheduler.
+  unsigned MaxRegionInstrs;
+
   // The maximum number of instructions that a block can contain to be
   // Treat data dependencies of type ORDER as data dependencies
   bool TreatOrderAsDataDeps;
@@ -198,11 +203,20 @@ protected:
   // scheduling approach.
   SchedPriorities SecondPassEnumPriorities;
 
+  GT_POSITION GraphTransPosition = GT_POSITION::NONE;
+  GT_POSITION GraphTransPosition2ndPass = GT_POSITION::NONE;
+
   // Static node superiority RP only graph transformation.
   bool StaticNodeSup;
 
   // ILP Static Node Superiority graph transformation
   bool ILPStaticNodeSup;
+
+  // Occupancy-preserving ILP Static Node Superiority graph transformation
+  bool OccupancyPreservingILPStaticNodeSup;
+
+  // Occupancy-preserving ILP Static Node Superiority graph transformation
+  bool OccupancyPreservingILPStaticNodeSup2ndPass;
 
   // Run multiple passes of the static node superiority algorithm
   // (StaticNodeSup must be enabled).
@@ -225,6 +239,9 @@ protected:
 
   // Get spill cost function
   SPILL_COST_FUNCTION parseSpillCostFunc() const;
+
+  // Get the GT_POSITION
+  static GT_POSITION parseGraphTransPosition(llvm::StringRef Str);
 
   // Return true if the OptScheduler should be enabled for the function this
   // ScheduleDAG was created for
