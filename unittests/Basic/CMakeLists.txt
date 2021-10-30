@@ -5,4 +5,5 @@ add_optsched_unittest(OptSchedBasicTests
   LoggerTest.cpp
   UtilitiesTest.cpp
   simple_machine_model_test.cpp
+  ddg_test.cpp
   )

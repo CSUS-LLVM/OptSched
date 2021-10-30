@@ -173,11 +173,12 @@ class DataDepGraph : public llvm::opt_sched::OptSchedDDGWrapperBase,
                      public DirAcycGraph,
                      public DataDepStruct {
 public:
-  DataDepGraph(MachineModel *machMdl, LATENCY_PRECISION ltncyPcsn);
+  DataDepGraph(MachineModel *machMdl);
   virtual ~DataDepGraph();
 
   // Reads the data dependence graph from a text file.
   FUNC_RESULT ReadFrmFile(SpecsBuffer *buf, bool &endOfFileReached);
+  FUNC_RESULT ReadFromString(const std::string &Str);
   // Continues reading until the end of the current graph definition,
   // discarding the data.
   FUNC_RESULT SkipGraph(SpecsBuffer *buf, bool &endOfFileReached);
@@ -367,7 +368,6 @@ protected:
   int entryInstCnt_;
   int exitInstCnt_;
 
-  LATENCY_PRECISION ltncyPrcsn_;
   int edgeCntPerLtncy_[MAX_LATENCY_VALUE + 1];
 
   // Tracks all registers in the scheduling region. Each RegisterFile

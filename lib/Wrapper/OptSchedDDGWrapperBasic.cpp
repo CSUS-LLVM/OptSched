@@ -52,8 +52,8 @@ OptSchedDDGWrapperBasic::OptSchedDDGWrapperBasic(
     MachineSchedContext *Context, ScheduleDAGOptSched *DAG,
     OptSchedMachineModel *MM, LATENCY_PRECISION LatencyPrecision,
     const std::string &RegionID)
-    : DataDepGraph(MM, LatencyPrecision), MM(MM), Contex(Context), DAG(DAG),
-      RTFilter(nullptr) {
+    : DataDepGraph(MM), MM(MM), Contex(Context), DAG(DAG),
+      LatencyPrecision(LatencyPrecision), RTFilter(nullptr) {
   dagFileFormat_ = DFF_BB;
   isTraceFormat_ = false;
   TreatOrderDepsAsDataDeps =
@@ -447,11 +447,14 @@ void OptSchedDDGWrapperBasic::convertEdges(const SUnit &SU,
     }
 
     int16_t Latency;
-    if (ltncyPrcsn_ == LTP_PRECISE) { // get latency from the machine model
+    switch (LatencyPrecision) {
+    case LTP_PRECISE: { // get latency from the machine model
       const auto &InstName = DAG->TII->getName(instr->getOpcode());
       const auto &InstType = MM->GetInstTypeByName(InstName);
       Latency = MM->GetLatency(InstType, DepType);
-    } else if (ltncyPrcsn_ == LTP_ROUGH) { // rough latency = llvm latency
+      break;
+    }
+    case LTP_ROUGH: { // rough latency = llvm latency
       Latency = I->getLatency();
       // If latency is above a specified target then reduce the latency
       // by the specified divisor
@@ -468,12 +471,16 @@ void OptSchedDDGWrapperBasic::convertEdges(const SUnit &SU,
         Logger::Event("ReduceLatency", "FromInstruction", InstFromName.c_str(),
                       "ToInstruction", InstToName.c_str(), "OriginalLatency",
                       OldLatency, "NewLatency", Latency);
+        break;
       }
-    } else
+    }
+    case LTP_UNITY:
       Latency = 1; // unit latency = ignore ilp
 
-    CreateEdge_(SU.NodeNum, I->getSUnit()->NodeNum, Latency, DepType,
-                IsArtificial);
+      CreateEdge_(SU.NodeNum, I->getSUnit()->NodeNum, Latency, DepType,
+                  IsArtificial);
+      break;
+    }
   }
 }
 

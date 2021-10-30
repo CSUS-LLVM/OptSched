@@ -144,8 +144,7 @@ InstCount DataDepStruct::CmputAbslutUprBound_() {
   return schedUprBound_;
 }
 
-DataDepGraph::DataDepGraph(MachineModel *machMdl, LATENCY_PRECISION ltncyPrcsn)
-    : DataDepStruct(machMdl) {
+DataDepGraph::DataDepGraph(MachineModel *machMdl) : DataDepStruct(machMdl) {
   int i;
 
   type_ = DGT_FULL;
@@ -154,7 +153,6 @@ DataDepGraph::DataDepGraph(MachineModel *machMdl, LATENCY_PRECISION ltncyPrcsn)
   weight_ = 1.0;
   outptDags_ = ODG_ALL;
   maxOutptDagSize_ = 1000;
-  ltncyPrcsn_ = ltncyPrcsn;
   includesCall_ = false;
   includesUnpipelined_ = false;
 
@@ -337,6 +335,16 @@ void DataDepGraph::SetDynmcLwrBounds() {
     frwrdLwrBounds_[i] = frwrdLwrBound;
     bkwrdLwrBounds_[i] = bkwrdLwrBound;
   }
+}
+
+FUNC_RESULT DataDepGraph::ReadFromString(const std::string &Str) {
+  char *BufData = new char[Str.size() + 1];
+  std::copy_n(Str.data(), Str.size() + 1, BufData);
+  SpecsBuffer Buf;
+  Buf.SetBuf(BufData, Str.size() + 1);
+
+  bool EndReached = false;
+  return ReadFrmFile(&Buf, EndReached);
 }
 
 FUNC_RESULT DataDepGraph::ReadFrmFile(SpecsBuffer *buf,
