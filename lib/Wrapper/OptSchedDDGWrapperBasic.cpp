@@ -449,7 +449,7 @@ void OptSchedDDGWrapperBasic::convertEdges(const SUnit &SU,
     int16_t Latency;
     if (ltncyPrcsn_ == LTP_PRECISE) { // get latency from the machine model
       const auto &InstName = DAG->TII->getName(instr->getOpcode());
-      const auto &InstType = MM->GetInstTypeByName(InstName);
+      const auto &InstType = MM->GetInstTypeByName(std::string(InstName));
       Latency = MM->GetLatency(InstType, DepType);
     } else if (ltncyPrcsn_ == LTP_ROUGH) { // rough latency = llvm latency
       Latency = I->getLatency();
@@ -457,9 +457,11 @@ void OptSchedDDGWrapperBasic::convertEdges(const SUnit &SU,
       // by the specified divisor
       if (DAG->reducedLatencyPassStarted() &&
           Latency > DAG->getLatencyTarget()) {
-        const string &InstFromName = DAG->TII->getName(instr->getOpcode());
+        const string &InstFromName =
+            std::string(DAG->TII->getName(instr->getOpcode()));
         const MachineInstr *ToInstr = I->getSUnit()->getInstr();
-        const string &InstToName = DAG->TII->getName(ToInstr->getOpcode());
+        const string &InstToName =
+            std::string(DAG->TII->getName(ToInstr->getOpcode()));
         int16_t OldLatency = Latency;
         Latency /= DAG->getLatencyDivisor();
         if (Latency < DAG->getLatencyMinimun())
@@ -484,7 +486,7 @@ void OptSchedDDGWrapperBasic::convertSUnit(const SUnit &SU) {
     return;
 
   const MachineInstr *MI = SU.getInstr();
-  InstName = DAG->TII->getName(MI->getOpcode());
+  InstName = std::string(DAG->TII->getName(MI->getOpcode()));
 
   // Search in the machine model for an instType with this OpCode name
   InstType = MM->GetInstTypeByName(InstName.c_str());
