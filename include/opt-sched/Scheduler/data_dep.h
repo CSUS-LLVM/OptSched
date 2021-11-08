@@ -429,6 +429,9 @@ protected:
   // object holds all registers for a given register type.
   RegisterFile *RegFiles;
 
+  GraphEdge **dev_scsrElmnts_;
+  unsigned long *dev_keys_;
+
   __host__ __device__
   void AllocArrays_(InstCount instCnt);
   FUNC_RESULT ParseF2Nodes_(SpecsBuffer *specsBuf, MachineModel *machMdl);

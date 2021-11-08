@@ -1069,11 +1069,14 @@ void SchedInstruction::CreateSchedRange() {
 
 void SchedInstruction::CopyPointersToDevice(SchedInstruction *dev_inst,
                                             GraphNode **dev_nodes,
-					    InstCount instCnt, 
-					    RegisterFile *dev_regFiles,
+					                                  InstCount instCnt, 
+					                                  RegisterFile *dev_regFiles,
                                             int numThreads, 
                                             std::vector<GraphEdge *> *edges,
-                                            GraphEdge *dev_edges) {
+                                            GraphEdge *dev_edges, 
+                                            GraphEdge **dev_scsrElmnts, 
+                                            unsigned long *dev_keys, 
+                                            int &scsrIndex) {
   dev_inst->RegFiles_ = dev_regFiles;
   size_t memSize;
   memSize = sizeof(InstCount) * prdcsrCnt_;
@@ -1093,10 +1096,9 @@ void SchedInstruction::CopyPointersToDevice(SchedInstruction *dev_inst,
   gpuErrchk(cudaMemcpy(&dev_inst->crntRange_, &dev_crntRange,
 		       sizeof(SchedRange *), cudaMemcpyHostToDevice));
   // Copy sortedScsrLst_
-  InstCount *dev_elmnts;
-  unsigned long *dev_keys;
   GraphNode::CopyPointersToDevice((GraphNode *)dev_inst, dev_nodes, instCnt,
-                                  edges, dev_edges);
+                                  edges, dev_edges, dev_scsrElmnts, 
+                                  dev_keys, scsrIndex);
   // make sure managed mem is copied to device before kernel start
   memSize = sizeof(InstCount *) * numThreads;
   gpuErrchk(cudaMemPrefetchAsync(dev_rdyCyclePerPrdcsr_, memSize, 0));
@@ -1123,7 +1125,6 @@ void SchedInstruction::FreeDevicePointers(int numThreads) {
   if (rcrsvPrdcsrLst_)
     cudaFree(rcrsvPrdcsrLst_->dev_crnt_);
   cudaFree(scsrLst_->dev_crnt_);
-  cudaFree(prdcsrLst_->dev_crnt_);
   GraphNode::FreeDevicePointers();
 }
 
@@ -1182,7 +1183,6 @@ void SchedInstruction::AllocDevArraysForParallelACO(int numThreads) {
   if (rcrsvPrdcsrLst_)
     gpuErrchk(cudaMalloc(&rcrsvPrdcsrLst_->dev_crnt_, memSize));
   gpuErrchk(cudaMalloc(&scsrLst_->dev_crnt_, memSize));
-  gpuErrchk(cudaMalloc(&prdcsrLst_->dev_crnt_, memSize));
 }
 
 /******************************************************************************

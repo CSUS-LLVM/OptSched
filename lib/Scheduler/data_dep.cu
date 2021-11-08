@@ -3644,6 +3644,8 @@ void DataDepGraph::CopyPointersToDevice(DataDepGraph *dev_DDG, int numThreads) {
 		       cudaMemcpyHostToDevice));
   // update values of root_ and leaf_ on device
   SchedInstruction *dev_root = &dev_insts[root_->GetNum()];
+  // set dev_IsRoot to be used on device to check if it is the root
+  dev_root->SetDevIsRoot();
   memSize = sizeof(SchedInstruction *);
   gpuErrchk(cudaMemcpy(&dev_DDG->root_, &dev_root, memSize,
 	               cudaMemcpyHostToDevice));
@@ -3703,17 +3705,37 @@ void DataDepGraph::CopyPointersToDevice(DataDepGraph *dev_DDG, int numThreads) {
   gpuErrchk(cudaMemcpy(dev_edges_, host_edges, memSize, 
                        cudaMemcpyHostToDevice));
   free(host_edges);
+
+  Logger::Info("Copying SchedInstructions to device");
+  // count the number of elements in predecessor/successor lists
+  // used to malloc the large elements array
+  int lngthScsrElmnts = 0;
+  for (InstCount i = 0; i < instCnt_; i++) {
+    lngthScsrElmnts += insts_[i].GetScsrCnt();
+  }
+  memSize = sizeof(GraphEdge *) * lngthScsrElmnts;
+  gpuErrchk(cudaMallocManaged(&dev_scsrElmnts_, memSize));
+
+  memSize = sizeof(unsigned long) * lngthScsrElmnts;
+  gpuErrchk(cudaMallocManaged(&dev_keys_, memSize));
+
+  int scsrIndex = 0;
   // Copy SchedInstruction/GraphNode pointers and link them to device inst
   // and update RegFiles pointer to dev_regFiles
-  Logger::Info("Copying SchedInstructions to device");
   for (InstCount i = 0; i < instCnt_; i++)
     insts_[i].CopyPointersToDevice(&dev_DDG->insts_[i], dev_DDG->nodes_, 
 		                   instCnt_, dev_regFiles, numThreads,
-                                   edges_, dev_edges_);
+                                   edges_, dev_edges_,
+                                   dev_scsrElmnts_,
+                                   dev_keys_, scsrIndex);
   memSize = sizeof(SchedInstruction) * instCnt_;
   gpuErrchk(cudaMemPrefetchAsync(dev_insts, memSize, 0));
   memSize = sizeof(RegisterFile) * machMdl_->GetRegTypeCnt();
   gpuErrchk(cudaMemPrefetchAsync(dev_regFiles, memSize, 0));
+  memSize = sizeof(GraphEdge *) * lngthScsrElmnts;
+  gpuErrchk(cudaMemPrefetchAsync(dev_scsrElmnts_, memSize, 0));
+  memSize = sizeof(unsigned long) * lngthScsrElmnts;
+  gpuErrchk(cudaMemPrefetchAsync(dev_keys_, memSize, 0));
 }
 
 void DataDepGraph::FreeDevicePointers(int numThreads) {
@@ -3729,6 +3751,8 @@ void DataDepGraph::FreeDevicePointers(int numThreads) {
     insts_[i].FreeDevicePointers(numThreads);
   cudaFree(insts_);
   cudaFree(nodes_);
+  cudaFree(dev_scsrElmnts_);
+  cudaFree(dev_keys_);
 }
 
 void DataDepGraph::FreeDevEdges() {
