@@ -70,6 +70,7 @@ public:
   // Returns the best cost found so far for this region.
   inline InstCount GetBestCost() { return bestCost_; }
   // Returns the heuristic cost for this region.
+  __host__ __device__
   inline InstCount GetHeuristicCost() { return hurstcCost_; }
   // Returns a pointer to the list scheduler heurisitcs.
   inline SchedPriorities GetHeuristicPriorities() { return hurstcPrirts_; }

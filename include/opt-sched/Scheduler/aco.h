@@ -10,6 +10,8 @@ Last Update:  Jan. 2020
 #define OPTSCHED_ACO_H
 
 #include "opt-sched/Scheduler/gen_sched.h"
+#include "opt-sched/Scheduler/simplified_aco_ds.h"
+#include "opt-sched/Scheduler/ready_list.h"
 #include "opt-sched/Scheduler/device_vector.h"
 #include "llvm/ADT/ArrayRef.h"
 #include <memory>
@@ -18,8 +20,6 @@ Last Update:  Jan. 2020
 
 namespace llvm {
 namespace opt_sched {
-
-typedef double pheromone_t;
 
 // If set to 1 ACO is run on device
 #define DEV_ACO 1
@@ -54,7 +54,6 @@ public:
                InstCount upperBound, SchedPriorities priorities,
                bool vrfySched, bool IsPostBB, SchedRegion *dev_rgn = NULL,
 	       DataDepGraph *dev_DDG = NULL,
-	       DeviceVector<Choice> *dev_ready = NULL,
 	       MachineModel *dev_MM = NULL, curandState_t *dev_states = NULL);
   __host__ __device__
   virtual ~ACOScheduler();
@@ -78,8 +77,7 @@ public:
   // of creating a new one
   __host__ __device__
   InstSchedule *FindOneSchedule(InstCount RPTarget,
-                                InstSchedule *dev_schedule = NULL, 
-		                DeviceVector<Choice> *dev_ready = NULL);
+                                InstSchedule *dev_schedule = NULL);
   __host__ __device__
   void UpdatePheromone(InstSchedule *schedule);
   // Copies pheromone table to passed shared memory array
@@ -90,6 +88,8 @@ public:
                              bool IsGlobal);
   __host__ __device__
   InstCount GetNumAntsTerminated() { return numAntsTerminated_; }
+  __host__ __device__
+  void SetGlobalBestStalls(int stalls) { globalBestStalls_ = stalls; }
 
 private:
   __host__ __device__
@@ -97,15 +97,28 @@ private:
   __host__ __device__
   pheromone_t &Pheromone(InstCount from, InstCount to);
   __host__ __device__
-  double Score(SchedInstruction *from, Choice choice);
+  pheromone_t Score(InstCount FromId, InstCount ToId, HeurType ToHeuristic);
   DCF_OPT ParseDCFOpt(const std::string &opt);
   __host__ __device__
   void PrintPheromone();
   __host__ __device__
-  Choice SelectInstruction(DeviceVector<Choice> &ready,
-                           SchedInstruction *lastInst,
-                           double ScoreSum);
+  InstCount SelectInstruction(SchedInstruction *lastInst, InstCount totalStalls, 
+                              SchedRegion *rgn, bool &unnecessarilyStalling, 
+                              bool closeToRPTarget, bool currentlyWaiting);
+  __host__ __device__
+  void UpdateACOReadyList(SchedInstruction *Inst);
   DeviceVector<pheromone_t> pheromone_;
+  // new ds representations
+  ACOReadyList *readyLs;
+  KeysHelper *kHelper;
+  pheromone_t MaxPriorityInv;
+  InstCount MaxScoringInst;
+
+  // new ds representations for device
+  ACOReadyList *dev_readyLs;
+  KeysHelper *dev_kHelper;
+  InstCount *dev_MaxScoringInst;
+  
   // True if pheromone_.elmnts_ alloced on device
   bool dev_pheromone_elmnts_alloced_;
   pheromone_t initialValue_;
@@ -128,7 +141,6 @@ private:
   DCF_OPT DCFOption;
   SPILL_COST_FUNCTION DCFCostFn;
   DataDepGraph *dev_DDG_;
-  DeviceVector<Choice> *dev_ready_;
   MachineModel *dev_MM_;
   // Holds state for each thread for RNG
   curandState_t *dev_states_;
@@ -136,6 +148,10 @@ private:
   int returnLastInstCnt_;
   // Used to count how many ants are terminated early
   int numAntsTerminated_;
+
+  bool justWaited = false;
+  int globalBestStalls_ = 0;
+
 };
 
 } // namespace opt_sched

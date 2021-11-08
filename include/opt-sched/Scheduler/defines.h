@@ -25,6 +25,12 @@ typedef int64_t Milliseconds;
 // Instruction count.
 typedef int InstCount;
 
+// type for the aco heuristics and ready list keys
+typedef unsigned long HeurType;
+
+// Pheromone type
+typedef double pheromone_t;
+
 // A generic sentinel value. Should be used with care.
 // TODO(max): Get rid of this in favor of type- or purpose-specific sentinels.
 const int INVALID_VALUE = -1;

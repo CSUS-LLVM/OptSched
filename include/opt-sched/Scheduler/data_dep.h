@@ -330,6 +330,7 @@ public:
   __host__ __device__
   int16_t GetMaxUseCnt() { return maxUseCnt_; }
   int16_t GetRegTypeCnt() { return machMdl_->GetRegTypeCnt(); }
+  __host__ __device__
   int GetPhysRegCnt(int16_t regType) {
     return machMdl_->GetPhysRegCnt(regType);
   }
@@ -728,6 +729,8 @@ private:
 
   bool vrfy_;
 
+  int totalStalls_, unnecessaryStalls_;
+
   bool VerifySlots_(MachineModel *machMdl, DataDepGraph *dataDepGraph);
   bool VerifyDataDeps_(DataDepGraph *dataDepGraph);
   __host__ __device__
@@ -842,6 +845,18 @@ public:
   // Initializes schedules on device, used between iterations of ACO
   __device__
   void Initialize();
+  __host__ __device__
+  inline void incrementTotalStalls() {totalStalls_++;}
+  __host__ __device__
+  inline void incrementUnnecessaryStalls() {unnecessaryStalls_++;}
+  __host__ __device__
+  inline void resetTotalStalls() {totalStalls_ = 0;}
+  __host__ __device__
+  inline void resetUnnecessaryStalls() {unnecessaryStalls_ = 0;}
+  __host__ __device__
+  inline int getTotalStalls() const {return totalStalls_;}
+  __host__ __device__
+  inline int getUnnecessaryStalls() const {return unnecessaryStalls_;}
 };
 /*****************************************************************************/
 

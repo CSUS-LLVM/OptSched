@@ -2743,6 +2743,8 @@ InstSchedule::InstSchedule(MachineModel *machMdl, DataDepGraph *dataDepGraph,
   totSpillCost_ = 0;
   cnflctCnt_ = 0;
   spillCnddtCnt_ = 0;
+  totalStalls_ = 0;
+  unnecessaryStalls_ = 0;
 }
 
 InstSchedule::InstSchedule() {
@@ -2756,6 +2758,8 @@ InstSchedule::InstSchedule() {
   totSpillCost_ = 0;
   cnflctCnt_ = 0;
   spillCnddtCnt_ = 0;
+  totalStalls_ = 0;
+  unnecessaryStalls_ = 0;
 }
 
 InstSchedule::~InstSchedule() {
@@ -2959,6 +2963,8 @@ void InstSchedule::Copy(InstSchedule *src) {
   execCost_ = src->execCost_;
   NormSpillCost = src->NormSpillCost;
   spillCost_ = src->spillCost_;
+  totalStalls_ = src->totalStalls_;
+  unnecessaryStalls_ = src->unnecessaryStalls_;
 }
 
 __host__ __device__

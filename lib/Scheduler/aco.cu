@@ -2,7 +2,6 @@
 #include "opt-sched/Scheduler/config.h"
 #include "opt-sched/Scheduler/data_dep.h"
 #include "opt-sched/Scheduler/random.h"
-#include "opt-sched/Scheduler/ready_list.h"
 #include "opt-sched/Scheduler/register.h"
 #include "opt-sched/Scheduler/sched_region.h"
 #include "opt-sched/Scheduler/bb_spill.h"
@@ -49,18 +48,15 @@ ACOScheduler::ACOScheduler(DataDepGraph *dataDepGraph,
                            SchedPriorities priorities, bool vrfySched, 
                            bool IsPostBB, SchedRegion *dev_rgn,
                            DataDepGraph *dev_DDG, 
-                           DeviceVector<Choice> *dev_ready,
 			   MachineModel *dev_MM, curandState_t *dev_states)
-    : ConstrainedScheduler(dataDepGraph, machineModel, upperBound) {
+    : ConstrainedScheduler(dataDepGraph, machineModel, upperBound, true) {
   VrfySched_ = vrfySched;
   this->IsPostBB = IsPostBB;
   prirts_ = priorities;
-  rdyLst_ = new ReadyList(dataDepGraph_, priorities);
   count_ = dataDepGraph->GetInstCnt();
   Config &schedIni = SchedulerOptions::getInstance();
   dev_rgn_ = dev_rgn;
   dev_DDG_ = dev_DDG;
-  dev_ready_ = dev_ready;
   dev_MM_ = dev_MM;
   dev_states_ = dev_states;
   dev_pheromone_elmnts_alloced_ = false;
@@ -87,10 +83,27 @@ ACOScheduler::ACOScheduler(DataDepGraph *dataDepGraph,
 
   int pheromone_size = (count_ + 1) * count_;
   pheromone_.resize(pheromone_size);
+
+  //construct the ACOReadyList member and a key helper
+  int maxIndpntInstrs = 0;
+  for (int i = 0; i < count_; i++) {
+    int indpntInstrs = count_ - dataDepGraph->GetInstByIndx(i)->GetRcrsvPrdcsrCnt() - dataDepGraph->GetInstByIndx(i)->GetRcrsvScsrCnt();
+    maxIndpntInstrs = indpntInstrs > maxIndpntInstrs ? indpntInstrs : maxIndpntInstrs;
+  }
+  Logger::Info("Ready List Size is: %d, Percent of total number of instructions: %f", maxIndpntInstrs, double(maxIndpntInstrs)/double(count_));
+  readyLs = new ACOReadyList(maxIndpntInstrs);
+  kHelper = new KeysHelper(priorities);
+  kHelper->initForRegion(dataDepGraph);
+
   InitialSchedule = nullptr;
 }
 
-ACOScheduler::~ACOScheduler() { delete rdyLst_; }
+ACOScheduler::~ACOScheduler() {
+  if (readyLs)
+    delete readyLs;
+  if (kHelper)
+    delete kHelper;
+}
 
 // Pheromone table lookup
 // -1 means no instruction, so e.g. pheromone(-1, 10) gives pheromone on path
@@ -114,9 +127,12 @@ pheromone_t &ACOScheduler::Pheromone(InstCount from, InstCount to) {
 }
 
 __host__ __device__
-double ACOScheduler::Score(SchedInstruction *from, Choice choice) {
-  return Pheromone(from, choice.inst) *
-         pow(choice.heuristic, heuristicImportance_);
+pheromone_t ACOScheduler::Score(InstCount FromId, InstCount ToId, HeurType ToHeuristic) {
+  // tuneable heuristic importance is temporarily disabled
+  // double Hf = pow(ToHeuristic, heuristicImportance_);
+  pheromone_t HeurScore = ToHeuristic * MaxPriorityInv + 1;
+  pheromone_t Hf = heuristicImportance_ ? HeurScore : 1.0;
+  return Pheromone(FromId, ToId) * Hf;
 }
 
 __host__ __device__
@@ -170,23 +186,245 @@ bool ACOScheduler::shouldReplaceSchedule(InstSchedule *OldSched,
 }
 
 __host__ __device__
-Choice ACOScheduler::SelectInstruction(DeviceVector<Choice> &ready,
-                                       SchedInstruction *lastInst,
-                                       double ScoreSum) {
+InstCount ACOScheduler::SelectInstruction(SchedInstruction *lastInst, InstCount totalStalls, SchedRegion *rgn, bool &unnecessarilyStalling, bool closeToRPTarget, bool currentlyWaiting) {
+#ifdef __CUDA_ARCH__
+  // loop through instructions to see if all fully-ready instructions have a negative effect on RP
+  // if there are no fully-ready instructions, then onlyRPNegative will be true
+  bool onlyRPNegative = true;
+  for (InstCount I = 0; I < dev_readyLs->getReadyListSize(); ++I) {
+    // For this, do not consider instructions that are semi-ready,
+    // consider them once they become fully ready
+    if (*dev_readyLs->getInstReadyOnAtIndex(I) > dev_crntCycleNum_[GLOBALTID])
+      continue;
+    
+    InstCount CandidateId = *dev_readyLs->getInstIdAtIndex(I);
+    SchedInstruction *candidateInst = dataDepGraph_->GetInstByIndx(CandidateId);
+    HeurType candidateLUC = candidateInst->GetLastUseCnt();
+    int16_t candidateDefs = candidateInst->GetDefCnt();
+    if (candidateDefs <= candidateLUC) {
+      onlyRPNegative = false;
+      break;
+    }
+  }
+  // if we are waiting and have no fully-ready instruction that is 
+  // net 0 or benefit to RP, then return -1 to schedule a stall
+  if (currentlyWaiting && onlyRPNegative)
+    return -1;
 
+  // calculate MaxScoringInst, and ScoreSum
+  pheromone_t MaxScore = -1;
+  InstCount MaxScoreIndx = 0;
+  dev_readyLs->ScoreSum = 0;
+  int lastInstId = lastInst->GetNum();
+  // this bool is to check if stalling could be avoided
+  bool couldAvoidStalling = false;
+  // this bool is to check if we should currently avoid unnecessary stalls
+  // because RP is low or we have too many stalls in the schedule
+  bool RPIsHigh = false;
+  bool tooManyStalls = totalStalls >= globalBestStalls_ * 5 / 10;
+  dev_readyLs->dev_ScoreSum[GLOBALTID] = 0;
 
-  //genereate the random numbers that we will need for deciding if
+  for (InstCount I = 0; I < dev_readyLs->getReadyListSize(); ++I) {
+    RPIsHigh = false;
+    InstCount CandidateId = *dev_readyLs->getInstIdAtIndex(I);
+    SchedInstruction *candidateInst = dataDepGraph_->GetInstByIndx(CandidateId);
+    HeurType candidateLUC = candidateInst->GetLastUseCnt();
+    int16_t candidateDefs = candidateInst->GetDefCnt();
+    if (currentlyWaiting) {
+      // if currently waiting on an instruction, do not consider semi-ready instructions 
+      if (*dev_readyLs->getInstReadyOnAtIndex(I) > dev_crntCycleNum_[GLOBALTID])
+        continue;
+
+      // as well as instructions with a net negative impact on RP
+      if (candidateDefs > candidateLUC)
+        continue;
+    }
+    
+    // compute the score
+    HeurType Heur = *dev_readyLs->getInstHeuristicAtIndex(I);
+    pheromone_t IScore = Score(lastInstId, *dev_readyLs->getInstIdAtIndex(I), Heur);
+    if (!onlyRPNegative && candidateDefs > candidateLUC)
+      IScore = IScore * 9/10;
+
+    *dev_readyLs->getInstScoreAtIndex(I) = IScore;
+    dev_readyLs->dev_ScoreSum[GLOBALTID] += IScore;
+    // add a score penalty for instructions that are not ready yet
+    // unnecessary stalls should not be considered if current RP is low, or if we already have too many stalls
+    if (*dev_readyLs->getInstReadyOnAtIndex(I) > dev_crntCycleNum_[GLOBALTID]) {
+      if (!onlyRPNegative) {
+        IScore = 0.0000001;
+      }
+      else {
+        int cyclesNeededToWait = *dev_readyLs->getInstReadyOnAtIndex(I) - dev_crntCycleNum_[GLOBALTID];
+        if (cyclesNeededToWait < globalBestStalls_)
+          IScore = IScore * (globalBestStalls_ - cyclesNeededToWait) / globalBestStalls_;
+        else 
+          IScore = IScore / globalBestStalls_;
+
+        // check if any reg types used by the instructions are above the physical register limit
+        SchedInstruction *tempInst = dataDepGraph_->GetInstByIndx(*dev_readyLs->getInstIdAtIndex(I));
+        RegIndxTuple *uses;
+        Register *use;
+        uint16_t usesCount = tempInst->GetUses(uses);
+        for (uint16_t i = 0; i < usesCount; i++) {
+          use = dataDepGraph_->getRegByTuple(&uses[i]);
+          int16_t regType = use->GetType();
+          if ( ((BBWithSpill *)rgn)->IsRPHigh(regType) ) {
+            RPIsHigh = true;
+            break;
+          }
+        }
+
+        // reduce likelihood of selecting an instruction we have to wait for IF
+        // RP is low or we have too many stalls already
+        if (!(closeToRPTarget && RPIsHigh) || tooManyStalls) {
+          if (globalBestStalls_ > totalStalls)
+            IScore = IScore * (globalBestStalls_ - totalStalls) / globalBestStalls_;
+          else
+            IScore = IScore / globalBestStalls_;
+        }
+      }
+    }
+    else {
+      couldAvoidStalling = true;
+    }
+
+    if (IScore < 0.0000001)
+      IScore = 0.0000001;
+    *dev_readyLs->getInstScoreAtIndex(I) = IScore;
+    dev_readyLs->dev_ScoreSum[GLOBALTID] += IScore;
+    
+    if(IScore > MaxScore) {
+      MaxScoreIndx = I;
+      MaxScore = IScore;
+    }
+  }
+#else
+  // loop through instructions to see if all fully-ready instructions have a negative effect on RP
+  // if there are no fully-ready instructions, then onlyRPNegative will be true
+  bool onlyRPNegative = true;
+  for (InstCount I = 0; I < readyLs->getReadyListSize(); ++I) {
+    // For this, do not consider instructions that are semi-ready,
+    // consider them once they become fully ready
+    if (*readyLs->getInstReadyOnAtIndex(I) > crntCycleNum_)
+      continue;
+    
+    InstCount CandidateId = *readyLs->getInstIdAtIndex(I);
+    SchedInstruction *candidateInst = dataDepGraph_->GetInstByIndx(CandidateId);
+    HeurType candidateLUC = candidateInst->GetLastUseCnt();
+    int16_t candidateDefs = candidateInst->GetDefCnt();
+    if (candidateDefs <= candidateLUC) {
+      onlyRPNegative = false;
+      break;
+    }
+  }
+  // if we are waiting and have no fully-ready instruction that is 
+  // net 0 or benefit to RP, then return -1 to schedule a stall
+  if (currentlyWaiting && onlyRPNegative)
+    return -1;
+
+  // calculate MaxScoringInst, and ScoreSum
+  pheromone_t MaxScore = -1;
+  InstCount MaxScoreIndx = 0;
+  readyLs->ScoreSum = 0;
+  int lastInstId = lastInst->GetNum();
+  // this bool is to check if stalling could be avoided
+  bool couldAvoidStalling = false;
+  // this bool is to check if we should currently avoid unnecessary stalls
+  // because RP is low or we have too many stalls in the schedule
+  bool RPIsHigh = false;
+  bool tooManyStalls = totalStalls >= globalBestStalls_ * 5 / 10;
+  readyLs->ScoreSum = 0;
+
+  for (InstCount I = 0; I < readyLs->getReadyListSize(); ++I) {
+    RPIsHigh = false;
+    InstCount CandidateId = *readyLs->getInstIdAtIndex(I);
+    SchedInstruction *candidateInst = dataDepGraph_->GetInstByIndx(CandidateId);
+    HeurType candidateLUC = candidateInst->GetLastUseCnt();
+    int16_t candidateDefs = candidateInst->GetDefCnt();
+    if (currentlyWaiting) {
+      // if currently waiting on an instruction, do not consider semi-ready instructions 
+      if (*readyLs->getInstReadyOnAtIndex(I) > crntCycleNum_)
+        continue;
+
+      // as well as instructions with a net negative impact on RP
+      if (candidateDefs > candidateLUC)
+        continue;
+    }
+    
+    // compute the score
+    HeurType Heur = *readyLs->getInstHeuristicAtIndex(I);
+    pheromone_t IScore = Score(lastInstId, *readyLs->getInstIdAtIndex(I), Heur);
+    if (!onlyRPNegative && candidateDefs > candidateLUC)
+      IScore = IScore * 9/10;
+
+    *readyLs->getInstScoreAtIndex(I) = IScore;
+    readyLs->ScoreSum += IScore;
+    // add a score penalty for instructions that are not ready yet
+    // unnecessary stalls should not be considered if current RP is low, or if we already have too many stalls
+    if (*readyLs->getInstReadyOnAtIndex(I) > crntCycleNum_) {
+      if (!onlyRPNegative) {
+        IScore = 0.0000001;
+      }
+      else {
+        int cyclesNeededToWait = *readyLs->getInstReadyOnAtIndex(I) - crntCycleNum_;
+        if (cyclesNeededToWait < globalBestStalls_)
+          IScore = IScore * (globalBestStalls_ - cyclesNeededToWait) / globalBestStalls_;
+        else 
+          IScore = IScore / globalBestStalls_;
+
+        // check if any reg types used by the instructions are above the physical limit
+        SchedInstruction *tempInst = dataDepGraph_->GetInstByIndx(*readyLs->getInstIdAtIndex(I));
+        RegIndxTuple *uses;
+        Register *use;
+        uint16_t usesCount = tempInst->GetUses(uses);
+        for (uint16_t i = 0; i < usesCount; i++) {
+          use = dataDepGraph_->getRegByTuple(&uses[i]);
+          int16_t regType = use->GetType();
+          if ( ((BBWithSpill *)rgn)->IsRPHigh(regType) ) {
+            RPIsHigh = true;
+            break;
+          }
+        }
+
+        // reduce likelihood of selecting an instruction we have to wait for IF
+        // RP is low or we have too many stalls already
+        if (!(closeToRPTarget && RPIsHigh) || tooManyStalls) {
+          if (globalBestStalls_ > totalStalls)
+            IScore = IScore * (globalBestStalls_ - totalStalls) / globalBestStalls_;
+          else
+            IScore = IScore / globalBestStalls_;
+        }
+      }
+    }
+    else {
+      couldAvoidStalling = true;
+    }
+
+    if (IScore < 0.0000001)
+      IScore = 0.0000001;
+    *readyLs->getInstScoreAtIndex(I) = IScore;
+    readyLs->ScoreSum += IScore;
+    
+    if(IScore > MaxScore) {
+      MaxScoreIndx = I;
+      MaxScore = IScore;
+    }
+  }
+#endif
+
+  //generate the random numbers that we will need for deciding if
   //we are going to use the fixed bias or if we are going to use
-  //fitness porportional selection.  Generate the number used for
-  //the fitness porportional selection point
+  //fitness proportional selection.  Generate the number used for
+  //the fitness proportional selection point
   double rand;
   pheromone_t point;
 #ifdef __CUDA_ARCH__
   rand = curand_uniform(&dev_states_[GLOBALTID]);
-  point = ScoreSum * curand_uniform(&dev_states_[GLOBALTID]);
+  point = dev_readyLs->dev_ScoreSum[GLOBALTID] * curand_uniform(&dev_states_[GLOBALTID]);
 #else
   rand = RandDouble(0, 1);
-  point = RandDouble(0, ScoreSum);
+  point = RandDouble(0, readyLs->ScoreSum);
 #endif
 
   //here we compute the chance that we will use fp selection or auto pick the best
@@ -196,126 +434,148 @@ Choice ACOScheduler::SelectInstruction(DeviceVector<Choice> &ready,
   } else
     choose_best_chance = bias_ratio;
 
-
   //here we determine the max scoring instruction and the fp choice
   //this code is a bit dense, but what we are doing is picking the
   //indices of the max and fp choice instructions
   //The only branch in this code is the branch for deciding to stay in the loop vs exit the loop
   //this will diverge if two ants ready lists are of different sizes
-  size_t maxIndx=0, fpIndx=0;
-  pheromone_t max = -1, scoreProgress = 0;
-  bool foundFPIndx = false;
-  for (size_t i = 0; i < ready.size(); ++i) {
-    const Choice &choice = ready[i];
 
-    //code for picking the max
-    bool CurrIsMax = choice.Score > max;
-    max = CurrIsMax ? choice.Score : max;
-    maxIndx = CurrIsMax ? i : maxIndx;
-
-    //code for picking the fitness proportional choice
-    scoreProgress += choice.Score;
-    bool PastPoint = scoreProgress >= point;
-    bool SetFP = PastPoint & !foundFPIndx;
-    fpIndx = SetFP ? i : fpIndx;
-    foundFPIndx |= PastPoint;
-  }
-
+  // select the instruction index for fp choice
+  #ifdef __CUDA_ARCH__
+    size_t fpIndx=0;
+    for (size_t i = 0; i < dev_readyLs->getReadyListSize(); ++i) {
+      // if we are avoiding unnecessary stalls, skip over instructions that are not latency ready
+      // if (couldAvoidStalling && avoidStalling && *dev_readyLs->getInstReadyOnAtIndex(i))
+      //   continue;
+      point -= *dev_readyLs->getInstScoreAtIndex(i);
+      if (point <= 0) {
+        if (couldAvoidStalling && *dev_readyLs->getInstReadyOnAtIndex(i) > dev_crntCycleNum_[GLOBALTID]) {
+          unnecessarilyStalling = true;
+        }
+        else
+          unnecessarilyStalling = false;
+        fpIndx = i;
+        break;
+      }
+    }
+  #else
+    size_t fpIndx=0;
+    for (size_t i = 0; i < readyLs->getReadyListSize(); ++i) {
+      // if we are avoiding unnecessary stalls, skip over instructions that are not latency ready
+      // if (couldAvoidStalling && avoidStalling && *readyLs->getInstReadyOnAtIndex(i))
+      //   continue;
+      point -= *readyLs->getInstScoreAtIndex(i);
+      if (point <= 0) {
+        if (couldAvoidStalling && *readyLs->getInstReadyOnAtIndex(i) > crntCycleNum_) {
+          unnecessarilyStalling = true;
+        }
+        else
+          unnecessarilyStalling = false;
+        fpIndx = i;
+        break;
+      }
+    }
+  #endif
   //finally we pick whether we will return the fp choice or max score inst w/o using a branch
-  bool UseMax = rand < choose_best_chance;
-  size_t indx = UseMax ? maxIndx : fpIndx;
-  return ready[indx];
-
+  bool UseMax = (rand < choose_best_chance) || currentlyWaiting;
+  size_t indx = UseMax ? MaxScoreIndx : fpIndx;
+  // #ifdef __CUDA_ARCH__
+  //   if (GLOBALTID==0)
+  //     printf("UseMax: %s, maxInstNum: %d, maxInstScore: %f, fpInstNum: %d, readySize: %d\n", UseMax ? "true" : "false", *dev_readyLs->getInstIdAtIndex(MaxScoreIndx), *dev_readyLs->getInstScoreAtIndex(MaxScoreIndx), *dev_readyLs->getInstIdAtIndex(fpIndx), dev_readyLs->getReadyListSize());
+  // #else
+  //   printf("UseMax: %s, maxInstNum: %d, maxInstScore: %f, fpInstNum: %d, readySize: %d\n", UseMax ? "true" : "false", *readyLs->getInstIdAtIndex(MaxScoreIndx), *readyLs->getInstScoreAtIndex(MaxScoreIndx), *readyLs->getInstIdAtIndex(fpIndx), dev_readyLs->getReadyListSize());
+  // #endif
+  #ifdef __CUDA_ARCH__
+    if (couldAvoidStalling && *dev_readyLs->getInstReadyOnAtIndex(indx) > dev_crntCycleNum_[GLOBALTID])
+      unnecessarilyStalling = true;
+    else
+      unnecessarilyStalling = false;
+    
+    // if (GLOBALTID==0)
+    //   printf("UseMax: %s, instNum: %d, unnecessarilyStalling: %s\n", UseMax ? "true" : "false", *dev_readyLs->getInstIdAtIndex(indx), unnecessarilyStalling ? "true" : "false");
+  #else
+    if (couldAvoidStalling && *readyLs->getInstReadyOnAtIndex(indx) > crntCycleNum_)
+      unnecessarilyStalling = true;
+    else
+      unnecessarilyStalling = false;
+    // printf("UseMax: %s, instNum: %d, unnecessarilyStalling: %s\n", UseMax ? "true" : "false", *readyLs->getInstIdAtIndex(indx), unnecessarilyStalling ? "true" : "false");
+  #endif
+  return indx;
 }
 
 __host__ __device__
 InstSchedule *ACOScheduler::FindOneSchedule(InstCount RPTarget, 
-                                            InstSchedule *dev_schedule,
-		                            DeviceVector<Choice> *dev_ready) {
+                                            InstSchedule *dev_schedule) {
 #ifdef __CUDA_ARCH__ // device version of function
   SchedInstruction *inst = NULL;
   SchedInstruction *lastInst = NULL;
+  ACOReadyListEntry LastInstInfo;
   InstSchedule *schedule = dev_schedule;
-  InstCount maxPriority = dev_rdyLst_->MaxPriority();
   bool IsSecondPass = dev_rgn_->IsSecondPass();
-  if (maxPriority == 0)
-    maxPriority = 1; // divide by 0 is bad
+  dev_readyLs->clearReadyList();
+  ScRelMax = dev_rgn_->GetHeuristicCost();
+  bool unnecessarilyStalling = false;
+
+  // The MaxPriority that we are getting from the ready list represents
+  // the maximum possible heuristic/key value that we can have
+  HeurType MaxPriority = dev_kHelper->getMaxValue();
+  if (MaxPriority == 0)
+    MaxPriority = 1; // divide by 0 is bad
   Initialize_();
-  ((BBWithSpill *)dev_rgn_)->Dev_InitForSchdulng();
 
   SchedInstruction *waitFor = NULL;
   InstCount waitUntil = 0;
-  double maxPriorityInv = 1 / maxPriority;
-  DeviceVector<Choice> *ready = dev_ready;
+  MaxPriorityInv = 1 / (pheromone_t)MaxPriority;
+
+  // initialize the aco ready list so that the start instruction is ready
+  // The luc component is 0 since the root inst uses no instructions
+  InstCount RootId = rootInst_->GetNum();
+  HeurType RootHeuristic = dev_kHelper->computeKey(rootInst_, true);
+  pheromone_t RootScore = Score(-1, RootId, RootHeuristic);
+  ACOReadyListEntry InitialRoot{RootId, 0, RootHeuristic, RootScore};
+  dev_readyLs->addInstructionToReadyList(InitialRoot);
+  dev_readyLs->dev_ScoreSum[GLOBALTID] = RootScore;
+  dev_MaxScoringInst[GLOBALTID] = 0;
+  lastInst = dataDepGraph_->GetInstByIndx(RootId);
+  bool closeToRPTarget = false;
+
   while (!IsSchedComplete_()) {
-    UpdtRdyLst_(dev_crntCycleNum_[GLOBALTID], dev_crntSlotNum_[GLOBALTID]);
 
     // there are two steps to scheduling an instruction:
     // 1)Select the instruction(if we are not waiting on another instruction)
-    if (!waitFor) {
-      // if we have not already committed to schedule an instruction
-      // next then pick one. First add ready instructions.  Including
-      //"illegal" e.g. blocked instructions
-
-      // convert the ready list from a custom priority queue to a std::vector,
-      // much nicer for this particular scheduler
-      double ScoreSum=0;
-      unsigned long heuristic;
-      ready->reserve(dev_rdyLst_->GetInstCnt());
-      SchedInstruction *rInst = dev_rdyLst_->GetNextPriorityInst(heuristic);
-      while (rInst != NULL) {
-        if (ACO_SCHED_STALLS || ChkInstLglty_(inst)) {
-          Choice c;
-          c.inst = rInst;
-          c.heuristic = (double)heuristic * maxPriorityInv + 1;
-          c.readyOn = 0;
-          c.Score = Score(lastInst,c);
-          ScoreSum += c.Score;
-          ready->push_back(c);
-        }
-        rInst = dev_rdyLst_->GetNextPriorityInst(heuristic);
-      }
-      dev_rdyLst_->ResetIterator();
-
-#if ACO_SCHED_STALLS
-      // add all instructions that are waiting due to latency to the choices
-      // list
-      PriorityArrayList<InstCount, InstCount> *lst = 
-	                         dev_instsWithPrdcsrsSchduld_[GLOBALTID];
-      SchedInstruction *fIns;
-      for (InstCount fInstNum = lst->GetLastElmnt(); fInstNum != END;
-           fInstNum = lst->GetPrevElmnt()) {
-        fIns = dataDepGraph_->GetInstByIndx(fInstNum);
-        bool changed;
-        unsigned long heuristic = dev_rdyLst_->CmputKey_(fIns, false, changed);
-        Choice c;
-        c.inst = fIns;
-        c.heuristic = (double)heuristic * maxPriorityInv + 1;
-        c.readyOn = lst->GetCrntKey();
-        c.Score = Score(lastInst,c);
-        ScoreSum += c.Score;
-        ready->push_back(c);
-      }
-      lst->ResetIterator();
-#endif
+    if (!waitFor && waitUntil <= dev_crntCycleNum_[GLOBALTID]) {
+      assert(dev_readyLs->getReadyListSize());
       
-      if (!ready->empty()) {
-        Choice Sel = SelectInstruction(*ready, lastInst, ScoreSum);
-        waitUntil = Sel.readyOn;
-        inst = Sel.inst;
-        if (waitUntil > dev_crntCycleNum_[GLOBALTID] || !ChkInstLglty_(inst)) {
+      InstCount closeToRPCheck = RPTarget - 2 < RPTarget * 9 / 10 ? RPTarget - 2 : RPTarget * 9 / 10;
+      closeToRPTarget = ((BBWithSpill *)dev_rgn_)->GetCrntSpillCost() >= closeToRPCheck;
+      // select the instruction and get info on it
+      InstCount SelIndx = SelectInstruction(lastInst, schedule->getTotalStalls(), dev_rgn_, unnecessarilyStalling, closeToRPTarget, waitFor ? true: false);
+
+      if (SelIndx != -1) {
+        LastInstInfo = dev_readyLs->removeInstructionAtIndex(SelIndx);
+        
+        InstCount InstId = LastInstInfo.InstId;
+        inst = dataDepGraph_->GetInstByIndx(InstId);
+        // potentially wait on the current instruction
+        if (LastInstInfo.ReadyOn > crntCycleNum_ || !ChkInstLglty_(inst)) {
+          waitUntil = LastInstInfo.ReadyOn;
+          // should not wait for an instruction while already
+          // waiting for another instruction
+          assert(waitFor == NULL);
           waitFor = inst;
           inst = NULL;
         }
-      }
-      if (inst != NULL) {
+
+        if (inst != NULL) {
 #if USE_ACS
-        // local pheromone decay
-        pheromone_t *pheromone = &Pheromone(lastInst, inst);
-        *pheromone = 
-          (1 - local_decay) * *pheromone + local_decay * initialValue_;
+          // local pheromone decay
+          pheromone_t *pheromone = &Pheromone(lastInst, inst);
+          *pheromone = 
+            (1 - local_decay) * *pheromone + local_decay * initialValue_;
 #endif
-        lastInst = inst;
+          // save the last instruction scheduled
+          lastInst = inst;
+        }
       }
     }
 
@@ -325,13 +585,17 @@ InstSchedule *ACOScheduler::FindOneSchedule(InstCount RPTarget,
       if (ChkInstLglty_(waitFor)) {
         inst = waitFor;
         waitFor = NULL;
+        lastInst = inst;
       }
     }
 
     // boilerplate, mostly copied from ListScheduler, try not to touch it
     InstCount instNum;
-    if (inst == NULL) {
+    if (!inst) {
       instNum = SCHD_STALL;
+      schedule->incrementTotalStalls();
+      if (unnecessarilyStalling)
+        schedule->incrementUnnecessaryStalls();
     } else {
       instNum = inst->GetNum();
       SchdulInst_(inst, dev_crntCycleNum_[GLOBALTID]);
@@ -351,125 +615,93 @@ InstSchedule *ACOScheduler::FindOneSchedule(InstCount RPTarget,
         schedule->SetCost(INVALID_VALUE);
         // keep track of ants terminated
         atomicAdd(&numAntsTerminated_, 1);
-        dev_rdyLst_->ResetIterator();
-        dev_rdyLst_->Reset();
-        ready->clear();
-        dev_instsWithPrdcsrsSchduld_[GLOBALTID]->Reset();
+        dev_readyLs->clearReadyList();
         // end schedule construction
         return NULL;
       } 
       DoRsrvSlots_(inst);
       // this is annoying
-      SchedInstruction *blah = dev_rdyLst_->GetNextPriorityInst();
-      while (blah != NULL && blah != inst) {
-        blah = dev_rdyLst_->GetNextPriorityInst();
-      }
-      if (blah == inst)
-        dev_rdyLst_->RemoveNextPriorityInst();
       UpdtSlotAvlblty_(inst);
+
+      // new readylist update
+      UpdateACOReadyList(inst);
     }
     schedule->AppendInst(instNum);
     if (MovToNxtSlot_(inst))
       InitNewCycle_();
-    dev_rdyLst_->ResetIterator();
-    ready->clear();
   }
   dev_rgn_->UpdateScheduleCost(schedule);
   return schedule;
 
 #else  // **** Host version of function ****
   SchedInstruction *lastInst = NULL;
+  ACOReadyListEntry LastInstInfo;
   InstSchedule *schedule;
   schedule = new InstSchedule(machMdl_, dataDepGraph_, true);
-  InstCount maxPriority = rdyLst_->MaxPriority();
   bool IsSecondPass = rgn_->IsSecondPass();
-  if (maxPriority == 0)
-    maxPriority = 1; // divide by 0 is bad
+  bool unnecessarilyStalling = false;
+  // The MaxPriority that we are getting from the ready list represents the maximum possible heuristic/key value that we can have
+  // I want to move all the heuristic computation stuff to another class for code tidiness reasons.
+  HeurType MaxPriority = kHelper->getMaxValue();
+  if (MaxPriority == 0)
+    MaxPriority = 1; // divide by 0 is bad
   Initialize_();
-  rgn_->InitForSchdulng();
 
   SchedInstruction *waitFor = NULL;
   InstCount waitUntil = 0;
-  double maxPriorityInv = 1 / maxPriority;
-  DeviceVector<Choice> *ready = 
-      new DeviceVector<Choice>(dataDepGraph_->GetInstCnt());
+  MaxPriorityInv = 1 / (pheromone_t)MaxPriority;
+
+  // initialize the aco ready list so that the start instruction is ready
+  // The luc component is 0 since the root inst uses no instructions
+  InstCount RootId = rootInst_->GetNum();
+  HeurType RootHeuristic = kHelper->computeKey(rootInst_, true);
+  pheromone_t RootScore = Score(-1, RootId, RootHeuristic);
+  ACOReadyListEntry InitialRoot{RootId, 0, RootHeuristic, RootScore};
+  readyLs->addInstructionToReadyList(InitialRoot);
+  readyLs->ScoreSum = RootScore;
+  MaxScoringInst = 0;
+  lastInst = dataDepGraph_->GetInstByIndx(RootId);
+  bool closeToRPTarget = false;
+
   SchedInstruction *inst = NULL;
   while (!IsSchedComplete_()) {
-    UpdtRdyLst_(crntCycleNum_, crntSlotNum_);
 
     // there are two steps to scheduling an instruction:
     // 1)Select the instruction(if we are not waiting on another instruction)
     inst = NULL;
-    if (!waitFor) {
-      // if we have not already committed to schedule an instruction
-      // next then pick one. First add ready instructions.  Including
-      //"illegal" e.g. blocked instructions
+    if (!(waitFor && waitUntil <= crntCycleNum_)) {
+      // If an instruction is ready select it
+      assert(readyLs->getReadyListSize()); // we should always have something in the rl
 
-      // convert the ready list from a custom priority queue to a std::vector,
-      // much nicer for this particular scheduler
-      double ScoreSum=0;
-      unsigned long heuristic;
-      ready->reserve(rdyLst_->GetInstCnt());
-      SchedInstruction *rInst = rdyLst_->GetNextPriorityInst(heuristic);
-      while (rInst != NULL) {
-        if (ACO_SCHED_STALLS || ChkInstLglty_(rInst)) {
-          Choice c;
-          c.inst = rInst;
-          c.heuristic = (double)heuristic * maxPriorityInv + 1;
-          c.readyOn = 0;
-          c.Score = Score(lastInst,c);
-          ScoreSum += c.Score;
-          ready->push_back(c);
-        }
-        rInst = rdyLst_->GetNextPriorityInst(heuristic);
-      }
-      rdyLst_->ResetIterator();
+      InstCount closeToRPCheck = RPTarget - 2 < RPTarget * 9 / 10 ? RPTarget - 2 : RPTarget * 9 / 10;
+      closeToRPTarget = ((BBWithSpill *)rgn_)->GetCrntSpillCost() >= closeToRPCheck;
+      // select the instruction and get info on it
+      InstCount SelIndx = SelectInstruction(lastInst, schedule->getTotalStalls(), rgn_, unnecessarilyStalling, closeToRPTarget, waitFor ? true: false);
 
-#if ACO_SCHED_STALLS
-      // add all instructions that are waiting due to latency to the choices
-      // list
-      for (InstCount fCycle = 1; fCycle < dataDepGraph_->GetMaxLtncy() &&
-                                 crntCycleNum_ + fCycle < schedUprBound_;
-           ++fCycle) {
-        ArrayList<InstCount> *futureReady =
-            frstRdyLstPerCycle_[crntCycleNum_ + fCycle];
-        if (!futureReady)
-          continue;
-
-        SchedInstruction *fIns;
-        for (InstCount fInstNum = futureReady->GetFrstElmnt(); fInstNum != END;
-             fInstNum = futureReady->GetNxtElmnt()) {
-          fIns = dataDepGraph_->GetInstByIndx(fInstNum);
-          bool changed;
-          unsigned long heuristic = rdyLst_->CmputKey_(fIns, false, changed);
-          Choice c;
-          c.inst = fIns;
-          c.heuristic = (double)heuristic * maxPriorityInv + 1;
-          c.readyOn = crntCycleNum_ + fCycle;
-          c.Score = Score(lastInst,c);
-          ScoreSum += c.Score;
-          ready->push_back(c);
-        }
-        futureReady->ResetIterator();
-      }
-#endif
-
-      if (!ready->empty()) {
-        Choice Sel = SelectInstruction(*ready, lastInst, ScoreSum);
-        waitUntil = Sel.readyOn;
-        inst = Sel.inst;
-        if (waitUntil > crntCycleNum_ || !ChkInstLglty_(inst)) {
+      if (SelIndx != -1) {
+        LastInstInfo = readyLs->removeInstructionAtIndex(SelIndx);
+        
+        InstCount InstId = LastInstInfo.InstId;
+        inst = dataDepGraph_->GetInstByIndx(InstId);
+        // potentially wait on the current instruction
+        if (LastInstInfo.ReadyOn > crntCycleNum_ || !ChkInstLglty_(inst)) {
+          waitUntil = LastInstInfo.ReadyOn;
+          // should not wait for an instruction while already
+          // waiting for another instruction
+          assert(waitFor == NULL);
           waitFor = inst;
           inst = NULL;
         }
-      }
-      if (inst != NULL) {
+
+        if (inst != NULL) {
   #if USE_ACS
-        // local pheromone decay
-        pheromone_t *pheromone = &Pheromone(lastInst, inst);
-        *pheromone = (1 - local_decay) * *pheromone + local_decay * initialValue_;
+          // local pheromone decay
+          pheromone_t *pheromone = &Pheromone(lastInst, inst);
+          *pheromone = (1 - local_decay) * *pheromone + local_decay * initialValue_;
   #endif
-        lastInst = inst;
+          // save the last instruction scheduled
+          lastInst = inst;
+        }
       }
     }
 
@@ -479,13 +711,17 @@ InstSchedule *ACOScheduler::FindOneSchedule(InstCount RPTarget,
       if (ChkInstLglty_(waitFor)) {
         inst = waitFor;
         waitFor = NULL;
+        lastInst = inst;
       }
     }
 
     // boilerplate, mostly copied from ListScheduler, try not to touch it
     InstCount instNum;
-    if (inst == NULL) {
+    if (!inst) {
       instNum = SCHD_STALL;
+      schedule->incrementTotalStalls();
+      if (unnecessarilyStalling)
+        schedule->incrementUnnecessaryStalls();
     } else {
       instNum = inst->GetNum();
       SchdulInst_(inst, crntCycleNum_);
@@ -497,30 +733,22 @@ InstSchedule *ACOScheduler::FindOneSchedule(InstCount RPTarget,
         // end schedule construction
         // keep track of ants terminated
         numAntsTerminated_++;
-        delete rdyLst_;
-        delete ready;
-        rdyLst_ = new ReadyList(dataDepGraph_, prirts_); 
+        readyLs->clearReadyList();
         delete schedule;
         return NULL;
       }
       DoRsrvSlots_(inst);
       // this is annoying
-      SchedInstruction *blah = rdyLst_->GetNextPriorityInst();
-      while (blah != NULL && blah != inst) {
-        blah = rdyLst_->GetNextPriorityInst();
-      }
-      if (blah == inst)
-        rdyLst_->RemoveNextPriorityInst();
       UpdtSlotAvlblty_(inst);
+
+      // new readylist update
+      UpdateACOReadyList(inst);
     }
     /* Logger::Info("Chose instruction %d (for some reason)", instNum); */
     schedule->AppendInst(instNum);
     if (MovToNxtSlot_(inst))
       InitNewCycle_();
-    rdyLst_->ResetIterator();
-    ready->clear();
   }
-  delete ready;
   rgn_->UpdateScheduleCost(schedule);
   return schedule;
 #endif
@@ -620,8 +848,8 @@ __device__ bool lowerBoundSchedFound;
 __global__
 void Dev_ACO(SchedRegion *dev_rgn, DataDepGraph *dev_DDG,
             ACOScheduler *dev_AcoSchdulr, InstSchedule **dev_schedules,
-            DeviceVector<Choice> *dev_ready, InstSchedule *dev_bestSched,
-            int noImprovementMax, int *blockBestIndex) {
+            InstSchedule *dev_bestSched, int noImprovementMax, 
+            int *blockBestIndex) {
   // holds cost and index of bestSched per block
   __shared__ int bestIndex, dev_iterations;
   __shared__ bool needsSLIL;
@@ -642,14 +870,14 @@ void Dev_ACO(SchedRegion *dev_rgn, DataDepGraph *dev_DDG,
     RPTarget = dev_bestSched->GetSpillCost();
   else
     RPTarget = INT_MAX;
-
+  
+  dev_AcoSchdulr->SetGlobalBestStalls(dev_bestSched->GetCrntLngth() - dev_DDG->GetInstCnt());
   // Start ACO
   while (dev_noImprovement < noImprovementMax && !lowerBoundSchedFound) {
     // Reset schedules to post constructor state
     dev_schedules[GLOBALTID]->Initialize();
     dev_AcoSchdulr->FindOneSchedule(RPTarget,
-                                    dev_schedules[GLOBALTID],
-                                    &dev_ready[GLOBALTID]);
+                                    dev_schedules[GLOBALTID]);
     // Sync threads after schedule creation
     threadGroup.sync();
     globalBestIndex = INVALID_VALUE;
@@ -709,15 +937,19 @@ void Dev_ACO(SchedRegion *dev_rgn, DataDepGraph *dev_DDG,
         // update RPTarget if we are in second pass and not using SLIL
         if (!needsSLIL)
           RPTarget = dev_bestSched->GetSpillCost();
+        InstCount globalStalls = 1 > dev_bestSched->getTotalStalls() ? 1 : dev_bestSched->getTotalStalls();
+        dev_AcoSchdulr->SetGlobalBestStalls(globalStalls);
         printf("New best sched found by thread %d\n", globalBestIndex);
         printf("ACO found schedule "
                "cost:%d, rp cost:%d, exec cost: %d, and "
                "iteration:%d"
-               " (sched length: %d, abs rp cost: %d, rplb: %d)\n",
+               " (sched length: %d, abs rp cost: %d, rplb: %d)"
+              " stalls: %d, unnecessary stalls: %d\n",
              dev_bestSched->GetCost(), dev_bestSched->GetNormSpillCost(),
              dev_bestSched->GetExecCost(), dev_iterations,
              dev_bestSched->GetCrntLngth(), dev_bestSched->GetSpillCost(),
-             dev_rgn->GetRPCostLwrBound());
+             dev_rgn->GetRPCostLwrBound(),
+             dev_bestSched->getTotalStalls(), dev_bestSched->getUnnecessaryStalls());
 #if !RUNTIME_TESTING
           dev_noImprovement = 0;
 #else
@@ -739,6 +971,8 @@ void Dev_ACO(SchedRegion *dev_rgn, DataDepGraph *dev_DDG,
     // wait for other blocks to finish before starting next iteration
     threadGroup.sync();
     // make sure no threads reset schedule before above operations complete
+    dev_schedules[GLOBALTID]->resetTotalStalls();
+    dev_schedules[GLOBALTID]->resetUnnecessaryStalls();
     if (threadIdx.x == 0)
       dev_iterations++;
   }
@@ -782,6 +1016,8 @@ FUNC_RESULT ACOScheduler::FindSchedule(InstSchedule *schedule_out,
   InstCount heuristicCost =
       heuristicSched->GetCost() + 1; // prevent divide by zero
   InstCount InitialCost = InitialSchedule ? InitialSchedule->GetCost() : 0;
+  InstCount TargetSC = InitialSchedule ? InitialSchedule->GetSpillCost()
+                                        : heuristicSched->GetSpillCost();  
 
 #if USE_ACS
   initialValue_ = 2.0 / ((double)count_ * heuristicCost);
@@ -792,13 +1028,26 @@ FUNC_RESULT ACOScheduler::FindSchedule(InstSchedule *schedule_out,
     pheromone_[i] = initialValue_;
   std::cerr << "initialValue_" << initialValue_ << std::endl;
   InstSchedule *bestSchedule = InitialSchedule;
+
+  // check if heuristic schedule is better than the initial
+  // schedule passed from the list scheduler
+  if (shouldReplaceSchedule(InitialSchedule, heuristicSched,
+                                /*IsGlobal=*/true)) {
+    bestSchedule = std::move(heuristicSched);
+    printf("Heuristic schedule is better\n");
+  }
+  else {
+    bestSchedule = std::move(InitialSchedule);
+    printf("Initial schedule is better\n");
+  }
   if (bestSchedule) {
     UpdatePheromone(bestSchedule);
   }
   int noImprovement = 0; // how many iterations with no improvement
   int iterations = 0;
   InstSchedule *iterationBest = nullptr;
-
+  SetGlobalBestStalls(std::max(1, bestSchedule->GetCrntLngth() - dataDepGraph_->GetInstCnt()));
+  
   if (DEV_ACO) { // Run ACO on device
     size_t memSize;
     // Update pheromones on device
@@ -869,15 +1118,14 @@ FUNC_RESULT ACOScheduler::FindSchedule(InstSchedule *schedule_out,
     // of void pointers to host memory locations of the arguments
     dim3 gridDim(NUMBLOCKS);
     dim3 blockDim(NUMTHREADSPERBLOCK);
-    void *dArgs[8];
+    void *dArgs[7];
     dArgs[0] = (void*)&dev_rgn_;
     dArgs[1] = (void*)&dev_DDG_;
     dArgs[2] = (void*)&dev_AcoSchdulr;
     dArgs[3] = (void*)&dev_schedules;
-    dArgs[4] = (void*)&dev_ready_;
-    dArgs[5] = (void*)&dev_bestSched;
-    dArgs[6] = (void*)&noImprovementMax;
-    dArgs[7] = (void*)&dev_blockBestIndex;
+    dArgs[4] = (void*)&dev_bestSched;
+    dArgs[5] = (void*)&noImprovementMax;
+    dArgs[6] = (void*)&dev_blockBestIndex;
     gpuErrchk(cudaLaunchCooperativeKernel((void*)Dev_ACO, gridDim, blockDim, 
                                           dArgs));
     cudaDeviceSynchronize();
@@ -931,6 +1179,7 @@ FUNC_RESULT ACOScheduler::FindSchedule(InstSchedule *schedule_out,
         bestSchedule = std::move(iterationBest);
         if (!((BBWithSpill *)rgn_)->needsSLIL())
           RPTarget = bestSchedule->GetSpillCost();
+        SetGlobalBestStalls(bestSchedule->GetCrntLngth() - dataDepGraph_->GetInstCnt());
         printf("ACO found schedule "
                "cost:%d, rp cost:%d, exec cost: %d, and "
                "iteration:%d"
@@ -1052,7 +1301,7 @@ void ACOScheduler::UpdatePheromone(InstSchedule *schedule) {
   // decay pheromone
   for (int i = 0; i < count_; i++) {
     for (int j = 0; j < count_; j++) {
-      pheromone = &Pheromone(j, instNum);
+      pheromone = &Pheromone(i, j);
       *pheromone *= (1 - decay_factor);
       *pheromone = fmax(1, fmin(8, *pheromone));
     }
@@ -1074,46 +1323,76 @@ void ACOScheduler::CopyPheromonesToSharedMem(double *s_pheromone) {
   }
 }
 
-inline void ACOScheduler::UpdtRdyLst_(InstCount cycleNum, int slotNum) {
-#ifdef __CUDA_ARCH__ // Device version
-  InstCount prevCycleNum = cycleNum - 1;
-  int lstSize = dev_instsWithPrdcsrsSchduld_[GLOBALTID]->size_;
-  PriorityArrayList<InstCount, InstCount> *lst = 
-	                         dev_instsWithPrdcsrsSchduld_[GLOBALTID];
-  SchedInstruction *inst;
-  // PriorityArrayList holds keys in decreasing order, so insts with earliest
-  // rdyCycle are last on the list
-  while (lstSize > 0 && lst->keys_[lstSize - 1] <= cycleNum) {
-    inst = dataDepGraph_->GetInstByIndx(lst->elmnts_[lstSize - 1]);
-    dev_rdyLst_->AddInst(inst);
-    lst->RmvLastElmnt();
-    lstSize--;
-  }
+inline void ACOScheduler::UpdateACOReadyList(SchedInstruction *inst) {
+  InstCount prdcsrNum, scsrRdyCycle;
+  
+  #ifdef __CUDA_ARCH__ // device version of function
+    // Notify each successor of this instruction that it has been scheduled.
+    for (SchedInstruction *crntScsr = inst->GetFrstScsr(&prdcsrNum);
+          crntScsr != NULL; crntScsr = inst->GetNxtScsr(&prdcsrNum)) {
+        bool wasLastPrdcsr =
+            crntScsr->PrdcsrSchduld(prdcsrNum, dev_crntCycleNum_[GLOBALTID], scsrRdyCycle);
 
-#else  // Host version
-  InstCount prevCycleNum = cycleNum - 1;
-  ArrayList<InstCount> *lst1 = NULL;
-  ArrayList<InstCount> *lst2 = frstRdyLstPerCycle_[cycleNum];
-
-  if (slotNum == 0 && prevCycleNum >= 0) {
-    // If at the begining of a new cycle other than the very first cycle, then
-    // we also have to include the instructions that might have become ready in
-    // the previous cycle due to a zero latency of the instruction scheduled in
-    // the very last slot of that cycle [GOS 9.8.02].
-    lst1 = frstRdyLstPerCycle_[prevCycleNum];
-
-    if (lst1 != NULL) {
-      rdyLst_->AddList(lst1);
-      lst1->Reset();
-      CleanupCycle_(prevCycleNum);
+        if (wasLastPrdcsr) {
+          // If all other predecessors of this successor have been scheduled then
+          // we now know in which cycle this successor will become ready.
+          HeurType HeurWOLuc = dev_kHelper->computeKey(crntScsr, false);
+          dev_readyLs->addInstructionToReadyList(ACOReadyListEntry{crntScsr->GetNum(), scsrRdyCycle, HeurWOLuc, 0});
+        }
     }
-  }
 
-  if (lst2 != NULL) {
-    rdyLst_->AddList(lst2);
-    lst2->Reset();
-  }
-#endif
+    // Make sure the scores are valid.  The scheduling of an instruction may
+    // have increased another instruction's LUC Score
+    PriorityEntry LUCEntry = dev_kHelper->getPriorityEntry(LSH_LUC);
+    for (InstCount I = 0; I < dev_readyLs->getReadyListSize(); ++I) {
+      //we first get the heuristic without the LUC component, add the LUC
+      //LUC component, and then compute the score
+      HeurType Heur = *dev_readyLs->getInstHeuristicAtIndex(I);
+      InstCount CandidateId = *dev_readyLs->getInstIdAtIndex(I);
+      if (LUCEntry.Width) {
+        SchedInstruction *ScsrInst = dataDepGraph_->GetInstByIndx(CandidateId);
+        HeurType LUCVal = ScsrInst->CmputLastUseCnt();
+        LUCVal <<= LUCEntry.Offset;
+        Heur &= LUCVal;
+      }
+    }
+  #else // host version of function
+    // Notify each successor of this instruction that it has been scheduled.
+    for (SchedInstruction *crntScsr = inst->GetFrstScsr(&prdcsrNum);
+          crntScsr != NULL; crntScsr = inst->GetNxtScsr(&prdcsrNum)) {
+        bool wasLastPrdcsr =
+            crntScsr->PrdcsrSchduld(prdcsrNum, crntCycleNum_, scsrRdyCycle);
+
+        if (wasLastPrdcsr) {
+          // If all other predecessors of this successor have been scheduled then
+          // we now know in which cycle this successor will become ready.
+          HeurType HeurWOLuc = kHelper->computeKey(crntScsr, false);
+          readyLs->addInstructionToReadyList(ACOReadyListEntry{crntScsr->GetNum(), scsrRdyCycle, HeurWOLuc, 0});
+        }
+    }
+
+    // Make sure the scores are valid.  The scheduling of an instruction may
+    // have increased another instruction's LUC Score
+    PriorityEntry LUCEntry = kHelper->getPriorityEntry(LSH_LUC);
+    for (InstCount I = 0; I < readyLs->getReadyListSize(); ++I) {
+      //we first get the heuristic without the LUC component, add the LUC
+      //LUC component, and then compute the score
+      HeurType Heur = *readyLs->getInstHeuristicAtIndex(I);
+      InstCount CandidateId = *readyLs->getInstIdAtIndex(I);
+      if (LUCEntry.Width) {
+        SchedInstruction *ScsrInst = dataDepGraph_->GetInstByIndx(CandidateId);
+        HeurType LUCVal = ScsrInst->CmputLastUseCnt();
+        LUCVal <<= LUCEntry.Offset;
+        Heur &= LUCVal;
+      }
+    }
+  #endif
+}
+
+// copied from Enumerator
+inline void ACOScheduler::UpdtRdyLst_(InstCount cycleNum, int slotNum) {
+  assert(false); // do not use this function with aco
+  // it is only implemented b/c it is a pure virtual in ConstrainedScheduler
 }
 
 __host__ __device__
@@ -1196,8 +1475,12 @@ void ACOScheduler::AllocDevArraysForParallelACO() {
   // Alloc dev array for isCrntCycleBlkd_;
   memSize = sizeof(bool) * NUMTHREADS;
   gpuErrchk(cudaMalloc(&dev_isCrntCycleBlkd_, memSize));
-  // Alloc dev array for rdyLst_
-  rdyLst_->AllocDevArraysForParallelACO(NUMTHREADS);
+  
+  // Alloc dev array for readyLs;
+  readyLs->AllocDevArraysForParallelACO(NUMTHREADS);
+  // Alloc dev arrays for MaxScoringInst
+  memSize = sizeof(InstCount) * NUMTHREADS;
+  gpuErrchk(cudaMalloc(&dev_MaxScoringInst, memSize));
   // Alloc dev array for avlblSlotsInCrntCycle_
   memSize = sizeof(int16_t *) * NUMTHREADS;
   gpuErrchk(cudaMallocManaged(&dev_avlblSlotsInCrntCycle_, memSize));
@@ -1206,9 +1489,6 @@ void ACOScheduler::AllocDevArraysForParallelACO() {
   for (int i = 0; i < NUMTHREADS; i++) {
     gpuErrchk(cudaMalloc(&dev_avlblSlotsInCrntCycle_[i], memSize));
   }
-  // Alloc dev arrays for dev_instsWithPrdcsrsSchduld_
-  memSize = sizeof(PriorityArrayList<InstCount, InstCount> *) * NUMTHREADS;
-  gpuErrchk(cudaMallocManaged(&dev_instsWithPrdcsrsSchduld_, memSize));
   // Alloc dev arrays for rsrvSlots_
   memSize = sizeof(ReserveSlot *) * NUMTHREADS;
   gpuErrchk(cudaMallocManaged(&dev_rsrvSlots_, memSize));
@@ -1259,55 +1539,21 @@ void ACOScheduler::CopyPointersToDevice(ACOScheduler *dev_ACOSchedulr) {
   // set root/leaf inst
   dev_ACOSchedulr->rootInst_ = dev_DDG_->GetRootInst();
   dev_ACOSchedulr->leafInst_ = dev_DDG_->GetLeafInst();
-  // Create an array of PriorityArrayLists, allocate dev mem for it 
-  // and elmnts_ for each one, and copy it to device
-  PriorityArrayList<InstCount, InstCount> *temp = 
-    new PriorityArrayList<InstCount, InstCount>[NUMTHREADS];
-  // Allocate elmnts_ and keys_ for all PArrayLists
-  InstCount *dev_elmnts, *dev_keys;
-  memSize = sizeof(InstCount) * count_ * NUMTHREADS;
-  gpuErrchk(cudaMalloc(&dev_elmnts, memSize));
-  gpuErrchk(cudaMalloc(&dev_keys, memSize));
-  // set correct maxSize, elmnts_, and keys_ for each PArrayList
-  for (int i = 0; i < NUMTHREADS; i++) {
-    temp[i].maxSize_ = count_;
-    temp[i].elmnts_ = &dev_elmnts[i * count_];
-    temp[i].keys_ = &dev_keys[i * count_];
-  }
-  // Alloc dev mem and copy array of PArrayLists to device
-  PriorityArrayList<InstCount, InstCount> *dev_array;
-  memSize = sizeof(PriorityArrayList<InstCount, InstCount>) * NUMTHREADS;
-  gpuErrchk(cudaMallocManaged(&dev_array, memSize));
-  gpuErrchk(cudaMemcpy(dev_array, temp, memSize, cudaMemcpyHostToDevice));
-  // set dev_instsWithPrdcsrsScheduld_ pointers to each PAL in array
-  for (int i = 0; i < NUMTHREADS; i++)
-    dev_instsWithPrdcsrsSchduld_[i] = &dev_array[i];
-  // make sure host also has a copy of array for later deletion
-  memSize = sizeof(PriorityArrayList<InstCount, InstCount>) * NUMTHREADS;
-  gpuErrchk(cudaMemPrefetchAsync(dev_array, memSize, cudaCpuDeviceId));
-  // remove references to dev arrays in host copy and delete host copy
-  for (int i = 0; i < NUMTHREADS; i++) {
-    temp[i].elmnts_ = NULL;
-    temp[i].keys_ = NULL;
-  }
-  delete[] temp;
-
-  // Copy rdyLst_
-  memSize = sizeof(ReadyList);
-  gpuErrchk(cudaMallocManaged(&dev_ACOSchedulr->dev_rdyLst_, memSize));
-  gpuErrchk(cudaMemcpy(dev_ACOSchedulr->dev_rdyLst_, rdyLst_, memSize,
+  // copy readyLs
+  memSize = sizeof(ACOReadyList);
+  gpuErrchk(cudaMalloc(&dev_ACOSchedulr->dev_readyLs, memSize));
+  gpuErrchk(cudaMemcpy(dev_ACOSchedulr->dev_readyLs, readyLs, memSize,
 		       cudaMemcpyHostToDevice));
-  rdyLst_->CopyPointersToDevice(dev_ACOSchedulr->dev_rdyLst_, dev_DDG_,
-		                NUMTHREADS);
+  // copy khelper
+  memSize = sizeof(KeysHelper);
+  gpuErrchk(cudaMalloc(&dev_ACOSchedulr->dev_kHelper, memSize));
+  gpuErrchk(cudaMemcpy(dev_ACOSchedulr->dev_kHelper, kHelper, memSize,
+		       cudaMemcpyHostToDevice));
   // make sure cudaMallocManaged memory is copied to device before kernel start
   memSize = sizeof(int16_t *) * NUMTHREADS;
   gpuErrchk(cudaMemPrefetchAsync(dev_avlblSlotsInCrntCycle_, memSize, 0));
-  memSize = sizeof(PriorityArrayList<InstCount, InstCount> *) * NUMTHREADS;
-  gpuErrchk(cudaMemPrefetchAsync(dev_instsWithPrdcsrsSchduld_, memSize, 0));
   memSize = sizeof(ReserveSlot *) * NUMTHREADS;
   gpuErrchk(cudaMemPrefetchAsync(dev_rsrvSlots_, memSize, 0));
-  memSize = sizeof(ReadyList);
-  gpuErrchk(cudaMemPrefetchAsync(&dev_ACOSchedulr->dev_rdyLst_, memSize, 0));
 }
 
 void ACOScheduler::FreeDevicePointers() {
@@ -1319,20 +1565,15 @@ void ACOScheduler::FreeDevicePointers() {
   cudaFree(slotsPerTypePerCycle_);
   cudaFree(instCntPerIssuType_);
   for (int i = 0; i < NUMTHREADS; i++){
-    //cudaFree(dev_instsWithPrdcsrsSchduld_[i]->elmnts_);
-    //cudaFree(dev_instsWithPrdcsrsSchduld_[i]->keys_);
-    //cudaFree(dev_instsWithPrdcsrsSchduld_[i]);
     cudaFree(dev_avlblSlotsInCrntCycle_[i]);
     cudaFree(dev_rsrvSlots_[i]);
   }
-  cudaFree(dev_instsWithPrdcsrsSchduld_[0]->elmnts_);
-  cudaFree(dev_instsWithPrdcsrsSchduld_[0]->keys_);
-  cudaFree(dev_instsWithPrdcsrsSchduld_[0]);
-  dev_rdyLst_->FreeDevicePointers(NUMTHREADS);
+  cudaFree(dev_MaxScoringInst);
+  readyLs->FreeDevicePointers();
   cudaFree(dev_avlblSlotsInCrntCycle_);
   cudaFree(dev_rsrvSlots_);
   cudaFree(dev_rsrvSlotCnt_);
-  cudaFree(dev_instsWithPrdcsrsSchduld_);
-  cudaFree(dev_rdyLst_);
+  cudaFree(dev_readyLs);
+  cudaFree(dev_kHelper);
   cudaFree(pheromone_.elmnts_);
 }

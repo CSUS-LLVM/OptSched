@@ -112,7 +112,7 @@ public:
   // graph, with the specified upper bound.
   __host__ __device__
   ConstrainedScheduler(DataDepGraph *dataDepGraph, MachineModel *machMdl,
-                       InstCount schedUprBound);
+                       InstCount schedUprBound, bool ACOEn=false);
   // Deallocates memory used by the scheduler.
   __host__ __device__
   virtual ~ConstrainedScheduler();
@@ -122,15 +122,15 @@ public:
   //FUNC_RESULT FindSchedule(InstSchedule *sched, SchedRegion *rgn) = 0;
 
 protected:
+  // Whether this instance of ConstrainedScheduler is being used with ACO and
+  // therefore can use the aco optimizations
+  bool IsACO;
   // The data dependence graph to be scheduled.
   DataDepGraph *dataDepGraph_;
   // The current schedule.
   InstSchedule *crntSched_;
   // The ready list.
   ReadyList *rdyLst_;
-  // pointer to a device array used to store rdyLst_ for
-  // each thread by parallel ACO
-  ReadyList *dev_rdyLst_;
 
   // The number of the current cycle to be used in cycle-by-cycle scheduling.
   InstCount crntCycleNum_;
@@ -166,9 +166,6 @@ protected:
   // corresponding first-ready list of that cycle into the global sorted ready
   // list.
   ArrayList<InstCount> **frstRdyLstPerCycle_;
-  // On the device, use one PriorityArrayList with the instruction's rdyCycle
-  // as the key instead of maxLtncy+2 ArrayLists for each thread
-  PriorityArrayList<InstCount, InstCount> **dev_instsWithPrdcsrsSchduld_;
 
   // An array holding the number of issue slots available for each issue type
   // in the current machine cycle.

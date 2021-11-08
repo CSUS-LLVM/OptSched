@@ -7,123 +7,167 @@
 
 using namespace llvm::opt_sched;
 
+// pre-compute region info
+__host__ __device__
+void KeysHelper::initForRegion(DataDepGraph *DDG) {
+
+  uint16_t CurrentOffset = 0, CurrentWidth = 0;
+
+  uint64_t MaxKVs[MAX_SCHED_PRIRTS] = { 0 };
+
+  // Calculate the number of bits needed to hold the maximum value of each
+  // priority scheme
+  for (int I = 0; I < priorities.cnt; ++I) {
+    LISTSCHED_HEURISTIC Heur = priorities.vctr[I];
+    uint64_t MaxV = 0;
+    switch (Heur) {
+    case LSH_CP:
+    case LSH_CPR:
+      MaxV = DDG->GetRootInst()->GetCrntLwrBound(DIR_BKWRD);
+      break;
+
+    case LSH_LUC:
+    case LSH_UC:
+      MaxV = DDG->GetMaxUseCnt();
+      break;
+
+    case LSH_NID:
+    case LSH_LLVM:
+      MaxV = DDG->GetInstCnt() - 1;
+      break;
+
+    case LSH_ISO:
+      MaxV = DDG->GetMaxFileSchedOrder();
+      break;
+
+    case LSH_SC:
+      MaxV = DDG->GetMaxScsrCnt();
+      break;
+
+    case LSH_LS:
+      MaxV = DDG->GetMaxLtncySum();
+      break;
+    } // end switch
+
+    // Track the size of the key and the width and location of our values
+    CurrentWidth = Utilities::clcltBitsNeededToHoldNum(MaxV);
+    Entries[Heur] = PriorityEntry{CurrentWidth, CurrentOffset};
+    MaxKVs[Heur] = MaxV;
+    CurrentOffset += CurrentWidth;
+  }   // end for
+
+  // check to see if the key can fit in our type
+  assert(CurrentOffset <= 8 * sizeof(HeurType));
+
+  // set the key size value to the final offset of the key
+  KeysSz = CurrentOffset;
+
+  //set maximumvalues needed to compute keys
+  MaxNID = DDG->GetInstCnt() - 1;
+  MaxISO = MaxKVs[LSH_ISO];
+
+  // mark the object as initialized
+  WasInitialized = true;
+
+  // set the max value using the values compute key
+  MaxValue = computeKey(MaxKVs);
+}
+
+// compute key
+__host__ __device__
+HeurType KeysHelper::computeKey(SchedInstruction *Inst, bool IncludeDynamic) const {
+  assert(WasInitialized);
+
+  HeurType Key= 0;
+  for (int I = 0; I < priorities.cnt; ++I) {
+    LISTSCHED_HEURISTIC Heur = priorities.vctr[I];
+    HeurType PriorityValue = 0;
+    switch (Heur) {
+    case LSH_CP:
+    case LSH_CPR:
+      PriorityValue = Inst->GetCrtclPath(DIR_BKWRD);
+      break;
+
+    case LSH_LUC:
+      PriorityValue = IncludeDynamic ? Inst->CmputLastUseCnt() : 0;
+      break;
+
+    case LSH_UC:
+      PriorityValue = Inst->GetUseCnt();
+      break;
+
+    case LSH_NID:
+    case LSH_LLVM:
+      PriorityValue = MaxNID - Inst->GetNodeID();
+      break;
+
+    case LSH_ISO:
+      PriorityValue = MaxISO - Inst->GetFileSchedOrder();
+      break;
+
+    case LSH_SC:
+      PriorityValue = Inst->GetScsrCnt();
+      break;
+
+    case LSH_LS:
+      PriorityValue = Inst->GetLtncySum();
+      break;
+    }
+    
+    Key <<= Entries[Heur].Width;
+    Key |= PriorityValue;
+  }
+  return Key;
+}
+
+__host__ __device__
+HeurType KeysHelper::computeKey(const uint64_t *Values) const {
+  assert(WasInitialized);
+
+  HeurType Key = 0;
+
+  for (int I = 0; I < priorities.cnt; ++I) {
+    LISTSCHED_HEURISTIC Heur = priorities.vctr[I];
+    Key <<= Entries[Heur].Width;
+    Key |= Values[Heur];
+  }
+
+  return Key;
+}
+
 __host__ __device__
 ReadyList::ReadyList(DataDepGraph *dataDepGraph, SchedPriorities prirts) {
   dataDepGraph_ = dataDepGraph;
   prirts_ = prirts;
-  prirtyLst_ = NULL;
-  int i;
-  uint16_t totKeyBits = 0;
-
-  // Initialize an array of KeyedEntry if a dynamic heuristic is used. This
-  // enable fast updating for dynamic heuristics.
-/*  if (prirts_.isDynmc)
-    keyedEntries_ = new KeyedEntry<SchedInstruction, unsigned long>
-        *[dataDepGraph->GetInstCnt()];
-  else*/
-    keyedEntries_ = nullptr;
-
-  useCntBits_ = crtclPathBits_ = scsrCntBits_ = ltncySumBits_ = nodeID_Bits_ =
-      inptSchedOrderBits_ = 0;
-
-  // Calculate the number of bits needed to hold the maximum value of each
-  // priority scheme
-  for (i = 0; i < prirts.cnt; i++) {
-    switch (prirts.vctr[i]) {
-    case LSH_CP:
-    case LSH_CPR:
-      maxCrtclPath_ = dataDepGraph->GetRootInst()->GetCrntLwrBound(DIR_BKWRD);
-      crtclPathBits_ = Utilities::clcltBitsNeededToHoldNum(maxCrtclPath_);
-      totKeyBits += crtclPathBits_;
-      break;
-
-    case LSH_LUC:
-      /*for (int j = 0; j < dataDepGraph->GetInstCnt(); j++) {
-        keyedEntries_[j] = NULL;
-      }*/
-      maxUseCnt_ = dataDepGraph->GetMaxUseCnt();
-      useCntBits_ = Utilities::clcltBitsNeededToHoldNum(maxUseCnt_);
-      totKeyBits += useCntBits_;
-      break;
-
-    case LSH_UC:
-      maxUseCnt_ = dataDepGraph->GetMaxUseCnt();
-      useCntBits_ = Utilities::clcltBitsNeededToHoldNum(maxUseCnt_);
-      totKeyBits += useCntBits_;
-      break;
-
-    case LSH_NID:
-    case LSH_LLVM:
-      maxNodeID_ = dataDepGraph->GetInstCnt() - 1;
-      nodeID_Bits_ = Utilities::clcltBitsNeededToHoldNum(maxNodeID_);
-      totKeyBits += nodeID_Bits_;
-      break;
-
-    case LSH_ISO:
-      maxInptSchedOrder_ = dataDepGraph->GetMaxFileSchedOrder();
-      inptSchedOrderBits_ =
-          Utilities::clcltBitsNeededToHoldNum(maxInptSchedOrder_);
-      totKeyBits += inptSchedOrderBits_;
-      break;
-
-    case LSH_SC:
-      maxScsrCnt_ = dataDepGraph->GetMaxScsrCnt();
-      scsrCntBits_ = Utilities::clcltBitsNeededToHoldNum(maxScsrCnt_);
-      totKeyBits += scsrCntBits_;
-      break;
-
-    case LSH_LS:
-      maxLtncySum_ = dataDepGraph->GetMaxLtncySum();
-      ltncySumBits_ = Utilities::clcltBitsNeededToHoldNum(maxLtncySum_);
-      totKeyBits += ltncySumBits_;
-      break;
-    } // end switch
-  }   // end for
-
-  assert(totKeyBits <= 8 * sizeof(unsigned long));
-
-#ifdef IS_DEBUG_READY_LIST2
-  Logger::Info("The ready list key size is %d bits", totKeyBits);
-#endif
-
   prirtyLst_ = 
       new PriorityArrayList<InstCount>(dataDepGraph_->GetInstCnt());
   latestSubLst_ = new ArrayList<InstCount>(dataDepGraph_->GetInstCnt());
 
-  int16_t keySize = 0;
-  maxPriority_ = 0;
-  for (i = 0; i < prirts_.cnt; i++) {
-    switch (prirts_.vctr[i]) {
-    case LSH_CP:
-    case LSH_CPR:
-      AddPrirtyToKey_(maxPriority_, keySize, crtclPathBits_, maxCrtclPath_,
-                      maxCrtclPath_);
-      break;
-    case LSH_LUC:
-    case LSH_UC:
-      AddPrirtyToKey_(maxPriority_, keySize, useCntBits_, maxUseCnt_,
-                      maxUseCnt_);
-      break;
-    case LSH_NID:
-    case LSH_LLVM:
-      AddPrirtyToKey_(maxPriority_, keySize, nodeID_Bits_, maxNodeID_,
-                      maxNodeID_);
-      break;
-    case LSH_ISO:
-      AddPrirtyToKey_(maxPriority_, keySize, inptSchedOrderBits_,
-                      maxInptSchedOrder_, maxInptSchedOrder_);
-      break;
-    case LSH_SC:
-      AddPrirtyToKey_(maxPriority_, keySize, scsrCntBits_, maxScsrCnt_,
-                      maxScsrCnt_);
-      break;
-    case LSH_LS:
-      AddPrirtyToKey_(maxPriority_, keySize, ltncySumBits_, maxLtncySum_,
-                      maxLtncySum_);
-      break;
-    }
+  // Initialize an array of KeyedEntry if a dynamic heuristic is used. This
+  // enable fast updating for dynamic heuristics.
+  if (prirts_.isDynmc) {
+    keyedEntries_ = new KeyedEntry<SchedInstruction, unsigned long>
+        *[dataDepGraph->GetInstCnt()];
+  } else
+    keyedEntries_ = nullptr;
+
+  // Initialize the KeyHelper
+  KHelper = KeysHelper(prirts);
+  KHelper.initForRegion(dataDepGraph);
+
+  // if we have an luc in the Priorities then lets store some info about it
+  // to improve efficiency
+  PriorityEntry LUCEntry = KHelper.getPriorityEntry(LSH_LUC);
+  if (LUCEntry.Width) {
+    useCntBits_ = LUCEntry.Width;
+    LUCOffset = LUCEntry.Offset;
   }
-}
+
+#ifdef IS_DEBUG_READY_LIST2
+  Logger::Info("The ready list key size is %d bits", KHelper->getKeySizeInBits());
+#endif
+
+  }
 
 __host__ __device__
 ReadyList::~ReadyList() {
@@ -161,59 +205,22 @@ void ReadyList::CopyList(ReadyList *othrLst) {
 __device__ __host__
 unsigned long ReadyList::CmputKey_(SchedInstruction *inst, bool isUpdate,
                                    bool &changed) {
-  unsigned long key = 0;
-  int16_t keySize = 0;
-  int i;
-  int16_t oldLastUseCnt, newLastUseCnt;
-  changed = true;
-  if (isUpdate)
-    changed = false;
 
-  for (i = 0; i < prirts_.cnt; i++) {
-    switch (prirts_.vctr[i]) {
-    case LSH_CP:
-    case LSH_CPR:
-      AddPrirtyToKey_(key, keySize, crtclPathBits_,
-                      inst->GetCrtclPath(DIR_BKWRD), maxCrtclPath_);
-      break;
+  int16_t OldLastUseCnt, NewLastUseCnt;
 
-    case LSH_LUC:
-      oldLastUseCnt = inst->GetLastUseCnt();
-      newLastUseCnt = inst->CmputLastUseCnt();
-      if (newLastUseCnt != oldLastUseCnt)
-        changed = true;
+  // if we have an LUC Priority then we need to save the oldLUC
+  OldLastUseCnt = inst->GetLastUseCnt();
 
-      AddPrirtyToKey_(key, keySize, useCntBits_, newLastUseCnt, maxUseCnt_);
-      break;
+  HeurType Key = KHelper.computeKey(inst, /*IncludeDynamic*/ true);
 
-    case LSH_UC:
-      AddPrirtyToKey_(key, keySize, useCntBits_, inst->GetUseCnt(), maxUseCnt_);
-      break;
+  //check if the luc value changed
+  HeurType Mask = (0x01 << useCntBits_) - 1;
+  HeurType LUCVal = (Key >> LUCOffset) & Mask;
+  NewLastUseCnt = (int16_t) LUCVal;
+  //set changed if the compute is not an update or the luc was changed
+  changed = !isUpdate || OldLastUseCnt != NewLastUseCnt;
 
-    case LSH_NID:
-    case LSH_LLVM:
-      AddPrirtyToKey_(key, keySize, nodeID_Bits_,
-                      maxNodeID_ - inst->GetNodeID(), maxNodeID_);
-      break;
-
-    case LSH_ISO:
-      AddPrirtyToKey_(key, keySize, inptSchedOrderBits_,
-                      maxInptSchedOrder_ - inst->GetFileSchedOrder(),
-                      maxInptSchedOrder_);
-      break;
-
-    case LSH_SC:
-      AddPrirtyToKey_(key, keySize, scsrCntBits_, inst->GetScsrCnt(),
-                      maxScsrCnt_);
-      break;
-
-    case LSH_LS:
-      AddPrirtyToKey_(key, keySize, ltncySumBits_, inst->GetLtncySum(),
-                      maxLtncySum_);
-      break;
-    }
-  }
-  return key;
+  return Key;
 }
 
 __host__ __device__
@@ -403,19 +410,8 @@ bool ReadyList::FindInst(SchedInstruction *inst, int &hitCnt) {
   return prirtyLst_->FindElmnt(inst->GetNum(), hitCnt);
 }
 
-__device__ __host__
-void ReadyList::AddPrirtyToKey_(unsigned long &key, int16_t &keySize,
-                                int16_t bitCnt, unsigned long val,
-                                unsigned long maxVal) {
-  assert(val <= maxVal);
-  if (keySize > 0)
-    key <<= bitCnt;
-  key |= val;
-  keySize += bitCnt;
-}
-
 __host__ __device__
-unsigned long ReadyList::MaxPriority() { return maxPriority_; }
+unsigned long ReadyList::MaxPriority() { return KHelper.getMaxValue(); }
 
 void ReadyList::AllocDevArraysForParallelACO(int numThreads) {
   size_t memSize;

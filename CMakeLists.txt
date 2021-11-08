@@ -53,6 +53,7 @@ SET(OPT_SCHED_SRCS
   Scheduler/register.cu
   Scheduler/sched_basic_data.cu
   Scheduler/sched_region.cu
+  Scheduler/simplified_aco_ds.cu
   Wrapper/OptimizingScheduler.cu
 
   Scheduler/buffers.cpp

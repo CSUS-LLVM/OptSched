@@ -218,7 +218,14 @@ public:
   bool needsSLIL();
   __host__ __device__
   InstCount GetCrntSpillCost();
-
+  __host__ __device__
+  bool IsRPHigh(int regType) const {
+    #ifdef __CUDA_ARCH__
+    return dev_regPressures_[regType][GLOBALTID] > (unsigned int) machMdl_->GetPhysRegCnt(regType);
+    #else
+      return regPressures_[regType] > (unsigned int) machMdl_->GetPhysRegCnt(regType);
+    #endif
+  }
 protected:
   // (Chris)
   inline virtual const int *GetSLIL_() const {

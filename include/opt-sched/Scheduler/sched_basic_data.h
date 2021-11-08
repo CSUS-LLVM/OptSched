@@ -498,6 +498,7 @@ public:
   // Returns whether this instruction uses the specified register.
   __host__ __device__
   bool FindUse(Register *reg) const;
+  
   // Retrieves the list of registers defined by this node. The array is put
   // into defs and the number of elements is returned.
   __host__ __device__
