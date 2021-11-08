@@ -727,7 +727,7 @@ void Dev_ACO(SchedRegion *dev_rgn, DataDepGraph *dev_DDG,
 #endif
         // if a schedule is found with the cost at the lower bound
         // exit the loop after the current iteration is finished
-        if (dev_bestSched && dev_bestSched->GetCost() == 0) {
+        if ( dev_bestSched && ( dev_bestSched->GetCost() == 0 || ( IsSecondPass && dev_bestSched->GetExecCost() == 0 ) ) ) {
           lowerBoundSchedFound = true;
         }
       } else {
@@ -945,7 +945,7 @@ FUNC_RESULT ACOScheduler::FindSchedule(InstSchedule *schedule_out,
           // Disable resetting noImp to lock iterations to 10
           noImprovement++;
 #endif
-        if (bestSchedule && bestSchedule->GetCost() == 0)
+        if (bestSchedule && ( bestSchedule->GetCost() == 0 || ( !IsFirst && bestSchedule->GetExecCost() == 0 ) ) )
           break;
       } else {
         delete iterationBest;
