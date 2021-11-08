@@ -944,12 +944,12 @@ void Dev_ACO(SchedRegion *dev_rgn, DataDepGraph *dev_DDG,
                "cost:%d, rp cost:%d, exec cost: %d, and "
                "iteration:%d"
                " (sched length: %d, abs rp cost: %d, rplb: %d)"
-              " stalls: %d, unnecessary stalls: %d\n",
-             dev_bestSched->GetCost(), dev_bestSched->GetNormSpillCost(),
-             dev_bestSched->GetExecCost(), dev_iterations,
-             dev_bestSched->GetCrntLngth(), dev_bestSched->GetSpillCost(),
-             dev_rgn->GetRPCostLwrBound(),
-             dev_bestSched->getTotalStalls(), dev_bestSched->getUnnecessaryStalls());
+               " stalls: %d, unnecessary stalls: %d\n",
+               dev_bestSched->GetCost(), dev_bestSched->GetNormSpillCost(),
+               dev_bestSched->GetExecCost(), dev_iterations,
+               dev_bestSched->GetCrntLngth(), dev_bestSched->GetSpillCost(),
+               dev_rgn->GetRPCostLwrBound(),
+               dev_bestSched->getTotalStalls(), dev_bestSched->getUnnecessaryStalls());
 #if !RUNTIME_TESTING
           dev_noImprovement = 0;
 #else
@@ -1183,11 +1183,13 @@ FUNC_RESULT ACOScheduler::FindSchedule(InstSchedule *schedule_out,
         printf("ACO found schedule "
                "cost:%d, rp cost:%d, exec cost: %d, and "
                "iteration:%d"
-               " (sched length: %d, abs rp cost: %d, rplb: %d)\n",
+               " (sched length: %d, abs rp cost: %d, rplb: %d)"
+               " stalls: %d, unnecessary stalls: %d\n",
                bestSchedule->GetCost(), bestSchedule->GetNormSpillCost(),
                bestSchedule->GetExecCost(), iterations,
                bestSchedule->GetCrntLngth(), bestSchedule->GetSpillCost(),
-               rgn_->GetRPCostLwrBound());
+               rgn_->GetRPCostLwrBound(),
+               bestSchedule->getTotalStalls(), bestSchedule->getUnnecessaryStalls());
 #if !RUNTIME_TESTING
           noImprovement = 0;
 #else
