@@ -85,13 +85,7 @@ ACOScheduler::ACOScheduler(DataDepGraph *dataDepGraph,
   pheromone_.resize(pheromone_size);
 
   //construct the ACOReadyList member and a key helper
-  int maxIndpntInstrs = 0;
-  for (int i = 0; i < count_; i++) {
-    int indpntInstrs = count_ - dataDepGraph->GetInstByIndx(i)->GetRcrsvPrdcsrCnt() - dataDepGraph->GetInstByIndx(i)->GetRcrsvScsrCnt();
-    maxIndpntInstrs = indpntInstrs > maxIndpntInstrs ? indpntInstrs : maxIndpntInstrs;
-  }
-  Logger::Info("Ready List Size is: %d, Percent of total number of instructions: %f", maxIndpntInstrs, double(maxIndpntInstrs)/double(count_));
-  readyLs = new ACOReadyList(maxIndpntInstrs);
+  readyLs = new ACOReadyList(dataDepGraph->GetMaxIndependentInstructions());
   kHelper = new KeysHelper(priorities);
   kHelper->initForRegion(dataDepGraph);
 

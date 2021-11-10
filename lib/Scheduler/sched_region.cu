@@ -337,10 +337,16 @@ FUNC_RESULT SchedRegion::FindOptimalSchedule(
     // calling GetCost() on the InstSchedule instance.
     CmputNormCost_(lstSched, CCM_DYNMC, hurstcExecCost, true);
     hurstcCost_ = lstSched->GetCost();
-
+    InstCount maxIndependentInstructions = 0;
+    for (int i = 0; i < dataDepGraph_->GetInstCnt(); i++) {
+      int independentInstructions = dataDepGraph_->GetInstCnt() - dataDepGraph_->GetInstByIndx(i)->GetRcrsvPrdcsrCnt() - dataDepGraph_->GetInstByIndx(i)->GetRcrsvScsrCnt();
+      maxIndependentInstructions = independentInstructions > maxIndependentInstructions ? independentInstructions : maxIndependentInstructions;
+    }
+    dataDepGraph_->SetMaxIndependentInstructions(maxIndependentInstructions);
+    Logger::Info("Ready List Size is: %d, Percent of total number of instructions: %f", maxIndependentInstructions, double(maxIndependentInstructions)/double(dataDepGraph_->GetInstCnt()));
     // This schedule is optimal so ACO will not be run
     // so set bestSched here.
-    if (hurstcCost_ == 0) {
+    if (hurstcCost_ == 0 || maxIndependentInstructions == 1) {
       isLstOptml = true;
       bestSched = bestSched_ = lstSched;
       bestSchedLngth_ = heuristicScheduleLength;

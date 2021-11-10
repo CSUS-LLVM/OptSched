@@ -336,6 +336,11 @@ public:
   }
 
   __host__ __device__
+  InstCount GetMaxIndependentInstructions() { return maxIndependentInstructions_; }
+  __host__ __device__
+  void SetMaxIndependentInstructions(InstCount maxIndependentInstructions) { maxIndependentInstructions_ = maxIndependentInstructions; }
+
+  __host__ __device__
   RegisterFile *getRegFiles() { return RegFiles; }
   __host__ __device__
   Register *getRegByTuple(RegIndxTuple *tuple) { 
@@ -432,6 +437,8 @@ protected:
 
   GraphEdge **dev_scsrElmnts_;
   unsigned long *dev_keys_;
+
+  InstCount maxIndependentInstructions_;
 
   __host__ __device__
   void AllocArrays_(InstCount instCnt);

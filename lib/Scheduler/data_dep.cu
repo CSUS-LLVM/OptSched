@@ -216,6 +216,7 @@ DataDepGraph::DataDepGraph(MachineModel *machMdl, LATENCY_PRECISION ltncyPrcsn)
 
   entryInstCnt_ = 0;
   exitInstCnt_ = 0;
+  maxIndependentInstructions_ = 0;
 
 #ifdef __CUDA_ARCH__
   graphTrans_ = NULL;
@@ -968,7 +969,8 @@ void DataDepGraph::CreateEdge(SchedInstruction *frmNode,
   GraphEdge *newEdg = new GraphEdge(frmNode->GetNum(), toNode->GetNum(), 
 		                    ltncy, depType);
   // If compiling on device, keep track of the pointers to all edges
-  if (DEV_ACO && instCnt_ >= 50) {
+  // Set instCnt_ comparison to REGION_MIN_SIZE
+  if (DEV_ACO && instCnt_ >= 1) {
     // if the edges_ vector has not been created, create it
     if (!edges_)
       edges_ = new std::vector<GraphEdge *>();
@@ -1019,7 +1021,8 @@ void DataDepGraph::CreateEdge_(InstCount frmNodeNum, InstCount toNodeNum,
     edge = new GraphEdge(frmNode->GetNum(), toNode->GetNum(), ltncy, depType,
                          IsArtificial);
     // If compiling on device, keep track of the pointers to all edges
-    if (DEV_ACO && instCnt_ >= 50) {
+    // Set instCnt_ comparison to REGION_MIN_SIZE
+    if (DEV_ACO && instCnt_ >= 1) {
       // if the edges_ vector has not been created, create it
       if (!edges_)
         edges_ = new std::vector<GraphEdge *>();
