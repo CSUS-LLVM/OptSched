@@ -1205,8 +1205,9 @@ FUNC_RESULT ACOScheduler::FindSchedule(InstSchedule *schedule_out,
   } // End run on CPU
 
   printf("Best schedule: ");
+  printf("Absolute RP Cost: %d, Length: %d, Cost: ", bestSchedule->GetSpillCost(), bestSchedule->GetCrntLngth());
   PrintSchedule(bestSchedule);
-  schedule_out->Copy(bestSchedule);
+  schedule_out->Copy(bestSchedule); 
   if (bestSchedule != InitialSchedule)
     delete bestSchedule;
   if (!DEV_ACO)

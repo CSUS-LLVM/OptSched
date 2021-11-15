@@ -740,9 +740,9 @@ void BBWithSpill::UpdateSpillInfoForSchdul_(SchedInstruction *inst,
       // happen here.
       if (needsSLIL()) {
         sumOfLiveIntervalLengths_[regType]++;
-        if (!use->IsInInterval(inst) && !use->IsInPossibleInterval(inst)) {
-          ++dynamicSlilLowerBound_;
-        }
+        // if (!use->IsInInterval(inst) && !use->IsInPossibleInterval(inst)) {
+        //   ++dynamicSlilLowerBound_;
+        // }
       }
 
       liveRegs_[regType].SetBit(regNum, false, use->GetWght());
@@ -810,14 +810,14 @@ void BBWithSpill::UpdateSpillInfoForSchdul_(SchedInstruction *inst,
     // (Chris): Compute sum of live range lengths at this point
     if (needsSLIL()) {
       sumOfLiveIntervalLengths_[i] += liveRegs_[i].GetOneCnt();
-      for (int j = 0; j < liveRegs_[i].GetSize(); ++j) {
-        if (liveRegs_[i].GetBit(j)) {
-          const Register *reg = regFiles_[i].GetReg(j);
-          if (!reg->IsInInterval(inst) && !reg->IsInPossibleInterval(inst)) {
-            ++dynamicSlilLowerBound_;
-          }
-        }
-      }
+      // for (int j = 0; j < liveRegs_[i].GetSize(); ++j) {
+      //   if (liveRegs_[i].GetBit(j)) {
+      //     const Register *reg = regFiles_[i].GetReg(j);
+      //     if (!reg->IsInInterval(inst) && !reg->IsInPossibleInterval(inst)) {
+      //       ++dynamicSlilLowerBound_;
+      //     }
+      //   }
+      // }
     }
   }
   
@@ -879,11 +879,11 @@ void BBWithSpill::UpdateSpillInfoForUnSchdul_(SchedInstruction *inst) {
     for (int i = 0; i < regTypeCnt_; ++i) {
       for (int j = 0; j < liveRegs_[i].GetSize(); ++j) {
         if (liveRegs_[i].GetBit(j)) {
-          const Register *reg = regFiles_[i].GetReg(j);
+          // const Register *reg = regFiles_[i].GetReg(j);
           sumOfLiveIntervalLengths_[i]--;
-          if (!reg->IsInInterval(inst) && !reg->IsInPossibleInterval(inst)) {
-            --dynamicSlilLowerBound_;
-          }
+          // if (!reg->IsInInterval(inst) && !reg->IsInPossibleInterval(inst)) {
+          //   --dynamicSlilLowerBound_;
+          // }
         }
       }
       assert(sumOfLiveIntervalLengths_[i] >= 0 &&
@@ -938,9 +938,9 @@ void BBWithSpill::UpdateSpillInfoForUnSchdul_(SchedInstruction *inst) {
       // take this instruction into account.
       if (GetSpillCostFunc() == SCF_SLIL) {
         sumOfLiveIntervalLengths_[regType]--;
-        if (!use->IsInInterval(inst) && !use->IsInPossibleInterval(inst)) {
-          --dynamicSlilLowerBound_;
-        }
+        // if (!use->IsInInterval(inst) && !use->IsInPossibleInterval(inst)) {
+        //   --dynamicSlilLowerBound_;
+        // }
         assert(sumOfLiveIntervalLengths_[regType] >= 0 &&
                "UpdateSpillInfoForUnSchdul_: SLIL negative!");
       }
