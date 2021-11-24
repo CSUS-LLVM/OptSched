@@ -212,62 +212,65 @@ bool HistEnumTreeNode::DoesDominate_(EnumTreeNode *node,
     }
   }
 
-  InstCount entryCnt;
-  InstCount minTimeToExmn = GetMinTimeToExmn_(thisTime, enumrtr);
-
-  entryCnt = SetLastInsts_(lastInsts, thisTime, minTimeToExmn);
-  assert(entryCnt == thisTime - minTimeToExmn + 1);
-
-  assert(lastInsts != NULL);
   bool isAbslutDmnnt = true;
 
-  if (othrHstry != NULL) {
-    othrHstry->SetLwrBounds_(othrLwrBounds, othrLastInsts, othrTime,
-                             minTimeToExmn, enumrtr);
-  }
+  if (enumrtr->getIsSecondPass()) {
+    InstCount entryCnt;
+    InstCount minTimeToExmn = GetMinTimeToExmn_(thisTime, enumrtr);
 
-  CmputNxtAvlblCycles_(enumrtr, instsPerType, nxtAvlblCycles);
+    entryCnt = SetLastInsts_(lastInsts, thisTime, minTimeToExmn);
+    assert(entryCnt == thisTime - minTimeToExmn + 1);
 
-  for (indx = 0; indx < entryCnt; indx++) {
-    time = thisTime - indx;
-    InstCount cycleNum = enumrtr->GetCycleNumFrmTime_(time);
-    SchedInstruction *inst = lastInsts[indx];
+    assert(lastInsts != NULL);
 
-    // If an inst. is scheduled after its static lower bound then its
-    // successors will potentially be pushed down and should be checked.
-    if (inst != NULL && (cycleNum > inst->GetLwrBound(DIR_FRWRD) || shft > 0)) {
-      UDT_GLABEL ltncy;
-      DependenceType depType;
+    if (othrHstry != NULL) {
+      othrHstry->SetLwrBounds_(othrLwrBounds, othrLastInsts, othrTime,
+                               minTimeToExmn, enumrtr);
+    }
 
-      // Examine all the unscheduled successors of this instruction to see if
-      // any of them is pushed down.
-      for (SchedInstruction *scsr = inst->GetFrstScsr(NULL, &ltncy, &depType);
-           scsr != NULL; scsr = inst->GetNxtScsr(NULL, &ltncy, &depType)) {
-        if (scsr->IsSchduld() == false) {
-          InstCount nxtAvlblCycle = nxtAvlblCycles[scsr->GetIssueType()];
-          InstCount num = scsr->GetNum();
-          InstCount thisBound = cycleNum + ltncy;
-          thisBound = std::max(thisBound, nxtAvlblCycle);
-          InstCount sttcBound = scsr->GetLwrBound(DIR_FRWRD);
-          InstCount normBound = std::max(sttcBound, nxtAvlblCycle);
+    CmputNxtAvlblCycles_(enumrtr, instsPerType, nxtAvlblCycles);
 
-          if (thisBound > normBound || shft > 0) {
-            isAbslutDmnnt = false;
-            InstCount othrBound = othrLwrBounds[num];
+    for (indx = 0; indx < entryCnt; indx++) {
+      time = thisTime - indx;
+      InstCount cycleNum = enumrtr->GetCycleNumFrmTime_(time);
+      SchedInstruction *inst = lastInsts[indx];
 
-            if ((thisBound + shft) > othrBound)
-              return false;
+      // If an inst. is scheduled after its static lower bound then its
+      // successors will potentially be pushed down and should be checked.
+      if (inst != NULL &&
+          (cycleNum > inst->GetLwrBound(DIR_FRWRD) || shft > 0)) {
+        UDT_GLABEL ltncy;
+        DependenceType depType;
+
+        // Examine all the unscheduled successors of this instruction to see if
+        // any of them is pushed down.
+        for (SchedInstruction *scsr = inst->GetFrstScsr(NULL, &ltncy, &depType);
+             scsr != NULL; scsr = inst->GetNxtScsr(NULL, &ltncy, &depType)) {
+          if (scsr->IsSchduld() == false) {
+            InstCount nxtAvlblCycle = nxtAvlblCycles[scsr->GetIssueType()];
+            InstCount num = scsr->GetNum();
+            InstCount thisBound = cycleNum + ltncy;
+            thisBound = std::max(thisBound, nxtAvlblCycle);
+            InstCount sttcBound = scsr->GetLwrBound(DIR_FRWRD);
+            InstCount normBound = std::max(sttcBound, nxtAvlblCycle);
+
+            if (thisBound > normBound || shft > 0) {
+              isAbslutDmnnt = false;
+              InstCount othrBound = othrLwrBounds[num];
+
+              if ((thisBound + shft) > othrBound)
+                return false;
+            }
           }
         }
+      } else {
+        // If this inst. is scheduled at its static lower bound it cannot
+        // push down any successors. Therefore it will be safe to skip it in
+        // future tests
+        lastInsts[indx] = NULL;
       }
-    } else {
-      // If this inst. is scheduled at its static lower bound it cannot
-      // push down any successors. Therefore it will be safe to skip it in
-      // future tests
-      lastInsts[indx] = NULL;
     }
   }
-
   // If this node is an absolute dominant that dominates any matching node.
   if (isAbslutDmnnt)
     stats::absoluteDominationHits++;

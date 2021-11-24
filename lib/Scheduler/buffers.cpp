@@ -580,3 +580,6 @@ FUNC_RESULT SpecsBuffer::checkTitle(const char *const title) {
 }
 
 SpecsBuffer::SpecsBuffer() { nxtLineType = NXT_DATA; }
+SpecsBuffer::SpecsBuffer(char *buf, long size) : SpecsBuffer() {
+  SetBuf(buf, size);
+}

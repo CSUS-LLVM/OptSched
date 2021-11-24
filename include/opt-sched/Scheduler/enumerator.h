@@ -515,6 +515,7 @@ protected:
 
   inline bool getIsTwoPass() { return IsTwoPassEnabled_; }
   inline bool getIsSecondPass() { return IsSecondPass_; }
+  inline bool getIsFirstPass() { return IsTwoPassEnabled_ && !IsSecondPass_; }
 
   inline void setIsTwoPass(bool IsTwoPassEnabled) {
     IsTwoPassEnabled_ = IsTwoPassEnabled;
