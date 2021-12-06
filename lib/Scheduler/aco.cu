@@ -66,7 +66,6 @@ ACOScheduler::ACOScheduler(DataDepGraph *dataDepGraph,
   use_tournament = schedIni.GetBool("ACO_TOURNAMENT");
   bias_ratio = schedIni.GetFloat("ACO_BIAS_RATIO");
   local_decay = schedIni.GetFloat("ACO_LOCAL_DECAY");
-  decay_factor = schedIni.GetFloat("ACO_DECAY_FACTOR");
   ants_per_iteration = schedIni.GetInt("ACO_ANT_PER_ITERATION");
   print_aco_trace = schedIni.GetBool("ACO_TRACE");
   IsTwoPassEn = schedIni.GetBool("USE_TWO_PASS");
@@ -989,6 +988,7 @@ FUNC_RESULT ACOScheduler::FindSchedule(InstSchedule *schedule_out,
   if (dev_AcoSchdulr)
     dev_AcoSchdulr->heuristicImportance_ = heuristicImportance_;
   fixed_bias = schedIni.GetInt(IsFirst ? "ACO_FIXED_BIAS" : "ACO2P_FIXED_BIAS");
+  decay_factor = schedIni.GetInt(IsFirst ? "ACO_DECAY_FACTOR" : "ACO2P_DECAY_FACTOR");
   if (dev_AcoSchdulr)
     dev_AcoSchdulr->fixed_bias = fixed_bias;
   noImprovementMax = schedIni.GetInt(IsFirst ? "ACO_STOP_ITERATIONS"
@@ -1207,7 +1207,7 @@ FUNC_RESULT ACOScheduler::FindSchedule(InstSchedule *schedule_out,
   printf("Best schedule: ");
   printf("Absolute RP Cost: %d, Length: %d, Cost: ", bestSchedule->GetSpillCost(), bestSchedule->GetCrntLngth());
   PrintSchedule(bestSchedule);
-  schedule_out->Copy(bestSchedule); 
+  schedule_out->Copy(bestSchedule);
   if (bestSchedule != InitialSchedule)
     delete bestSchedule;
   if (!DEV_ACO)
