@@ -73,6 +73,7 @@ SET(OPT_SCHED_SRCS
 
 SET(OPT_SCHED_INCLUDE_DIRS ${CMAKE_CURRENT_SOURCE_DIR}/include)
 SET(OPT_SCHED_TARGET_DEPS "LLVMCodeGen")
+set(llvm_subproject TRUE)
 
 function(check_if_AMDGPU_supported)
   IF(${PACKAGE_VERSION} VERSION_LESS "7.0")
@@ -102,12 +103,12 @@ ENDIF()
 include_directories(${OPT_SCHED_INCLUDE_DIRS})
 add_subdirectory(lib)
 
-if(OPTSCHED_INCLUDE_TESTS)
-  add_subdirectory(unittests)
-  list(APPEND OPTSCHED_TEST_DEPS OptSchedUnitTests)
-  list(APPEND OPTSCHED_TEST_PARAMS
-    clang_unit_site_config=${CMAKE_CURRENT_BINARY_DIR}/test/Unit/lit.site.cfg
-    )
+# if(OPTSCHED_INCLUDE_TESTS)
+#   add_subdirectory(unittests)
+#   list(APPEND OPTSCHED_TEST_DEPS OptSchedUnitTests)
+#   list(APPEND OPTSCHED_TEST_PARAMS
+#     clang_unit_site_config=${CMAKE_CURRENT_BINARY_DIR}/test/Unit/lit.site.cfg
+#     )
 
-  add_subdirectory(test)
-endif()
+#   add_subdirectory(test)
+# endif()
