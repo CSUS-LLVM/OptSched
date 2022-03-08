@@ -228,7 +228,7 @@ static InstCount ComputeSLILStaticLowerBound(int64_t regTypeCnt_,
   // based on the instructions that use more than one register (defined by
   // different instructions).
   int commonUseLowerBound = closureLowerBound;
-  std::vector<std::pair<const SchedInstruction *, Register *>> usedInsts;
+  std::vector<std::pair<const SchedInstruction *, llvm::opt_sched::Register *>> usedInsts;
   for (int i = 0; i < dataDepGraph_->GetInstCnt(); ++i) {
     const auto &inst = dataDepGraph_->GetInstByIndx(i);
     RegIndxTuple *usedRegisters = nullptr;
@@ -237,7 +237,7 @@ static InstCount ComputeSLILStaticLowerBound(int64_t regTypeCnt_,
     // Get a list of instructions that define the registers, in array form.
     usedInsts.clear();
     for (int j = 0; j < usedRegCount; ++j) {
-      Register *reg = dataDepGraph_->getRegByTuple(&usedRegisters[j]);
+      llvm::opt_sched::Register *reg = dataDepGraph_->getRegByTuple(&usedRegisters[j]);
       assert(reg->GetDefList().size() == 1 &&
              "Number of defs for register is not 1!");
       usedInsts.push_back(std::make_pair(

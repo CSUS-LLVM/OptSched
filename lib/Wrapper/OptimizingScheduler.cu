@@ -32,6 +32,7 @@
 #include "llvm/Support/Path.h"
 #include "llvm/Support/raw_ostream.h"
 #include "opt-sched/Scheduler/dev_defines.h"
+#include "llvm/Target/TargetMachine.h"
 #include <algorithm>
 #include <chrono>
 #include <string>
@@ -68,7 +69,7 @@ static constexpr const char *DEFAULT_CFGMM_FNAME = "/machine_model.cfg";
 // Create OptSched ScheduleDAG.
 static ScheduleDAGInstrs *createOptSched(MachineSchedContext *C) {
   ScheduleDAGMILive *DAG =
-      new ScheduleDAGOptSched(C, llvm::make_unique<GenericScheduler>(C));
+      new ScheduleDAGOptSched(C, std::make_unique<GenericScheduler>(C));
   DAG->addMutation(createCopyConstrainDAGMutation(DAG->TII, DAG->TRI));
   // README: if you need the x86 mutations uncomment the next line.
   // addMutation(createX86MacroFusionDAGMutation());
@@ -177,7 +178,7 @@ static SchedulerType parseListSchedType() {
 
 static std::unique_ptr<GraphTrans>
 createStaticNodeSupTrans(DataDepGraph *DataDepGraph, bool IsMultiPass = false) {
-  return llvm::make_unique<StaticNodeSupTrans>(DataDepGraph, IsMultiPass);
+  return std::make_unique<StaticNodeSupTrans>(DataDepGraph, IsMultiPass);
 }
 
 void ScheduleDAGOptSched::addGraphTransformations(
@@ -432,7 +433,7 @@ void ScheduleDAGOptSched::schedule() {
   }
   
   // create region
-  auto region = llvm::make_unique<BBWithSpill>(
+  auto region = std::make_unique<BBWithSpill>(
       OST.get(), static_cast<DataDepGraph *>(DDG.get()), RegionNumber, HistTableHashBits,
       LowerBoundAlgorithm, HeuristicPriorities, EnumPriorities, VerifySchedule,
       PruningStrategy, SchedForRPOnly, EnumStalls, SCW, SCF, HeurSchedType,
@@ -633,7 +634,7 @@ bool ScheduleDAGOptSched::isOptSchedEnabled() const {
     return true;
   } else if (optSchedOption == "HOT_ONLY") {
     // get the name of the function this scheduler was created for
-    std::string functionName = C->MF->getFunction().getName();
+    std::string functionName = C->MF->getFunction().getName().data();
     // check the list of hot functions for the name of the current function
     return HotFunctions.GetBool(functionName, false);
   } else if (optSchedOption == "NO") {
@@ -760,7 +761,7 @@ bool ScheduleDAGOptSched::shouldPrintSpills() const {
   } else if (printSpills == "NO") {
     return false;
   } else if (printSpills == "HOT_ONLY") {
-    std::string functionName = C->MF->getFunction().getName();
+    std::string functionName = C->MF->getFunction().getName().data();
     return HotFunctions.GetBool(functionName, false);
   } else {
     LLVM_DEBUG(

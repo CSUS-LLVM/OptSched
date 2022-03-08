@@ -45,7 +45,7 @@ void dumpInstType(InstTypeInfo &instType, MachineModel *mm) {
 std::unique_ptr<MachineModelGenerator>
 createCortexA7MMGenerator(const llvm::ScheduleDAGInstrs *dag,
                           MachineModel *mm) {
-  return make_unique<CortexA7MMGenerator>(dag, mm);
+  return std::make_unique<CortexA7MMGenerator>(dag, mm);
 }
 
 } // end anonymous namespace
@@ -251,7 +251,7 @@ IssueType CortexA7MMGenerator::generateIssueType(const InstrStage *E) const {
 
 InstType CortexA7MMGenerator::generateInstrType(const MachineInstr *instr) {
   // Search in the machine model for an instType with this OpCode
-  const std::string instrName = DAG->TII->getName(instr->getOpcode());
+  const std::string instrName = DAG->TII->getName(instr->getOpcode()).data();
   const InstType InstType = MM->GetInstTypeByName(instrName);
 
   // If the machine model does not have instType with this OpCode name,

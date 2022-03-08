@@ -447,7 +447,7 @@ void OptSchedDDGWrapperBasic::convertEdges(const SUnit &SU,
 
     int16_t Latency;
     if (ltncyPrcsn_ == LTP_PRECISE) { // get latency from the machine model
-      const auto &InstName = DAG->TII->getName(instr->getOpcode());
+      const auto &InstName = DAG->TII->getName(instr->getOpcode()).data();
       const auto &InstType = MM->GetInstTypeByName(InstName);
       Latency = MM->GetLatency(InstType, DepType);
     } else if (ltncyPrcsn_ == LTP_ROUGH) // rough latency = llvm latency
@@ -467,7 +467,7 @@ void OptSchedDDGWrapperBasic::convertSUnit(const SUnit &SU) {
     return;
 
   const MachineInstr *MI = SU.getInstr();
-  InstName = DAG->TII->getName(MI->getOpcode());
+  InstName = DAG->TII->getName(MI->getOpcode()).data();
 
   // Search in the machine model for an instType with this OpCode name
   InstType = MM->GetInstTypeByName(InstName.c_str());

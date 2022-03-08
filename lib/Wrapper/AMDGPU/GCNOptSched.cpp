@@ -22,7 +22,7 @@ static cl::opt<bool>
 
 static ScheduleDAGInstrs *createOptSchedGCN(MachineSchedContext *C) {
   return new ScheduleDAGOptSchedGCN(
-      C, llvm::make_unique<GCNMaxOccupancySchedStrategy>(C));
+      C, std::make_unique<GCNMaxOccupancySchedStrategy>(C));
 }
 
 // Register the machine scheduler.
