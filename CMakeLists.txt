@@ -1,6 +1,7 @@
 cmake_minimum_required(VERSION 3.20)
 
-project(OptSched LANGUAGES CXX CUDA)
+# project(OptSched LANGUAGES CXX CUDA)
+enable_language(CUDA)
 
 # Allow our .cpp files to include CUDA headers:
 include_directories(${CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES})
@@ -71,7 +72,7 @@ SET(OPT_SCHED_SRCS
   Wrapper/OptSchedGenericTarget.cpp)
 
 
-SET(OPT_SCHED_INCLUDE_DIRS ${CMAKE_CURRENT_SOURCE_DIR}/include)
+SET(OPT_SCHED_INCLUDE_DIRS ${CMAKE_CURRENT_SOURCE_DIR}/include ${CMAKE_CURRENT_SOURCE_DIR}/lib)
 SET(OPT_SCHED_TARGET_DEPS "LLVMCodeGen")
 set(llvm_subproject TRUE)
 
@@ -99,8 +100,20 @@ IF("AMDGPU" IN_LIST LLVM_TARGETS_TO_BUILD)
                                 ${CMAKE_CURRENT_BINARY_DIR}/../../lib/Target/AMDGPU)
   ENDIF()
 ENDIF()
+list(APPEND CMAKE_MODULE_PATH "${LLVM_CMAKE_DIR}" ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
+include(AddLLVM)
 
 include_directories(${OPT_SCHED_INCLUDE_DIRS})
+#include_directories(
+	#${OPTSCHED_SOURCE_DIR}/include
+  #${OPTSCHED_SOURCE_DIR}/lib
+  #${OPTSCHED_SOURCE_DIR}/Garbage
+  #${LLVM_INCLUDE_DIRS}
+  #${OPTSCHED_EXTRA_INCLUDE_DIRS}
+  #)
+add_definitions(${OPTSCHED_EXTRA_DEFINITIONS})
+link_directories(${OPTSCHED_EXTRA_LINK_LIBRARIES})
+
 add_subdirectory(lib)
 
 # if(OPTSCHED_INCLUDE_TESTS)

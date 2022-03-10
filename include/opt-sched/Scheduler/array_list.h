@@ -4,7 +4,7 @@
 // whole array must be copied in those cases. This class works on both host
 // and device and contains methods to copy to device
 
-#define END -1
+const int END = -1;
 #define GLOBALTID blockIdx.x * blockDim.x + threadIdx.x 
 
 // Base ArrayList class, replaces LinkedList

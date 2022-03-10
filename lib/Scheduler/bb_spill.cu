@@ -21,7 +21,7 @@
 #include <utility>
 #include <cuda_runtime.h>
 
-extern bool OPTSCHED_gPrintSpills;
+extern bool OPTSCHED_gPrintSpills; 
 
 using namespace llvm::opt_sched;
 
@@ -48,7 +48,7 @@ BBWithSpill::BBWithSpill(const OptSchedTarget *OST_, DataDepGraph *dataDepGraph,
   crntSpillCost_ = INVALID_VALUE;
 
   SchedForRPOnly_ = SchedForRPOnly;
-
+   
   enblStallEnum_ = enblStallEnum;
   SCW_ = SCW;
   schedCostFactor_ = COST_WGHT_BASE;
@@ -56,12 +56,12 @@ BBWithSpill::BBWithSpill(const OptSchedTarget *OST_, DataDepGraph *dataDepGraph,
   NeedsComputeSLIL = (spillCostFunc == SCF_SLIL);
 
   regTypeCnt_ = OST->MM->GetRegTypeCnt();
-  regFiles_ = dataDepGraph->getRegFiles();
+  regFiles_ = dataDepGraph->getRegFiles(); 
   liveRegs_ = new WeightedBitVector[regTypeCnt_];
   livePhysRegs_ = new WeightedBitVector[regTypeCnt_];
   spillCosts_ = new InstCount[dataDepGraph_->GetInstCnt()];
   peakRegPressures_ = new InstCount[regTypeCnt_];
-  regPressures_ = new unsigned[regTypeCnt_];
+  regPressures_.resize(regTypeCnt_);
   sumOfLiveIntervalLengths_ = new int[regTypeCnt_];
 
   //initialize all values to 0
@@ -81,7 +81,6 @@ BBWithSpill::~BBWithSpill() {
     delete enumrtr_;
   }
  
-  delete[] regPressures_;
   delete[] sumOfLiveIntervalLengths_;
   delete[] liveRegs_;
   delete[] livePhysRegs_;

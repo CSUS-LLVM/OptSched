@@ -9,6 +9,7 @@
 #include "GCNSchedStrategy.h"
 #include "SIMachineFunctionInfo.h"
 #include "llvm/Support/Debug.h"
+#include "AMDGPUExportClustering.h"
 
 #define DEBUG_TYPE "optsched"
 
@@ -21,13 +22,17 @@ static cl::opt<bool>
                          cl::init(false), cl::Hidden);
 
 static ScheduleDAGInstrs *createOptSchedGCN(MachineSchedContext *C) {
-  return new ScheduleDAGOptSchedGCN(
+  ScheduleDAGMILive *DAG = new ScheduleDAGOptSchedGCN(
       C, std::make_unique<GCNMaxOccupancySchedStrategy>(C));
+  DAG->addMutation(createLoadClusterDAGMutation(DAG->TII, DAG->TRI));
+  DAG->addMutation(createAMDGPUMacroFusionDAGMutation());
+  DAG->addMutation(createAMDGPUExportClusteringDAGMutation());
+  return DAG;
 }
 
 // Register the machine scheduler.
 static MachineSchedRegistry
-    OptSchedMIRegistry("gcn-optsched", "Use the GCN OptSched scheduler.",
+    OptSchedGCNMIRegistry("gcn-optsched", "Use the GCN OptSched scheduler.",
                        createOptSchedGCN);
 
 #if !defined(NDEBUG) || defined(LLVM_ENABLE_DUMP)
@@ -46,12 +51,6 @@ ScheduleDAGOptSchedGCN::ScheduleDAGOptSchedGCN(
     : ScheduleDAGOptSched(C, std::move(S)) {}
 
 void ScheduleDAGOptSchedGCN::initSchedulers() {
-  // Add DAG mutations that apply to both GCN and OptSched DAG's
-
-  addMutation(createLoadClusterDAGMutation(TII, TRI));
-  addMutation(createStoreClusterDAGMutation(TII, TRI));
-  // addMutation(createAMDGPUMacroFusionDAGMutation());
-
   // Add passes
 
   // SchedPasses.push_back(GCNMaxOcc);

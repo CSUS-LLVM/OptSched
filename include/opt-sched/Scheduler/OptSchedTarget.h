@@ -46,7 +46,7 @@ public:
   // Get target specific cost from peak register pressure (e.g. occupancy for
   // AMDGPU)
   virtual InstCount
-  getCost(const unsigned *PRP) const = 0;
+  getCost(const llvm::SmallVectorImpl<unsigned> &PRP) const = 0;
 
   // Targets that wish to discard the finalized schedule for any reason can
   // override this.
@@ -76,11 +76,13 @@ public:
 
   FactoryT getFactoryWithName(llvm::StringRef Name) {
     FactoryT Factory = nullptr;
-    for (auto I = List; I; I = I->Next)
-      if (I->Name == Name) {
+    for (auto I = List; I; I = I->Next) {
+      if (strncmp(I->Name.data(), Name.data(), I->Name.size()) == 0) {
+        Logger::Info("FOUND TARGET %s", Name.data());
         Factory = I->Factory;
         break;
       }
+    }
     return Factory;
   }
 

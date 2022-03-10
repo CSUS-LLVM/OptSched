@@ -22,7 +22,7 @@ using namespace llvm::opt_sched;
 
 // This is necessary because we cannot perfectly predict the number of registers
 // of each type that will be allocated.
-static const unsigned GPRErrorMargin = 3;
+static const unsigned GPRErrorMargin = 0;
 
 #ifndef NDEBUG
 static unsigned getOccupancyWeight(unsigned Occupancy) {
@@ -83,7 +83,7 @@ public:
 
   // Returns occupancy cost with number of VGPRs and SGPRs from PRP for
   // a partial or complete schedule.
-  InstCount getCost(const unsigned *PRP) const override;
+  InstCount getCost(const llvm::SmallVectorImpl<unsigned> &PRP) const;
 
   void dumpOccupancyInfo(const InstSchedule *Schedule) const;
 
@@ -157,7 +157,7 @@ void OptSchedGCNTarget::initRegion(llvm::ScheduleDAGInstrs *DAG_,
   RPTracker.advance(DAG->begin(), DAG->end(), nullptr);
   const GCNRegPressure &P = RPTracker.moveMaxPressure();
   RegionStartingOccupancy =
-      getAdjustedOccupancy(ST, P.getVGPRNum(), P.getSGPRNum(), MaxOccLDS);
+      getAdjustedOccupancy(ST, P.getVGPRNum(ST->hasGFX90AInsts()), P.getSGPRNum(), MaxOccLDS);
   TargetOccupancy =
       shouldLimitWaves() ? MFI->getMinAllowedOccupancy() : MFI->getOccupancy();
 
@@ -190,8 +190,7 @@ void OptSchedGCNTarget::finalizeRegion(const InstSchedule *Schedule) {
   MFI->limitOccupancy(RegionOccupancy);
 }
 
-InstCount
-OptSchedGCNTarget::getCost(const unsigned *PRP) const {
+InstCount OptSchedGCNTarget::getCost(const llvm::SmallVectorImpl<unsigned> &PRP) const {
   // FIXME: It's bad to asssume that the reg types for SGPR32/VGPR32 are
   // fixed, but we avoid doing an expensive string compare here with
   // GetRegTypeByName since updating the cost happens so often. We should
@@ -212,7 +211,6 @@ bool OptSchedGCNTarget::shouldKeepSchedule() {
   Logger::Info(
       "Reverting Scheduling because of a decrease in occupancy from %d to %d.",
       RegionStartingOccupancy, RegionEndingOccupancy);
-
   return false;
 }
 
@@ -221,6 +219,9 @@ namespace opt_sched {
 
 OptSchedTargetRegistry OptSchedGCNTargetRegistry("amdgcn",
                                                  createOptSchedGCNTarget);
+
+OptSchedTargetRegistry OptSchedGCNHSATargetRegistry("amdgcn-amd-amdhsa",
+                                                    createOptSchedGCNTarget);
 
 } // namespace opt_sched
 } // namespace llvm
