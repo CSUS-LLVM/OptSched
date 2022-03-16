@@ -73,7 +73,7 @@ RelaxedScheduler::RelaxedScheduler(DataDepGraph *dataDepGraph,
 }
 /*****************************************************************************/
 
-__host__ __device__
+__host__
 RelaxedScheduler::~RelaxedScheduler() {
   assert(instLst_ != NULL);
   delete instLst_;
@@ -258,7 +258,7 @@ RJ_RelaxedScheduler::RJ_RelaxedScheduler(
 }
 /*****************************************************************************/
 
-__host__ __device__
+__host__
 RJ_RelaxedScheduler::~RJ_RelaxedScheduler() {}
 /*****************************************************************************/
 
@@ -603,7 +603,7 @@ LC_RelaxedScheduler::LC_RelaxedScheduler(DataDepGraph *dataDepGraph,
 }
 /*****************************************************************************/
 
-__host__ __device__
+__host__
 LC_RelaxedScheduler::~LC_RelaxedScheduler() {
   assert(subGraphInstLst_ != NULL);
   delete subGraphInstLst_;
@@ -781,7 +781,7 @@ LPP_RelaxedScheduler::LPP_RelaxedScheduler(DataDepGraph *dataDepGraph,
 }
 /*****************************************************************************/
 
-__host__ __device__
+__host__
 LPP_RelaxedScheduler::~LPP_RelaxedScheduler() {
   delete subGraphInstLst_;
   delete[] crntFrwrdLwrBounds_;

@@ -23,6 +23,11 @@ static void PrintInstruction(SchedInstruction *inst);
 #endif
 void PrintSchedule(InstSchedule *schedule);
 
+__device__
+hiprandState_t *ACOScheduler::getDevRandStates() {
+  return (hiprandState_t *) dev_states_;
+}
+
 double RandDouble(double min, double max) {
   double rand = (double)RandomGen::GetRand32() / INT32_MAX;
   return (rand * (max - min)) + min;
@@ -50,7 +55,7 @@ ACOScheduler::ACOScheduler(DataDepGraph *dataDepGraph,
                            SchedPriorities priorities, bool vrfySched, 
                            bool IsPostBB, SchedRegion *dev_rgn,
                            DataDepGraph *dev_DDG, 
-			   MachineModel *dev_MM, hiprandState_t *dev_states)
+			   MachineModel *dev_MM, void *dev_states)
     : ConstrainedScheduler(dataDepGraph, machineModel, upperBound, true) {
   VrfySched_ = vrfySched;
   this->IsPostBB = IsPostBB;
@@ -415,8 +420,9 @@ InstCount ACOScheduler::SelectInstruction(SchedInstruction *lastInst, InstCount 
   double rand;
   pheromone_t point;
 #ifdef __HIP_DEVICE_COMPILE__
-  rand = hiprand_uniform(&dev_states_[GLOBALTID]);
-  point = dev_readyLs->dev_ScoreSum[GLOBALTID] * hiprand_uniform(&dev_states_[GLOBALTID]);
+  auto dev_states = getDevRandStates();
+  rand = hiprand_uniform(&dev_states[GLOBALTID]);
+  point = dev_readyLs->dev_ScoreSum[GLOBALTID] * hiprand_uniform(&dev_states[GLOBALTID]);
 #else
   rand = RandDouble(0, 1);
   point = RandDouble(0, readyLs->ScoreSum);

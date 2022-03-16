@@ -17,7 +17,6 @@ Last Update:  Jan. 2020
 #include <memory>
 #include <hip/hip_runtime.h>
 
-
 namespace llvm {
 namespace opt_sched {
 
@@ -54,7 +53,7 @@ public:
                InstCount upperBound, SchedPriorities priorities,
                bool vrfySched, bool IsPostBB, SchedRegion *dev_rgn = NULL,
 	       DataDepGraph *dev_DDG = NULL,
-	       MachineModel *dev_MM = NULL, hiprandState_t *dev_states = NULL);
+	       MachineModel *dev_MM = NULL, void *dev_states = NULL);
   __host__ __device__
   virtual ~ACOScheduler();
   FUNC_RESULT FindSchedule(InstSchedule *schedule, SchedRegion *region, 
@@ -143,7 +142,7 @@ private:
   DataDepGraph *dev_DDG_;
   MachineModel *dev_MM_;
   // Holds state for each thread for RNG
-  hiprandState_t *dev_states_;
+  void *dev_states_;
   // Used to count how many threads returned last instruction
   int returnLastInstCnt_;
   // Used to count how many ants are terminated early

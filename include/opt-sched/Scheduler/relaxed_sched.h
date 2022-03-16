@@ -98,7 +98,7 @@ public:
   RelaxedScheduler(DataDepGraph *dataDepGraph, MachineModel *machMdl,
                    InstCount uprBound, DIRECTION schedDir,
                    RLXD_SCHED_TYPE schedType, InstCount maxInstCnt);
-  __host__ __device__
+  __host__
   virtual ~RelaxedScheduler();
 
   // Find a feasible relaxed schedule and return its length
@@ -124,7 +124,7 @@ public:
                       InstCount uprBound, DIRECTION schedDir,
                       RLXD_SCHED_TYPE schedType,
                       InstCount maxInstCnt = INVALID_VALUE);
-  __host__ __device__
+  __host__
   ~RJ_RelaxedScheduler();
 
   inline void Initialize(bool setPrirtyLst);
@@ -169,7 +169,7 @@ private:
 public:
   LC_RelaxedScheduler(DataDepGraph *dataDepGraph, MachineModel *machMdl,
                       InstCount uprBound, DIRECTION schedDir);
-  __host__ __device__
+  __host__
   ~LC_RelaxedScheduler();
 
   // Find a relaxed schedule of all instructions and return its length
@@ -226,7 +226,7 @@ private:
 public:
   LPP_RelaxedScheduler(DataDepGraph *dataDepGraph, MachineModel *machMdl,
                        InstCount uprBound, DIRECTION schedDir);
-  __host__ __device__
+  __host__
   ~LPP_RelaxedScheduler();
 
   // Find a minimum-length relaxed schedule of all instructions and return its
