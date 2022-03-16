@@ -16,7 +16,7 @@ Last Update:  Apr. 2011
 #include <map>
 #include <set>
 #include <vector>
-#include <cuda_runtime.h>
+#include <hip/hip_runtime.h>
 
 namespace llvm {
 namespace opt_sched {

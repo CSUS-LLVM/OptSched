@@ -1,10 +1,10 @@
-cmake_minimum_required(VERSION 3.20)
+cmake_minimum_required(VERSION 3.18)
 
 # project(OptSched LANGUAGES CXX CUDA)
-enable_language(CUDA)
+#enable_language(CUDA)
 
 # Allow our .cpp files to include CUDA headers:
-include_directories(${CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES})
+#include_directories(${CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES})
 
 include(CTest)
 
@@ -30,7 +30,7 @@ SET(OPT_SCHED_DEBUG_FLAGS "")
 SET(CMAKE_CXX_FLAGS_DEBUG " -DIS_DEBUG")
 SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OPT_SCHED_DEBUG_FLAGS}")
 
-set(CMAKE_CUDA_SEPARABLE_COMPILATION ON)
+#set(CMAKE_CUDA_SEPARABLE_COMPILATION ON)
 SET(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
 IF(CMAKE_BUILD_TYPE EQUAL "DEBUG")

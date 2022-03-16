@@ -19,7 +19,7 @@ Last Update:  Mar. 2011
 #include "opt-sched/Scheduler/defines.h"
 #include "opt-sched/Scheduler/cuda_lnkd_lst.cuh"
 #include "opt-sched/Scheduler/sched_basic_data.h"
-#include <cuda_runtime.h>
+#include <hip/hip_runtime.h>
 
 namespace llvm {
 namespace opt_sched {

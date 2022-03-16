@@ -14,7 +14,7 @@
 #include "opt-sched/Scheduler/dev_defines.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/Debug.h"
-#include <cuda_runtime.h>
+#include <hip/hip_runtime.h>
 
 // only print pressure if enabled by sched.ini
 extern bool OPTSCHED_gPrintSpills;
@@ -218,7 +218,7 @@ DataDepGraph::DataDepGraph(MachineModel *machMdl, LATENCY_PRECISION ltncyPrcsn)
   exitInstCnt_ = 0;
   maxIndependentInstructions_ = 0;
 
-#ifdef __CUDA_ARCH__
+#ifdef __HIP_DEVICE_COMPILE__
   graphTrans_ = NULL;
 #else
   graphTrans_ = new SmallVector<std::unique_ptr<GraphTrans>, 0>;
@@ -1474,7 +1474,7 @@ DataDepSubGraph::DataDepSubGraph(DataDepGraph *fullGraph, InstCount maxInstCnt,
 
 __host__ __device__
 DataDepSubGraph::~DataDepSubGraph() {
-#ifdef __CUDA_ARCH__
+#ifdef __HIP_DEVICE_COMPILE__
 #else
   DelRootAndLeafInsts_(true);
 #endif
@@ -2786,7 +2786,7 @@ bool InstSchedule::operator==(InstSchedule &b) const {
 
 __host__ __device__
 bool InstSchedule::AppendInst(InstCount instNum) {
-#ifdef __CUDA_ARCH__
+#ifdef __HIP_DEVICE_COMPILE__
   assert(crntSlotNum_ < totSlotCnt_);
   dev_instInSlot_[crntSlotNum_] = instNum;
 
@@ -2885,7 +2885,7 @@ InstCount InstSchedule::GetNxtInst(InstCount &cycleNum, InstCount &slotNum) {
     return INVALID_VALUE;
   }
   do {
-#ifdef __CUDA_ARCH__
+#ifdef __HIP_DEVICE_COMPILE__
     instNum = dev_instInSlot_[iterSlotNum_];
 #else
     instNum = instInSlot_[iterSlotNum_];
@@ -2913,7 +2913,7 @@ InstCount InstSchedule::GetPrevInstNum(InstCount instNum) {
 __host__ __device__
 void InstSchedule::Reset() {
   InstCount i;
-#ifdef __CUDA_ARCH__
+#ifdef __HIP_DEVICE_COMPILE__
   if (vrfy_) {
     for (i = 0; i <= maxInstNumSchduld_; i++) {
       dev_slotForInst_[i] = SCHD_UNSCHDULD;
@@ -2945,7 +2945,7 @@ void InstSchedule::Reset() {
 __host__ __device__
 void InstSchedule::Copy(InstSchedule *src) {
   Reset();
-#ifdef __CUDA_ARCH__
+#ifdef __HIP_DEVICE_COMPILE__
   InstCount i;
   for (i = 0; i < totSlotCnt_ && src->dev_instInSlot_[i] != SCHD_UNSCHDULD; i++) {
     AppendInst(src->dev_instInSlot_[i]);
@@ -2972,7 +2972,7 @@ void InstSchedule::Copy(InstSchedule *src) {
 
 __host__ __device__
 void InstSchedule::SetSpillCosts(InstCount spillCosts[]) {
-#ifdef __CUDA_ARCH__
+#ifdef __HIP_DEVICE_COMPILE__
   totSpillCost_ = 0; 
   for (InstCount i = 0; i < totInstCnt_; i++) {
     dev_spillCosts_[i] = spillCosts[i];
@@ -2998,7 +2998,7 @@ void InstSchedule::Dev_SetSpillCosts(InstCount **spillCosts) {
 
 __host__ __device__
 void InstSchedule::SetPeakRegPressures(InstCount peakRegPressures[]) {
-#ifdef __CUDA_ARCH__
+#ifdef __HIP_DEVICE_COMPILE__
   for (InstCount i = 0; i < dev_machMdl_->GetRegTypeCnt(); i++) {
     dev_peakRegPressures_[i] = peakRegPressures[i];
   }
@@ -3025,7 +3025,7 @@ InstSchedule::GetPeakRegPressures(const InstCount *&regPressures) const {
 __host__ __device__
 InstCount InstSchedule::GetSpillCost(InstCount stepNum) {
   assert(stepNum >= 0 && stepNum < totInstCnt_);
-#ifdef __CUDA_ARCH__
+#ifdef __HIP_DEVICE_COMPILE__
   return dev_spillCosts_[stepNum];
 #else
   return spillCosts_[stepNum];
@@ -3052,7 +3052,7 @@ void InstSchedule::Print() {
   InstCount i;
   for (i = 0; i < crntSlotNum_; i++) {
     if (slotInCycle == 0)
-#ifdef __CUDA_ARCH__
+#ifdef __HIP_DEVICE_COMPILE__
       printf("Cycle# %d : %d\n", cycleNum, dev_instInSlot_[i]);
 #else
       printf("Cycle# %d : %d\n", cycleNum, instInSlot_[i]);
@@ -3320,15 +3320,15 @@ InstCount InstSchedule::GetExtraSpillCost(SPILL_COST_FUNCTION Fn) const {
 void InstSchedule::AllocateOnDevice(MachineModel *dev_machMdl) {
   // Alloc instInSlot_ on device
   size_t memSize = totSlotCnt_ * sizeof(InstCount);
-  gpuErrchk(cudaMalloc((void**)&dev_instInSlot_, memSize));
+  gpuErrchk(hipMalloc((void**)&dev_instInSlot_, memSize));
   // Alloc slotForInst_ on device
   memSize = totInstCnt_ * sizeof(InstCount);
-  gpuErrchk(cudaMalloc((void**)&dev_slotForInst_, memSize));
+  gpuErrchk(hipMalloc((void**)&dev_slotForInst_, memSize));
   // Alloc spillCosts_ on device
-  gpuErrchk(cudaMalloc((void**)&dev_spillCosts_, memSize));
+  gpuErrchk(hipMalloc((void**)&dev_spillCosts_, memSize));
   // Alloc peakRegPressures_ on device
   memSize = machMdl_->GetRegTypeCnt() * sizeof(InstCount);
-  gpuErrchk(cudaMalloc((void**)&dev_peakRegPressures_, memSize));
+  gpuErrchk(hipMalloc((void**)&dev_peakRegPressures_, memSize));
   dev_machMdl_ = dev_machMdl;
 }
 
@@ -3356,45 +3356,45 @@ void InstSchedule::CopyArraysToDevice() {
   size_t memSize;
   // Copy instInSlot to device
   memSize = totSlotCnt_ * sizeof(InstCount);
-  gpuErrchk(cudaMemcpy(dev_instInSlot_, instInSlot_, memSize,
-                       cudaMemcpyHostToDevice));
+  gpuErrchk(hipMemcpy(dev_instInSlot_, instInSlot_, memSize,
+                       hipMemcpyHostToDevice));
   // Copy slotForInst_ to device
   memSize = totInstCnt_ * sizeof(InstCount);
-  gpuErrchk(cudaMemcpy(dev_slotForInst_, slotForInst_, memSize,
-                       cudaMemcpyHostToDevice));
+  gpuErrchk(hipMemcpy(dev_slotForInst_, slotForInst_, memSize,
+                       hipMemcpyHostToDevice));
   // Copy spillCosts to device
-  gpuErrchk(cudaMemcpy(dev_spillCosts_, spillCosts_, memSize,
-                       cudaMemcpyHostToDevice));
+  gpuErrchk(hipMemcpy(dev_spillCosts_, spillCosts_, memSize,
+                       hipMemcpyHostToDevice));
   // Copy peakRegPressures to device
   memSize = machMdl_->GetRegTypeCnt() * sizeof(InstCount);
-  gpuErrchk(cudaMemcpy(dev_peakRegPressures_, peakRegPressures_, memSize,
-                       cudaMemcpyHostToDevice));
+  gpuErrchk(hipMemcpy(dev_peakRegPressures_, peakRegPressures_, memSize,
+                       hipMemcpyHostToDevice));
 }
 
 void InstSchedule::CopyArraysToHost() {
   size_t memSize;
   // Copy instInSlot to host
   memSize = totSlotCnt_ * sizeof(InstCount);
-  gpuErrchk(cudaMemcpy(instInSlot_, dev_instInSlot_, memSize,
-		       cudaMemcpyDeviceToHost));
+  gpuErrchk(hipMemcpy(instInSlot_, dev_instInSlot_, memSize,
+		       hipMemcpyDeviceToHost));
   // Copy slotForInst_ to host
   memSize = totInstCnt_ * sizeof(InstCount);
-  gpuErrchk(cudaMemcpy(slotForInst_, dev_slotForInst_, memSize, 
-		       cudaMemcpyDeviceToHost));
+  gpuErrchk(hipMemcpy(slotForInst_, dev_slotForInst_, memSize, 
+		       hipMemcpyDeviceToHost));
   // Copy spillCosts to host
-  gpuErrchk(cudaMemcpy(spillCosts_, dev_spillCosts_, memSize, 
-		       cudaMemcpyDeviceToHost));
+  gpuErrchk(hipMemcpy(spillCosts_, dev_spillCosts_, memSize, 
+		       hipMemcpyDeviceToHost));
   // Copy peakRegPressures to host
   memSize = machMdl_->GetRegTypeCnt() * sizeof(InstCount);
-  gpuErrchk(cudaMemcpy(peakRegPressures_, dev_peakRegPressures_, memSize,
-		       cudaMemcpyDeviceToHost));
+  gpuErrchk(hipMemcpy(peakRegPressures_, dev_peakRegPressures_, memSize,
+		       hipMemcpyDeviceToHost));
 }
 
 void InstSchedule::FreeDeviceArrays() {
-  cudaFree(dev_instInSlot_);
-  cudaFree(dev_slotForInst_);
-  cudaFree(dev_spillCosts_);
-  cudaFree(dev_peakRegPressures_);  
+  hipFree(dev_instInSlot_);
+  hipFree(dev_slotForInst_);
+  hipFree(dev_spillCosts_);
+  hipFree(dev_peakRegPressures_);  
 }
 
 __device__
@@ -3613,87 +3613,87 @@ void DataDepGraph::CopyPointersToDevice(DataDepGraph *dev_DDG, int numThreads) {
   // Copy instCntPerType_ to device
   InstCount *dev_instCntPerType;
   memSize = sizeof(InstCount) * instTypeCnt_;
-  gpuErrchk(cudaMalloc(&dev_instCntPerType, memSize));
-  gpuErrchk(cudaMemcpy(dev_instCntPerType, instCntPerType_, memSize,
-		       cudaMemcpyHostToDevice));
-  gpuErrchk(cudaMemcpy(&dev_DDG->instCntPerType_, &dev_instCntPerType,
-		       sizeof(InstCount *), cudaMemcpyHostToDevice));
+  gpuErrchk(hipMalloc(&dev_instCntPerType, memSize));
+  gpuErrchk(hipMemcpy(dev_instCntPerType, instCntPerType_, memSize,
+		       hipMemcpyHostToDevice));
+  gpuErrchk(hipMemcpy(&dev_DDG->instCntPerType_, &dev_instCntPerType,
+		       sizeof(InstCount *), hipMemcpyHostToDevice));
   // Copy instCntPerIssuType_
   InstCount *dev_instCntPerIssuType;
   memSize = sizeof(InstCount) * issuTypeCnt_;
-  gpuErrchk(cudaMalloc(&dev_instCntPerIssuType, memSize));
-  gpuErrchk(cudaMemcpy(dev_instCntPerIssuType, instCntPerIssuType_, memSize,
-                       cudaMemcpyHostToDevice));
-  gpuErrchk(cudaMemcpy(&dev_DDG->instCntPerIssuType_, &dev_instCntPerIssuType,
-                       sizeof(InstCount *), cudaMemcpyHostToDevice));
+  gpuErrchk(hipMalloc(&dev_instCntPerIssuType, memSize));
+  gpuErrchk(hipMemcpy(dev_instCntPerIssuType, instCntPerIssuType_, memSize,
+                       hipMemcpyHostToDevice));
+  gpuErrchk(hipMemcpy(&dev_DDG->instCntPerIssuType_, &dev_instCntPerIssuType,
+                       sizeof(InstCount *), hipMemcpyHostToDevice));
   // Copy frwrdLwrBounds_ to device
   InstCount *dev_frwrdLwrBounds;
   memSize = sizeof(InstCount) * instCnt_;
-  gpuErrchk(cudaMalloc(&dev_frwrdLwrBounds, memSize));
-  gpuErrchk(cudaMemcpy(dev_frwrdLwrBounds, frwrdLwrBounds_, memSize,
-                       cudaMemcpyHostToDevice));
-  gpuErrchk(cudaMemcpy(&dev_DDG->frwrdLwrBounds_, &dev_frwrdLwrBounds,
-                       sizeof(InstCount *), cudaMemcpyHostToDevice));
+  gpuErrchk(hipMalloc(&dev_frwrdLwrBounds, memSize));
+  gpuErrchk(hipMemcpy(dev_frwrdLwrBounds, frwrdLwrBounds_, memSize,
+                       hipMemcpyHostToDevice));
+  gpuErrchk(hipMemcpy(&dev_DDG->frwrdLwrBounds_, &dev_frwrdLwrBounds,
+                       sizeof(InstCount *), hipMemcpyHostToDevice));
   // Copy bkwardLwrBounds_ to device
   InstCount *dev_bkwrdLwrBounds;
   memSize = sizeof(InstCount) * instCnt_;
-  gpuErrchk(cudaMalloc(&dev_bkwrdLwrBounds, memSize));
-  gpuErrchk(cudaMemcpy(dev_bkwrdLwrBounds, bkwrdLwrBounds_, memSize,
-                       cudaMemcpyHostToDevice));
-  gpuErrchk(cudaMemcpy(&dev_DDG->bkwrdLwrBounds_, &dev_bkwrdLwrBounds,
-                       sizeof(InstCount *), cudaMemcpyHostToDevice));
+  gpuErrchk(hipMalloc(&dev_bkwrdLwrBounds, memSize));
+  gpuErrchk(hipMemcpy(dev_bkwrdLwrBounds, bkwrdLwrBounds_, memSize,
+                       hipMemcpyHostToDevice));
+  gpuErrchk(hipMemcpy(&dev_DDG->bkwrdLwrBounds_, &dev_bkwrdLwrBounds,
+                       sizeof(InstCount *), hipMemcpyHostToDevice));
   // Copy insts_ to device
   SchedInstruction *dev_insts;
   memSize = sizeof(SchedInstruction) * instCnt_;
-  gpuErrchk(cudaMallocManaged(&dev_insts, memSize));
-  gpuErrchk(cudaMemcpy(dev_insts, insts_, memSize,
-	               cudaMemcpyHostToDevice));
-  gpuErrchk(cudaMemcpy(&dev_DDG->insts_, &dev_insts, 
+  gpuErrchk(hipMallocManaged(&dev_insts, memSize));
+  gpuErrchk(hipMemcpy(dev_insts, insts_, memSize,
+	               hipMemcpyHostToDevice));
+  gpuErrchk(hipMemcpy(&dev_DDG->insts_, &dev_insts, 
 		       sizeof(SchedInstruction *), 
-		       cudaMemcpyHostToDevice));
+		       hipMemcpyHostToDevice));
   // update values of root_ and leaf_ on device
   SchedInstruction *dev_root = &dev_insts[root_->GetNum()];
   // set dev_IsRoot to be used on device to check if it is the root
   dev_root->SetDevIsRoot();
   memSize = sizeof(SchedInstruction *);
-  gpuErrchk(cudaMemcpy(&dev_DDG->root_, &dev_root, memSize,
-	               cudaMemcpyHostToDevice));
+  gpuErrchk(hipMemcpy(&dev_DDG->root_, &dev_root, memSize,
+	               hipMemcpyHostToDevice));
   SchedInstruction *dev_leaf = &dev_insts[leaf_->GetNum()];
-  gpuErrchk(cudaMemcpy(&dev_DDG->leaf_, &dev_leaf, memSize,
-	               cudaMemcpyHostToDevice));
+  gpuErrchk(hipMemcpy(&dev_DDG->leaf_, &dev_leaf, memSize,
+	               hipMemcpyHostToDevice));
   // Copy nodes_ to device
   SchedInstruction **dev_nodes;
   memSize = sizeof(SchedInstruction *) * instCnt_;
-  gpuErrchk(cudaMallocManaged(&dev_nodes, memSize));
-  gpuErrchk(cudaMemcpy(dev_nodes, nodes_, memSize, cudaMemcpyHostToDevice));
-  gpuErrchk(cudaMemcpy(&dev_DDG->nodes_, &dev_nodes,
+  gpuErrchk(hipMallocManaged(&dev_nodes, memSize));
+  gpuErrchk(hipMemcpy(dev_nodes, nodes_, memSize, hipMemcpyHostToDevice));
+  gpuErrchk(hipMemcpy(&dev_DDG->nodes_, &dev_nodes,
 		       sizeof(SchedInstruction **),
-	  	       cudaMemcpyHostToDevice));
+	  	       hipMemcpyHostToDevice));
   // update nodes_ values on device
   for (InstCount i = 0; i < instCnt_; i++) 
     dev_DDG->nodes_[i] = &dev_insts[i];
-  gpuErrchk(cudaMemPrefetchAsync(dev_DDG->nodes_, memSize, 0));
+  gpuErrchk(hipMemPrefetchAsync(dev_DDG->nodes_, memSize, 0));
   // Copy tplgclOrdr_ to device
   SchedInstruction **dev_tplgclOrdr;
   memSize = sizeof(SchedInstruction *) * instCnt_;
-  gpuErrchk(cudaMallocManaged(&dev_tplgclOrdr, memSize));
-  gpuErrchk(cudaMemcpy(dev_tplgclOrdr, tplgclOrdr_, memSize,
-                       cudaMemcpyHostToDevice));
-  gpuErrchk(cudaMemcpy(&dev_DDG->tplgclOrdr_, &dev_tplgclOrdr,
+  gpuErrchk(hipMallocManaged(&dev_tplgclOrdr, memSize));
+  gpuErrchk(hipMemcpy(dev_tplgclOrdr, tplgclOrdr_, memSize,
+                       hipMemcpyHostToDevice));
+  gpuErrchk(hipMemcpy(&dev_DDG->tplgclOrdr_, &dev_tplgclOrdr,
                        sizeof(SchedInstruction **),
-                       cudaMemcpyHostToDevice));
+                       hipMemcpyHostToDevice));
   // update tplgclOrdr values on device
   for (InstCount i = 0; i < instCnt_; i++) 
     dev_DDG->tplgclOrdr_[i] = &dev_insts[tplgclOrdr_[i]->GetNum()];
-  gpuErrchk(cudaMemPrefetchAsync(dev_DDG->tplgclOrdr_, memSize, 0));
+  gpuErrchk(hipMemPrefetchAsync(dev_DDG->tplgclOrdr_, memSize, 0));
   // Copy RegFiles
   RegisterFile *dev_regFiles;
   memSize = sizeof(RegisterFile) * machMdl_->GetRegTypeCnt();
-  gpuErrchk(cudaMallocManaged(&dev_regFiles, memSize));
-  gpuErrchk(cudaMemcpy(dev_regFiles, RegFiles, memSize,
-		       cudaMemcpyHostToDevice));
-  gpuErrchk(cudaMemcpy(&dev_DDG->RegFiles, &dev_regFiles, 
-		       sizeof(RegisterFile *), cudaMemcpyHostToDevice));
+  gpuErrchk(hipMallocManaged(&dev_regFiles, memSize));
+  gpuErrchk(hipMemcpy(dev_regFiles, RegFiles, memSize,
+		       hipMemcpyHostToDevice));
+  gpuErrchk(hipMemcpy(&dev_DDG->RegFiles, &dev_regFiles, 
+		       sizeof(RegisterFile *), hipMemcpyHostToDevice));
   // Also copy each RegFile's pointers
   for (InstCount i = 0; i < machMdl_->GetRegTypeCnt(); i++)
     RegFiles[i].CopyPointersToDevice(&dev_DDG->RegFiles[i]);
@@ -3704,15 +3704,15 @@ void DataDepGraph::CopyPointersToDevice(DataDepGraph *dev_DDG, int numThreads) {
   memSize = sizeof(GraphEdge) * edges_->size();
   // Will hold all host edges in one array to be copied to device in one copy
   GraphEdge *host_edges = (GraphEdge *)malloc(memSize);
-  gpuErrchk(cudaMalloc(&dev_edges_, memSize));
+  gpuErrchk(hipMalloc(&dev_edges_, memSize));
   // iterate through all pointers to edges and copy them into one host array
   memSize = sizeof(GraphEdge);
   for (uint i = 0; i < edges_->size(); i++)
     memcpy(&host_edges[i], edges_->at(i), memSize);
   // Copy host_edges to device and delete the host_edges array
   memSize = sizeof(GraphEdge) * edges_->size();
-  gpuErrchk(cudaMemcpy(dev_edges_, host_edges, memSize, 
-                       cudaMemcpyHostToDevice));
+  gpuErrchk(hipMemcpy(dev_edges_, host_edges, memSize, 
+                       hipMemcpyHostToDevice));
   free(host_edges);
 
   Logger::Info("Copying SchedInstructions to device");
@@ -3723,10 +3723,10 @@ void DataDepGraph::CopyPointersToDevice(DataDepGraph *dev_DDG, int numThreads) {
     lngthScsrElmnts += insts_[i].GetScsrCnt();
   }
   memSize = sizeof(GraphEdge *) * lngthScsrElmnts;
-  gpuErrchk(cudaMallocManaged(&dev_scsrElmnts_, memSize));
+  gpuErrchk(hipMallocManaged(&dev_scsrElmnts_, memSize));
 
   memSize = sizeof(unsigned long) * lngthScsrElmnts;
-  gpuErrchk(cudaMallocManaged(&dev_keys_, memSize));
+  gpuErrchk(hipMallocManaged(&dev_keys_, memSize));
 
   int scsrIndex = 0;
   // Copy SchedInstruction/GraphNode pointers and link them to device inst
@@ -3738,35 +3738,35 @@ void DataDepGraph::CopyPointersToDevice(DataDepGraph *dev_DDG, int numThreads) {
                                    dev_scsrElmnts_,
                                    dev_keys_, scsrIndex);
   memSize = sizeof(SchedInstruction) * instCnt_;
-  gpuErrchk(cudaMemPrefetchAsync(dev_insts, memSize, 0));
+  gpuErrchk(hipMemPrefetchAsync(dev_insts, memSize, 0));
   memSize = sizeof(RegisterFile) * machMdl_->GetRegTypeCnt();
-  gpuErrchk(cudaMemPrefetchAsync(dev_regFiles, memSize, 0));
+  gpuErrchk(hipMemPrefetchAsync(dev_regFiles, memSize, 0));
   memSize = sizeof(GraphEdge *) * lngthScsrElmnts;
-  gpuErrchk(cudaMemPrefetchAsync(dev_scsrElmnts_, memSize, 0));
+  gpuErrchk(hipMemPrefetchAsync(dev_scsrElmnts_, memSize, 0));
   memSize = sizeof(unsigned long) * lngthScsrElmnts;
-  gpuErrchk(cudaMemPrefetchAsync(dev_keys_, memSize, 0));
+  gpuErrchk(hipMemPrefetchAsync(dev_keys_, memSize, 0));
 }
 
 void DataDepGraph::FreeDevicePointers(int numThreads) {
-  cudaFree(instCntPerType_);
-  cudaFree(instCntPerIssuType_);
-  cudaFree(frwrdLwrBounds_);
-  cudaFree(bkwrdLwrBounds_);
-  cudaFree(tplgclOrdr_);
+  hipFree(instCntPerType_);
+  hipFree(instCntPerIssuType_);
+  hipFree(frwrdLwrBounds_);
+  hipFree(bkwrdLwrBounds_);
+  hipFree(tplgclOrdr_);
   for (InstCount i = 0; i < machMdl_->GetRegTypeCnt(); i++)
     RegFiles[i].FreeDevicePointers();
-  cudaFree(RegFiles);
+  hipFree(RegFiles);
   for (InstCount i = 0; i < instCnt_; i++)
     insts_[i].FreeDevicePointers(numThreads);
-  cudaFree(insts_);
-  cudaFree(nodes_);
-  cudaFree(dev_scsrElmnts_);
-  cudaFree(dev_keys_);
+  hipFree(insts_);
+  hipFree(nodes_);
+  hipFree(dev_scsrElmnts_);
+  hipFree(dev_keys_);
 }
 
 void DataDepGraph::FreeDevEdges() {
   if (dev_edges_)
-    cudaFree(dev_edges_);
+    hipFree(dev_edges_);
 }
 
 /*

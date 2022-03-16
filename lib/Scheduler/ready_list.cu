@@ -182,7 +182,7 @@ ReadyList::~ReadyList() {
 
 __host__ __device__
 void ReadyList::Reset() {
-#ifdef __CUDA_ARCH__
+#ifdef __HIP_DEVICE_COMPILE__
   dev_prirtyLst_[GLOBALTID].Reset();
 #else
   prirtyLst_->Reset();
@@ -312,7 +312,7 @@ void ReadyList::RemoveLatestSubList() {
 
 __host__ __device__
 void ReadyList::ResetIterator() {
-#ifdef __CUDA_ARCH__
+#ifdef __HIP_DEVICE_COMPILE__
   dev_prirtyLst_[GLOBALTID].ResetIterator();
 #else
   prirtyLst_->ResetIterator(); 
@@ -324,7 +324,7 @@ void ReadyList::AddInst(SchedInstruction *inst) {
   bool changed;
   unsigned long key = CmputKey_(inst, false, changed);
   assert(changed == true);
-#ifdef __CUDA_ARCH__
+#ifdef __HIP_DEVICE_COMPILE__
   dev_prirtyLst_[GLOBALTID].InsrtElmnt(inst->GetNum(), key, true);
 #else
   prirtyLst_->InsrtElmnt(inst->GetNum(), key, true);
@@ -347,7 +347,7 @@ void ReadyList::AddList(ArrayList<InstCount> *lst) {
 
 __host__ __device__
 InstCount ReadyList::GetInstCnt() const {
-#ifdef __CUDA_ARCH__
+#ifdef __HIP_DEVICE_COMPILE__
   return dev_prirtyLst_[GLOBALTID].GetElmntCnt();
 #else
   return prirtyLst_->GetElmntCnt();
@@ -356,7 +356,7 @@ InstCount ReadyList::GetInstCnt() const {
 
 __host__ __device__
 SchedInstruction *ReadyList::GetNextPriorityInst() {
-#ifdef __CUDA_ARCH__
+#ifdef __HIP_DEVICE_COMPILE__
   return dataDepGraph_->GetInstByIndx(dev_prirtyLst_[GLOBALTID].GetNxtElmnt());
 #else
   return dataDepGraph_->GetInstByIndx(prirtyLst_->GetNxtElmnt());
@@ -365,7 +365,7 @@ SchedInstruction *ReadyList::GetNextPriorityInst() {
 
 __host__ __device__
 SchedInstruction *ReadyList::GetNextPriorityInst(unsigned long &key) {
-#ifdef __CUDA_ARCH__
+#ifdef __HIP_DEVICE_COMPILE__
   int indx;
   SchedInstruction *inst = dataDepGraph_->
                     GetInstByIndx(dev_prirtyLst_[GLOBALTID].GetNxtElmnt(indx));
@@ -398,7 +398,7 @@ void ReadyList::UpdatePriorities() {
 
 __host__ __device__
 void ReadyList::RemoveNextPriorityInst() {
-#ifdef __CUDA_ARCH__
+#ifdef __HIP_DEVICE_COMPILE__
   dev_prirtyLst_[GLOBALTID].RmvCrntElmnt();
 #else
   prirtyLst_->RmvCrntElmnt();
@@ -417,7 +417,7 @@ void ReadyList::AllocDevArraysForParallelACO(int numThreads) {
   size_t memSize;
   // Alloc dev array for dev_prirtyLst_
   memSize = sizeof(PriorityArrayList<InstCount>) * numThreads;
-  gpuErrchk(cudaMallocManaged(&dev_prirtyLst_, memSize));
+  gpuErrchk(hipMallocManaged(&dev_prirtyLst_, memSize));
 }
 
 void ReadyList::CopyPointersToDevice(ReadyList *dev_rdyLst, 
@@ -429,46 +429,46 @@ void ReadyList::CopyPointersToDevice(ReadyList *dev_rdyLst,
   prirtyLst_->ResetIterator();
   memSize = sizeof(PriorityArrayList<InstCount>);
   for (int i = 0; i < numThreads; i++) {
-    gpuErrchk(cudaMemcpy(&dev_rdyLst->dev_prirtyLst_[i], prirtyLst_, memSize,
-	  	         cudaMemcpyHostToDevice));
+    gpuErrchk(hipMemcpy(&dev_rdyLst->dev_prirtyLst_[i], prirtyLst_, memSize,
+	  	         hipMemcpyHostToDevice));
   }
-  // Alloc elmnts for each prirtyLst_ in one cudaMalloc call
+  // Alloc elmnts for each prirtyLst_ in one hipMalloc call
   InstCount *temp_arr;
   memSize = sizeof(InstCount) * prirtyLst_->maxSize_ * numThreads;
-  gpuErrchk(cudaMalloc(&temp_arr, memSize));
+  gpuErrchk(hipMalloc(&temp_arr, memSize));
   // Assign a chunk of the large array to each prirtyLst_
   for (int i = 0; i < numThreads; i++)
     dev_rdyLst->dev_prirtyLst_[i].elmnts_ = &temp_arr[i * prirtyLst_->maxSize_];
-  // Alloc keys for each prirtyLst_ in one cudaMalloc call
+  // Alloc keys for each prirtyLst_ in one hipMalloc call
   unsigned long *temp_ptr;
   memSize = sizeof(unsigned long) * prirtyLst_->maxSize_ * numThreads;
-  gpuErrchk(cudaMalloc(&temp_ptr, memSize));
+  gpuErrchk(hipMalloc(&temp_ptr, memSize));
   // Assign a chunk of the large array to each prirtyLst_
   for (int i = 0; i < numThreads; i++)
     dev_rdyLst->dev_prirtyLst_[i].keys_ = &temp_ptr[i * prirtyLst_->maxSize_];
 /*
   memSize = sizeof(PriorityArrayList<InstCount>);
-  gpuErrchk(cudaMallocManaged(&dev_rdyLst->prirtyLst_, memSize));
-  gpuErrchk(cudaMemcpy(dev_rdyLst->prirtyLst_, prirtyLst_, memSize,
-                       cudaMemcpyHostToDevice));
+  gpuErrchk(hipMallocManaged(&dev_rdyLst->prirtyLst_, memSize));
+  gpuErrchk(hipMemcpy(dev_rdyLst->prirtyLst_, prirtyLst_, memSize,
+                       hipMemcpyHostToDevice));
   if (prirtyLst_->elmnts_) {
     memSize = sizeof(InstCount) * prirtyLst_->maxSize_;
-    gpuErrchk(cudaMalloc(&dev_rdyLst->prirtyLst_->elmnts_, memSize));
+    gpuErrchk(hipMalloc(&dev_rdyLst->prirtyLst_->elmnts_, memSize));
     memSize = sizeof(unsigned long) * prirtyLst_->maxSize_;
-    gpuErrchk(cudaMalloc(&dev_rdyLst->prirtyLst_->keys_, memSize));
+    gpuErrchk(hipMalloc(&dev_rdyLst->prirtyLst_->keys_, memSize));
   }
 */
   memSize = sizeof(PriorityArrayList<InstCount>) * numThreads;
-  gpuErrchk(cudaMemPrefetchAsync(dev_prirtyLst_, memSize, 0)); 
+  gpuErrchk(hipMemPrefetchAsync(dev_prirtyLst_, memSize, 0)); 
 }
 
 void ReadyList::FreeDevicePointers(int numThreads) {
-  cudaFree(dev_prirtyLst_[0].keys_);
-  cudaFree(dev_prirtyLst_[0].elmnts_);
-  cudaFree(dev_prirtyLst_);
+  hipFree(dev_prirtyLst_[0].keys_);
+  hipFree(dev_prirtyLst_[0].elmnts_);
+  hipFree(dev_prirtyLst_);
 /*
-  cudaFree(prirtyLst_->elmnts_);
-  cudaFree(prirtyLst_->keys_);
-  cudaFree(prirtyLst_);
+  hipFree(prirtyLst_->elmnts_);
+  hipFree(prirtyLst_->keys_);
+  hipFree(prirtyLst_);
 */
 }

@@ -11,7 +11,7 @@ Last Update:  Mar. 2011
 #include "opt-sched/Scheduler/data_dep.h"
 #include "opt-sched/Scheduler/gen_sched.h"
 #include "opt-sched/Scheduler/hash_table.h"
-#include <cuda_runtime.h>
+#include <hip/hip_runtime.h>
 
 namespace llvm {
 namespace opt_sched {

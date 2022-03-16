@@ -12,7 +12,7 @@ Last Update:  Mar. 2011
 #include "opt-sched/Scheduler/mem_mngr.h"
 #include <cstring>
 #include <memory>
-#include <cuda_runtime.h>
+#include <hip/hip_runtime.h>
 
 
 namespace llvm {
@@ -292,7 +292,7 @@ inline void WeightedBitVector::SetBit(int index, bool bitVal, int weight) {
 
 __host__ __device__
 inline int WeightedBitVector::GetWghtedCnt() const { return wghtedCnt_; }
-
+__host__ __device__
 inline void WeightedBitVector::Reset() {
   BitVector::Reset();
   wghtedCnt_ = 0;

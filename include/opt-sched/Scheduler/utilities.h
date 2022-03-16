@@ -10,13 +10,14 @@ Last Update:  Mar. 2017
 
 #include "opt-sched/Scheduler/defines.h"
 #include <chrono>
-#include <cuda_runtime.h>
+#include <hip/hip_runtime.h>
 
 namespace llvm {
 namespace opt_sched {
 
 namespace Utilities {
 // Calculates the minimum number of bits that can hold a given integer value.
+__host__ __device__
 uint16_t clcltBitsNeededToHoldNum(uint64_t value);
 // Returns the time that has passed since the start of the process, in
 // milliseconds.

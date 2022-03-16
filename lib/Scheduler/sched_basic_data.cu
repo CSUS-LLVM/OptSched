@@ -171,7 +171,7 @@ bool SchedInstruction::UseFileBounds() {
 __host__ __device__
 bool SchedInstruction::InitForSchdulng(InstCount schedLngth,
                                        LinkedList<SchedInstruction> *fxdLst) {
-#ifdef __CUDA_ARCH__
+#ifdef __HIP_DEVICE_COMPILE__
   dev_crntSchedCycle_[GLOBALTID] = SCHD_UNSCHDULD;
   dev_lastUseCnt_[GLOBALTID] = 0;
   dev_ready_[GLOBALTID] = false;
@@ -316,12 +316,12 @@ bool SchedInstruction::ApplyPreFxng(LinkedList<SchedInstruction> *tightndLst,
 __host__ __device__
 void SchedInstruction::AddDef(Register *reg) {
   if (defCnt_ >= MAX_DEFS_PER_INSTR) {
-#ifndef __CUDA_ARCH__
+#ifndef __HIP_DEVICE_COMPILE__
     Logger::Fatal("An instruction can't have more than %d defs",
                   MAX_DEFS_PER_INSTR);
 #endif
   }
-#ifndef __CUDA_ARCH__
+#ifndef __HIP_DEVICE_COMPILE__
 /*
   Logger::Info("Inst %d defines reg %d of type %d and physNum %d and useCnt %d",
   GetNum(), reg->GetNum(), reg->GetType(), reg->GetPhysicalNumber(),
@@ -337,12 +337,12 @@ void SchedInstruction::AddDef(Register *reg) {
 __host__ __device__
 void SchedInstruction::AddUse(Register *reg) {
   if (useCnt_ >= MAX_USES_PER_INSTR) {
-#ifndef __CUDA_ARCH__
+#ifndef __HIP_DEVICE_COMPILE__
     Logger::Fatal("An instruction can't have more than %d uses",
                   MAX_USES_PER_INSTR);
 #endif
   }
-#ifndef __CUDA_ARCH__
+#ifndef __HIP_DEVICE_COMPILE__
 /*
   Logger::Info("Inst %d uses reg %d of type %d and physNum %d and useCnt %d",
   GetNum(), reg->GetNum(), reg->GetType(), reg->GetPhysicalNumber(),
@@ -437,7 +437,7 @@ int SchedInstruction::GetMaxLtncy() const { return GetMaxEdgeLabel(); }
 
 __host__ __device__
 int16_t SchedInstruction::GetLastUseCnt() { 
-#ifdef __CUDA_ARCH__
+#ifdef __HIP_DEVICE_COMPILE__
   return dev_lastUseCnt_[GLOBALTID];
 #else
   return lastUseCnt_;
@@ -664,7 +664,7 @@ __host__ __device__
 bool SchedInstruction::PrdcsrSchduld(InstCount prdcsrNum, InstCount cycle,
                                      InstCount &rdyCycle) {
   assert(prdcsrNum < prdcsrCnt_);
-#ifdef __CUDA_ARCH__
+#ifdef __HIP_DEVICE_COMPILE__
   dev_rdyCyclePerPrdcsr_[GLOBALTID][prdcsrNum] = cycle + ltncyPerPrdcsr_[prdcsrNum];
   dev_prevMinRdyCyclePerPrdcsr_[GLOBALTID][prdcsrNum] = dev_minRdyCycle_[GLOBALTID];
 
@@ -727,7 +727,7 @@ IssueType SchedInstruction::GetIssueType() const { return issuType_; }
 
 __host__ __device__
 bool SchedInstruction::IsSchduld(InstCount *cycle) const {
-#ifdef __CUDA_ARCH__
+#ifdef __HIP_DEVICE_COMPILE__
   if (cycle)
     *cycle = dev_crntSchedCycle_[GLOBALTID];
   return dev_crntSchedCycle_[GLOBALTID] != SCHD_UNSCHDULD;
@@ -740,7 +740,7 @@ bool SchedInstruction::IsSchduld(InstCount *cycle) const {
 
 __host__ __device__
 InstCount SchedInstruction::GetSchedCycle() const { 
-#ifdef __CUDA_ARCH__
+#ifdef __HIP_DEVICE_COMPILE__
   return dev_crntSchedCycle_[GLOBALTID];
 #else
   return crntSchedCycle_;
@@ -749,7 +749,7 @@ InstCount SchedInstruction::GetSchedCycle() const {
 
 __host__ __device__
 InstCount SchedInstruction::GetSchedSlot() const { 
-#ifdef __CUDA_ARCH__
+#ifdef __HIP_DEVICE_COMPILE__
   return dev_crntSchedSlot_[GLOBALTID];
 #else
   return crntSchedSlot_;
@@ -758,7 +758,7 @@ InstCount SchedInstruction::GetSchedSlot() const {
 
 __host__ __device__
 InstCount SchedInstruction::GetCrntDeadline() const {
-#ifdef __CUDA_ARCH__
+#ifdef __HIP_DEVICE_COMPILE__
   return IsSchduld() ? dev_crntSchedCycle_[GLOBALTID] : crntRange_->GetDeadline();
 #else
   return IsSchduld() ? crntSchedCycle_ : crntRange_->GetDeadline();
@@ -767,7 +767,7 @@ InstCount SchedInstruction::GetCrntDeadline() const {
 
 __host__ __device__
 InstCount SchedInstruction::GetCrntReleaseTime() const {
-#ifdef __CUDA_ARCH__
+#ifdef __HIP_DEVICE_COMPILE__
   return IsSchduld() ? dev_crntSchedCycle_[GLOBALTID] : GetCrntLwrBound(DIR_FRWRD);
 #else
   return IsSchduld() ? crntSchedCycle_ : GetCrntLwrBound(DIR_FRWRD);
@@ -776,7 +776,7 @@ InstCount SchedInstruction::GetCrntReleaseTime() const {
 
 __host__ __device__
 InstCount SchedInstruction::GetRlxdCycle() const {
-#ifdef __CUDA_ARCH__
+#ifdef __HIP_DEVICE_COMPILE__
   return IsSchduld() ? dev_crntSchedCycle_[GLOBALTID] : crntRlxdCycle_;
 #else
   return IsSchduld() ? crntSchedCycle_ : crntRlxdCycle_;
@@ -788,7 +788,7 @@ void SchedInstruction::SetRlxdCycle(InstCount cycle) { crntRlxdCycle_ = cycle; }
 
 __host__ __device__
 void SchedInstruction::Schedule(InstCount cycleNum, InstCount slotNum) {
-#ifdef __CUDA_ARCH__
+#ifdef __HIP_DEVICE_COMPILE__
   assert(dev_crntSchedCycle_[GLOBALTID] == SCHD_UNSCHDULD);
   dev_crntSchedCycle_[GLOBALTID] = cycleNum;
   dev_crntSchedSlot_[GLOBALTID] = slotNum;
@@ -801,7 +801,7 @@ void SchedInstruction::Schedule(InstCount cycleNum, InstCount slotNum) {
 
 __host__ __device__
 bool SchedInstruction::IsInReadyList() const { 
-#ifdef __CUDA_ARCH__
+#ifdef __HIP_DEVICE_COMPILE__
   return dev_ready_[GLOBALTID];
 #else
   return ready_;
@@ -810,7 +810,7 @@ bool SchedInstruction::IsInReadyList() const {
 
 __host__ __device__
 void SchedInstruction::PutInReadyList() { 
-#ifdef __CUDA_ARCH__
+#ifdef __HIP_DEVICE_COMPILE__
   dev_ready_[GLOBALTID] = true;
 #else
   ready_ = true;
@@ -819,7 +819,7 @@ void SchedInstruction::PutInReadyList() {
 
 __host__ __device__
 void SchedInstruction::RemoveFromReadyList() { 
-#ifdef __CUDA_ARCH__
+#ifdef __HIP_DEVICE_COMPILE__
   dev_ready_[GLOBALTID] = false;
 #else
   ready_ = false;
@@ -964,7 +964,7 @@ void SchedInstruction::SetPrdcsrNums_() {
 
 __host__ __device__
 int16_t SchedInstruction::CmputLastUseCnt() {
-#ifdef __CUDA_ARCH__
+#ifdef __HIP_DEVICE_COMPILE__
   dev_lastUseCnt_[GLOBALTID] = 0;
 #else
   lastUseCnt_ = 0;
@@ -974,13 +974,13 @@ int16_t SchedInstruction::CmputLastUseCnt() {
     Register *reg = RegFiles_[uses_[i].regType_].GetReg(uses_[i].regNum_);
     assert(reg->GetCrntUseCnt() < reg->GetUseCnt());
     if (reg->GetCrntUseCnt() + 1 == reg->GetUseCnt())
-#ifdef __CUDA_ARCH__
+#ifdef __HIP_DEVICE_COMPILE__
       dev_lastUseCnt_[GLOBALTID]++;
 #else
       lastUseCnt_++;
 #endif
   }
-#ifdef __CUDA_ARCH__
+#ifdef __HIP_DEVICE_COMPILE__
   return dev_lastUseCnt_[GLOBALTID];
 #else
   return lastUseCnt_;
@@ -1054,7 +1054,7 @@ void SchedInstruction::InitializeNode_(InstCount instNum,
   mustBeInBBExit_ = false;
 
   // if not on device create a new SchedRange/PrdcsrList/ScsrList
-#ifndef __CUDA_ARCH__
+#ifndef __HIP_DEVICE_COMPILE__
   crntRange_ = new SchedRange(this);
   GraphNode::CreatePrdcsrScsrLists(maxNodeCnt);
 #endif
@@ -1082,49 +1082,49 @@ void SchedInstruction::CopyPointersToDevice(SchedInstruction *dev_inst,
   memSize = sizeof(InstCount) * prdcsrCnt_;
   // Copy ltncyPerPrdcsr 
   InstCount *dev_ltncyPerPrdcsr;
-  gpuErrchk(cudaMalloc(&dev_ltncyPerPrdcsr, memSize));
-  gpuErrchk(cudaMemcpy(dev_ltncyPerPrdcsr, ltncyPerPrdcsr_, memSize, 
-		       cudaMemcpyHostToDevice));
-  gpuErrchk(cudaMemcpy(&dev_inst->ltncyPerPrdcsr_, &dev_ltncyPerPrdcsr,
-		       sizeof(InstCount *), cudaMemcpyHostToDevice));
+  gpuErrchk(hipMalloc(&dev_ltncyPerPrdcsr, memSize));
+  gpuErrchk(hipMemcpy(dev_ltncyPerPrdcsr, ltncyPerPrdcsr_, memSize, 
+		       hipMemcpyHostToDevice));
+  gpuErrchk(hipMemcpy(&dev_inst->ltncyPerPrdcsr_, &dev_ltncyPerPrdcsr,
+		       sizeof(InstCount *), hipMemcpyHostToDevice));
   // Copy SchedRange
   SchedRange *dev_crntRange;
   memSize = sizeof(SchedRange);
-  gpuErrchk(cudaMalloc(&dev_crntRange, memSize));
-  gpuErrchk(cudaMemcpy(dev_crntRange, crntRange_, memSize,
-		       cudaMemcpyHostToDevice));
-  gpuErrchk(cudaMemcpy(&dev_inst->crntRange_, &dev_crntRange,
-		       sizeof(SchedRange *), cudaMemcpyHostToDevice));
+  gpuErrchk(hipMalloc(&dev_crntRange, memSize));
+  gpuErrchk(hipMemcpy(dev_crntRange, crntRange_, memSize,
+		       hipMemcpyHostToDevice));
+  gpuErrchk(hipMemcpy(&dev_inst->crntRange_, &dev_crntRange,
+		       sizeof(SchedRange *), hipMemcpyHostToDevice));
   // Copy sortedScsrLst_
   GraphNode::CopyPointersToDevice((GraphNode *)dev_inst, dev_nodes, instCnt,
                                   edges, dev_edges, dev_scsrElmnts, 
                                   dev_keys, scsrIndex);
   // make sure managed mem is copied to device before kernel start
   memSize = sizeof(InstCount *) * numThreads;
-  gpuErrchk(cudaMemPrefetchAsync(dev_rdyCyclePerPrdcsr_, memSize, 0));
+  gpuErrchk(hipMemPrefetchAsync(dev_rdyCyclePerPrdcsr_, memSize, 0));
   memSize = sizeof(InstCount *) * numThreads;
-  gpuErrchk(cudaMemPrefetchAsync(dev_prevMinRdyCyclePerPrdcsr_, memSize, 0));
+  gpuErrchk(hipMemPrefetchAsync(dev_prevMinRdyCyclePerPrdcsr_, memSize, 0));
 }
 
 void SchedInstruction::FreeDevicePointers(int numThreads) {
-  cudaFree(ltncyPerPrdcsr_);
-  cudaFree(crntRange_);
-  cudaFree(dev_crntSchedCycle_);
-  cudaFree(dev_crntSchedSlot_);
-  cudaFree(dev_lastUseCnt_);
-  cudaFree(dev_ready_);
-  cudaFree(dev_minRdyCycle_);
-  cudaFree(dev_unschduldPrdcsrCnt_);
-  cudaFree(dev_unschduldScsrCnt_);
-  cudaFree(dev_rdyCyclePerPrdcsr_[0]);
-  cudaFree(dev_rdyCyclePerPrdcsr_);
-  cudaFree(dev_prevMinRdyCyclePerPrdcsr_[0]);
-  cudaFree(dev_prevMinRdyCyclePerPrdcsr_);
+  hipFree(ltncyPerPrdcsr_);
+  hipFree(crntRange_);
+  hipFree(dev_crntSchedCycle_);
+  hipFree(dev_crntSchedSlot_);
+  hipFree(dev_lastUseCnt_);
+  hipFree(dev_ready_);
+  hipFree(dev_minRdyCycle_);
+  hipFree(dev_unschduldPrdcsrCnt_);
+  hipFree(dev_unschduldScsrCnt_);
+  hipFree(dev_rdyCyclePerPrdcsr_[0]);
+  hipFree(dev_rdyCyclePerPrdcsr_);
+  hipFree(dev_prevMinRdyCyclePerPrdcsr_[0]);
+  hipFree(dev_prevMinRdyCyclePerPrdcsr_);
   if (rcrsvScsrLst_)
-    cudaFree(rcrsvScsrLst_->dev_crnt_);
+    hipFree(rcrsvScsrLst_->dev_crnt_);
   if (rcrsvPrdcsrLst_)
-    cudaFree(rcrsvPrdcsrLst_->dev_crnt_);
-  cudaFree(scsrLst_->dev_crnt_);
+    hipFree(rcrsvPrdcsrLst_->dev_crnt_);
+  hipFree(scsrLst_->dev_crnt_);
   GraphNode::FreeDevicePointers();
 }
 
@@ -1132,42 +1132,42 @@ void SchedInstruction::AllocDevArraysForParallelACO(int numThreads) {
   // Create an array of size numThreads for each thread
   // to hold crntSchedCycle_ indexed by its GLOBALTID
   size_t memSize = sizeof(InstCount) * numThreads;
-  gpuErrchk(cudaMalloc(&dev_crntSchedCycle_, memSize));
+  gpuErrchk(hipMalloc(&dev_crntSchedCycle_, memSize));
   // allocate an array of lastUseCnt_ of size numThreads
   memSize = sizeof(int16_t) * numThreads;
-  gpuErrchk(cudaMalloc(&dev_lastUseCnt_, memSize));
+  gpuErrchk(hipMalloc(&dev_lastUseCnt_, memSize));
   // Allocate an array of crntSchedSlot_ of size numThreads
   memSize = sizeof(InstCount) * numThreads;
-  gpuErrchk(cudaMalloc(&dev_crntSchedSlot_, memSize));
+  gpuErrchk(hipMalloc(&dev_crntSchedSlot_, memSize));
   // Allocate an array of ready_ of size numThreads
   memSize = sizeof(bool) * numThreads;
-  gpuErrchk(cudaMalloc(&dev_ready_, memSize));
+  gpuErrchk(hipMalloc(&dev_ready_, memSize));
   // Allocate an array of minRdyCycle_ of size numThreads
   memSize = sizeof(InstCount) * numThreads;
-  gpuErrchk(cudaMalloc(&dev_minRdyCycle_, memSize));
+  gpuErrchk(hipMalloc(&dev_minRdyCycle_, memSize));
   // Allocate an array of unschduldPrdcsrCnt_ of size numThreads
   memSize = sizeof(InstCount) * numThreads;
-  gpuErrchk(cudaMalloc(&dev_unschduldPrdcsrCnt_, memSize));
+  gpuErrchk(hipMalloc(&dev_unschduldPrdcsrCnt_, memSize));
   // Allocate an array of unschduldScsrCnt_ of size numThreads
   memSize = sizeof(InstCount) * numThreads;
-  gpuErrchk(cudaMalloc(&dev_unschduldScsrCnt_, memSize));
+  gpuErrchk(hipMalloc(&dev_unschduldScsrCnt_, memSize));
   // Allocate an array of rdyCyclePerPrdcsr_ of size numThreads
   memSize = sizeof(InstCount *) * numThreads;
-  gpuErrchk(cudaMallocManaged(&dev_rdyCyclePerPrdcsr_, memSize));
+  gpuErrchk(hipMallocManaged(&dev_rdyCyclePerPrdcsr_, memSize));
   // Trying new approach, malloc one huge array and set every multiple
   // of prdscrCnt_ as another index in the array of arrays
   memSize = sizeof(InstCount) * prdcsrCnt_ * numThreads;
   InstCount *temp_arr;
-  gpuErrchk(cudaMalloc(&temp_arr, memSize));
+  gpuErrchk(hipMalloc(&temp_arr, memSize));
   for (int i = 0; i < numThreads; i++) {
     dev_rdyCyclePerPrdcsr_[i] = &temp_arr[i * prdcsrCnt_];
   }
   // Allocate an array of prevMinRdyCyclePerPrdcsr_ of size numThreads
   memSize = sizeof(InstCount *) * numThreads;
-  gpuErrchk(cudaMallocManaged(&dev_prevMinRdyCyclePerPrdcsr_, memSize));
+  gpuErrchk(hipMallocManaged(&dev_prevMinRdyCyclePerPrdcsr_, memSize));
   // use same one malloc approach as above
   memSize = sizeof(InstCount) * prdcsrCnt_ * numThreads;
-  gpuErrchk(cudaMalloc(&temp_arr, memSize));
+  gpuErrchk(hipMalloc(&temp_arr, memSize));
   for (int i = 0; i < numThreads; i++) {
     dev_prevMinRdyCyclePerPrdcsr_[i] = &temp_arr[i * prdcsrCnt_];
   }
@@ -1175,14 +1175,14 @@ void SchedInstruction::AllocDevArraysForParallelACO(int numThreads) {
   // Alloc array of iterators for sortedScsrLst_
   memSize = sizeof(int) * numThreads;
   if (sortedScsrLst_)  
-    gpuErrchk(cudaMalloc(&sortedScsrLst_->dev_crnt_, memSize));
+    gpuErrchk(hipMalloc(&sortedScsrLst_->dev_crnt_, memSize));
   if (sortedPrdcsrLst_)
-    gpuErrchk(cudaMalloc(&sortedPrdcsrLst_->dev_crnt_, memSize));
+    gpuErrchk(hipMalloc(&sortedPrdcsrLst_->dev_crnt_, memSize));
   if (rcrsvScsrLst_)
-    gpuErrchk(cudaMalloc(&rcrsvScsrLst_->dev_crnt_, memSize));
+    gpuErrchk(hipMalloc(&rcrsvScsrLst_->dev_crnt_, memSize));
   if (rcrsvPrdcsrLst_)
-    gpuErrchk(cudaMalloc(&rcrsvPrdcsrLst_->dev_crnt_, memSize));
-  gpuErrchk(cudaMalloc(&scsrLst_->dev_crnt_, memSize));
+    gpuErrchk(hipMalloc(&rcrsvPrdcsrLst_->dev_crnt_, memSize));
+  gpuErrchk(hipMalloc(&scsrLst_->dev_crnt_, memSize));
 }
 
 /******************************************************************************

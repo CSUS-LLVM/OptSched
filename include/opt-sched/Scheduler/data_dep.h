@@ -15,7 +15,7 @@ Last Update:  Mar. 2011
 #include "opt-sched/Scheduler/sched_basic_data.h"
 #include "llvm/ADT/SmallVector.h"
 #include <memory>
-#include <cuda_runtime.h>
+#include <hip/hip_runtime.h>
 
 namespace llvm {
 namespace opt_sched {
@@ -348,7 +348,7 @@ public:
   }
   // Deep Copies DDG's arrays to device and links them to device DDG pointer
   void CopyPointersToDevice(DataDepGraph *dev_DDG, int numThreads = 0);
-  // Calls cudaFree on all arrays/objects that were allocated with cudaMalloc
+  // Calls hipFree on all arrays/objects that were allocated with hipMalloc
   void FreeDevicePointers(int numThreads);
   // frees the dev_edges_ array, for some reason did not work in the destructor
   void FreeDevEdges();

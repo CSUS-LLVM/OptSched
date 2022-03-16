@@ -17,7 +17,7 @@ Last Update:  Sept. 2013
 #include "opt-sched/Scheduler/machine_model.h"
 #include "opt-sched/Scheduler/register.h"
 #include <iostream>
-#include <cuda_runtime.h>
+#include <hip/hip_runtime.h>
 #include <string.h>
 
 namespace llvm {
@@ -553,7 +553,7 @@ public:
                             int numThreads, std::vector<GraphEdge *> *edges,
                             GraphEdge *dev_edges, GraphEdge **dev_scsrElmnts_, 
                             unsigned long *dev_keys, int &scsrIndex);
-  // Calls cudaFree on all arrays/objects that were allocated with cudaMalloc
+  // Calls hipFree on all arrays/objects that were allocated with hipMalloc
   void FreeDevicePointers(int numThreads);
   // Allocates arrays used for storing individual values for each thread in
   // parallel ACO on device

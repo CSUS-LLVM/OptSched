@@ -218,7 +218,7 @@ ScheduleDAGOptSched::ScheduleDAGOptSched(
 ScheduleDAGOptSched::~ScheduleDAGOptSched() {
   if (DEV_ACO && dev_MM) {
     dev_MM->FreeDevicePointers();
-    cudaFree(dev_MM);
+    hipFree(dev_MM);
   }
 }
 
@@ -405,14 +405,14 @@ void ScheduleDAGOptSched::schedule() {
   if (DEV_ACO && dev_MM == NULL) {
     // Copy MachineModel to device for use during DevListSched.
     // Allocate device memory
-    gpuErrchk(cudaMallocManaged((void**)&dev_MM, sizeof(MachineModel)));
+    gpuErrchk(hipMallocManaged((void**)&dev_MM, sizeof(MachineModel)));
     // Copy machMdl_ to device
-    gpuErrchk(cudaMemcpy(dev_MM, MM.get(), sizeof(MachineModel),
-                         cudaMemcpyHostToDevice));
+    gpuErrchk(hipMemcpy(dev_MM, MM.get(), sizeof(MachineModel),
+                         hipMemcpyHostToDevice));
     // Copy over all pointers to device
     MM.get()->CopyPointersToDevice(dev_MM);
     // make sure mallocmanaged mem is copied to device before kernel start
-    gpuErrchk(cudaMemPrefetchAsync(dev_MM, sizeof(MachineModel), 0));
+    gpuErrchk(hipMemPrefetchAsync(dev_MM, sizeof(MachineModel), 0));
   }
   
   // create region

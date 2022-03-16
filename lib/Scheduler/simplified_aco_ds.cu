@@ -174,7 +174,7 @@ InstCount ACOReadyList::computePrimaryCapacity(InstCount RegionSize) {
 
 __host__ __device__
 void ACOReadyList::addInstructionToReadyList(const ACOReadyListEntry &Entry) {
-  #ifdef __CUDA_ARCH__
+  #ifdef __HIP_DEVICE_COMPILE__
     // Ready List should never be resized on device, assume it will never overflow capacity
     assert(dev_CurrentSize[GLOBALTID] < CurrentCapacity);
 
@@ -244,7 +244,7 @@ void ACOReadyList::addInstructionToReadyList(const ACOReadyListEntry &Entry) {
 // This function has undefined behavior if CurrentSize == 0
 __host__ __device__
 ACOReadyListEntry ACOReadyList::removeInstructionAtIndex(InstCount Indx) {
-  #ifdef __CUDA_ARCH__
+  #ifdef __HIP_DEVICE_COMPILE__
     assert(dev_CurrentSize[GLOBALTID] <= 0 || Indx >= dev_CurrentSize[GLOBALTID] || Indx < 0);
     ACOReadyListEntry E{dev_InstrBase[Indx*numThreads_ + GLOBALTID], 
                         dev_ReadyOnBase[Indx*numThreads_ + GLOBALTID], 
@@ -274,23 +274,23 @@ void ACOReadyList::AllocDevArraysForParallelACO(int numThreads) {
 
   // Alloc dev array for dev_IntAllocation
   memSize = sizeof(InstCount) * CurrentCapacity * numThreads_ * 2;
-  gpuErrchk(cudaMalloc(&dev_IntAllocation, memSize));
+  gpuErrchk(hipMalloc(&dev_IntAllocation, memSize));
 
   // Alloc dev array for dev_HeurAllocation
   memSize = sizeof(HeurType) * CurrentCapacity * numThreads_;
-  gpuErrchk(cudaMalloc(&dev_HeurAllocation, memSize));
+  gpuErrchk(hipMalloc(&dev_HeurAllocation, memSize));
 
   // Alloc dev array for dev_ScoreAllocation
   memSize = sizeof(pheromone_t) * CurrentCapacity * numThreads_;
-  gpuErrchk(cudaMalloc(&dev_ScoreAllocation, memSize));
+  gpuErrchk(hipMalloc(&dev_ScoreAllocation, memSize));
 
   // Alloc dev array for dev_CurrentSize
   memSize = sizeof(InstCount) * numThreads_;
-  gpuErrchk(cudaMalloc(&dev_CurrentSize, memSize));
+  gpuErrchk(hipMalloc(&dev_CurrentSize, memSize));
 
   // Alloc dev array for dev_CurrentSize
   memSize = sizeof(pheromone_t) * numThreads_;
-  gpuErrchk(cudaMalloc(&dev_ScoreSum, memSize));
+  gpuErrchk(hipMalloc(&dev_ScoreSum, memSize));
 
   //build shortcut pointers
   dev_InstrBase = dev_IntAllocation;
@@ -300,9 +300,9 @@ void ACOReadyList::AllocDevArraysForParallelACO(int numThreads) {
 }
 
 void ACOReadyList::FreeDevicePointers() {
-  cudaFree(dev_IntAllocation);
-  cudaFree(dev_HeurAllocation);
-  cudaFree(dev_ScoreAllocation);
-  cudaFree(dev_CurrentSize);
-  cudaFree(dev_ScoreSum);
+  hipFree(dev_IntAllocation);
+  hipFree(dev_HeurAllocation);
+  hipFree(dev_ScoreAllocation);
+  hipFree(dev_CurrentSize);
+  hipFree(dev_ScoreSum);
 }

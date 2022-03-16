@@ -14,7 +14,7 @@ Last Update:  Jun. 2017
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/SmallVector.h"
 #include <memory>
-#include <cuda_runtime.h>
+#include <hip/hip_runtime.h>
 #include "opt-sched/Scheduler/device_set.h"
 
 using namespace llvm;
@@ -127,7 +127,7 @@ public:
   void AllocDevArrayForParallelACO(int numThreads);
   // Copies all array/objects to device and links them to device pointer
   void CopyPointersToDevice(Register *dev_reg);
-  // Calls cudaFree on all arrays/objects that were allocated with cudaMalloc
+  // Calls hipFree on all arrays/objects that were allocated with hipMalloc
   void FreeDevicePointers();
 
 private:
@@ -217,7 +217,7 @@ public:
   void Reset();
   // Copies all array/objects to device and links them to device pointer
   void CopyPointersToDevice(RegisterFile *dev_regFile);
-  // Calls cudaFree on all arrays/objects that were allocated with cudaMalloc
+  // Calls hipFree on all arrays/objects that were allocated with hipMalloc
   void FreeDevicePointers();
 
 private:

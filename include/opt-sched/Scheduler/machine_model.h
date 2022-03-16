@@ -18,7 +18,7 @@ Last Update:  Mar. 2011
 #include <string.h>
 // For class vector.
 #include "opt-sched/Scheduler/defines.h"
-#include <cuda_runtime.h>
+#include <hip/hip_runtime.h>
 
 namespace llvm {
 namespace opt_sched {

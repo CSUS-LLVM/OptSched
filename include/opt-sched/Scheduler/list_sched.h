@@ -15,7 +15,7 @@ Last Update:  Sept. 2013
 #define OPTSCHED_LIST_SCHED_LIST_SCHED_H
 
 #include "opt-sched/Scheduler/gen_sched.h"
-#include <cuda_runtime.h>
+#include <hip/hip_runtime.h>
 
 namespace llvm {
 namespace opt_sched {

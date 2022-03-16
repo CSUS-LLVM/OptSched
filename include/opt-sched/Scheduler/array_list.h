@@ -162,7 +162,7 @@ class ArrayList<int> {
     // Returns first element, resets iterator
     __host__ __device__
     int GetFrstElmnt() {
-#ifdef __CUDA_ARCH__
+#ifdef __HIP_DEVICE_COMPILE__
       if (dev_crnt_) {
         dev_crnt_[GLOBALTID] = 0;
 
@@ -191,7 +191,7 @@ class ArrayList<int> {
     // Returns next element in the array
     __host__ __device__
     int GetNxtElmnt() {
-#ifdef __CUDA_ARCH__
+#ifdef __HIP_DEVICE_COMPILE__
       if (dev_crnt_) {
         if (dev_crnt_[GLOBALTID] != size_)
           dev_crnt_[GLOBALTID]++;
@@ -228,7 +228,7 @@ class ArrayList<int> {
 
     __host__ __device__
     int GetNxtElmnt(int &indx) {
-#ifdef __CUDA_ARCH__
+#ifdef __HIP_DEVICE_COMPILE__
       if (dev_crnt_) {
         if (dev_crnt_[GLOBALTID] != size_)
           dev_crnt_[GLOBALTID]++;
@@ -272,7 +272,7 @@ class ArrayList<int> {
     // Returns previous element in the array
     __host__ __device__
     int GetPrevElmnt() {
-#ifdef __CUDA_ARCH__
+#ifdef __HIP_DEVICE_COMPILE__
       if (dev_crnt_) {
         if (dev_crnt_[GLOBALTID] != 0)
           dev_crnt_[GLOBALTID]--;
@@ -310,7 +310,7 @@ class ArrayList<int> {
     // Returns last element in array
     __host__ __device__
     int GetLastElmnt() {
-#ifdef __CUDA_ARCH__
+#ifdef __HIP_DEVICE_COMPILE__
       if (dev_crnt_) {
         if (size_ > 0)
           dev_crnt_[GLOBALTID] = size_ - 1;
@@ -350,7 +350,7 @@ class ArrayList<int> {
 
     __host__ __device__
     void ResetIterator() {
-#ifdef __CUDA_ARCH__
+#ifdef __HIP_DEVICE_COMPILE__
       if (dev_crnt_)
         dev_crnt_[GLOBALTID] = -1;
       else
@@ -432,7 +432,7 @@ int ArrayList<T>::GetElmntCnt() {
 template <typename T>
 __host__ __device__
 T ArrayList<T>::GetFrstElmnt() {
-#ifdef __CUDA_ARCH__
+#ifdef __HIP_DEVICE_COMPILE__
   if (dev_crnt_) {
     dev_crnt_[GLOBALTID] = 0;
 
@@ -461,7 +461,7 @@ T ArrayList<T>::GetFrstElmnt() {
 template <typename T>
 __host__ __device__
 T ArrayList<T>::GetNxtElmnt() {
-#ifdef __CUDA_ARCH__
+#ifdef __HIP_DEVICE_COMPILE__
   if (dev_crnt_) {
     if (dev_crnt_[GLOBALTID] != size_)
       dev_crnt_[GLOBALTID]++;
@@ -499,7 +499,7 @@ T ArrayList<T>::GetNxtElmnt() {
 template <typename T>
 __host__ __device__
 T ArrayList<T>::GetNxtElmnt(int &indx) {
-#ifdef __CUDA_ARCH__
+#ifdef __HIP_DEVICE_COMPILE__
   if (dev_crnt_) {
     if (dev_crnt_[GLOBALTID] != size_)
       dev_crnt_[GLOBALTID]++;
@@ -543,7 +543,7 @@ T ArrayList<T>::GetNxtElmnt(int &indx) {
 template <typename T>
 __host__ __device__
 T ArrayList<T>::GetPrevElmnt() {
-#ifdef __CUDA_ARCH__
+#ifdef __HIP_DEVICE_COMPILE__
   if (dev_crnt_) {
     if (dev_crnt_[GLOBALTID] != 0)
       dev_crnt_[GLOBALTID]--;
@@ -581,7 +581,7 @@ T ArrayList<T>::GetPrevElmnt() {
 template <typename T>
 __host__ __device__
 T ArrayList<T>::GetLastElmnt() {
-#ifdef __CUDA_ARCH__
+#ifdef __HIP_DEVICE_COMPILE__
   if (dev_crnt_) {
     if (size_ > 0)
       dev_crnt_[GLOBALTID] = size_ - 1;
@@ -623,7 +623,7 @@ void ArrayList<T>::Reset() {
 template <typename T>
 __host__ __device__
 void ArrayList<T>::ResetIterator() {
-#ifdef __CUDA_ARCH__
+#ifdef __HIP_DEVICE_COMPILE__
   if (dev_crnt_)
     dev_crnt_[GLOBALTID] = -1;
   else

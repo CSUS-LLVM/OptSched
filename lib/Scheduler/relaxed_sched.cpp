@@ -2,7 +2,7 @@
 #include "opt-sched/Scheduler/logger.h"
 #include "opt-sched/Scheduler/utilities.h"
 #include <algorithm>
-#include <cuda_runtime.h>
+#include <hip/hip_runtime.h>
 
 using namespace llvm::opt_sched;
 

@@ -30,7 +30,7 @@ void Register::SetPhysicalNumber(int physicalNumber) {
 
 __host__ __device__
 bool Register::IsLive() const {
-#ifdef __CUDA_ARCH__
+#ifdef __HIP_DEVICE_COMPILE__
   assert(dev_crntUseCnt_[GLOBALTID] <= useCnt_);
   return dev_crntUseCnt_[GLOBALTID] < useCnt_;
 #else
@@ -50,7 +50,7 @@ void Register::SetIsLiveOut(bool liveOut) { liveOut_ = liveOut; }
 
 __host__ __device__
 void Register::ResetCrntUseCnt() { 
-#ifdef __CUDA_ARCH__
+#ifdef __HIP_DEVICE_COMPILE__
   dev_crntUseCnt_[GLOBALTID] = 0;
 #else
   crntUseCnt_ = 0;
@@ -93,7 +93,7 @@ int Register::GetCrntUseCnt() const { return crntUseCnt_; }
 
 __host__ __device__
 void Register::AddCrntUse() {
-#ifdef __CUDA_ARCH__
+#ifdef __HIP_DEVICE_COMPILE__
   dev_crntUseCnt_[GLOBALTID]++;
 #else
   crntUseCnt_++;
@@ -175,7 +175,7 @@ void Register::ResetLiveIntervals() {
 void Register::AllocDevArrayForParallelACO(int numThreads) {
   // Allocate dev array for crntUseCnt_
   size_t memSize = sizeof(int) * numThreads;
-  gpuErrchk(cudaMalloc(&dev_crntUseCnt_, memSize));
+  gpuErrchk(hipMalloc(&dev_crntUseCnt_, memSize));
 }
 
 void Register::CopyPointersToDevice(Register *dev_reg) {
@@ -184,59 +184,59 @@ void Register::CopyPointersToDevice(Register *dev_reg) {
   unsigned long *dev_vctr;
   if (conflicts_.GetUnitCnt() > 0) {
     memSize = sizeof(unsigned long) * conflicts_.GetUnitCnt();
-    gpuErrchk(cudaMalloc(&dev_vctr, memSize));
-    gpuErrchk(cudaMemcpy(dev_vctr, conflicts_.vctr_, memSize,
-                         cudaMemcpyHostToDevice));
-    gpuErrchk(cudaMemcpy(&dev_reg->conflicts_.vctr_, &dev_vctr,
-                         sizeof(unsigned long *), cudaMemcpyHostToDevice));
+    gpuErrchk(hipMalloc(&dev_vctr, memSize));
+    gpuErrchk(hipMemcpy(dev_vctr, conflicts_.vctr_, memSize,
+                         hipMemcpyHostToDevice));
+    gpuErrchk(hipMemcpy(&dev_reg->conflicts_.vctr_, &dev_vctr,
+                         sizeof(unsigned long *), hipMemcpyHostToDevice));
   }
   // Copy uses_.elmnt array
   InstCount *dev_elmnt;
   if (uses_.alloc_ > 0) {
     memSize = sizeof(InstCount) * uses_.alloc_;
-    gpuErrchk(cudaMalloc(&dev_elmnt, memSize));
-    gpuErrchk(cudaMemcpy(dev_elmnt, uses_.elmnt, memSize,
-			 cudaMemcpyHostToDevice));
-    gpuErrchk(cudaMemcpy(&dev_reg->uses_.elmnt, &dev_elmnt,
-			 sizeof(InstCount *), cudaMemcpyHostToDevice));
+    gpuErrchk(hipMalloc(&dev_elmnt, memSize));
+    gpuErrchk(hipMemcpy(dev_elmnt, uses_.elmnt, memSize,
+			 hipMemcpyHostToDevice));
+    gpuErrchk(hipMemcpy(&dev_reg->uses_.elmnt, &dev_elmnt,
+			 sizeof(InstCount *), hipMemcpyHostToDevice));
   }
   // Copy defs_.elmnt array
   if (defs_.alloc_ > 0) {
     memSize = sizeof(InstCount) * defs_.alloc_;
-    gpuErrchk(cudaMalloc(&dev_elmnt, memSize));
-    gpuErrchk(cudaMemcpy(dev_elmnt, defs_.elmnt, memSize,
-                         cudaMemcpyHostToDevice));
-    gpuErrchk(cudaMemcpy(&dev_reg->defs_.elmnt, &dev_elmnt,
-                         sizeof(InstCount *), cudaMemcpyHostToDevice));
+    gpuErrchk(hipMalloc(&dev_elmnt, memSize));
+    gpuErrchk(hipMemcpy(dev_elmnt, defs_.elmnt, memSize,
+                         hipMemcpyHostToDevice));
+    gpuErrchk(hipMemcpy(&dev_reg->defs_.elmnt, &dev_elmnt,
+                         sizeof(InstCount *), hipMemcpyHostToDevice));
   }
   // Copy liveIntervalSet_.elmnt array
   if (liveIntervalSet_.alloc_ > 0) {
     memSize = sizeof(InstCount) * liveIntervalSet_.alloc_;
-    gpuErrchk(cudaMalloc(&dev_elmnt, memSize));
-    gpuErrchk(cudaMemcpy(dev_elmnt, liveIntervalSet_.elmnt, memSize,
-                         cudaMemcpyHostToDevice));
-    gpuErrchk(cudaMemcpy(&dev_reg->liveIntervalSet_.elmnt, &dev_elmnt,
-                         sizeof(InstCount *), cudaMemcpyHostToDevice));
+    gpuErrchk(hipMalloc(&dev_elmnt, memSize));
+    gpuErrchk(hipMemcpy(dev_elmnt, liveIntervalSet_.elmnt, memSize,
+                         hipMemcpyHostToDevice));
+    gpuErrchk(hipMemcpy(&dev_reg->liveIntervalSet_.elmnt, &dev_elmnt,
+                         sizeof(InstCount *), hipMemcpyHostToDevice));
   }
 
   // Copy possibleLiveIntervalSet_.elmnt array
   if (possibleLiveIntervalSet_.alloc_ > 0) {
     memSize = sizeof(InstCount) * possibleLiveIntervalSet_.alloc_;
-    gpuErrchk(cudaMalloc(&dev_elmnt, memSize));
-    gpuErrchk(cudaMemcpy(dev_elmnt, possibleLiveIntervalSet_.elmnt, memSize,
-			 cudaMemcpyHostToDevice));
-    gpuErrchk(cudaMemcpy(&dev_reg->possibleLiveIntervalSet_.elmnt, &dev_elmnt,
-			 sizeof(InstCount *), cudaMemcpyHostToDevice));
+    gpuErrchk(hipMalloc(&dev_elmnt, memSize));
+    gpuErrchk(hipMemcpy(dev_elmnt, possibleLiveIntervalSet_.elmnt, memSize,
+			 hipMemcpyHostToDevice));
+    gpuErrchk(hipMemcpy(&dev_reg->possibleLiveIntervalSet_.elmnt, &dev_elmnt,
+			 sizeof(InstCount *), hipMemcpyHostToDevice));
   }
 }
 
 void Register::FreeDevicePointers() {
-  cudaFree(conflicts_.vctr_);
-  cudaFree(uses_.elmnt);
-  cudaFree(defs_.elmnt);
-  cudaFree(liveIntervalSet_.elmnt);
-  cudaFree(possibleLiveIntervalSet_.elmnt);
-  cudaFree(dev_crntUseCnt_);
+  hipFree(conflicts_.vctr_);
+  hipFree(uses_.elmnt);
+  hipFree(defs_.elmnt);
+  hipFree(liveIntervalSet_.elmnt);
+  hipFree(possibleLiveIntervalSet_.elmnt);
+  hipFree(dev_crntUseCnt_);
 }
 
 __host__ __device__
@@ -427,33 +427,33 @@ void RegisterFile::CopyPointersToDevice(RegisterFile *dev_regFile) {
   size_t memSize;
   //allocate device memory
   memSize = getCount() * sizeof(Register *);
-  gpuErrchk(cudaMallocManaged((void**)&dev_regs, memSize));
+  gpuErrchk(hipMallocManaged((void**)&dev_regs, memSize));
   //copy array of host pointers to device
-  gpuErrchk(cudaMemcpy(dev_regs, Regs, memSize, cudaMemcpyHostToDevice));
+  gpuErrchk(hipMemcpy(dev_regs, Regs, memSize, hipMemcpyHostToDevice));
   //copy each register to device and update its pointer in dev_regs
   Register *dev_reg = NULL;
   for (int i = 0; i < getCount(); i++) {
     //allocate device memory
     // managed for deleting later
-    gpuErrchk(cudaMallocManaged((void**)&dev_reg, sizeof(Register)));
+    gpuErrchk(hipMallocManaged((void**)&dev_reg, sizeof(Register)));
     //copy register to device
-    gpuErrchk(cudaMemcpy(dev_reg, Regs[i], sizeof(Register), 
-			 cudaMemcpyHostToDevice));
+    gpuErrchk(hipMemcpy(dev_reg, Regs[i], sizeof(Register), 
+			 hipMemcpyHostToDevice));
     Regs[i]->CopyPointersToDevice(dev_reg);
     //update dev_regs pointer
-    gpuErrchk(cudaMemcpy(&dev_regs[i], &dev_reg, sizeof(Register *), 
-			 cudaMemcpyHostToDevice));
+    gpuErrchk(hipMemcpy(&dev_regs[i], &dev_reg, sizeof(Register *), 
+			 hipMemcpyHostToDevice));
   }
   //update dev_regFile->Regs pointer
   dev_regFile->Regs = dev_regs;
   memSize = getCount() * sizeof(Register *);
-  //gpuErrchk(cudaMemPrefetchAsync(dev_regs, memSize, 0));
+  //gpuErrchk(hipMemPrefetchAsync(dev_regs, memSize, 0));
 }
 
 void RegisterFile::FreeDevicePointers() {
   for (int i = 0; i < getCount(); i++) {
     Regs[i]->FreeDevicePointers();
-    cudaFree(Regs[i]);
+    hipFree(Regs[i]);
   }
-  cudaFree(Regs);
+  hipFree(Regs);
 }

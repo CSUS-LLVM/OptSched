@@ -16,7 +16,7 @@ Last Update:  Sept. 2013
 #include "opt-sched/Scheduler/cuda_lnkd_lst.cuh"
 #include "opt-sched/Scheduler/sched_basic_data.h"
 #include <cstdio>
-#include <cuda_runtime.h>
+#include <hip/hip_runtime.h>
 
 namespace llvm {
 namespace opt_sched {
@@ -56,7 +56,7 @@ class KeysHelper {
   // Allocates arrays to hold independent values for each device thread during
   // parallel ACO
   // void AllocDevArraysForParallelACO(int numThreads);
-  // Calls cudaFree on all arrays/objects that were allocated with cudaMalloc
+  // Calls hipFree on all arrays/objects that were allocated with hipMalloc
   // void FreeDevicePointers(int numThreads);
 
   private:
@@ -166,7 +166,7 @@ public:
   // Allocates arrays to hold independent values for each device thread during
   // parallel ACO
   void AllocDevArraysForParallelACO(int numThreads);
-  // Calls cudaFree on all arrays/objects that were allocated with cudaMalloc
+  // Calls hipFree on all arrays/objects that were allocated with hipMalloc
   void FreeDevicePointers(int numThreads);
   // Constructs the priority-list key based on the schemes listed in prirts_.
   __host__ __device__

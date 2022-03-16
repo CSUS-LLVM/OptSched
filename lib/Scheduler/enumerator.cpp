@@ -9,7 +9,7 @@
 #include <iterator>
 #include <memory>
 #include <sstream>
-#include <cuda_runtime.h>
+#include <hip/hip_runtime.h>
 
 using namespace llvm::opt_sched;
 

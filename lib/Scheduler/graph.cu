@@ -254,7 +254,7 @@ void GraphNode::FindRcrsvNghbrs_(GraphNode *root, DIRECTION dir,
     BitVector *thisBitVector = this->GetRcrsvNghbrBitVector(dir);
     if (thisBitVector && thisBitVector->GetBit(root->GetNum()) == true) {
       graph->CycleDetected();
-#ifdef __CUDA_ARCH__
+#ifdef __HIP_DEVICE_COMPILE__
       printf("Detected a cycle between nodes %d and %d in graph\n", 
 		      root->GetNum(), this->GetNum());
 #else
@@ -387,11 +387,11 @@ void GraphNode::CopyPointersToDevice(GraphNode *dev_node, GraphNode **dev_nodes,
   // Copy scsrLst_ to device
   PriorityArrayList<GraphEdge *> *dev_scsrLst;
   memSize = sizeof(PriorityArrayList<GraphEdge *>);
-  gpuErrchk(cudaMallocManaged(&dev_scsrLst, memSize));
-  gpuErrchk(cudaMemcpy(dev_scsrLst, scsrLst_, memSize, cudaMemcpyHostToDevice));
-  gpuErrchk(cudaMemcpy(&dev_node->scsrLst_, &dev_scsrLst,
+  gpuErrchk(hipMallocManaged(&dev_scsrLst, memSize));
+  gpuErrchk(hipMemcpy(dev_scsrLst, scsrLst_, memSize, hipMemcpyHostToDevice));
+  gpuErrchk(hipMemcpy(&dev_node->scsrLst_, &dev_scsrLst,
 		       sizeof(PriorityArrayList<GraphEdge *> *),
-		       cudaMemcpyHostToDevice));
+		       hipMemcpyHostToDevice));
   // Copy elmnts_ and keys
   if (scsrLst_->maxSize_ > 0) {
     dev_node->scsrLst_->keys_ = &dev_keys[scsrIndex];
@@ -415,7 +415,7 @@ void GraphNode::CopyPointersToDevice(GraphNode *dev_node, GraphNode **dev_nodes,
     // New dev_edges values are copied before kernel start in DataDepGraph
   }
   memSize = sizeof(PriorityArrayList<GraphEdge *>);
-  gpuErrchk(cudaMemPrefetchAsync(dev_scsrLst, memSize, 0));
+  gpuErrchk(hipMemPrefetchAsync(dev_scsrLst, memSize, 0));
   
   //set value of nodes_ to dev_insts_
   dev_node->nodes_ = dev_nodes;
@@ -423,7 +423,7 @@ void GraphNode::CopyPointersToDevice(GraphNode *dev_node, GraphNode **dev_nodes,
 
 void GraphNode::FreeDevicePointers() {
   if (scsrLst_)
-    cudaFree(scsrLst_);
+    hipFree(scsrLst_);
 }
 
 __host__ __device__
@@ -475,7 +475,7 @@ FUNC_RESULT DirAcycGraph::DepthFirstSearch() {
   root_->DepthFirstVisit(tplgclOrdr_, tplgclIndx);
 
   if (tplgclIndx != -1) {
-#ifdef __CUDA_ARCH__
+#ifdef __HIP_DEVICE_COMPILE__
     printf("Invalid DAG Format: Ureachable nodes\n");
 #else
     Logger::Error("Invalid DAG Format: Ureachable nodes");

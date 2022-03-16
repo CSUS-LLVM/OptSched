@@ -55,7 +55,7 @@ void ConstrainedScheduler::AllocRsrvSlots_() {
 __host__ __device__
 void ConstrainedScheduler::ResetRsrvSlots_() {
   assert(includesUnpipelined_);
-#ifdef __CUDA_ARCH__
+#ifdef __HIP_DEVICE_COMPILE__
   assert(dev_rsrvSlots_[GLOBALTID] != NULL);
 
   for (int i = 0; i < issuRate_; i++) {
@@ -131,7 +131,7 @@ bool ConstrainedScheduler::Initialize_(InstCount trgtSchedLngth,
       return false;
   }
 
-#ifdef __CUDA_ARCH__
+#ifdef __HIP_DEVICE_COMPILE__
 
   ResetRsrvSlots_();
   dev_rsrvSlotCnt_[GLOBALTID] = 0;
@@ -167,7 +167,7 @@ bool ConstrainedScheduler::Initialize_(InstCount trgtSchedLngth,
 
   InitNewCycle_();
 
-#ifdef __CUDA_ARCH__
+#ifdef __HIP_DEVICE_COMPILE__
   ((BBWithSpill *)dev_rgn_)->Dev_InitForSchdulng();
 #else
   rgn_->InitForSchdulng();
@@ -178,7 +178,7 @@ bool ConstrainedScheduler::Initialize_(InstCount trgtSchedLngth,
 
 __host__ __device__
 void ConstrainedScheduler::SchdulInst_(SchedInstruction *inst, InstCount) {
-#ifdef __CUDA_ARCH__  // Device version
+#ifdef __HIP_DEVICE_COMPILE__  // Device version
   InstCount prdcsrNum, scsrRdyCycle;//, scsrRdyListNum;
 
   // Notify each successor of this instruction that it has been scheduled.
@@ -260,7 +260,7 @@ void ConstrainedScheduler::DoRsrvSlots_(SchedInstruction *inst) {
     return;
 
   if (!inst->IsPipelined()) {
-#ifdef __CUDA_ARCH__
+#ifdef __HIP_DEVICE_COMPILE__
     rsrvSlots_[dev_crntSlotNum_[GLOBALTID]].strtCycle = 
 	    dev_crntCycleNum_[GLOBALTID];
     rsrvSlots_[dev_crntSlotNum_[GLOBALTID]].endCycle = 
@@ -291,7 +291,7 @@ void ConstrainedScheduler::UndoRsrvSlots_(SchedInstruction *inst) {
 
 __host__ __device__
 bool InstScheduler::IsSchedComplete_() {
-#ifdef __CUDA_ARCH__
+#ifdef __HIP_DEVICE_COMPILE__
   return dev_schduldInstCnt_[GLOBALTID] == totInstCnt_;
 #else
   return schduldInstCnt_ == totInstCnt_;
@@ -300,7 +300,7 @@ bool InstScheduler::IsSchedComplete_() {
 
 __host__ __device__
 void ConstrainedScheduler::InitNewCycle_() {
-#ifdef __CUDA_ARCH__
+#ifdef __HIP_DEVICE_COMPILE__
   assert(dev_crntSlotNum_[GLOBALTID] == 0 && 
          dev_crntRealSlotNum_[GLOBALTID] == 0);
   for (int i = 0; i < issuTypeCnt_; i++) {
@@ -318,7 +318,7 @@ void ConstrainedScheduler::InitNewCycle_() {
 
 __host__ __device__
 bool ConstrainedScheduler::MovToNxtSlot_(SchedInstruction *inst) {
-#ifdef __CUDA_ARCH__
+#ifdef __HIP_DEVICE_COMPILE__
   // If we are currently in the last slot of the current cycle.
   if (dev_crntSlotNum_[GLOBALTID] == (issuRate_ - 1)) {
     dev_crntCycleNum_[GLOBALTID]++;
@@ -349,7 +349,7 @@ bool ConstrainedScheduler::MovToNxtSlot_(SchedInstruction *inst) {
 
 __host__ __device__
 bool ConstrainedScheduler::MovToPrevSlot_(int prevRealSlotNum) {
-#ifdef __CUDA_ARCH__
+#ifdef __HIP_DEVICE_COMPILE__
   dev_crntRealSlotNum_[GLOBALTID] = prevRealSlotNum;
 
   // If we are currently in the last slot of the current cycle.
@@ -413,7 +413,7 @@ bool ConstrainedScheduler::ChkInstLglty_(SchedInstruction *inst) const {
   // Do region-specific legality check
   //if (rgn_->ChkInstLglty(inst) == false)
     //return false;
-#ifdef __CUDA_ARCH__
+#ifdef __HIP_DEVICE_COMPILE__
    // Account for instructions that block the whole cycle.
   if (dev_isCrntCycleBlkd_[GLOBALTID])
     return false;
@@ -470,7 +470,7 @@ void ConstrainedScheduler::UpdtSlotAvlblty_(SchedInstruction *inst) {
     return;
   IssueType issuType = inst->GetIssueType();
   assert(issuType < issuTypeCnt_);
-#ifdef __CUDA_ARCH__
+#ifdef __HIP_DEVICE_COMPILE__
   assert(dev_avlblSlotsInCrntCycle_[GLOBALTID][issuType] > 0);
   dev_avlblSlotsInCrntCycle_[GLOBALTID][issuType]--;
 #else

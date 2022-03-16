@@ -13,7 +13,7 @@ Last Update:  Mar. 2011
 #include "opt-sched/Scheduler/defines.h"
 #include "opt-sched/Scheduler/cuda_lnkd_lst.cuh"
 #include "opt-sched/Scheduler/array_list.h"
-#include <cuda_runtime.h>
+#include <hip/hip_runtime.h>
 
 namespace llvm {
 namespace opt_sched {
@@ -292,7 +292,7 @@ public:
 		            InstCount instCnt, std::vector<GraphEdge *> *edges,
                             GraphEdge *dev_edges, GraphEdge **dev_scsrElmnts_, 
                             unsigned long *dev_keys, int &scsrIndex);
-  // Calls cudaFree on all arrays/objects that were allocated with cudaMalloc
+  // Calls hipFree on all arrays/objects that were allocated with hipMalloc
   void FreeDevicePointers();
 
 private:
@@ -466,7 +466,7 @@ protected:
 
 __host__ __device__
 inline bool GraphNode::IsRoot() const {
-  #ifdef __CUDA_ARCH__
+  #ifdef __HIP_DEVICE_COMPILE__
     return dev_IsRoot;
   #else
     return prdcsrLst_->GetElmntCnt() == 0;

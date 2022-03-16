@@ -13,7 +13,7 @@ Last Update:  May  2020
 #include "opt-sched/Scheduler/defines.h"
 #include "opt-sched/Scheduler/logger.h"
 #include <cstring>
-#include <cuda_runtime.h>
+#include <hip/hip_runtime.h>
 #include <vector>
 #include <type_traits>
 

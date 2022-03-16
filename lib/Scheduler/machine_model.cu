@@ -288,37 +288,37 @@ void MachineModel::CopyPointersToDevice(MachineModel *dev_machMdl) {
   InstTypeInfo *dev_instTypes = NULL; 
   //allocate device memory
   size_t memSize = instTypes_size_ * sizeof(InstTypeInfo);
-  gpuErrchk(cudaMalloc((void**)&dev_instTypes, memSize));
+  gpuErrchk(hipMalloc((void**)&dev_instTypes, memSize));
   //copy instTypes_ to device
-  gpuErrchk(cudaMemcpy(dev_instTypes, instTypes_, memSize,
-		       cudaMemcpyHostToDevice));
+  gpuErrchk(hipMemcpy(dev_instTypes, instTypes_, memSize,
+		       hipMemcpyHostToDevice));
   //update pointer dev_machMdl->instTypes_ to device pointer
-  gpuErrchk(cudaMemcpy(&(dev_machMdl->instTypes_), &dev_instTypes, 
-		       sizeof(InstTypeInfo *), cudaMemcpyHostToDevice));
+  gpuErrchk(hipMemcpy(&(dev_machMdl->instTypes_), &dev_instTypes, 
+		       sizeof(InstTypeInfo *), hipMemcpyHostToDevice));
   RegTypeInfo *dev_registerTypes = NULL;
   //allocate device memory
   memSize = registerTypes_size_ * sizeof(RegTypeInfo);
-  gpuErrchk(cudaMalloc((void**)&dev_registerTypes, memSize));
+  gpuErrchk(hipMalloc((void**)&dev_registerTypes, memSize));
   //copy registerTypes_ to device
-  gpuErrchk(cudaMemcpy(dev_registerTypes, registerTypes_, memSize, 
-	               cudaMemcpyHostToDevice));
+  gpuErrchk(hipMemcpy(dev_registerTypes, registerTypes_, memSize, 
+	               hipMemcpyHostToDevice));
   //update device pointer dev_machMdl->registerTypes_
-  gpuErrchk(cudaMemcpy(&dev_machMdl->registerTypes_, &dev_registerTypes, 
-		       sizeof(RegTypeInfo *), cudaMemcpyHostToDevice));
+  gpuErrchk(hipMemcpy(&dev_machMdl->registerTypes_, &dev_registerTypes, 
+		       sizeof(RegTypeInfo *), hipMemcpyHostToDevice));
   IssueTypeInfo *dev_issueTypes = NULL;
   //allocate device memory
   memSize = issueTypes_size_ * sizeof(IssueTypeInfo);
-  gpuErrchk(cudaMalloc((void**)&dev_issueTypes, memSize));
+  gpuErrchk(hipMalloc((void**)&dev_issueTypes, memSize));
   //copy issueTypes_ to device
-  gpuErrchk(cudaMemcpy(dev_issueTypes, issueTypes_, memSize,
-		       cudaMemcpyHostToDevice));
+  gpuErrchk(hipMemcpy(dev_issueTypes, issueTypes_, memSize,
+		       hipMemcpyHostToDevice));
   //update device pointer dev_machMdl->issueTypes_
-  gpuErrchk(cudaMemcpy(&(dev_machMdl->issueTypes_), &dev_issueTypes, 
-		       sizeof(IssueTypeInfo *), cudaMemcpyHostToDevice));
+  gpuErrchk(hipMemcpy(&(dev_machMdl->issueTypes_), &dev_issueTypes, 
+		       sizeof(IssueTypeInfo *), hipMemcpyHostToDevice));
 }
 
 void MachineModel::FreeDevicePointers() {
-  cudaFree(instTypes_);
-  cudaFree(registerTypes_);
-  cudaFree(issueTypes_);
+  hipFree(instTypes_);
+  hipFree(registerTypes_);
+  hipFree(issueTypes_);
 }

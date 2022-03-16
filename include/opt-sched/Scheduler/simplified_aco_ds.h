@@ -100,7 +100,7 @@ public:
   // Allocates arrays to hold independent values for each device thread during
   // parallel ACO
   void AllocDevArraysForParallelACO(int numThreads);
-  // Calls cudaFree on all arrays/objects that were allocated with cudaMalloc
+  // Calls hipFree on all arrays/objects that were allocated with hipMalloc
   void FreeDevicePointers();
 
   //used to store the total score of all instructions in the ready list
@@ -116,7 +116,7 @@ public:
   //gets the number of insturctions in the ready list
   __host__ __device__
   InstCount getReadyListSize() const { 
-    #ifdef __CUDA_ARCH__
+    #ifdef __HIP_DEVICE_COMPILE__
       return dev_CurrentSize[GLOBALTID];
     #else
       return CurrentSize;
@@ -154,7 +154,7 @@ inline size_t ACOReadyList::getTotalSizeInBytes() const {
 
 __host__ __device__
 inline InstCount *ACOReadyList::getInstIdAtIndex(InstCount Indx) const {
-  #ifdef __CUDA_ARCH__
+  #ifdef __HIP_DEVICE_COMPILE__
     return dev_InstrBase + Indx*numThreads_ + GLOBALTID;
   #else
     return InstrBase + Indx;
@@ -163,7 +163,7 @@ inline InstCount *ACOReadyList::getInstIdAtIndex(InstCount Indx) const {
 
 __host__ __device__
 inline InstCount *ACOReadyList::getInstReadyOnAtIndex(InstCount Indx) const {
-  #ifdef __CUDA_ARCH__
+  #ifdef __HIP_DEVICE_COMPILE__
     return dev_ReadyOnBase + Indx*numThreads_ + GLOBALTID;
   #else
     return ReadyOnBase + Indx;
@@ -172,7 +172,7 @@ inline InstCount *ACOReadyList::getInstReadyOnAtIndex(InstCount Indx) const {
 
 __host__ __device__
 inline HeurType *ACOReadyList::getInstHeuristicAtIndex(InstCount Indx) const {
-  #ifdef __CUDA_ARCH__
+  #ifdef __HIP_DEVICE_COMPILE__
     return dev_HeurBase + Indx*numThreads_ + GLOBALTID;
   #else
     return HeurBase + Indx;
@@ -181,7 +181,7 @@ inline HeurType *ACOReadyList::getInstHeuristicAtIndex(InstCount Indx) const {
 
 __host__ __device__
 inline pheromone_t *ACOReadyList::getInstScoreAtIndex(InstCount Indx) const {
-  #ifdef __CUDA_ARCH__
+  #ifdef __HIP_DEVICE_COMPILE__
     return dev_ScoreBase + Indx*numThreads_ + GLOBALTID;
   #else
     return ScoreBase + Indx;
@@ -190,7 +190,7 @@ inline pheromone_t *ACOReadyList::getInstScoreAtIndex(InstCount Indx) const {
 
 __host__ __device__
 inline void ACOReadyList::clearReadyList() {
-  #ifdef __CUDA_ARCH__
+  #ifdef __HIP_DEVICE_COMPILE__
     dev_CurrentSize[GLOBALTID] = 0;
     dev_ScoreSum[GLOBALTID] = 0;
   #else
