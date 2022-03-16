@@ -431,7 +431,7 @@ EnumTreeNode::ExaminedInst::~ExaminedInst() {
 /****************************************************************************/
 /****************************************************************************/
 
-__host__ __device__
+__host__
 Enumerator::Enumerator(DataDepGraph *dataDepGraph, MachineModel *machMdl,
                        InstCount schedUprBound, int16_t sigHashSize,
                        SchedPriorities prirts, Pruning PruningStrategy,
@@ -517,7 +517,7 @@ Enumerator::Enumerator(DataDepGraph *dataDepGraph, MachineModel *machMdl,
 }
 /****************************************************************************/
 
-__host__ __device__
+__host__
 Enumerator::~Enumerator() {
   delete exmndSubProbs_;
 
@@ -582,7 +582,7 @@ void Enumerator::FreeAllocators_() {
 }
 /****************************************************************************/
 
-__host__ __device__
+__host__
 void Enumerator::Reset() {
   if (IsHistDom()) {
     exmndSubProbs_->Clear(false, hashTblEntryAlctr_);
@@ -1854,7 +1854,7 @@ void Enumerator::PrintLog_() {
 bool Enumerator::EnumStall_() { return enblStallEnum_; }
 /*****************************************************************************/
 
-__host__ __device__
+__host__
 LengthEnumerator::LengthEnumerator(
     DataDepGraph *dataDepGraph, MachineModel *machMdl, InstCount schedUprBound,
     int16_t sigHashSize, SchedPriorities prirts, Pruning PruningStrategy,
@@ -1868,7 +1868,7 @@ LengthEnumerator::LengthEnumerator(
 }
 /*****************************************************************************/
 
-__host__ __device__
+__host__
 LengthEnumerator::~LengthEnumerator() {
   Reset();
   FreeAllocators_();
@@ -1913,7 +1913,7 @@ FUNC_RESULT LengthEnumerator::FindFeasibleSchedule(InstSchedule *sched,
 }
 /*****************************************************************************/
 
-__host__ __device__
+__host__
 void LengthEnumerator::Reset() { Enumerator::Reset(); }
 /*****************************************************************************/
 
@@ -1944,7 +1944,7 @@ void LengthEnumerator::FreeHistNode_(HistEnumTreeNode *histNode) {
 }
 /*****************************************************************************/
 
-__host__ __device__
+__host__
 LengthCostEnumerator::LengthCostEnumerator(
     DataDepGraph *dataDepGraph, MachineModel *machMdl, InstCount schedUprBound,
     int16_t sigHashSize, SchedPriorities prirts, Pruning PruningStrategy,
@@ -1965,7 +1965,7 @@ LengthCostEnumerator::LengthCostEnumerator(
 }
 /*****************************************************************************/
 
-__host__ __device__
+__host__
 LengthCostEnumerator::~LengthCostEnumerator() {
   Reset();
   FreeAllocators_();
@@ -2003,7 +2003,7 @@ void LengthCostEnumerator::FreeAllocators_() {
 bool LengthCostEnumerator::IsCostEnum() { return true; }
 /*****************************************************************************/
 
-__host__ __device__
+__host__
 void LengthCostEnumerator::Reset() { Enumerator::Reset(); }
 /*****************************************************************************/
 

@@ -463,7 +463,7 @@ protected:
   // slot will break feasiblity from issue slot availbility point of view
   bool ProbeIssuSlotFsblty_(SchedInstruction *inst);
 
-  __host__ __device__
+  __host__
   inline void UpdtRdyLst_(InstCount cycleNum, int slotNum);
 
   // Identify the current position in the schedule by linearizing the cycle
@@ -525,16 +525,16 @@ protected:
   virtual void InitNewNode_(EnumTreeNode *newNode);
 
 public:
-  __host__ __device__
+  __host__
   Enumerator(DataDepGraph *dataDepGraph, MachineModel *machMdl,
              InstCount schedUprBound, int16_t sigHashSize,
              SchedPriorities prirts, Pruning PruningStrategy,
              bool SchedForRPOnly, bool enblStallEnum, Milliseconds timeout,
              InstCount preFxdInstCnt = 0,
              SchedInstruction *preFxdInsts[] = NULL);
-  __host__ __device__
+  __host__
   virtual ~Enumerator();
-  __host__ __device__
+  __host__
   virtual void Reset();
 
   // Get the number of nodes that have been examined
@@ -550,7 +550,7 @@ public:
   inline bool IsSchedForRPOnly() const { return SchedForRPOnly_; }
 
   // Calculates the schedule and returns it in the passed argument.
-  __host__ __device__
+  __host__
   FUNC_RESULT FindSchedule(InstSchedule *sched, SchedRegion *rgn) {
     return RES_ERROR;
   }
@@ -574,16 +574,16 @@ private:
   void FreeHistNode_(HistEnumTreeNode *histNode);
 
 public:
-  __host__ __device__
+  __host__
   LengthEnumerator(DataDepGraph *dataDepGraph, MachineModel *machMdl,
                    InstCount schedUprBound, int16_t sigHashSize,
                    SchedPriorities prirts, Pruning PruningStrategy,
                    bool SchedForRPOnly, bool enblStallEnum,
                    Milliseconds timeout, InstCount preFxdInstCnt = 0,
                    SchedInstruction *preFxdInsts[] = NULL);
-  __host__ __device__
+  __host__
   virtual ~LengthEnumerator();
-  __host__ __device__
+  __host__
   void Reset();
 
   // Given a schedule with some instructions possibly fixed, find a
@@ -626,7 +626,7 @@ private:
   void InitNewNode_(EnumTreeNode *newNode);
 
 public:
-  __host__ __device__
+  __host__
   LengthCostEnumerator(DataDepGraph *dataDepGraph, MachineModel *machMdl,
                        InstCount schedUprBound, int16_t sigHashSize,
                        SchedPriorities prirts, Pruning PruningStrategy,
@@ -634,9 +634,9 @@ public:
                        Milliseconds timeout, SPILL_COST_FUNCTION spillCostFunc,
                        InstCount preFxdInstCnt = 0,
                        SchedInstruction *preFxdInsts[] = NULL);
-  __host__ __device__
+  __host__
   virtual ~LengthCostEnumerator();
-  __host__ __device__
+  __host__
   void Reset();
 
   // Given a schedule with some instructions possibly fixed, find a
@@ -943,7 +943,7 @@ inline InstCount Enumerator::GetCrntCycleNum_() { return crntCycleNum_; }
 inline int Enumerator::GetCrntSlotNum_() { return crntSlotNum_; }
 /*****************************************************************************/
 
-__host__ __device__
+__host__
 inline void Enumerator::UpdtRdyLst_(InstCount cycleNum, int slotNum) {
   InstCount prevCycleNum = cycleNum - 1;
   ArrayList<InstCount> *lst1 = NULL;
