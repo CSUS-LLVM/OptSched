@@ -16,29 +16,29 @@ find_package(hip)
 set(HIP_PATH "/opt/rocm-4.5.2/hip")
 
 add_llvm_target(
-  OptSched Scheduler/aco.cu
-  Scheduler/bb_spill.cu
+  OptSched Scheduler/aco.hip.cpp
+  Scheduler/bb_spill.hip.cpp
   Scheduler/buffers.cpp
   Scheduler/config.cpp
-  Scheduler/data_dep.cu
+  Scheduler/data_dep.hip.cpp
   Scheduler/enumerator.cpp
-  Scheduler/gen_sched.cu
-  Scheduler/graph.cu
+  Scheduler/gen_sched.hip.cpp
+  Scheduler/graph.hip.cpp
   Scheduler/graph_trans.cpp
   Scheduler/hist_table.cpp
-  Scheduler/list_sched.cu
+  Scheduler/list_sched.hip.cpp
   Scheduler/logger.cpp
   Scheduler/reg_alloc.cpp
   Scheduler/utilities.cpp
-  Scheduler/machine_model.cu
-  Scheduler/random.cu
-  Scheduler/ready_list.cu
-  Scheduler/register.cu
+  Scheduler/machine_model.hip.cpp
+  Scheduler/random.hip.cpp
+  Scheduler/ready_list.hip.cpp
+  Scheduler/register.hip.cpp
   Scheduler/relaxed_sched.cpp
-  Scheduler/sched_basic_data.cu
-  Scheduler/sched_region.cu
+  Scheduler/sched_basic_data.hip.cpp
+  Scheduler/sched_region.hip.cpp
   Scheduler/stats.cpp
-  Wrapper/OptimizingScheduler.cu
+  Wrapper/OptimizingScheduler.hip.cpp
   Wrapper/OptSchedMachineWrapper.cpp
   Wrapper/OptSchedDDGWrapperBasic.cpp
   Wrapper/OptSchedGenericTarget.cpp

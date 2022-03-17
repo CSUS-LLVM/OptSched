@@ -42,20 +42,20 @@ set(OPTSCHED_BINARY_DIR ${CMAKE_CURRENT_BINARY_DIR})
 
 # OptSched sources
 SET(OPT_SCHED_SRCS
-  Scheduler/aco.cu
-  Scheduler/bb_spill.cu
-  Scheduler/data_dep.cu
-  Scheduler/gen_sched.cu
-  Scheduler/graph.cu
-  Scheduler/list_sched.cu
-  Scheduler/machine_model.cu
-  Scheduler/random.cu
-  Scheduler/ready_list.cu
-  Scheduler/register.cu
-  Scheduler/sched_basic_data.cu
-  Scheduler/sched_region.cu
-  Scheduler/simplified_aco_ds.cu
-  Wrapper/OptimizingScheduler.cu
+  Scheduler/aco.hip.cpp
+  Scheduler/bb_spill.hip.cpp
+  Scheduler/data_dep.hip.cpp
+  Scheduler/gen_sched.hip.cpp
+  Scheduler/graph.hip.cpp
+  Scheduler/list_sched.hip.cpp
+  Scheduler/machine_model.hip.cpp
+  Scheduler/random.hip.cpp
+  Scheduler/ready_list.hip.cpp
+  Scheduler/register.hip.cpp
+  Scheduler/sched_basic_data.hip.cpp
+  Scheduler/sched_region.hip.cpp
+  Scheduler/simplified_aco_ds.hip.cpp
+  Wrapper/OptimizingScheduler.hip.cpp
 
   Scheduler/buffers.cpp
   Scheduler/config.cpp
