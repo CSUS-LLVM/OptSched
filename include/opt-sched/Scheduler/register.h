@@ -100,7 +100,7 @@ public:
   Register &operator=(const Register &rhs);
 
   void SetupConflicts(int regCnt);
-  __host__
+  __host__ __device__
   void ResetConflicts();
   __host__ __device__
   void AddConflict(int regNum, bool isSpillCnddt);

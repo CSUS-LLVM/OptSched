@@ -98,7 +98,7 @@ SequentialListScheduler::SequentialListScheduler(DataDepGraph *dataDepGraph,
                                                  SchedPriorities prirts)
     : ListScheduler(dataDepGraph, machMdl, schedUprBound, prirts) {}
 
-__host__ __device__
+__host__
 FUNC_RESULT SequentialListScheduler::FindSchedule(InstSchedule *sched, SchedRegion *rgn) {
   InstCount rdyLstSize, maxRdyLstSize = 0, avgRdyLstSize = 0, iterCnt = 0;
   bool isEmptyCycle = true;

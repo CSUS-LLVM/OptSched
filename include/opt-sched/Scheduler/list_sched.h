@@ -31,7 +31,7 @@ public:
   virtual ~ListScheduler();
 
   // Calculates the schedule and returns it in the passed argument.
-  __host__ __device__
+  __host__
   FUNC_RESULT FindSchedule(InstSchedule *sched, SchedRegion *rgn);
 
 protected:
@@ -57,7 +57,7 @@ public:
   // Calculates the schedule and returns it in the passed argument.
   // Needs own method since virtualization for FindSchedule is disabled
   // to allow ACO to work on device
-  __host__ __device__
+  __host__
   FUNC_RESULT FindSchedule(InstSchedule *sched, SchedRegion *rgn);
 
 private:

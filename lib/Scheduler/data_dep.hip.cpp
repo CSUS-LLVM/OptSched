@@ -65,7 +65,7 @@ DataDepStruct::~DataDepStruct() {
     delete[] frwrdLwrBounds_;
   if (bkwrdLwrBounds_ != NULL)
     delete[] bkwrdLwrBounds_;
-  #ifdef __HIP_DEVICE_COMPILE__
+  #ifndef __HIP_DEVICE_COMPILE__
     if (edges_)
       delete edges_;
   #endif
@@ -237,7 +237,7 @@ DataDepGraph::~DataDepGraph() {
   delete[] instCntPerType_;
 }
 
-__host__ __device__
+__host__
 FUNC_RESULT DataDepGraph::SetupForSchdulng(bool cmputTrnstvClsr) {
   assert(wasSetupForSchduling_ == false);
 
@@ -288,56 +288,56 @@ FUNC_RESULT DataDepGraph::SetupForSchdulng(bool cmputTrnstvClsr) {
   return RES_SUCCESS;
 }
 
-__device__
-FUNC_RESULT DataDepGraph::Dev_SetupForSchdulng(bool cmputTrnstvClsr) {
-  assert(wasSetupForSchduling_ == false);
+// __device__
+// FUNC_RESULT DataDepGraph::Dev_SetupForSchdulng(bool cmputTrnstvClsr) {
+//   assert(wasSetupForSchduling_ == false);
 
-  InstCount i = blockIdx.x;
+//   InstCount i = blockIdx.x;
 
-  maxUseCnt_ = 0;
+//   maxUseCnt_ = 0;
   
-  if (i < instCnt_) {
-    SchedInstruction *inst = &insts_[i];
-    inst->SetupForSchdulng(instCnt_, cmputTrnstvClsr, cmputTrnstvClsr);
-    InstType instType = inst->GetInstType();
-    IssueType issuType = machMdl_->GetIssueType(instType);
-    assert(issuType < issuTypeCnt_);
-    inst->SetIssueType(issuType);
-    instCntPerIssuType_[issuType]++;
+//   if (i < instCnt_) {
+//     SchedInstruction *inst = &insts_[i];
+//     inst->SetupForSchdulng(instCnt_, cmputTrnstvClsr, cmputTrnstvClsr);
+//     InstType instType = inst->GetInstType();
+//     IssueType issuType = machMdl_->GetIssueType(instType);
+//     assert(issuType < issuTypeCnt_);
+//     inst->SetIssueType(issuType);
+//     instCntPerIssuType_[issuType]++;
 
-    inst->SetMustBeInBBEntry(false);
-    inst->SetMustBeInBBExit(false);
+//     inst->SetMustBeInBBEntry(false);
+//     inst->SetMustBeInBBExit(false);
   
-    if (inst->GetUseCnt() > maxUseCnt_)
-      maxUseCnt_ = inst->GetUseCnt();
-  }
+//     if (inst->GetUseCnt() > maxUseCnt_)
+//       maxUseCnt_ = inst->GetUseCnt();
+//   }
 
-  // Do a depth-first search leading to a topological sort
-  if (i == 0) {
-    if (!dpthFrstSrchDone_) {
-      DepthFirstSearch();
-    }
+//   // Do a depth-first search leading to a topological sort
+//   if (i == 0) {
+//     if (!dpthFrstSrchDone_) {
+//       DepthFirstSearch();
+//     }
 
-    frwrdLwrBounds_ = new InstCount[instCnt_];
-    bkwrdLwrBounds_ = new InstCount[instCnt_];
+//     frwrdLwrBounds_ = new InstCount[instCnt_];
+//     bkwrdLwrBounds_ = new InstCount[instCnt_];
 
-    CmputCrtclPaths_();
+//     CmputCrtclPaths_();
 
-    if (cmputTrnstvClsr) {
-      if (FindRcrsvNghbrs(DIR_FRWRD) == RES_ERROR)
-        return RES_ERROR;
-      if (FindRcrsvNghbrs(DIR_BKWRD) == RES_ERROR)
-        return RES_ERROR;
-      CmputRltvCrtclPaths_(DIR_FRWRD);
-      CmputRltvCrtclPaths_(DIR_BKWRD);
-    }
+//     if (cmputTrnstvClsr) {
+//       if (FindRcrsvNghbrs(DIR_FRWRD) == RES_ERROR)
+//         return RES_ERROR;
+//       if (FindRcrsvNghbrs(DIR_BKWRD) == RES_ERROR)
+//         return RES_ERROR;
+//       CmputRltvCrtclPaths_(DIR_FRWRD);
+//       CmputRltvCrtclPaths_(DIR_BKWRD);
+//     }
 
-    CmputAbslutUprBound_();
-    CmputBasicLwrBounds_();
-    wasSetupForSchduling_ = true;
-  }
-  return RES_SUCCESS;
-}
+//     CmputAbslutUprBound_();
+//     CmputBasicLwrBounds_();
+//     wasSetupForSchduling_ = true;
+//   }
+//   return RES_SUCCESS;
+// }
 
 FUNC_RESULT DataDepGraph::UpdateSetupForSchdulng(bool cmputTrnstvClsr) {
   InstCount i;
@@ -3024,7 +3024,7 @@ InstSchedule::GetPeakRegPressures(const InstCount *&regPressures) const {
   return machMdl_->GetRegTypeCnt();
 }
 
-__host__
+__host__ __device__
 InstCount InstSchedule::GetSpillCost(InstCount stepNum) {
   assert(stepNum >= 0 && stepNum < totInstCnt_);
 #ifdef __HIP_DEVICE_COMPILE__

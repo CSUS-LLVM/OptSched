@@ -233,8 +233,8 @@ public:
   __host__ __device__
   FUNC_RESULT SetupForSchdulng(bool cmputTrnstvClsr);
   // Parallelized device version of SetupForSchdulng
-  __device__
-  FUNC_RESULT Dev_SetupForSchdulng(bool cmputTrnstvClsr);
+  // __device__
+  // FUNC_RESULT Dev_SetupForSchdulng(bool cmputTrnstvClsr);
   // Update the Dep after applying graph transformations
   FUNC_RESULT UpdateSetupForSchdulng(bool cmputTrnstvClsr);
 
@@ -458,7 +458,7 @@ protected:
                                 InstCount fileSchedCycle, InstCount fileLB,
                                 InstCount fileUB, int blkNum);
   FUNC_RESULT FinishNode_(InstCount nodeNum, InstCount edgeCnt = -1);
-  __host__ __device__
+  __host__
   void CreateEdge_(InstCount frmInstNum, InstCount toInstNum, int ltncy,
                    DependenceType depType, bool IsArtificial = false);
 

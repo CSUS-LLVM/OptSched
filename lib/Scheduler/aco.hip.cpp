@@ -23,11 +23,6 @@ static void PrintInstruction(SchedInstruction *inst);
 #endif
 void PrintSchedule(InstSchedule *schedule);
 
-__device__
-hiprandState_t *ACOScheduler::getDevRandStates() {
-  return (hiprandState_t *) dev_states_;
-}
-
 double RandDouble(double min, double max) {
   double rand = (double)RandomGen::GetRand32() / INT32_MAX;
   return (rand * (max - min)) + min;
@@ -103,6 +98,11 @@ ACOScheduler::~ACOScheduler() {
     delete readyLs;
   if (kHelper)
     delete kHelper;
+}
+
+__device__
+hiprandState_t *getDevRandStates() {
+  return (hiprandState_t *) dev_states_;
 }
 
 // Pheromone table lookup
@@ -1336,7 +1336,7 @@ void ACOScheduler::CopyPheromonesToSharedMem(double *s_pheromone) {
     toInstNum += NUMTHREADSPERBLOCK;
   }
 }
-
+__host__ __device__
 inline void ACOScheduler::UpdateACOReadyList(SchedInstruction *inst) {
   InstCount prdcsrNum, scsrRdyCycle;
   

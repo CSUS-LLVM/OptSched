@@ -319,7 +319,7 @@ Register *RegisterFile::getNext() {
   return Regs[RegNum];
 }
 
-__host__ __device__
+__host__
 void RegisterFile::SetRegCnt(int regCnt) {
   if (regCnt == 0)
     return;
