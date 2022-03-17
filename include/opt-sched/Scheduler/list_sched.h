@@ -38,7 +38,7 @@ protected:
   bool isDynmcPrirty_;
   // Adds the instructions that have just become ready at this cycle to the
   // ready list.
-  __host__ __device__
+  __host__
   void UpdtRdyLst_(InstCount cycleNum, int slotNum);
   // Pick next instruction to be scheduled. Returns NULL if no instructions are
   // ready.

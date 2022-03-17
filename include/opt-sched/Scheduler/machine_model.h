@@ -107,6 +107,7 @@ public:
   // Returns the register type given its name.
   int16_t GetRegTypeByName(const char *const regTypeName) const;
   // Returns the number of issue slots for a given issue type.
+  __host__ __device__
   int GetSlotsPerCycle(IssueType type) const;
   // Returns the total number of issue slots and fills the passed array with
   // the number of issue slots for each issue type.

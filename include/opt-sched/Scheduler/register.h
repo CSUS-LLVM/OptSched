@@ -177,7 +177,7 @@ public:
 
   __host__ __device__
   int GetRegCnt() const;
-  __host__ __device__
+  __host__
   void SetRegCnt(int regCnt);
 
   __host__ __device__
@@ -199,6 +199,7 @@ public:
   int GetPhysRegCnt() const;
 
   void SetupConflicts();
+  __host__ __device__
   void ResetConflicts();
   __host__ __device__
   void AddConflictsWithLiveRegs(int regNum, int liveRegCnt);

@@ -230,7 +230,7 @@ public:
 
   // Setup the Dep. Graph for scheduling by doing a topological sort
   // followed by critical path computation
-  __host__ __device__
+  __host__
   FUNC_RESULT SetupForSchdulng(bool cmputTrnstvClsr);
   // Parallelized device version of SetupForSchdulng
   // __device__

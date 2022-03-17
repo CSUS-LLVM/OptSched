@@ -209,7 +209,7 @@ bool SequentialListScheduler::IsSequentialInstruction(
   return crntSched_->GetSchedCycle(Inst->GetNum() - 1) != SCHD_UNSCHDULD;
 }
 
-__host__ __device__
+__host__
 void ListScheduler::UpdtRdyLst_(InstCount cycleNum, int slotNum) {
   InstCount prevCycleNum = cycleNum - 1;
   ArrayList<InstCount> *lst1 = NULL;

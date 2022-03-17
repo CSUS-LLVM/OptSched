@@ -58,7 +58,7 @@ public:
   virtual ~ACOScheduler();
   FUNC_RESULT FindSchedule(InstSchedule *schedule, SchedRegion *region, 
 		           ACOScheduler *dev_AcoSchdulr = NULL);
-  __host__ __device__
+  __host__
   inline void UpdtRdyLst_(InstCount cycleNum, int slotNum);
   // Set the initial schedule for ACO
   // Default is NULL if none are set.

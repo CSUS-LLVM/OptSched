@@ -143,7 +143,7 @@ public:
 
   // Finds the successor edge from this node to the target node. Returns
   // null if not found.
-  __host__ __device__
+  __host__
   GraphEdge *FindScsr(GraphNode *trgtNode);
   // Finds the predecessor edge from this node to the target node. Returns
   // null if not found.
@@ -152,7 +152,7 @@ public:
   // Fills the node's recursive predecessors or recursive successors list by
   // doing a depth first traversal either up the predecessor tree or down the
   // successor tree.
-  __host__ __device__
+  __host__
   void FindRcrsvNghbrs(DIRECTION dir, DirAcycGraph *graph);
   // Adds the specified node to this node' recursive predecessor or successor
   // list, depending on which direction is specified.

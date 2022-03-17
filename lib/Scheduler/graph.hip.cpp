@@ -44,7 +44,9 @@ GraphNode::GraphNode() {
 
 __host__ __device__
 GraphNode::~GraphNode() {
-  DelScsrLst();
+  #ifndef __HIP_DEVICE_COMPILE__
+    DelScsrLst();
+  #endif
   delete scsrLst_;
   delete prdcsrLst_;
   if (rcrsvScsrLst_ != NULL)

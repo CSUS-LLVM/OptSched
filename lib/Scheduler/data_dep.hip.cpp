@@ -3299,6 +3299,7 @@ InstCount InstSchedule::GetExecCost() const { return execCost_; }
 __host__ __device__
 void InstSchedule::SetSpillCost(InstCount cost) { spillCost_ = cost; }
 
+__host__ __device__
 InstCount InstSchedule::GetSpillCost() const { return spillCost_; }
 
 // NOTE: ACO needs statically normalized costs.  These are statically normalized
