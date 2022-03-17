@@ -440,7 +440,7 @@ protected:
 
   InstCount maxIndependentInstructions_;
 
-  __host__ __device__
+  __host__
   void AllocArrays_(InstCount instCnt);
   FUNC_RESULT ParseF2Nodes_(SpecsBuffer *specsBuf, MachineModel *machMdl);
   FUNC_RESULT ParseF2Edges_(SpecsBuffer *specsBuf, MachineModel *machMdl);

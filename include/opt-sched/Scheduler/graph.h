@@ -89,10 +89,10 @@ public:
   __host__ __device__
   void CreatePrdcsrScsrLists(UDT_GNODES maxNodeCnt);
   // Clears the node's predecessor list.
-  __host__ __device__
+  __host__
   void DelPrdcsrLst();
   // Clears the node's successor list.
-  __host__ __device__
+  __host__
   void DelScsrLst();
 
   // Adds a new edge to the successor list.
@@ -147,7 +147,7 @@ public:
   GraphEdge *FindScsr(GraphNode *trgtNode);
   // Finds the predecessor edge from this node to the target node. Returns
   // null if not found.
-  __host__ __device__
+  __host__
   GraphEdge *FindPrdcsr(GraphNode *trgtNode);
   // Fills the node's recursive predecessors or recursive successors list by
   // doing a depth first traversal either up the predecessor tree or down the
@@ -156,7 +156,7 @@ public:
   void FindRcrsvNghbrs(DIRECTION dir, DirAcycGraph *graph);
   // Adds the specified node to this node' recursive predecessor or successor
   // list, depending on which direction is specified.
-  __host__ __device__
+  __host__
   void AddRcrsvNghbr(GraphNode *nghbr, DIRECTION dir);
   // Returns a pointer to the first successor of the node and writes the label
   // of the edge between them to the label argument. Sets the successor
@@ -178,7 +178,7 @@ public:
   GraphNode *GetNxtScsr();
   // Checks if a given node is successor-equivalent to this node. Two nodes
   // are successor-equivalent if they have identical successor lists.
-  __host__ __device__
+  __host__
   bool IsScsrEquvlnt(GraphNode *othrNode);
   // Returns a pointer to the first Predecesor of the node. Sets the predecesor
   // iterator.
@@ -190,14 +190,14 @@ public:
  GraphNode *GetNxtPrdcsr(UDT_GLABEL &label);
   // Checks if a given node is predecessor-equivalent to this node. Two nodes
   // are predecessor-equivalent if they have identical predecessor lists.
-  __host__ __device__
+  __host__
   bool IsPrdcsrEquvlnt(GraphNode *othrNode);
   // Checks if the successor list of this node is dominated by the successor
   // list of the given node. This is the case when the successor list of this
   // node is a subset of that of the given node and each edge label from this
   // node to one of its successors is less than or equal to the corresponding
   // label from the given node to the same successor
-  __host__ __device__
+  __host__
   bool IsScsrDmntd(GraphNode *cnddtDmnnt);
 
   // Returns the sum of the labels of edges from this node to its successors.
@@ -249,7 +249,7 @@ public:
 
   // Allocates memory for the node's predecessor or successor list and bitset,
   // depending on the specified direction.
-  __host__ __device__
+  __host__
   void AllocRcrsvInfo(DIRECTION dir, UDT_GNODES nodeCnt);
   // Returns the node's recursive predecessor or successor list, depending on
   // the specified direction.
@@ -264,7 +264,7 @@ public:
   // Performs a depth-first visit starting from this node, which includes
   // visiting all of its successors recursively and deducing a topological
   // sort of the nodes.
-  __host__ __device__
+  __host__
   void DepthFirstVisit(GraphNode *tplgclOrdr[], UDT_GNODES &tplgclIndx);
 
   // Writes a comma-separated list of (direct) successor node numbers to the
@@ -345,10 +345,10 @@ protected:
   // much faster copying to the Device
   GraphNode **nodes_;
   // TODO(max): Document what this is.
-  __host__ __device__
+  __host__ 
   bool FindScsr_(GraphNode *&crntScsr, UDT_GNODES trgtNum, UDT_GLABEL trgtLbl);
   // Actually implements the functionality of FindRcrsvNghbrs().
-  __host__ __device__
+  __host__
   void FindRcrsvNghbrs_(GraphNode *root, DIRECTION dir, DirAcycGraph *graph);
 
   // Returns the node's predecessor or successor list, depending on
@@ -416,11 +416,11 @@ public:
 
   // Calculates the topological order of the graph's nodes by performing a
   // depth-first traversal.
-  __host__ __device__
+  __host__
   FUNC_RESULT DepthFirstSearch();
   // Fills the recursive predecessor or successor lists for each node in the
   // graph, depending on the specified direction.
-  __host__ __device__
+  __host__
   FUNC_RESULT FindRcrsvNghbrs(DIRECTION dir);
 
   __host__ __device__

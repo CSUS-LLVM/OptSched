@@ -36,17 +36,17 @@ public:
 
   __host__ __device__
   int16_t GetType() const;
-  __host__ __device__
+  __host__
   void SetType(int16_t type);
 
   __host__ __device__
   int GetNum() const;
-  __host__ __device__
+  __host__
   void SetNum(int num);
 
   __host__ __device__
   int GetWght() const;
-  __host__ __device__
+  __host__
   void SetWght(int wght);
 
   bool IsPhysical() const;
@@ -54,7 +54,7 @@ public:
   int GetPhysicalNumber() const;
   void SetPhysicalNumber(int physicalNumber);
 
-  __host__ __device__
+  __host__
   void AddUse(const SchedInstruction *inst);
   __host__ __device__
   int GetUseCnt() const;
@@ -63,7 +63,7 @@ public:
   __host__ __device__
   int GetCrntUseCnt() const;
 
-  __host__ __device__
+  __host__
   void AddDef(const SchedInstruction *inst);
   int GetDefCnt() const;
   const InstSetType &GetDefList() const;
@@ -89,18 +89,18 @@ public:
   bool IsLive() const;
   // Live in registers are defined by the artifical entry node.
   bool IsLiveIn() const;
-  __host__ __device__
+  __host__
   void SetIsLiveIn(bool liveIn);
   // Live out registers are used by the artifical exit node.
   __host__ __device__
   bool IsLiveOut() const;
-  __host__ __device__
+  __host__
   void SetIsLiveOut(bool liveOut);
 
   Register &operator=(const Register &rhs);
 
   void SetupConflicts(int regCnt);
-  __host__ __device__
+  __host__
   void ResetConflicts();
   __host__ __device__
   void AddConflict(int regNum, bool isSpillCnddt);

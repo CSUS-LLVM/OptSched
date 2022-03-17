@@ -444,7 +444,7 @@ DirAcycGraph::~DirAcycGraph() {
     delete[] tplgclOrdr_;
 }
 
-__host__ __device__
+__host__
 void DirAcycGraph::CreateEdge_(UDT_GNODES frmNodeNum, UDT_GNODES toNodeNum,
                                UDT_GLABEL label) {
   GraphEdge *newEdg;

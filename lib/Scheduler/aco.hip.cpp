@@ -7,7 +7,7 @@
 #include "opt-sched/Scheduler/sched_region.h"
 #include "opt-sched/Scheduler/bb_spill.h"
 #include "opt-sched/Scheduler/dev_defines.h"
-#include <thrust/functional.h>
+// #include <thrust/functional.h>
 #include <hip/hip_cooperative_groups.h>
 #include "llvm/ADT/STLExtras.h"
 #include <iomanip>
@@ -1223,6 +1223,15 @@ FUNC_RESULT ACOScheduler::FindSchedule(InstSchedule *schedule_out,
 
   return RES_SUCCESS;
 }
+__device__
+double dmax(double d1, double d2) {
+  return d1 >= d2 ? d1 : d2;
+}
+
+__device__
+double dmin(double d1, double d2) {
+  return d1 <= d2 ? d1 : d2;
+}
 
 __host__ __device__
 void ACOScheduler::UpdatePheromone(InstSchedule *schedule) {
@@ -1238,8 +1247,8 @@ void ACOScheduler::UpdatePheromone(InstSchedule *schedule) {
   // For the case NUMTHREADS < count_, increase instNum by 
   // NUMTHREADS at the end of the loop.
   InstCount lastInstNum = -1;
-  thrust::maximum<double> dmax;
-  thrust::minimum<double> dmin;
+  // thrust::maximum<double> dmax;
+  // thrust::minimum<double> dmin;
   pheromone_t portion = schedule->GetCost() / (ScRelMax * 1.5);
   pheromone_t deposition;
   if (portion < 1)

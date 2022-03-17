@@ -65,8 +65,10 @@ DataDepStruct::~DataDepStruct() {
     delete[] frwrdLwrBounds_;
   if (bkwrdLwrBounds_ != NULL)
     delete[] bkwrdLwrBounds_;
-  if (edges_)
-    delete edges_;
+  #ifdef __HIP_DEVICE_COMPILE__
+    if (edges_)
+      delete edges_;
+  #endif
 }
 
 __host__ __device__
@@ -986,7 +988,7 @@ void DataDepGraph::CreateEdge(SchedInstruction *frmNode,
   }
 }
 
-__host__ __device__
+__host__
 void DataDepGraph::CreateEdge_(InstCount frmNodeNum, InstCount toNodeNum,
                                int ltncy, DependenceType depType,
                                bool IsArtificial) {
@@ -3022,7 +3024,7 @@ InstSchedule::GetPeakRegPressures(const InstCount *&regPressures) const {
   return machMdl_->GetRegTypeCnt();
 }
 
-__host__ __device__
+__host__
 InstCount InstSchedule::GetSpillCost(InstCount stepNum) {
   assert(stepNum >= 0 && stepNum < totInstCnt_);
 #ifdef __HIP_DEVICE_COMPILE__

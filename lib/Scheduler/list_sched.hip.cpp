@@ -36,7 +36,7 @@ SchedInstruction *ListScheduler::PickInst() const {
   return inst;
 }
 
-__host__ __device__
+__host__
 FUNC_RESULT ListScheduler::FindSchedule(InstSchedule *sched, SchedRegion *rgn) {
   InstCount rdyLstSize, maxRdyLstSize = 0, avgRdyLstSize = 0, iterCnt = 0;
   bool isEmptyCycle = true;

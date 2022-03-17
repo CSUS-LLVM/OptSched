@@ -246,7 +246,7 @@ protected:
   bool MovToPrevSlot_(int prevRealSlotNum);
 
   // Cleans up the first-ready array of the current cycle (if any).
-  __host__ __device__
+  __host__
   void CleanupCycle_(InstCount cycleNum);
 
   // Checks the legality of issuing an instruction of a given issue type.
