@@ -98,7 +98,7 @@ __host__ __device__
 SchedInstruction::SchedInstruction()
   :GraphNode() {}
 
-__host__ __device__
+__host__
 SchedInstruction::~SchedInstruction() {
   if (memAllocd_)
     DeAllocMem_();

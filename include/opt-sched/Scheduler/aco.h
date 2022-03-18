@@ -89,7 +89,8 @@ public:
   InstCount GetNumAntsTerminated() { return numAntsTerminated_; }
   __host__ __device__
   void SetGlobalBestStalls(int stalls) { globalBestStalls_ = stalls; }
-
+    // Holds state for each thread for RNG
+  void *dev_states_;
 private:
   __host__ __device__
   pheromone_t &Pheromone(SchedInstruction *from, SchedInstruction *to);
@@ -141,8 +142,6 @@ private:
   SPILL_COST_FUNCTION DCFCostFn;
   DataDepGraph *dev_DDG_;
   MachineModel *dev_MM_;
-  // Holds state for each thread for RNG
-  void *dev_states_;
   // Used to count how many threads returned last instruction
   int returnLastInstCnt_;
   // Used to count how many ants are terminated early

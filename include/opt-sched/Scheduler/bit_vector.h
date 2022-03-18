@@ -112,7 +112,7 @@ inline void BitVector::Construct(int length) {
   oneCnt_ = 0;
 }
 
-__host__ __device__
+__host__
 inline BitVector::~BitVector() {
   if (vctr_ != NULL)
     delete[] vctr_;
@@ -265,7 +265,7 @@ inline WeightedBitVector::WeightedBitVector(int length) : BitVector(length) {
   wghtedCnt_ = 0;
 }
 
-__host__ __device__
+__host__
 inline WeightedBitVector::~WeightedBitVector() {}
 
 __host__ __device__

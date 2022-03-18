@@ -40,7 +40,7 @@ InstScheduler::InstScheduler(DataDepGraph *dataDepGraph, MachineModel *machMdl,
   includesUnpipelined_ = dataDepGraph->IncludesUnpipelined();
 }
 
-__host__ __device__
+__host__
 InstScheduler::~InstScheduler() {
   delete[] slotsPerTypePerCycle_;
   delete[] instCntPerIssuType_;
@@ -109,7 +109,7 @@ ConstrainedScheduler::ConstrainedScheduler(DataDepGraph *dataDepGraph,
   rsrvSlotCnt_ = 0;
 }
 
-__host__ __device__
+__host__
 ConstrainedScheduler::~ConstrainedScheduler() {
   if (crntCycleNum_ < schedUprBound_ &&
       frstRdyLstPerCycle_[crntCycleNum_] != NULL) {

@@ -58,7 +58,7 @@ DataDepStruct::DataDepStruct(MachineModel *machMdl) {
   edges_ = NULL;
 }
 
-__host__ __device__
+__host__
 DataDepStruct::~DataDepStruct() {
   delete[] instCntPerIssuType_;
   if (frwrdLwrBounds_ != NULL)
@@ -229,7 +229,7 @@ DataDepGraph::DataDepGraph(MachineModel *machMdl, LATENCY_PRECISION ltncyPrcsn)
   RegFiles = new RegisterFile[machMdl_->GetRegTypeCnt()];
 }
 
-__host__ __device__
+__host__
 DataDepGraph::~DataDepGraph() {
   if (insts_ != NULL) {
     delete[] insts_;

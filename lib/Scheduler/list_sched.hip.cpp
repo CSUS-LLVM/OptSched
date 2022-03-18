@@ -20,7 +20,7 @@ ListScheduler::ListScheduler(DataDepGraph *dataDepGraph, MachineModel *machMdl,
   rdyLst_ = new ReadyList(dataDepGraph_, prirts);
 }
 
-__host__ __device__
+__host__
 ListScheduler::~ListScheduler() { 
   delete rdyLst_; 
 }

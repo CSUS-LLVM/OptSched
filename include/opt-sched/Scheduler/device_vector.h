@@ -112,7 +112,7 @@ DeviceVector<T>::DeviceVector(int size) {
 }
 
 template <typename T>
-__host__ __device__
+__host__
 DeviceVector<T>::~DeviceVector() {
   if(elmnts_)
     delete[] elmnts_;

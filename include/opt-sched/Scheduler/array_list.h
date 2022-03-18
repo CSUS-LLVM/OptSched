@@ -410,7 +410,7 @@ ArrayList<T>::ArrayList(int maxSize) {
 }
 
 template <typename T>
-__host__ __device__
+__host__
 ArrayList<T>::~ArrayList() {
   if (elmnts_)
     delete[] elmnts_;
@@ -685,7 +685,7 @@ PriorityArrayList<T,K>::PriorityArrayList(int maxSize) : ArrayList<T>(maxSize) {
 }
 
 template <typename T, typename K>
-__host__ __device__
+__host__
 PriorityArrayList<T,K>::~PriorityArrayList() {
   if (keys_)
     delete[] keys_;

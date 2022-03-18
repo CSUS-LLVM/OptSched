@@ -169,7 +169,7 @@ ReadyList::ReadyList(DataDepGraph *dataDepGraph, SchedPriorities prirts) {
 
   }
 
-__host__ __device__
+__host__
 ReadyList::~ReadyList() {
   Reset();
   if (prirtyLst_)

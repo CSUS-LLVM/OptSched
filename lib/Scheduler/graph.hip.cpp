@@ -42,11 +42,9 @@ GraphNode::GraphNode() {
   dev_IsRoot = false;
 }
 
-__host__ __device__
+__host__
 GraphNode::~GraphNode() {
-  #ifndef __HIP_DEVICE_COMPILE__
-    DelScsrLst();
-  #endif
+  DelScsrLst();
   delete scsrLst_;
   delete prdcsrLst_;
   if (rcrsvScsrLst_ != NULL)
@@ -440,7 +438,7 @@ DirAcycGraph::DirAcycGraph() {
   cycleDetected_ = false;
 }
 
-__host__ __device__
+__host__
 DirAcycGraph::~DirAcycGraph() {
   if (tplgclOrdr_ != NULL)
     delete[] tplgclOrdr_;

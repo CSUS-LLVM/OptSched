@@ -267,7 +267,7 @@ inline LinkedList<T>::LinkedList(int maxSize) {
 }
 
 template <class T>
-__host__ __device__
+__host__
 LinkedList<T>::~LinkedList() {
   Reset();
 

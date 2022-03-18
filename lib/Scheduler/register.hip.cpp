@@ -261,7 +261,7 @@ RegisterFile::RegisterFile() {
   physRegCnt_ = 0;
 }
 
-__host__ __device__
+__host__
 RegisterFile::~RegisterFile() {
   if (Regs) {
     for (int i = 0; i < Regs_size_; i++)

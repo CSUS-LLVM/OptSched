@@ -102,8 +102,8 @@ ACOScheduler::~ACOScheduler() {
 }
 
 __device__
-hiprandState_t *ACOScheduler::getDevRandStates() {
-  return (hiprandState_t *) dev_states_;
+hiprandState_t *getDevRandStates() {
+  return (hiprandState_t *) ACOScheduler->dev_states_;
 }
 
 // Pheromone table lookup
