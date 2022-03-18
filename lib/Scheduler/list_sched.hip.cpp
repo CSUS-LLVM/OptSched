@@ -8,7 +8,7 @@
 
 using namespace llvm::opt_sched;
 
-__host__ __device__
+__host__
 ListScheduler::ListScheduler(DataDepGraph *dataDepGraph, MachineModel *machMdl,
                              InstCount schedUprBound, SchedPriorities prirts)
     : ConstrainedScheduler(dataDepGraph, machMdl, schedUprBound) {

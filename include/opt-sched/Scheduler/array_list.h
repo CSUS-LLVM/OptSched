@@ -85,7 +85,7 @@ class ArrayList {
 template <typename T, typename K = unsigned long>
 class PriorityArrayList : public ArrayList<T> {
   public:
-    __host__ __device__
+    __host__
     PriorityArrayList(int maxSize = 0);
 
     __host__

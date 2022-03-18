@@ -135,7 +135,7 @@ HeurType KeysHelper::computeKey(const uint64_t *Values) const {
   return Key;
 }
 
-__host__ __device__
+__host__
 ReadyList::ReadyList(DataDepGraph *dataDepGraph, SchedPriorities prirts) {
   dataDepGraph_ = dataDepGraph;
   prirts_ = prirts;

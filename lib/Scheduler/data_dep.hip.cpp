@@ -160,7 +160,7 @@ InstCount DataDepStruct::CmputAbslutUprBound_() {
   return schedUprBound_;
 }
 
-__host__ __device__
+__host__
 DataDepGraph::DataDepGraph(MachineModel *machMdl, LATENCY_PRECISION ltncyPrcsn)
     : DataDepStruct(machMdl) {
   int i;

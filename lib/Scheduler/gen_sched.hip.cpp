@@ -76,7 +76,7 @@ void ConstrainedScheduler::ResetRsrvSlots_() {
 #endif
 }
 
-__host__ __device__
+__host__
 ConstrainedScheduler::ConstrainedScheduler(DataDepGraph *dataDepGraph,
                                            MachineModel *machMdl,
                                            InstCount schedUprBound,

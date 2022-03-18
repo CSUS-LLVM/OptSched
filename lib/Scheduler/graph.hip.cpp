@@ -8,7 +8,7 @@
 
 using namespace llvm::opt_sched;
 
-__host__ __device__
+__host__
 GraphNode::GraphNode(UDT_GNODES num, UDT_GNODES maxNodeCnt) {
   num_ = num;
   scsrLblSum_ = 0;
@@ -57,7 +57,7 @@ GraphNode::~GraphNode() {
     delete isRcrsvPrdcsr_;
 }
 
-__host__ __device__
+__host__
 void GraphNode::CreatePrdcsrScsrLists(UDT_GNODES maxNodeCnt) {
   scsrLst_ = new PriorityArrayList<GraphEdge*>(maxNodeCnt);
   prdcsrLst_ = new ArrayList<GraphEdge*>(maxNodeCnt);

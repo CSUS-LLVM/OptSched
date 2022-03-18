@@ -56,7 +56,7 @@ struct GraphEdge {
   bool IsArtificial;
 
   // Creates an edge between two nodes with labels label and label2.
-  __host__ __device__
+  __host__
   GraphEdge(UDT_GNODES from, UDT_GNODES to, UDT_GLABEL label = 0,
             UDT_GLABEL label2 = 0, bool IsArtificial = false)
       : from(from), to(to), label(label), label2(label2),
@@ -86,7 +86,7 @@ public:
   __host__ __device__
   ~GraphNode();
   // Creates a new prdcsr/scsr list, for use on blank nodes on device
-  __host__ __device__
+  __host__
   void CreatePrdcsrScsrLists(UDT_GNODES maxNodeCnt);
   // Clears the node's predecessor list.
   __host__
@@ -392,7 +392,7 @@ protected:
 class DirAcycGraph {
 public:
   // Creates an empty directed acyclic graph.
-  __host__ __device__
+  __host__
   DirAcycGraph();
   // Destroys the graph.
   __host__

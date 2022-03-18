@@ -208,7 +208,7 @@ bool SchedInstruction::InitForSchdulng(InstCount schedLngth,
   return true;
 }
 
-__host__ __device__
+__host__
 void SchedInstruction::AllocMem_(InstCount instCnt, bool isCP_FromScsr,
                                  bool isCP_FromPrdcsr) {
   scsrCnt_ = GetScsrCnt();

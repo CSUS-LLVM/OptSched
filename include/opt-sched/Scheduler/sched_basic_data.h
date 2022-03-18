@@ -744,7 +744,7 @@ protected:
   //     paths from successors.
   //   isCP_FromPrdcsr: Whether this instruction will keep track of critical
   //     paths from predecessors.
-  __host__ __device__
+  __host__
   void AllocMem_(InstCount instCnt, bool isCP_FromScsr, bool isCP_FromPrdcsr);
   // Deallocates the memory used by the node's data structures.
   __host__ __device__
