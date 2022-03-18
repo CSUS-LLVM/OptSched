@@ -253,7 +253,7 @@ Register::Register(int16_t type, int num, int physicalNumber) {
   liveOut_ = false;
 }
 
-__host__ __device__
+__host__
 RegisterFile::RegisterFile() {
   regType_ = 0;
   Regs = NULL;

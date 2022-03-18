@@ -747,7 +747,7 @@ protected:
   __host__
   void AllocMem_(InstCount instCnt, bool isCP_FromScsr, bool isCP_FromPrdcsr);
   // Deallocates the memory used by the node's data structures.
-  __host__ __device__
+  __host__
   void DeAllocMem_();
   // Sets the predecessor order numbers on the edges between this node and its
   // predecessors.
