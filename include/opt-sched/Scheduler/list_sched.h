@@ -24,7 +24,7 @@ class ListScheduler : public ConstrainedScheduler {
 public:
   // Creates a list scheduler for the given dependence graph, machine and
   // schedule upper bound, using the specified heuristic.
-  __host__ __device__
+  __host__
   ListScheduler(DataDepGraph *dataDepGraph, MachineModel *machMdl,
                 InstCount schedUprBound, SchedPriorities prirts);
   __host__
@@ -50,7 +50,7 @@ protected:
 // regardless of latency or machine model constraints.
 class SequentialListScheduler : public ListScheduler {
 public:
-  __host__ __device__
+  __host__
   SequentialListScheduler(DataDepGraph *dataDepGraph, MachineModel *machMdl,
                           InstCount schedUprBound, SchedPriorities prirts);
 

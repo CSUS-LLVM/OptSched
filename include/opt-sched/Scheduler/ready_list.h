@@ -85,7 +85,7 @@ class ReadyList {
 public:
   // Constructs a ready list for the specified dependence graph with the
   // specified priorities.
-  __host__ __device__
+  __host__
   ReadyList(DataDepGraph *dataDepGraph, SchedPriorities prirts);
   // Destroys the ready list and deallocates the memory used by it.
   __host__ __device__

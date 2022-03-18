@@ -239,7 +239,7 @@ void Register::FreeDevicePointers() {
   hipFree(dev_crntUseCnt_);
 }
 
-__host__ __device__
+__host__
 Register::Register(int16_t type, int num, int physicalNumber) {
   type_ = type;
   num_ = num;

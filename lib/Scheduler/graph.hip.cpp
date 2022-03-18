@@ -426,7 +426,7 @@ void GraphNode::FreeDevicePointers() {
     hipFree(scsrLst_);
 }
 
-__host__ __device__
+__host__
 DirAcycGraph::DirAcycGraph() {
   nodeCnt_ = 0;
   edgeCnt_ = 0;

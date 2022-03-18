@@ -77,7 +77,7 @@ public:
   // Creates a node with the number (label) num and with up to maxNodeCnt
   // successors or predecessors. It is assumed that a single graph never
   // contains multiple nodes with the same number.
-  __host__ __device__
+  __host__
   GraphNode(UDT_GNODES num, UDT_GNODES maxNodeCnt);
   // Allocates a blank node, used for allocating nodes on device
   __host__ __device__

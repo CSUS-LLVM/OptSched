@@ -106,7 +106,7 @@ SchedInstruction::~SchedInstruction() {
   delete crntRange_;
 }
 
-__host__ __device__
+__host__
 void SchedInstruction::SetupForSchdulng(InstCount instCnt, bool isCP_FromScsr,
                                         bool isCP_FromPrdcsr) {
   if (memAllocd_)
@@ -118,7 +118,7 @@ void SchedInstruction::SetupForSchdulng(InstCount instCnt, bool isCP_FromScsr,
   ComputeAdjustedUseCnt_();
 }
 
-__host__ __device__
+__host__
 bool SchedInstruction::UseFileBounds() {
   bool match = true;
 #ifdef IS_DEBUG_BOUNDS

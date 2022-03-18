@@ -102,8 +102,8 @@ ACOScheduler::~ACOScheduler() {
 }
 
 __device__
-hiprandState_t *getDevRandStates() {
-  return (hiprandState_t *) (ACOScheduler->dev_states_);
+hiprandState_t *getDevRandStates(ACOScheduler ACOSchedulr) {
+  return (hiprandState_t *) (ACOSchedulr->dev_states_);
 }
 
 // Pheromone table lookup
@@ -421,7 +421,7 @@ InstCount ACOScheduler::SelectInstruction(SchedInstruction *lastInst, InstCount 
   double rand;
   pheromone_t point;
 #ifdef __HIP_DEVICE_COMPILE__
-  auto dev_states = getDevRandStates();
+  auto dev_states = getDevRandStates(this);
   rand = hiprand_uniform(&dev_states[GLOBALTID]);
   point = dev_readyLs->dev_ScoreSum[GLOBALTID] * hiprand_uniform(&dev_states[GLOBALTID]);
 #else

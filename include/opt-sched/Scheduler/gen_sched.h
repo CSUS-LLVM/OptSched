@@ -110,7 +110,7 @@ class ConstrainedScheduler : public InstScheduler {
 public:
   // Constructs a constrained scheduler for the given machine and dependence
   // graph, with the specified upper bound.
-  __host__ __device__
+  __host__
   ConstrainedScheduler(DataDepGraph *dataDepGraph, MachineModel *machMdl,
                        InstCount schedUprBound, bool ACOEn=false);
   // Deallocates memory used by the scheduler.

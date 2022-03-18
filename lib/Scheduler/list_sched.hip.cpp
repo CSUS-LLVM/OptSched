@@ -91,7 +91,7 @@ FUNC_RESULT ListScheduler::FindSchedule(InstSchedule *sched, SchedRegion *rgn) {
   return RES_SUCCESS;
 }
 
-__host__ __device__
+__host__
 SequentialListScheduler::SequentialListScheduler(DataDepGraph *dataDepGraph,
                                                  MachineModel *machMdl,
                                                  InstCount schedUprBound,

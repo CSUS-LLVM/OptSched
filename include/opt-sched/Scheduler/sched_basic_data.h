@@ -163,17 +163,17 @@ public:
   __host__ __device__
   SchedInstruction();
   // Deallocates the memory used by the instruction and destroys the object.
-  __host__ __device__
+  __host__
   ~SchedInstruction();
 
   // Prepares the instruction for scheduling. Should be called only once in
   // the lifetime of an instruction object.
-  __host__ __device__
+  __host__
   void SetupForSchdulng(InstCount instCnt, bool isCP_FromScsr,
                         bool isCP_FromPrdcsr);
 
   // Sets the instruction's bounds to the ones specified in the input file.
-  __host__ __device__
+  __host__
   bool UseFileBounds();
 
   // Initializes the instruction for a new scheduling iteration. Sometimes,

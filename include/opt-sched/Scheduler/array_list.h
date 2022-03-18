@@ -13,7 +13,7 @@ class ArrayList {
   public:
     __host__ __device__
     ArrayList(int maxSize = 0);
-    
+
     __host__
     ~ArrayList();
     
@@ -676,7 +676,7 @@ bool ArrayList<T>::FindElmnt(const T element) const {
 }
 
 template <typename T, typename K>
-__host__ __device__
+__host__
 PriorityArrayList<T,K>::PriorityArrayList(int maxSize) : ArrayList<T>(maxSize) {
   if (maxSize > 0)
     keys_ = new K[maxSize];
