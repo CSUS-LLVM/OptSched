@@ -21,6 +21,7 @@ namespace cg = cooperative_groups;
 #ifndef NDEBUG
 static void PrintInstruction(SchedInstruction *inst);
 #endif
+__host__ __device__
 void PrintSchedule(InstSchedule *schedule);
 
 double RandDouble(double min, double max) {
@@ -101,7 +102,7 @@ ACOScheduler::~ACOScheduler() {
 }
 
 __device__
-hiprandState_t *getDevRandStates() {
+hiprandState_t *ACOScheduler::getDevRandStates() {
   return (hiprandState_t *) dev_states_;
 }
 
@@ -1129,7 +1130,7 @@ FUNC_RESULT ACOScheduler::FindSchedule(InstSchedule *schedule_out,
     dArgs[5] = (void*)&noImprovementMax;
     dArgs[6] = (void*)&dev_blockBestIndex;
     gpuErrchk(hipLaunchCooperativeKernel((void*)Dev_ACO, gridDim, blockDim, 
-                                          dArgs));
+                                          dArgs, 0, NULL));
     hipDeviceSynchronize();
     Logger::Info("Post Kernel Error: %s", 
                  hipGetErrorString(hipGetLastError()));

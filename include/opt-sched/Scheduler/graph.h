@@ -460,7 +460,7 @@ protected:
 
   // Creates a new edge between two nodes with the given numbers with the
   // given label.
-  __host__ __device__
+  __host__
   void CreateEdge_(UDT_GNODES frmNodeNum, UDT_GNODES toNodeNum, UDT_GLABEL lbl);
 };
 
