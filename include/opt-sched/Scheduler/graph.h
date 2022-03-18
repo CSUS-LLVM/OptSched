@@ -395,7 +395,7 @@ public:
   __host__ __device__
   DirAcycGraph();
   // Destroys the graph.
-  __host__ __device__
+  __host__
   virtual ~DirAcycGraph();
 
   // Returns the total number of nodes in the graph.

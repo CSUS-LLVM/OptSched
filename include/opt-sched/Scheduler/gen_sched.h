@@ -56,7 +56,7 @@ public:
   InstScheduler(DataDepGraph *dataDepGraph, MachineModel *machMdl,
                 InstCount schedUprBound);
   // Deallocates memory used by the scheduler.
-  __host__ __device__
+  __host__
   virtual ~InstScheduler();
 
   __host__ __device__
@@ -114,7 +114,7 @@ public:
   ConstrainedScheduler(DataDepGraph *dataDepGraph, MachineModel *machMdl,
                        InstCount schedUprBound, bool ACOEn=false);
   // Deallocates memory used by the scheduler.
-  __host__ __device__
+  __host__
   virtual ~ConstrainedScheduler();
 
   // Calculates the schedule and returns it in the passed argument.

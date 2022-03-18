@@ -116,7 +116,7 @@ public:
   __host__ __device__
   DataDepStruct(MachineModel *machMdl);
   // TODO(max): Document.
-  __host__ __device__
+  __host__
   virtual ~DataDepStruct();
 
   __host__ __device__
@@ -196,7 +196,7 @@ class DataDepGraph : public llvm::opt_sched::OptSchedDDGWrapperBase,
 public:
   __host__ __device__
   DataDepGraph(MachineModel *machMdl, LATENCY_PRECISION ltncyPcsn);
-  __host__ __device__
+  __host__
   virtual ~DataDepGraph();
 
   //Prevent DDG from being abstract, these should not actually be invoked

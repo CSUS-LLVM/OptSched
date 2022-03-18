@@ -27,7 +27,7 @@ template <class T> struct Entry {
   __host__ __device__
   inline Entry(T *element = NULL, Entry *next = NULL, Entry *prev = NULL)
       : element(element), next(next), prev(prev) {}
-  __host__ __device__
+  __host__
   virtual ~Entry() {}
   __host__ __device__
   virtual Entry *GetNext() const { return next; }
@@ -55,7 +55,7 @@ template <class T, class K = unsigned long> struct KeyedEntry : Entry<T> {
     Entry<T>::next = next;
     Entry<T>::prev = prev;
   }
-  __host__ __device__
+  __host__
   virtual ~KeyedEntry() {}
 
   __host__ __device__
@@ -83,7 +83,7 @@ public:
   __host__ __device__
   LinkedList(int maxSize = INVALID_VALUE);
   // A virtual destructor, to support inheritance.
-  __host__ __device__
+  __host__
   virtual ~LinkedList();
   // Deletes all existing entries and resets the list to its initial state.
   __host__ __device__

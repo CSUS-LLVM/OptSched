@@ -54,7 +54,7 @@ public:
                bool vrfySched, bool IsPostBB, SchedRegion *dev_rgn = NULL,
 	       DataDepGraph *dev_DDG = NULL,
 	       MachineModel *dev_MM = NULL, void *dev_states = NULL);
-  __host__ __device__
+  __host__
   virtual ~ACOScheduler();
   FUNC_RESULT FindSchedule(InstSchedule *schedule, SchedRegion *region, 
 		           ACOScheduler *dev_AcoSchdulr = NULL);

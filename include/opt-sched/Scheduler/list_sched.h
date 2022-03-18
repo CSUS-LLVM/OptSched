@@ -27,7 +27,7 @@ public:
   __host__ __device__
   ListScheduler(DataDepGraph *dataDepGraph, MachineModel *machMdl,
                 InstCount schedUprBound, SchedPriorities prirts);
-  __host__ __device__
+  __host__
   virtual ~ListScheduler();
 
   // Calculates the schedule and returns it in the passed argument.

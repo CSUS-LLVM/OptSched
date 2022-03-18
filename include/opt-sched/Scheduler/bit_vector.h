@@ -27,7 +27,7 @@ public:
   __host__ __device__
   BitVector(int length = 0);
   // Deallocates the vector.
-  __host__ __device__
+  __host__
   virtual ~BitVector();
 
   // Reconstructs the vector to hold a vector of the new length. All old data

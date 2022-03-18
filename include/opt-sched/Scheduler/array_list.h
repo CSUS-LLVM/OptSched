@@ -14,7 +14,7 @@ class ArrayList {
     __host__ __device__
     ArrayList(int maxSize = 0);
     
-    __host__ __device__
+    __host__
     ~ArrayList();
     
     // Appends a new element to the end of the list
@@ -88,7 +88,7 @@ class PriorityArrayList : public ArrayList<T> {
     __host__ __device__
     PriorityArrayList(int maxSize = 0);
 
-    __host__ __device__
+    __host__
     ~PriorityArrayList();
 
     // Insert a new element by automatically finding its place in the list.

@@ -14,7 +14,7 @@ namespace opt_sched {
 
 class OptSchedDDGWrapperBase {
 public:
-  __host__ __device__
+  __host__
   virtual ~OptSchedDDGWrapperBase() {}
 
   virtual void convertSUnits(bool IgnoreRealEdges, bool IgnoreArtificialEdges) = 0;
