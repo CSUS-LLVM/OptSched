@@ -510,7 +510,7 @@ __host__ __device__
 void LinkedList<T>::FreeEntry_(Entry<T> *entry) {
   if (maxSize_ == INVALID_VALUE) {
   // deconstructors crash the device kernel
-#ifndef __CUDA_ARCH__
+#ifndef __HIP_DEVICE_COMPILE__
     delete entry;
 #endif
   } else {

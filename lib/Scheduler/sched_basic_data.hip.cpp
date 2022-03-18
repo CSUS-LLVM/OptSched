@@ -704,7 +704,7 @@ bool SchedInstruction::PrdcsrUnSchduld(InstCount prdcsrNum,
 
 __host__ __device__
 bool SchedInstruction::ScsrSchduld() {
-#ifdef __CUDA_ARCH
+#ifdef __HIP_DEVICE_COMPILE__
   dev_unschduldScsrCnt_[GLOBALTID]--;
   return dev_unschduldScsrCnt_[GLOBALTID] == 0;
 #else
