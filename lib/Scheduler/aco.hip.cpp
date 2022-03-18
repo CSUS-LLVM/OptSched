@@ -102,7 +102,7 @@ ACOScheduler::~ACOScheduler() {
 }
 
 __device__
-hiprandState_t *getDevRandStates(ACOScheduler ACOSchedulr) {
+hiprandState_t *getDevRandStates(ACOScheduler *ACOSchedulr) {
   return (hiprandState_t *) (ACOSchedulr->dev_states_);
 }
 

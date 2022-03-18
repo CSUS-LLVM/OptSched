@@ -194,7 +194,7 @@ class DataDepGraph : public llvm::opt_sched::OptSchedDDGWrapperBase,
                      public DirAcycGraph,
                      public DataDepStruct {
 public:
-  __host__ __device__
+  __host__
   DataDepGraph(MachineModel *machMdl, LATENCY_PRECISION ltncyPcsn);
   __host__
   virtual ~DataDepGraph();

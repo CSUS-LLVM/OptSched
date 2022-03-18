@@ -27,7 +27,7 @@ SPILL_COST_FUNCTION llvm::opt_sched::ParseSCFName(const std::string &name) {
       "Unrecognized option for SPILL_COST_FUNCTION setting: " + name, false);
 }
 
-__host__ __device__
+__host__
 SchedInstruction::SchedInstruction(InstCount num, const char *name,
                                    InstType instType, const char *opCode,
                                    InstCount maxInstCnt, int nodeID,
@@ -249,7 +249,7 @@ void SchedInstruction::AllocMem_(InstCount instCnt, bool isCP_FromScsr,
   memAllocd_ = true;
 }
 
-__host__ __device__
+__host__
 void SchedInstruction::DeAllocMem_() {
   assert(memAllocd_);
 

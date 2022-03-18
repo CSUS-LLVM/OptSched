@@ -154,7 +154,7 @@ public:
   //   fileUB: The static upper bound on this instruction's scheduling as
   //     provided in the input file.
   //   model: The machine model used by this instruction.
-  __host__ __device__
+  __host__
   SchedInstruction(InstCount num, const char *name, InstType instType,
                    const char *opCode, InstCount maxInstCnt, int nodeID,
                    InstCount fileSchedCycle, InstCount fileSchedOrder,

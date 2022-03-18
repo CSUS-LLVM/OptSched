@@ -29,7 +29,7 @@ class SchedInstruction;
 // times this register is defined and used.
 class Register {
 public:
-  __host__ __device__
+  __host__
   Register(int16_t type = 0, int num = 0, int physicalNumber = INVALID_VALUE);
 
   using InstSetType = DevicePtrSet<InstCount>;
@@ -170,9 +170,9 @@ private:
 // Represents a file of registers of a certain type and tracks their usages.
 class RegisterFile {
 public:
-  __host__ __device__
+  __host__
   RegisterFile();
-  __host__ __device__
+  __host__
   ~RegisterFile();
 
   __host__ __device__
