@@ -98,6 +98,7 @@ IF("AMDGPU" IN_LIST LLVM_TARGETS_TO_BUILD)
     SET(OPT_SCHED_INCLUDE_DIRS ${OPT_SCHED_INCLUDE_DIRS} ${CMAKE_CURRENT_SOURCE_DIR}/lib
                                 ${LLVM_MAIN_SRC_DIR}/lib/Target/AMDGPU
                                 ${CMAKE_CURRENT_BINARY_DIR}/../../lib/Target/AMDGPU
+                                ${CMAKE_CURRENT_BINARY_DIR}/..
                                 "/opt/rocm-4.5.2/rocrand/include"
                                 "/opt/rocm-4.5.2/hiprand/include")
   ENDIF()

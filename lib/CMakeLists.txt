@@ -49,12 +49,14 @@ add_llvm_target(
 )
 target_include_directories(LLVMOptSched
     PRIVATE
-        ${HIP_PATH}/include>
-        ${HIP_PATH}/../include>
+        ${HIP_PATH}/include
+        ${HIP_PATH}/../include
         ${OPTSCHED_TARGET_DEPS})
 
 
+target_compile_options(LLVMOptSched PRIVATE "-Wno-suggest-override" "-Wno-c++98-compat-extra-semi" "-Wno-implicit-fallthrough" "-Wno-nested-anon-types" "-Wno-sign-compare" "-Wno-gnu-anonymous-struct" "-Wno-unused-variable" "-Wno-sometimes-uninitialized")
 
+target_link_libraries(LLVMOptSched hip::host)
 target_link_libraries(LLVMOptSched hip::device)
 
 set(OPTSCHED_TARGET_DEPS ${OPTSCHED_SOURCE_DIR}/include ${OPTSCHED_SOURCE_DIR}/lib "/opt/rocm-4.5.2/hiprand/include" "/opt/rocm-4.5.2/rocrand/include")
