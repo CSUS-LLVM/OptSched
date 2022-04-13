@@ -22,7 +22,7 @@
 #include "llvm/ADT/SmallString.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/FileSystem.h"
-#include <hiprand_kernel.h>
+#include <hiprand/hiprand_kernel.h>
 
 extern bool OPTSCHED_gPrintSpills;
 

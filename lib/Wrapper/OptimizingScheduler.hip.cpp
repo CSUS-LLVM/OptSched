@@ -164,8 +164,9 @@ static SchedulerType parseListSchedType() {
 //   return std::make_unique<StaticNodeSupTrans>(DataDepGraph, IsMultiPass);
 // }
 
-// void ScheduleDAGOptSched::addGraphTransformations(
-//     OptSchedDDGWrapperBasic *BDDG) {
+// AMKX: This was commented out?
+ void ScheduleDAGOptSched::addGraphTransformations(
+     OptSchedDDGWrapperBasic *BDDG) {
 //   auto *GraphTransfomations = BDDG->GetGraphTrans();
 
 //   if (StaticNodeSup) {
@@ -176,7 +177,7 @@ static SchedulerType parseListSchedType() {
 //       Logger::Info("Skipping RP-only graph transforms for non-unity pass.");
 //     }
 //   }
-// }
+ }
 
 ScheduleDAGOptSched::ScheduleDAGOptSched(
     MachineSchedContext *C, std::unique_ptr<MachineSchedStrategy> S)

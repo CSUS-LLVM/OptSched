@@ -13,7 +13,7 @@
 #include <iomanip>
 #include <iostream>
 #include <sstream>
-#include <hiprand_kernel.h>
+#include <hiprand/hiprand_kernel.h>
 
 using namespace llvm::opt_sched;
 namespace cg = cooperative_groups;

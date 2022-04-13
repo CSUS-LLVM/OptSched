@@ -19,6 +19,7 @@ using namespace llvm::opt_sched;
 // ACOReadyList
 // ----
 
+__host__ __device__
 ACOReadyList::ACOReadyList() {
   InstrCount = 0;
   CurrentSize = 0;
@@ -38,6 +39,7 @@ ACOReadyList::ACOReadyList() {
 
 }
 
+__host__ __device__
 ACOReadyList::ACOReadyList(InstCount RegionSize) {
   InstrCount = RegionSize;
   CurrentSize = 0;
@@ -56,6 +58,7 @@ ACOReadyList::ACOReadyList(InstCount RegionSize) {
   ScoreBase = ScoreAllocation;
 }
 
+__host__ __device__
 ACOReadyList::ACOReadyList(const ACOReadyList &Other) {
   InstrCount = Other.InstrCount;
   PrimaryBufferCapacity = Other.PrimaryBufferCapacity;
@@ -83,6 +86,7 @@ ACOReadyList::ACOReadyList(const ACOReadyList &Other) {
   }
 }
 
+__host__ __device__
 ACOReadyList &ACOReadyList::operator=(const ACOReadyList &Other) {
   InstrCount = Other.InstrCount;
   PrimaryBufferCapacity = Other.PrimaryBufferCapacity;
@@ -117,6 +121,7 @@ ACOReadyList &ACOReadyList::operator=(const ACOReadyList &Other) {
   return *this;
 }
 
+__host__ __device__
 ACOReadyList::ACOReadyList(ACOReadyList &&Other) noexcept {
   InstrCount = Other.InstrCount;
   PrimaryBufferCapacity = Other.PrimaryBufferCapacity;
@@ -139,6 +144,7 @@ ACOReadyList::ACOReadyList(ACOReadyList &&Other) noexcept {
   ScoreBase = Other.ScoreBase;
 }
 
+__host__ __device__
 ACOReadyList &ACOReadyList::operator=(ACOReadyList &&Other) noexcept {
   InstrCount = Other.InstrCount;
   PrimaryBufferCapacity = Other.PrimaryBufferCapacity;
@@ -147,9 +153,10 @@ ACOReadyList &ACOReadyList::operator=(ACOReadyList &&Other) noexcept {
   CurrentSize = Other.CurrentSize;
 
   // swap the allocations to give Other our allocations to delete
-  std::swap(IntAllocation, Other.IntAllocation);
-  std::swap(HeurAllocation, Other.HeurAllocation);
-  std::swap(ScoreAllocation, Other.ScoreAllocation);
+  // AMKX: Cannot call host swap impl here.
+  //std::swap(IntAllocation, Other.IntAllocation);
+  //std::swap(HeurAllocation, Other.HeurAllocation);
+  //std::swap(ScoreAllocation, Other.ScoreAllocation);
 
   InstrBase = Other.InstrBase;
   ReadyOnBase = Other.ReadyOnBase;
@@ -159,6 +166,7 @@ ACOReadyList &ACOReadyList::operator=(ACOReadyList &&Other) noexcept {
   return *this;
 }
 
+__host__ __device__
 ACOReadyList::~ACOReadyList() {
   delete[] IntAllocation;
   delete[] HeurAllocation;
@@ -168,6 +176,7 @@ ACOReadyList::~ACOReadyList() {
 
 // This is just a heuristic for the ready list size.
 // A better function should be chosen experimentally
+__host__ __device__
 InstCount ACOReadyList::computePrimaryCapacity(InstCount RegionSize) {
   return RegionSize;
 }
