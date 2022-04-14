@@ -154,10 +154,12 @@ ACOReadyList &ACOReadyList::operator=(ACOReadyList &&Other) noexcept {
 
   // swap the allocations to give Other our allocations to delete
   // AMKX: Cannot call host swap impl here.
-  //std::swap(IntAllocation, Other.IntAllocation);
-  //std::swap(HeurAllocation, Other.HeurAllocation);
-  //std::swap(ScoreAllocation, Other.ScoreAllocation);
-
+  #ifndef __HIP_DEVICE_COMPILE__
+  std::swap(IntAllocation, Other.IntAllocation);
+  std::swap(HeurAllocation, Other.HeurAllocation);
+  std::swap(ScoreAllocation, Other.ScoreAllocation);
+  #endif
+  
   InstrBase = Other.InstrBase;
   ReadyOnBase = Other.ReadyOnBase;
   HeurBase = Other.HeurBase;
@@ -254,7 +256,7 @@ void ACOReadyList::addInstructionToReadyList(const ACOReadyListEntry &Entry) {
 __host__ __device__
 ACOReadyListEntry ACOReadyList::removeInstructionAtIndex(InstCount Indx) {
   #ifdef __HIP_DEVICE_COMPILE__
-    assert(dev_CurrentSize[GLOBALTID] <= 0 || Indx >= dev_CurrentSize[GLOBALTID] || Indx < 0);
+    assert(dev_CurrentSize[GLOBALTID] > 0 && Indx < dev_CurrentSize[GLOBALTID] && Indx >= 0);
     ACOReadyListEntry E{dev_InstrBase[Indx*numThreads_ + GLOBALTID], 
                         dev_ReadyOnBase[Indx*numThreads_ + GLOBALTID], 
                         dev_HeurBase[Indx*numThreads_ + GLOBALTID], 
@@ -266,7 +268,7 @@ ACOReadyListEntry ACOReadyList::removeInstructionAtIndex(InstCount Indx) {
     dev_ScoreBase[Indx*numThreads_ + GLOBALTID] = dev_ScoreBase[EndIndx*numThreads_ + GLOBALTID];
     return E;
   #else
-    assert(CurrentSize <= 0 || Indx >= CurrentSize || Indx < 0);
+    assert(CurrentSize > 0 && Indx < CurrentSize && Indx >= 0);
     ACOReadyListEntry E{InstrBase[Indx], ReadyOnBase[Indx], HeurBase[Indx], ScoreBase[Indx]};
     InstCount EndIndx = --CurrentSize;
     InstrBase[Indx] = InstrBase[EndIndx];

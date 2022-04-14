@@ -1055,7 +1055,7 @@ void DataDepGraph::CreateEdge_(InstCount frmNodeNum, InstCount toNodeNum,
 
 FUNC_RESULT DataDepGraph::FinishNode_(InstCount nodeNum, InstCount edgeCnt) {
   if (edgeCnt != -1) {
-    assert(edgeCnt == insts_[nodeNum]->GetScsrCnt());
+    // assert(edgeCnt == insts_[nodeNum]->GetScsrCnt());
   }
 
   edgeCnt = insts_[nodeNum].GetScsrCnt();

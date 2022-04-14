@@ -930,9 +930,9 @@ printMaskPairs(const SmallVectorImpl<RegisterMaskPair> &RegPairs,
     for (const auto &P : RegPairs) {
       const TargetRegisterClass *RegClass;
 
-      if (TRI->isPhysicalRegister(P.RegUnit))
+      if (P.RegUnit.isPhysicalRegister(P.RegUnit))
         RegClass = TRI->getMinimalPhysRegClass(P.RegUnit);
-      else if (TRI->isVirtualRegister(P.RegUnit))
+      else if (P.RegUnit.isVirtualRegister(P.RegUnit))
         RegClass = MRI.getRegClass(P.RegUnit);
       else
         RegClass = nullptr;

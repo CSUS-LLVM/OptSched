@@ -34,7 +34,7 @@ using namespace llvm;
 using namespace llvm::opt_sched;
 
 #ifndef NDEBUG
-static Printable printOptSchedReg(const Register *Reg,
+static Printable printOptSchedReg(const llvm::opt_sched::Register *Reg,
                                   const std::string &RegTypeName,
                                   int16_t RegTypeNum);
 #endif
@@ -324,7 +324,7 @@ OptSchedDDGWrapperBasic::getRegisterType(unsigned RegUnit) const {
 }
 
 #if !defined(NDEBUG) || defined(LLVM_ENABLE_DUMP)
-static Printable printOptSchedReg(const Register *Reg,
+static Printable printOptSchedReg(const llvm::opt_sched::Register *Reg,
                                   const std::string &RegTypeName,
                                   int16_t RegTypeNum) {
   return Printable([Reg, &RegTypeName, RegTypeNum](raw_ostream &OS) {
@@ -335,7 +335,7 @@ static Printable printOptSchedReg(const Register *Reg,
         const_iterator;
 
     // Definitions for this register
-    const auto &DefList = Reg->GetDefList();
+    /*const auto &DefList = Reg->GetDefList();
     OS << "\t--Defs:";
     for (const_iterator I = DefList.begin(), E = DefList.end(); I != E; ++I)
       OS << " (" << (*I)->GetNodeID() << ") " << (*I)->GetOpCode();
@@ -347,7 +347,7 @@ static Printable printOptSchedReg(const Register *Reg,
     OS << "\t--Uses:";
     for (const_iterator I = UseList.begin(), E = UseList.end(); I != E; ++I)
       OS << " (" << (*I)->GetNodeID() << ") " << (*I)->GetOpCode();
-
+    */
     OS << "\n\n";
   });
 }

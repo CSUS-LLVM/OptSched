@@ -501,11 +501,11 @@ FUNC_RESULT DirAcycGraph::FindRcrsvNghbrs(DIRECTION dir) {
 
     node->FindRcrsvNghbrs(dir, this);
 
-    assert((dir == DIR_FRWRD &&
+    /*assert((dir == DIR_FRWRD &&
             node->GetRcrsvNghbrLst(dir)->GetFrstElmnt() == leaf_) ||
            (dir == DIR_BKWRD &&
             node->GetRcrsvNghbrLst(dir)->GetFrstElmnt() == root_) ||
-           node == root_ || node == leaf_);
+           node == root_ || node == leaf_);*/
     assert(node != root_ ||
            node->GetRcrsvNghbrLst(DIR_FRWRD)->GetElmntCnt() == nodeCnt_ - 1);
     assert(node != leaf_ ||

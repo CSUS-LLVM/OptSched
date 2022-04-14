@@ -546,7 +546,7 @@ InstSchedule *ACOScheduler::FindOneSchedule(InstCount RPTarget,
     // there are two steps to scheduling an instruction:
     // 1)Select the instruction(if we are not waiting on another instruction)
     if (!waitFor && waitUntil <= dev_crntCycleNum_[GLOBALTID]) {
-      assert(dev_readyLs->getReadyListSize());
+      assert(dev_readyLs->getReadyListSize() > 0 || waitFor != NULL);
       
       InstCount closeToRPCheck = RPTarget - 2 < RPTarget * 9 / 10 ? RPTarget - 2 : RPTarget * 9 / 10;
       closeToRPTarget = ((BBWithSpill *)dev_rgn_)->GetCrntSpillCost() >= closeToRPCheck;
@@ -673,7 +673,7 @@ InstSchedule *ACOScheduler::FindOneSchedule(InstCount RPTarget,
     inst = NULL;
     if (!(waitFor && waitUntil <= crntCycleNum_)) {
       // If an instruction is ready select it
-      assert(readyLs->getReadyListSize()); // we should always have something in the rl
+      assert(readyLs->getReadyListSize() > 0  || waitFor != NULL); // we should always have something in the rl
 
       InstCount closeToRPCheck = RPTarget - 2 < RPTarget * 9 / 10 ? RPTarget - 2 : RPTarget * 9 / 10;
       closeToRPTarget = ((BBWithSpill *)rgn_)->GetCrntSpillCost() >= closeToRPCheck;
@@ -1431,8 +1431,8 @@ static void PrintInstruction(SchedInstruction *inst) {
   std::cerr << std::setw(2) << inst->GetNum() << " ";
   std::cerr << std::setw(20) << std::left << inst->GetOpCode();
 
-  std::cerr << " defs ";
-  Register **defs;
+  /*std::cerr << " defs ";
+  llvm::opt_sched::Register **defs;
   uint16_t defsCount = inst->GetDefs(defs);
   for (uint16_t i = 0; i < defsCount; i++) {
     std::cerr << defs[i]->GetNum() << defs[i]->GetType();
@@ -1441,13 +1441,13 @@ static void PrintInstruction(SchedInstruction *inst) {
   }
 
   std::cerr << " uses ";
-  Register **uses;
+  llvm::opt_sched::Register **uses;
   uint16_t usesCount = inst->GetUses(uses);
   for (uint16_t i = 0; i < usesCount; i++) {
     std::cerr << uses[i]->GetNum() << uses[i]->GetType();
     if (i != usesCount - 1)
       std::cerr << ", ";
-  }
+  }*/
   std::cerr << std::endl;
 }
 #endif
