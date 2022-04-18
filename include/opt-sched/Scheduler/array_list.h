@@ -5,7 +5,7 @@
 // and device and contains methods to copy to device
 
 const int END = -1;
-#define GLOBALTID blockIdx.x * blockDim.x + threadIdx.x 
+#define GLOBALTID hipBlockIdx_x * hipBlockDim_x + hipThreadIdx_x 
 
 // Base ArrayList class, replaces LinkedList
 template <typename T>

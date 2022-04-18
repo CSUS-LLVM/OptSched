@@ -292,7 +292,7 @@ FUNC_RESULT DataDepGraph::SetupForSchdulng(bool cmputTrnstvClsr) {
 // FUNC_RESULT DataDepGraph::Dev_SetupForSchdulng(bool cmputTrnstvClsr) {
 //   assert(wasSetupForSchduling_ == false);
 
-//   InstCount i = blockIdx.x;
+//   InstCount i = hipBlockIdx_x;
 
 //   maxUseCnt_ = 0;
   

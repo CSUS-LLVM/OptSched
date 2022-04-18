@@ -1,7 +1,7 @@
 // File contains #defs that are common to a lot of device code
 
 // Formula for determining global thread ID on device
-#define GLOBALTID blockIdx.x * blockDim.x + threadIdx.x
+#define GLOBALTID hipBlockIdx_x * hipBlockDim_x + hipThreadIdx_x
 
 // Check for and print out errors on CUDA API calls
 #define gpuErrchk(ans) { gpuAssert((ans), __FILE__, __LINE__); }

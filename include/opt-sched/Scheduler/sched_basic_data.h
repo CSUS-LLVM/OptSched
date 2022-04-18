@@ -721,7 +721,7 @@ protected:
   // the last use. This value changes dynamically during scheduling
   int16_t lastUseCnt_;
   // Array of lastUseCnt_ used on device for parallel ACO, each index in array
-  // holds a threads value independently indexed by threadIdx.x
+  // holds a threads value independently indexed by hipThreadIdx_x
   int16_t *dev_lastUseCnt_;
   /***************************************************************************/
 

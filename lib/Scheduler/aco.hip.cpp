@@ -761,7 +761,7 @@ __inline__ __device__
 void reduceToBestSchedPerBlock(InstSchedule **dev_schedules, int *blockBestIndex, ACOScheduler *dev_AcoSchdulr) {
   __shared__ int sdata[NUMTHREADSPERBLOCK];
   uint gtid = GLOBALTID;
-  uint tid = threadIdx.x;
+  uint tid = hipThreadIdx_x;
   int blockSize = NUMTHREADSPERBLOCK;
   
   // load candidate schedules into smem
@@ -772,7 +772,7 @@ void reduceToBestSchedPerBlock(InstSchedule **dev_schedules, int *blockBestIndex
   __syncthreads();
 
   // do reduction on indexes in shared mem
-  for (uint s = 1; s < blockDim.x; s*=2) {
+  for (uint s = 1; s < hipBlockDim_x; s*=2) {
     if (tid%(2*s) == 0) {
       if (dev_AcoSchdulr->shouldReplaceSchedule(
           dev_schedules[sdata[tid]], 
@@ -783,7 +783,7 @@ void reduceToBestSchedPerBlock(InstSchedule **dev_schedules, int *blockBestIndex
   }
 
   if (tid == 0)
-    blockBestIndex[blockIdx.x] = sdata[0];
+    blockBestIndex[hipBlockIdx_x] = sdata[0];
 
 }
 
@@ -793,7 +793,7 @@ void reduceToBestSchedPerBlock(InstSchedule **dev_schedules, int *blockBestIndex
 __inline__ __device__
 void reduceToBestSched(InstSchedule **dev_schedules, int *blockBestIndex, ACOScheduler *dev_AcoSchdulr) {
   __shared__ int sBestIndex[NUMBLOCKS/4];
-  uint tid = threadIdx.x;
+  uint tid = hipThreadIdx_x;
   int index, sBestIndex1, sBestIndex2;
   
   // Load best indices into shared mem, reduce by half while doing so
@@ -806,13 +806,13 @@ void reduceToBestSched(InstSchedule **dev_schedules, int *blockBestIndex, ACOSch
     else
       sBestIndex[tid] = blockBestIndex[tid * 2];
 
-    tid += blockDim.x;
+    tid += hipBlockDim_x;
   }
   __syncthreads();
 
   // reduce in smem
   for (uint s = 1; s < NUMBLOCKS/4; s *= 2) {
-    tid = threadIdx.x;
+    tid = hipThreadIdx_x;
     // if there are more than 32 schedules in smem, a thread
     // may reduce more than once per loop
     while (tid < NUMBLOCKS/4) {
@@ -826,11 +826,11 @@ void reduceToBestSched(InstSchedule **dev_schedules, int *blockBestIndex, ACOSch
             dev_schedules[sBestIndex2], false))
           sBestIndex[index] = sBestIndex2;
       }
-      tid += blockDim.x;
+      tid += hipBlockDim_x;
     }
     __syncthreads();
   }
-  if (threadIdx.x == 0)
+  if (hipThreadIdx_x == 0)
     blockBestIndex[0] = sBestIndex[0];
 }
 
@@ -890,7 +890,7 @@ void Dev_ACO(SchedRegion *dev_rgn, DataDepGraph *dev_DDG,
     threadGroup.sync();
 
     // one block to reduce blockBest schedules to one best schedule
-    if (blockIdx.x == 0)
+    if (hipBlockIdx_x == 0)
       reduceToBestSched(dev_schedules, blockBestIndex, dev_AcoSchdulr);
 
     threadGroup.sync();    
@@ -907,7 +907,7 @@ void Dev_ACO(SchedRegion *dev_rgn, DataDepGraph *dev_DDG,
       dev_AcoSchdulr->UpdatePheromone(dev_schedules[globalBestIndex]);
 #elif (PHER_UPDATE_SCHEME == ONE_PER_BLOCK)
     // each block finds its blockIterationBest
-    if (threadIdx.x == 0) {
+    if (hipThreadIdx_x == 0) {
       bestCost = dev_schedules[GLOBALTID]->GetCost();
       bestIndex = GLOBALTID; 
       for (int i = GLOBALTID + 1; i < GLOBALTID + NUMTHREADSPERBLOCK; i++) {
@@ -923,8 +923,8 @@ void Dev_ACO(SchedRegion *dev_rgn, DataDepGraph *dev_DDG,
 #elif (PHER_UPDATE_SCHEME == ALL)
     // each block loops over all schedules created by its threads and
     // updates pheromones in block level parallel
-    for (int i = blockIdx.x * NUMTHREADSPERBLOCK; 
-         i < ((blockIdx.x + 1) * NUMTHREADSPERBLOCK); i++) {
+    for (int i = hipBlockIdx_x * NUMTHREADSPERBLOCK; 
+         i < ((hipBlockIdx_x + 1) * NUMTHREADSPERBLOCK); i++) {
       dev_AcoSchdulr->UpdatePheromone(dev_schedules[i]);
     }
 #endif
@@ -975,7 +975,7 @@ void Dev_ACO(SchedRegion *dev_rgn, DataDepGraph *dev_DDG,
     // make sure no threads reset schedule before above operations complete
     dev_schedules[GLOBALTID]->resetTotalStalls();
     dev_schedules[GLOBALTID]->resetUnnecessaryStalls();
-    if (threadIdx.x == 0)
+    if (hipThreadIdx_x == 0)
       dev_iterations++;
   }
   if (GLOBALTID == 0) {
@@ -1242,7 +1242,7 @@ void ACOScheduler::UpdatePheromone(InstSchedule *schedule) {
   int instNum = GLOBALTID;
 #elif (PHER_UPDATE_SCHEME == ALL || PHER_UPDATE_SCHEME == ONE_PER_BLOCK)
   // parallel on block level
-  int instNum = threadIdx.x;
+  int instNum = hipThreadIdx_x;
 #endif
   // Each thread updates pheromone table for 1 instruction
   // For the case NUMTHREADS < count_, increase instNum by 
@@ -1329,7 +1329,7 @@ void ACOScheduler::UpdatePheromone(InstSchedule *schedule) {
 
 __device__
 void ACOScheduler::CopyPheromonesToSharedMem(double *s_pheromone) {
-  InstCount toInstNum = threadIdx.x;
+  InstCount toInstNum = hipThreadIdx_x;
   while (toInstNum < count_) {
     for (int fromInstNum = -1; fromInstNum < count_; fromInstNum++)
       s_pheromone[((fromInstNum + 1) * count_) + toInstNum] = 
