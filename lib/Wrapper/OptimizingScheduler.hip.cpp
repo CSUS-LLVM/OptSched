@@ -506,9 +506,10 @@ void ScheduleDAGOptSched::ScheduleNode(SUnit *SU, unsigned CurCycle) {
   if (SU) {
     MachineInstr *instr = SU->getInstr();
     // Reset read - undef flags and update them later.
-    for (auto &Op : instr->operands())
-      if (Op.isReg() && Op.isDef())
-        Op.setIsUndef(false);
+    for (MIBundleOperands MIO(*instr); MIO.isValid(); ++MIO) {
+      if (MIO->isReg() && MIO->isDef())
+        MIO->setIsUndef(false);
+    }
 
     if (&*CurrentTop == instr)
       CurrentTop = nextIfDebug(++CurrentTop, CurrentBottom);
