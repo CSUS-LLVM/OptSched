@@ -217,6 +217,9 @@ protected:
   // Return true if we should print spill count for the current function
   bool shouldPrintSpills() const;
 
+  // Reset the flags (e.g undef) before reverting scheduling
+  void ResetFlags(SUnit &SU);
+  
   // Add node to llvm schedule
   void ScheduleNode(SUnit *SU, unsigned CurCycle);
 

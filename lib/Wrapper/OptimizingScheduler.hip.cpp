@@ -464,8 +464,13 @@ void ScheduleDAGOptSched::schedule() {
 
   LLVM_DEBUG(Logger::Info("OptSched succeeded."));
   OST->finalizeRegion(Sched);
-  if (!OST->shouldKeepSchedule())
+  if (!OST->shouldKeepSchedule()) {
+  for (size_t i = 0; i < SUnits.size(); i++) {
+      SUnit SU = SUnits[i];
+      ResetFlags(SU);
+    }
     return;
+  }
 
   // Count simulated spills.
   if (isSimRegAllocEnabled()) {
@@ -497,6 +502,16 @@ void ScheduleDAGOptSched::schedule() {
   Logger::Info("Register pressure after");
   RPTracker.dump();
 #endif
+}
+
+void ScheduleDAGOptSched::ResetFlags(SUnit &SU) {
+ // if (SU) {
+    RegisterOperands RegOpers;
+    RegOpers.collect(*SU.getInstr(), *TRI, MRI, true, false);
+    // Adjust liveness and add missing dead+read-undef flags.
+    auto SlotIdx = LIS->getInstructionIndex(*SU.getInstr()).getRegSlot();
+    RegOpers.adjustLaneLiveness(*LIS, MRI, SlotIdx, SU.getInstr());
+ // }
 }
 
 void ScheduleDAGOptSched::ScheduleNode(SUnit *SU, unsigned CurCycle) {
