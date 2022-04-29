@@ -1,15 +1,3 @@
-#IF(${PACKAGE_VERSION} VERSION_LESS "8.0")
-#  add_llvm_loadable_module(OptSched OBJECT ${OPT_SCHED_SRCS})
-#ELSE()
-#  add_llvm_library(OptSched MODULE OBJECT ${OPT_SCHED_SRCS})
-#ENDIF()
-
-#enable_language(CUDA)
-#set(CMAKE_CUDA_SEPARABLE_COMPILATION ON)
-
-# Allow our .cpp files to include CUDA headers:
-#include_directories(${CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES})
-
 add_llvm_target(
   OptSched Scheduler/aco.hip.cpp
   Scheduler/simplified_aco_ds.hip.cpp
@@ -49,13 +37,10 @@ target_include_directories(LLVMOptSched
         ${HIP_PATH}/../include
         ${OPTSCHED_TARGET_DEPS})
 
-
+target_link_options(LLVMOptSched PUBLIC "$<$<LINK_LANGUAGE:CXX>:-fgpu-rdc;--hip-link>")
 target_link_libraries(LLVMOptSched ${HIP_LIBRARIES})
 
 set(OPTSCHED_TARGET_DEPS ${OPTSCHED_SOURCE_DIR}/include ${OPTSCHED_SOURCE_DIR}/lib)
-#add_dependencies(OptSched ${OPT_SCHED_TARGET_DEPS})
 
 target_compile_definitions(LLVMOptSched PRIVATE INSERT_ON_STEPFRWRD)
 target_include_directories(LLVMOptSched PRIVATE ${OPTSCHED_TARGET_DEPS})
-
-#target_include_directories(LLVMOptSched PRIVATE ${CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES})

@@ -936,11 +936,11 @@ void DataDepGraph::CreateEdge(SchedInstruction *frmNode,
                frmNodeNum, toNodeNum, depType, ltncy);
 #endif
 
-  assert(frmNodeNum < instCnt_);
-  assert(nodes_[frmNodeNum] != NULL);
+  //assert(frmNodeNum < instCnt_);
+  //assert(nodes_[frmNodeNum] != NULL);
 
-  assert(toNodeNum < instCnt_);
-  assert(nodes_[toNodeNum] != NULL);
+  //assert(toNodeNum < instCnt_);
+  //assert(nodes_[toNodeNum] != NULL);
 
 #ifdef IS_DEBUG_LATENCIES
   stats::dependenceTypeLatencies.Add(GetDependenceTypeName(depType), ltncy);

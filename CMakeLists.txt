@@ -24,11 +24,10 @@ IF(${PACKAGE_VERSION} VERSION_LESS "7.0")
 ENDIF()
 
 # Add OptSched debug defines eg: SET(OPT_SCHED_DEBUG_FLAGS "-DIS_DEBUG_DEFS_AND_USES -DIS_DEBUG_DEF_USE_COUNT")
-SET(OPT_SCHED_DEBUG_FLAGS "-DIS_DEBUG")
+SET(OPT_SCHED_DEBUG_FLAGS "")
 
 # If asserts are enabled opt-sched must be built with "IS_DEBUG".
 SET(CMAKE_CXX_FLAGS_DEBUG "")
-SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OPT_SCHED_DEBUG_FLAGS}")
 
 #set(CMAKE_CUDA_SEPARABLE_COMPILATION ON)
 SET(CMAKE_POSITION_INDEPENDENT_CODE ON)
@@ -102,27 +101,9 @@ IF("AMDGPU" IN_LIST LLVM_TARGETS_TO_BUILD)
   ENDIF()
 ENDIF()
 list(APPEND CMAKE_MODULE_PATH "${LLVM_CMAKE_DIR}" ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
-include(AddLLVM)
 
 include_directories(${OPT_SCHED_INCLUDE_DIRS})
-#include_directories(
-	#${OPTSCHED_SOURCE_DIR}/include
-  #${OPTSCHED_SOURCE_DIR}/lib
-  #${OPTSCHED_SOURCE_DIR}/Garbage
-  #${LLVM_INCLUDE_DIRS}
-  #${OPTSCHED_EXTRA_INCLUDE_DIRS}
-  #)
 add_definitions(${OPTSCHED_EXTRA_DEFINITIONS})
 link_directories(${OPTSCHED_EXTRA_LINK_LIBRARIES})
 
 add_subdirectory(lib)
-
-# if(OPTSCHED_INCLUDE_TESTS)
-#   add_subdirectory(unittests)
-#   list(APPEND OPTSCHED_TEST_DEPS OptSchedUnitTests)
-#   list(APPEND OPTSCHED_TEST_PARAMS
-#     clang_unit_site_config=${CMAKE_CURRENT_BINARY_DIR}/test/Unit/lit.site.cfg
-#     )
-
-#   add_subdirectory(test)
-# endif()

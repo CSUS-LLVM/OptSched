@@ -972,7 +972,7 @@ bool Enumerator::FindNxtFsblBrnch_(EnumTreeNode *&newNode) {
 #if defined(IS_DEBUG) || defined(IS_DEBUG_READY_LIST)
   InstCount rdyInstCnt = rdyLst_->GetInstCnt();
 #endif
-  assert(crntNode_->IsLeaf() || (brnchCnt != rdyInstCnt) ? 1 : rdyInstCnt);
+  //assert(crntNode_->IsLeaf() || (brnchCnt != rdyInstCnt) ? 1 : rdyInstCnt);
   // brnchCnt == rdyInstCnt == 0 ? 1 : rdyInstCnt);
 
 #ifdef IS_DEBUG_READY_LIST
