@@ -3763,8 +3763,9 @@ void DataDepGraph::FreeDevicePointers(int numThreads) {
     insts_[i].FreeDevicePointers(numThreads);
   hipFree(insts_);
   hipFree(nodes_);
-  hipFree(dev_scsrElmnts_);
-  hipFree(dev_keys_);
+  // (Josh) These frees are invalid but I am not sure why
+  // hipFree(dev_scsrElmnts_);
+  // hipFree(dev_keys_);
 }
 
 void DataDepGraph::FreeDevEdges() {

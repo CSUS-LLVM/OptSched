@@ -1695,8 +1695,6 @@ void BBWithSpill::FreeDevicePointers(int numThreads) {
   hipFree(dev_schduldEntryInstCnt_);
   hipFree(dev_schduldExitInstCnt_);
   hipFree(dev_schduldInstCnt_);
-  hipFree(dev_liveRegs_);
-  hipFree(dev_livePhysRegs_);
   hipFree(dev_peakRegPressures_[0]);
   hipFree(dev_peakRegPressures_);
   hipFree(dev_regPressures_[0]);
