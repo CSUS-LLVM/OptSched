@@ -127,6 +127,9 @@ private:
   InstCount *dev_slilSpillCost_;
   bool trackLiveRangeLngths_;
   bool NeedsComputeSLIL;
+  // variables needed for AMDGPU spill cost function
+  unsigned MaxOccLDS_;
+  unsigned TargetOccupancy_;
 
   // Virtual Functions:
   // Given a schedule, compute the cost function value
@@ -225,6 +228,12 @@ public:
     #else
       return regPressures_[regType] > (unsigned int) machMdl_->GetPhysRegCnt(regType);
     #endif
+  }
+  void setTargetOccupancy(unsigned targetOccupancy) {
+    TargetOccupancy_ = targetOccupancy;
+  }
+  void setMaxOccLDS(unsigned MaxOccLDS) {
+    MaxOccLDS_ = MaxOccLDS;
   }
 protected:
   // (Chris)

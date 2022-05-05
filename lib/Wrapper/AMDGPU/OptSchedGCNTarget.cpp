@@ -5,6 +5,7 @@
 //===----------------------------------------------------------------------===//
 #include "OptSchedDDGWrapperGCN.h"
 #include "SIMachineFunctionInfo.h"
+#include "OptSchedGCNTarget.h"
 #include "Wrapper/OptSchedMachineWrapper.h"
 #include "opt-sched/Scheduler/OptSchedTarget.h"
 #include "opt-sched/Scheduler/data_dep.h"
@@ -19,10 +20,6 @@ using namespace llvm;
 using namespace llvm::opt_sched;
 
 #define DEBUG_TYPE "optsched"
-
-// This is necessary because we cannot perfectly predict the number of registers
-// of each type that will be allocated.
-static const unsigned GPRErrorMargin = 0;
 
 #ifndef NDEBUG
 static unsigned getOccupancyWeight(unsigned Occupancy) {
@@ -59,64 +56,6 @@ static unsigned getAdjustedOccupancy(const GCNSubtarget *ST, unsigned VGPRCount,
       ST->getOccupancyWithNumSGPRs(SGPRCount + GPRErrorMargin);
   return std::min(MaxOccLDS, std::min(MaxOccVGPR, MaxOccSGPR));
 }
-
-namespace {
-
-class OptSchedGCNTarget : public OptSchedTarget {
-public:
-  std::unique_ptr<OptSchedMachineModel>
-  createMachineModel(const char *ConfigPath) override {
-    return std::make_unique<OptSchedMachineModel>(ConfigPath);
-  }
-
-  std::unique_ptr<OptSchedDDGWrapperBase>
-  createDDGWrapper(llvm::MachineSchedContext *Context, ScheduleDAGOptSched *DAG,
-                   OptSchedMachineModel *MM, LATENCY_PRECISION LatencyPrecision,
-                   const std::string &RegionID) override {
-    return std::make_unique<OptSchedDDGWrapperGCN>(Context, DAG, MM,
-                                                    LatencyPrecision, RegionID);
-  }
-
-  void initRegion(llvm::ScheduleDAGInstrs *DAG, MachineModel *MM_) override;
-
-  void finalizeRegion(const InstSchedule *Schedule) override;
-
-  // Returns occupancy cost with number of VGPRs and SGPRs from PRP for
-  // a partial or complete schedule.
-  InstCount getCost(const llvm::SmallVectorImpl<unsigned> &PRP) const;
-
-  void dumpOccupancyInfo(const InstSchedule *Schedule) const;
-
-  // Revert scheduing if we decrease occupancy.
-  bool shouldKeepSchedule() override;
-
-private:
-  const llvm::MachineFunction *MF;
-  SIMachineFunctionInfo *MFI;
-  ScheduleDAGOptSched *DAG;
-  const GCNSubtarget *ST;
-
-  unsigned RegionStartingOccupancy;
-  unsigned RegionEndingOccupancy;
-  unsigned TargetOccupancy;
-
-  // Max occupancy with local memory size;
-  unsigned MaxOccLDS;
-
-  // In RP only (max occupancy) scheduling mode we should try to find
-  // a min-RP schedule without considering perf hints which suggest limiting
-  // occupancy. Returns true if we should consider perf hints.
-  bool shouldLimitWaves() const;
-
-  // Find occupancy with spill cost.
-  unsigned getOccupancyWithCost(const InstCount Cost) const;
-};
-
-std::unique_ptr<OptSchedTarget> createOptSchedGCNTarget() {
-  return std::make_unique<OptSchedGCNTarget>();
-}
-
-} // end anonymous namespace
 
 #if !defined(NDEBUG) || defined(LLVM_ENABLE_DUMP)
 void OptSchedGCNTarget::dumpOccupancyInfo(const InstSchedule *Schedule) const {

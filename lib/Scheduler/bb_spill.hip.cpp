@@ -11,6 +11,7 @@
 #include "opt-sched/Scheduler/stats.h"
 #include "opt-sched/Scheduler/utilities.h"
 #include "opt-sched/Scheduler/dev_defines.h"
+#include "Wrapper/AMDGPU/OptSchedGCNTarget.h"
 #include <algorithm>
 #include <cstdio>
 #include <iostream>
@@ -56,6 +57,8 @@ BBWithSpill::BBWithSpill(const OptSchedTarget *OST_, DataDepGraph *dataDepGraph,
   NeedsComputeSLIL = (spillCostFunc == SCF_SLIL);
 
   regTypeCnt_ = OST->MM->GetRegTypeCnt();
+  MaxOccLDS_ = ((OptSchedGCNTarget *) OST)->getMaxOccLDS();
+  TargetOccupancy_ = ((OptSchedGCNTarget *) OST)->getTargetOccupancy();
   regFiles_ = dataDepGraph->getRegFiles(); 
   liveRegs_ = new WeightedBitVector[regTypeCnt_];
   livePhysRegs_ = new WeightedBitVector[regTypeCnt_];
@@ -1164,14 +1167,73 @@ InstCount BBWithSpill::CmputCostForFunction(SPILL_COST_FUNCTION SpillCF) {
 }
 
 __device__
+static unsigned getOccupancyWithNumVGPRs(unsigned VGPRs) {
+  // approximation from llvm/lib/Target/AMDGPUSubtarget.cpp
+  // from this llvm commit fd08dcb9db0df6dc1aaf329f790cc4a7af9e0a91
+  if (VGPRs <= 24)
+    return 10;
+  if (VGPRs <= 28)
+    return 9;
+  if (VGPRs <= 32)
+    return 8;
+  if (VGPRs <= 36)
+    return 7;
+  if (VGPRs <= 40)
+    return 6;
+  if (VGPRs <= 48)
+    return 5;
+  if (VGPRs <= 64)
+    return 4;
+  if (VGPRs <= 84)
+    return 3;
+  if (VGPRs <= 128)
+    return 2;
+  return 1;
+}
+
+__device__
+static unsigned getOccupancyWithNumSGPRs(unsigned SGPRs) {
+  // copied from llvm/lib/Target/AMDGPU/AMDGPUSubtarget.cpp
+  if (SGPRs <= 80)
+    return 10;
+  if (SGPRs <= 88)
+    return 9;
+  if (SGPRs <= 100)
+    return 8;
+  return 7;
+}
+
+__device__
+static unsigned getAdjustedOccupancy(unsigned VGPRCount, unsigned SGPRCount,
+                                     unsigned MaxOccLDS) {
+  unsigned MaxOccVGPR = getOccupancyWithNumVGPRs(VGPRCount);
+  unsigned MaxOccSGPR = getOccupancyWithNumSGPRs(SGPRCount);
+
+  if (MaxOccLDS <= MaxOccVGPR && MaxOccLDS <= MaxOccSGPR)
+    return MaxOccLDS;
+  else if (MaxOccVGPR <= MaxOccSGPR)
+    return MaxOccVGPR;
+  else
+    return MaxOccSGPR;
+}
+
+__device__
+static InstCount getAMDGPUCost(unsigned ** PRP, unsigned TargetOccupancy,
+                               unsigned MaxOccLDS) {
+  auto Occ =
+      getAdjustedOccupancy(PRP[OptSchedDDGWrapperGCN::VGPR32][GLOBALTID],
+                           PRP[OptSchedDDGWrapperGCN::SGPR32][GLOBALTID], MaxOccLDS);
+  // RP cost is the difference between the minimum allowed occupancy for the
+  // function, and the current occupancy.
+  return Occ >= TargetOccupancy ? 0 : TargetOccupancy - Occ;
+}
+
+__device__
 InstCount BBWithSpill::Dev_CmputCostForFunction(SPILL_COST_FUNCTION SpillCF) {
   // return the requested cost
   switch (SpillCF) {
   case SCF_TARGET: {
-    printf("***** SCF_TARGET NOT YET IMPLEMENTED ON DEVICE *****");
-    // TODO: FIX ME - Device does not allow virtual functions
-    //return OST->getCost(dev_regPressures_[GLOBALTID]);
-    return 0;
+    return getAMDGPUCost(dev_regPressures_, TargetOccupancy_, MaxOccLDS_);
   }
   case SCF_SLIL: {
     InstCount SLILCost = 0; 
