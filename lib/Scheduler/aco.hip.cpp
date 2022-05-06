@@ -12,6 +12,7 @@
 #include "llvm/ADT/STLExtras.h"
 #include <iomanip>
 #include <iostream>
+#include <unordered_map>
 #include <sstream>
 #include <hiprand/hiprand_kernel.h>
 
@@ -35,6 +36,7 @@ double RandDouble(double min, double max) {
 #define MAX_DEPOSITION 6
 #define MAX_DEPOSITION_MINUS_MIN (MAX_DEPOSITION - MIN_DEPOSITION)
 #define ACO_SCHED_STALLS 1
+#define CHECK_DIFFERENT_SCHEDULES 1
 //#define BIASED_CHOICES 10000000
 //#define LOCAL_DECAY 0.1
 
@@ -49,9 +51,9 @@ double RandDouble(double min, double max) {
 ACOScheduler::ACOScheduler(DataDepGraph *dataDepGraph,
                            MachineModel *machineModel, InstCount upperBound,
                            SchedPriorities priorities, bool vrfySched, 
-                           bool IsPostBB, SchedRegion *dev_rgn,
-                           DataDepGraph *dev_DDG, 
-			   MachineModel *dev_MM, void *dev_states)
+                           bool IsPostBB, int numBlocks,
+                           SchedRegion *dev_rgn, DataDepGraph *dev_DDG,
+			                     MachineModel *dev_MM, void *dev_states)
     : ConstrainedScheduler(dataDepGraph, machineModel, upperBound, true) {
   VrfySched_ = vrfySched;
   this->IsPostBB = IsPostBB;
@@ -64,12 +66,15 @@ ACOScheduler::ACOScheduler(DataDepGraph *dataDepGraph,
   dev_states_ = dev_states;
   dev_pheromone_elmnts_alloced_ = false;
   numAntsTerminated_ = 0;
+  numBlocks_ = numBlocks;
+  numThreads_ = numBlocks_ * NUMTHREADSPERBLOCK;
+  if(!DEV_ACO)
+    numThreads_ = schedIni.GetInt("HOST_ANTS");
 
   use_fixed_bias = schedIni.GetBool("ACO_USE_FIXED_BIAS");
   use_tournament = schedIni.GetBool("ACO_TOURNAMENT");
   bias_ratio = schedIni.GetFloat("ACO_BIAS_RATIO");
   local_decay = schedIni.GetFloat("ACO_LOCAL_DECAY");
-  ants_per_iteration = schedIni.GetInt("ACO_ANT_PER_ITERATION");
   print_aco_trace = schedIni.GetBool("ACO_TRACE");
   IsTwoPassEn = schedIni.GetBool("USE_TWO_PASS");
 
@@ -172,12 +177,32 @@ bool ACOScheduler::shouldReplaceSchedule(InstSchedule *OldSched,
       return false;
   }
   else {
+    #ifdef __HIP_DEVICE_COMPILE__
+      bool needsSLIL = ((BBWithSpill *)dev_rgn_)->needsSLIL();
+    #else
+      bool needsSLIL = ((BBWithSpill *)rgn_)->needsSLIL();
+    #endif
     InstCount NewCost = NewSched->GetExecCost();
     InstCount OldCost = OldSched->GetExecCost();
     InstCount NewSpillCost = NewSched->GetNormSpillCost();
     InstCount OldSpillCost = OldSched->GetNormSpillCost();
-    // Lower Spill Cost always wins
-    if (NewSpillCost < OldSpillCost)
+    // if using SLIL and old schedule is 0 PERP, new schedule wins if it
+    // is 0 PERP and shorter
+    if (needsSLIL && OldSched->getIsZeroPerp()) {
+      if (NewSched->getIsZeroPerp() && NewCost < OldCost)
+        return true;
+      else if (NewSched->getIsZeroPerp() && NewCost == OldCost && NewSpillCost < OldSpillCost)
+        return true;
+      else
+        return false;
+    }
+    // if old schedule is not 0 PERP and new schedule is 0 PERP,
+    // it wins regardless of schedule length
+    else if (needsSLIL && NewSched->getIsZeroPerp()) {
+      return true;
+    }
+    // Otherwise, Lower Spill Cost always wins
+    else if (NewSpillCost < OldSpillCost)
       return true;
     else if (NewSpillCost == OldSpillCost && NewCost < OldCost)
       return true;
@@ -231,6 +256,16 @@ InstCount ACOScheduler::SelectInstruction(SchedInstruction *lastInst, InstCount 
     SchedInstruction *candidateInst = dataDepGraph_->GetInstByIndx(CandidateId);
     HeurType candidateLUC = candidateInst->GetLastUseCnt();
     int16_t candidateDefs = candidateInst->GetDefCnt();
+
+    // compute the score
+    HeurType Heur = *dev_readyLs->getInstHeuristicAtIndex(I);
+    pheromone_t IScore = Score(lastInstId, *dev_readyLs->getInstIdAtIndex(I), Heur);
+    if (!onlyRPNegative && candidateDefs > candidateLUC)
+      IScore = IScore * 9/10;
+
+    *dev_readyLs->getInstScoreAtIndex(I) = IScore;
+    dev_readyLs->dev_ScoreSum[GLOBALTID] += IScore;
+
     if (currentlyWaiting) {
       // if currently waiting on an instruction, do not consider semi-ready instructions 
       if (*dev_readyLs->getInstReadyOnAtIndex(I) > dev_crntCycleNum_[GLOBALTID])
@@ -241,14 +276,6 @@ InstCount ACOScheduler::SelectInstruction(SchedInstruction *lastInst, InstCount 
         continue;
     }
     
-    // compute the score
-    HeurType Heur = *dev_readyLs->getInstHeuristicAtIndex(I);
-    pheromone_t IScore = Score(lastInstId, *dev_readyLs->getInstIdAtIndex(I), Heur);
-    if (!onlyRPNegative && candidateDefs > candidateLUC)
-      IScore = IScore * 9/10;
-
-    *dev_readyLs->getInstScoreAtIndex(I) = IScore;
-    dev_readyLs->dev_ScoreSum[GLOBALTID] += IScore;
     // add a score penalty for instructions that are not ready yet
     // unnecessary stalls should not be considered if current RP is low, or if we already have too many stalls
     if (*dev_readyLs->getInstReadyOnAtIndex(I) > dev_crntCycleNum_[GLOBALTID]) {
@@ -343,6 +370,16 @@ InstCount ACOScheduler::SelectInstruction(SchedInstruction *lastInst, InstCount 
     SchedInstruction *candidateInst = dataDepGraph_->GetInstByIndx(CandidateId);
     HeurType candidateLUC = candidateInst->GetLastUseCnt();
     int16_t candidateDefs = candidateInst->GetDefCnt();
+
+    // compute the score
+    HeurType Heur = *readyLs->getInstHeuristicAtIndex(I);
+    pheromone_t IScore = Score(lastInstId, *readyLs->getInstIdAtIndex(I), Heur);
+    if (!onlyRPNegative && candidateDefs > candidateLUC)
+      IScore = IScore * 9/10;
+
+    *readyLs->getInstScoreAtIndex(I) = IScore;
+    readyLs->ScoreSum += IScore;
+
     if (currentlyWaiting) {
       // if currently waiting on an instruction, do not consider semi-ready instructions 
       if (*readyLs->getInstReadyOnAtIndex(I) > crntCycleNum_)
@@ -353,14 +390,6 @@ InstCount ACOScheduler::SelectInstruction(SchedInstruction *lastInst, InstCount 
         continue;
     }
     
-    // compute the score
-    HeurType Heur = *readyLs->getInstHeuristicAtIndex(I);
-    pheromone_t IScore = Score(lastInstId, *readyLs->getInstIdAtIndex(I), Heur);
-    if (!onlyRPNegative && candidateDefs > candidateLUC)
-      IScore = IScore * 9/10;
-
-    *readyLs->getInstScoreAtIndex(I) = IScore;
-    readyLs->ScoreSum += IScore;
     // add a score penalty for instructions that are not ready yet
     // unnecessary stalls should not be considered if current RP is low, or if we already have too many stalls
     if (*readyLs->getInstReadyOnAtIndex(I) > crntCycleNum_) {
@@ -446,16 +475,8 @@ InstCount ACOScheduler::SelectInstruction(SchedInstruction *lastInst, InstCount 
   #ifdef __HIP_DEVICE_COMPILE__
     size_t fpIndx=0;
     for (size_t i = 0; i < dev_readyLs->getReadyListSize(); ++i) {
-      // if we are avoiding unnecessary stalls, skip over instructions that are not latency ready
-      // if (couldAvoidStalling && avoidStalling && *dev_readyLs->getInstReadyOnAtIndex(i))
-      //   continue;
       point -= *dev_readyLs->getInstScoreAtIndex(i);
       if (point <= 0) {
-        if (couldAvoidStalling && *dev_readyLs->getInstReadyOnAtIndex(i) > dev_crntCycleNum_[GLOBALTID]) {
-          unnecessarilyStalling = true;
-        }
-        else
-          unnecessarilyStalling = false;
         fpIndx = i;
         break;
       }
@@ -463,16 +484,8 @@ InstCount ACOScheduler::SelectInstruction(SchedInstruction *lastInst, InstCount 
   #else
     size_t fpIndx=0;
     for (size_t i = 0; i < readyLs->getReadyListSize(); ++i) {
-      // if we are avoiding unnecessary stalls, skip over instructions that are not latency ready
-      // if (couldAvoidStalling && avoidStalling && *readyLs->getInstReadyOnAtIndex(i))
-      //   continue;
       point -= *readyLs->getInstScoreAtIndex(i);
       if (point <= 0) {
-        if (couldAvoidStalling && *readyLs->getInstReadyOnAtIndex(i) > crntCycleNum_) {
-          unnecessarilyStalling = true;
-        }
-        else
-          unnecessarilyStalling = false;
         fpIndx = i;
         break;
       }
@@ -481,26 +494,16 @@ InstCount ACOScheduler::SelectInstruction(SchedInstruction *lastInst, InstCount 
   //finally we pick whether we will return the fp choice or max score inst w/o using a branch
   bool UseMax = (rand < choose_best_chance) || currentlyWaiting;
   size_t indx = UseMax ? MaxScoreIndx : fpIndx;
-  // #ifdef __HIP_DEVICE_COMPILE__
-  //   if (GLOBALTID==0)
-  //     printf("UseMax: %s, maxInstNum: %d, maxInstScore: %f, fpInstNum: %d, readySize: %d\n", UseMax ? "true" : "false", *dev_readyLs->getInstIdAtIndex(MaxScoreIndx), *dev_readyLs->getInstScoreAtIndex(MaxScoreIndx), *dev_readyLs->getInstIdAtIndex(fpIndx), dev_readyLs->getReadyListSize());
-  // #else
-  //   printf("UseMax: %s, maxInstNum: %d, maxInstScore: %f, fpInstNum: %d, readySize: %d\n", UseMax ? "true" : "false", *readyLs->getInstIdAtIndex(MaxScoreIndx), *readyLs->getInstScoreAtIndex(MaxScoreIndx), *readyLs->getInstIdAtIndex(fpIndx), dev_readyLs->getReadyListSize());
-  // #endif
   #ifdef __HIP_DEVICE_COMPILE__
     if (couldAvoidStalling && *dev_readyLs->getInstReadyOnAtIndex(indx) > dev_crntCycleNum_[GLOBALTID])
       unnecessarilyStalling = true;
     else
       unnecessarilyStalling = false;
-    
-    // if (GLOBALTID==0)
-    //   printf("UseMax: %s, instNum: %d, unnecessarilyStalling: %s\n", UseMax ? "true" : "false", *dev_readyLs->getInstIdAtIndex(indx), unnecessarilyStalling ? "true" : "false");
   #else
     if (couldAvoidStalling && *readyLs->getInstReadyOnAtIndex(indx) > crntCycleNum_)
       unnecessarilyStalling = true;
     else
       unnecessarilyStalling = false;
-    // printf("UseMax: %s, instNum: %d, unnecessarilyStalling: %s\n", UseMax ? "true" : "false", *readyLs->getInstIdAtIndex(indx), unnecessarilyStalling ? "true" : "false");
   #endif
   return indx;
 }
@@ -633,6 +636,7 @@ InstSchedule *ACOScheduler::FindOneSchedule(InstCount RPTarget,
       InitNewCycle_();
   }
   dev_rgn_->UpdateScheduleCost(schedule);
+  schedule->setIsZeroPerp( ((BBWithSpill *)dev_rgn_)->ReturnPeakSpillCost() == 0 );
   return schedule;
 
 #else  // **** Host version of function ****
@@ -752,6 +756,7 @@ InstSchedule *ACOScheduler::FindOneSchedule(InstCount RPTarget,
       InitNewCycle_();
   }
   rgn_->UpdateScheduleCost(schedule);
+  schedule->setIsZeroPerp( ((BBWithSpill *)rgn_)->ReturnPeakSpillCost() == 0 );
   return schedule;
 #endif
 }
@@ -791,15 +796,16 @@ void reduceToBestSchedPerBlock(InstSchedule **dev_schedules, int *blockBestIndex
 // reduce to only one best index. At the end of this function globalBestIndex
 // should be in blockBestIndex[0]
 __inline__ __device__
-void reduceToBestSched(InstSchedule **dev_schedules, int *blockBestIndex, ACOScheduler *dev_AcoSchdulr) {
-  __shared__ int sBestIndex[NUMBLOCKS/4];
+void reduceToBestSched(InstSchedule **dev_schedules, int *blockBestIndex,
+                       ACOScheduler *dev_AcoSchdulr, int numBlocks) {
+  __shared__ int sBestIndex[NUMBLOCKSMANYANTS/4];
   uint tid = hipThreadIdx_x;
   int index, sBestIndex1, sBestIndex2;
   
   // Load best indices into shared mem, reduce by half while doing so
   // If there are more than 64 schedules in blockBestIndex, some threads
   // will have to load in more than one value
-  while (tid < NUMBLOCKS/4) {
+  while (tid < numBlocks/4) {
     if (dev_AcoSchdulr->shouldReplaceSchedule(dev_schedules[blockBestIndex[tid * 2]], 
                                               dev_schedules[blockBestIndex[tid * 2 + 1]], false))
       sBestIndex[tid] = blockBestIndex[tid * 2 + 1];
@@ -811,14 +817,14 @@ void reduceToBestSched(InstSchedule **dev_schedules, int *blockBestIndex, ACOSch
   __syncthreads();
 
   // reduce in smem
-  for (uint s = 1; s < NUMBLOCKS/4; s *= 2) {
+  for (uint s = 1; s < numBlocks/4; s *= 2) {
     tid = hipThreadIdx_x;
     // if there are more than 32 schedules in smem, a thread
     // may reduce more than once per loop
-    while (tid < NUMBLOCKS/4) {
+    while (tid < numBlocks/4) {
       index = 2 * s * tid;
 
-      if (index + s < NUMBLOCKS/4) {
+      if (index + s < numBlocks/4) {
         sBestIndex1 = sBestIndex[index];
         sBestIndex2 = sBestIndex[index + s];
         if (dev_AcoSchdulr->shouldReplaceSchedule(
@@ -844,8 +850,9 @@ void reduceToBestSched(InstSchedule **dev_schedules, int *blockBestIndex, ACOSch
 // select which pheromone update scheme to use
 #define PHER_UPDATE_SCHEME ONE_PER_ITER
 
-__device__ int globalBestIndex, dev_noImprovement;
-__device__ bool lowerBoundSchedFound;
+__device__ int globalBestIndex, dev_noImprovement, dev_schedsUsed, dev_schedsFound;
+__device__ pheromone_t dev_totalPherInTable;
+__device__ bool lowerBoundSchedFound, isGlobalBest;
 
 __global__
 void Dev_ACO(SchedRegion *dev_rgn, DataDepGraph *dev_DDG,
@@ -853,8 +860,9 @@ void Dev_ACO(SchedRegion *dev_rgn, DataDepGraph *dev_DDG,
             InstSchedule *dev_bestSched, int noImprovementMax, 
             int *blockBestIndex) {
   // holds cost and index of bestSched per block
-  __shared__ int bestIndex, dev_iterations;
-  __shared__ bool needsSLIL;
+  __shared__ int bestIndex;
+  int dev_iterations;
+  bool needsSLIL;
   needsSLIL = ((BBWithSpill *)dev_rgn)->needsSLIL();
   bool IsSecondPass = dev_rgn->IsSecondPass();
   dev_rgn->SetDepGraph(dev_DDG);
@@ -862,18 +870,20 @@ void Dev_ACO(SchedRegion *dev_rgn, DataDepGraph *dev_DDG,
   dev_noImprovement = 0;
   dev_iterations = 0;
   lowerBoundSchedFound = false;
+  isGlobalBest = false;
   // Used to synchronize all launched threads
   auto threadGroup = cg::this_grid();
   // Get RPTarget
   InstCount RPTarget;
+  dev_schedsUsed = 0;
+  dev_schedsFound = 0;
 
   // If in second pass and not using SLIL, set RPTarget
   if (!needsSLIL)
     RPTarget = dev_bestSched->GetSpillCost();
   else
     RPTarget = INT_MAX;
-  
-  dev_AcoSchdulr->SetGlobalBestStalls(dev_bestSched->GetCrntLngth() - dev_DDG->GetInstCnt());
+
   // Start ACO
   while (dev_noImprovement < noImprovementMax && !lowerBoundSchedFound) {
     // Reset schedules to post constructor state
@@ -884,14 +894,14 @@ void Dev_ACO(SchedRegion *dev_rgn, DataDepGraph *dev_DDG,
     threadGroup.sync();
     globalBestIndex = INVALID_VALUE;
     // reduce dev_schedules to 1 best schedule per block
-    if (GLOBALTID < NUMTHREADS/2)
+    if (GLOBALTID < dev_AcoSchdulr->GetNumThreads()/2)
       reduceToBestSchedPerBlock(dev_schedules, blockBestIndex, dev_AcoSchdulr);
 
     threadGroup.sync();
 
     // one block to reduce blockBest schedules to one best schedule
     if (hipBlockIdx_x == 0)
-      reduceToBestSched(dev_schedules, blockBestIndex, dev_AcoSchdulr);
+      reduceToBestSched(dev_schedules, blockBestIndex, dev_AcoSchdulr, dev_AcoSchdulr->GetNumBlocks());
 
     threadGroup.sync();    
 
@@ -899,35 +909,6 @@ void Dev_ACO(SchedRegion *dev_rgn, DataDepGraph *dev_DDG,
         dev_schedules[blockBestIndex[0]]->GetCost() != INVALID_VALUE)
       globalBestIndex = blockBestIndex[0];
 
-    // perform pheremone update based on selected scheme
-#if (PHER_UPDATE_SCHEME == ONE_PER_ITER)
-    // Another hard sync point after iteration best selection
-    threadGroup.sync();
-    if (globalBestIndex != INVALID_VALUE) 
-      dev_AcoSchdulr->UpdatePheromone(dev_schedules[globalBestIndex]);
-#elif (PHER_UPDATE_SCHEME == ONE_PER_BLOCK)
-    // each block finds its blockIterationBest
-    if (hipThreadIdx_x == 0) {
-      bestCost = dev_schedules[GLOBALTID]->GetCost();
-      bestIndex = GLOBALTID; 
-      for (int i = GLOBALTID + 1; i < GLOBALTID + NUMTHREADSPERBLOCK; i++) {
-        if (dev_schedules[i]->GetCost() < bestCost) {
-          bestCost = dev_schedules[i]->GetCost();
-          bestIndex = i; 
-        }
-      }   
-    }
-    // wait for thread 0 of each block to find blockIterationBest
-    threadGroup.sync();
-    dev_AcoSchdulr->UpdatePheromone(dev_schedules[bestIndex]);
-#elif (PHER_UPDATE_SCHEME == ALL)
-    // each block loops over all schedules created by its threads and
-    // updates pheromones in block level parallel
-    for (int i = hipBlockIdx_x * NUMTHREADSPERBLOCK; 
-         i < ((hipBlockIdx_x + 1) * NUMTHREADSPERBLOCK); i++) {
-      dev_AcoSchdulr->UpdatePheromone(dev_schedules[i]);
-    }
-#endif
     // 1 thread compares iteration best to overall bestsched
     if (GLOBALTID == 0) {
       // Compare to initialSched/current best
@@ -935,11 +916,24 @@ void Dev_ACO(SchedRegion *dev_rgn, DataDepGraph *dev_DDG,
           dev_AcoSchdulr->shouldReplaceSchedule(dev_bestSched, 
                                                 dev_schedules[globalBestIndex], 
                                                 true)) {
+        #ifdef DEBUG_0_PERP
+          InstCount NewCost = dev_schedules[globalBestIndex]->GetExecCost();
+          InstCount OldCost = dev_bestSched->GetExecCost();
+          InstCount NewSpillCost = dev_schedules[globalBestIndex]->GetNormSpillCost();
+          InstCount OldSpillCost = dev_bestSched->GetNormSpillCost();
+          if (needsSLIL && dev_bestSched->getIsZeroPerp() && NewCost < OldCost) {
+            if (NewSpillCost < OldSpillCost)
+              printf("Shorter schedule found with 0 PERP. New RP: %d, Old RP: %d\n", NewSpillCost, OldSpillCost);
+            else if ( NewSpillCost > OldSpillCost) {
+              printf("Shorter schedule found with 0 PERP. Old was better. New RP: %d, Old RP: %d\n", NewSpillCost, OldSpillCost);
+            }
+          }
+        #endif
         dev_bestSched->Copy(dev_schedules[globalBestIndex]);
         // update RPTarget if we are in second pass and not using SLIL
         if (!needsSLIL)
           RPTarget = dev_bestSched->GetSpillCost();
-        InstCount globalStalls = 1 > dev_bestSched->getTotalStalls() ? 1 : dev_bestSched->getTotalStalls();
+        InstCount globalStalls = dev_bestSched->getTotalStalls();
         dev_AcoSchdulr->SetGlobalBestStalls(globalStalls);
         printf("New best sched found by thread %d\n", globalBestIndex);
         printf("ACO found schedule "
@@ -957,25 +951,74 @@ void Dev_ACO(SchedRegion *dev_rgn, DataDepGraph *dev_DDG,
 #else
           // for testing compile times disable resetting dev_noImprovement to
           // allow the same number of iterations every time
-          atomicAdd(&dev_noImprovement, 1);
+          dev_noImprovement++;
 #endif
         // if a schedule is found with the cost at the lower bound
         // exit the loop after the current iteration is finished
-        if ( dev_bestSched && ( dev_bestSched->GetCost() == 0 || ( IsSecondPass && dev_bestSched->GetExecCost() == 0 ) ) ) {
+        if ( dev_bestSched && (!IsSecondPass && dev_bestSched->GetNormSpillCost() == 0  || ( IsSecondPass && dev_bestSched->GetExecCost() == 0 ) ) ) {
           lowerBoundSchedFound = true;
+        } else if (!IsSecondPass  && ((BBWithSpill *)dev_rgn)->ReturnPeakSpillCost() == 0) {
+          lowerBoundSchedFound = true;
+          printf("Schedule with 0 PERP was found\n");
         }
+        isGlobalBest = true;
       } else {
-        atomicAdd(&dev_noImprovement, 1);
+        dev_noImprovement++;
         if (dev_noImprovement > noImprovementMax)
           break;
       }
     }
+    // perform pheremone update based on selected scheme
+#if (PHER_UPDATE_SCHEME == ONE_PER_ITER)
+    // Another hard sync point after iteration best selection
+    threadGroup.sync();
+    if (globalBestIndex != INVALID_VALUE)
+      dev_AcoSchdulr->UpdatePheromone(dev_schedules[globalBestIndex], isGlobalBest);
+#elif (PHER_UPDATE_SCHEME == ONE_PER_BLOCK)
+    // each block finds its blockIterationBest
+    if (threadIdx.x == 0) {
+      auto bestCost = dev_schedules[GLOBALTID]->GetCost();
+      bestIndex = GLOBALTID;
+      for (int i = GLOBALTID + 1; i < GLOBALTID + NUMTHREADSPERBLOCK; i++) {
+        if (dev_schedules[i]->GetCost() < bestCost) {
+          bestCost = dev_schedules[i]->GetCost();
+          bestIndex = i;
+        }
+      }
+    }
+    // wait for thread 0 of each block to find blockIterationBest
+    threadGroup.sync();
+    if (bestIndex == globalBestIndex) {
+      dev_AcoSchdulr->UpdatePheromone(dev_schedules[bestIndex], isGlobalBest);
+    }
+    else {
+      dev_AcoSchdulr->UpdatePheromone(dev_schedules[bestIndex], false);
+    }
+
+#elif (PHER_UPDATE_SCHEME == ALL)
+    // each block loops over all schedules created by its threads and
+    // updates pheromones in block level parallel
+    for (int i = blockIdx.x * NUMTHREADSPERBLOCK;
+         i < ((blockIdx.x + 1) * NUMTHREADSPERBLOCK); i++) {
+      // if sched is within 10% of rp cost and sched length, use it to update pheromone table
+      if (dev_schedules[i]->GetNormSpillCost() <= dev_bestSched->GetNormSpillCost() &&
+         (!IsSecondPass || dev_schedules[i]->GetExecCost() <= dev_bestSched->GetExecCost())) {
+        dev_AcoSchdulr->UpdatePheromone(dev_schedules[i], false);
+        atomicAdd(&dev_schedsUsed, 1);
+      }
+      else {
+        atomicAdd(&dev_schedsFound, 1);
+      }
+    }
+  #endif
+    threadGroup.sync();
+    dev_AcoSchdulr->ScalePheromoneTable();
     // wait for other blocks to finish before starting next iteration
     threadGroup.sync();
     // make sure no threads reset schedule before above operations complete
     dev_schedules[GLOBALTID]->resetTotalStalls();
     dev_schedules[GLOBALTID]->resetUnnecessaryStalls();
-    if (hipThreadIdx_x == 0)
+    if (GLOBALTID == 0)
       dev_iterations++;
   }
   if (GLOBALTID == 0) {
@@ -1000,8 +1043,18 @@ FUNC_RESULT ACOScheduler::FindSchedule(InstSchedule *schedule_out,
   decay_factor = schedIni.GetInt(IsFirst ? "ACO_DECAY_FACTOR" : "ACO2P_DECAY_FACTOR");
   if (dev_AcoSchdulr)
     dev_AcoSchdulr->fixed_bias = fixed_bias;
-  noImprovementMax = schedIni.GetInt(IsFirst ? "ACO_STOP_ITERATIONS"
-                                             : "ACO2P_STOP_ITERATIONS");
+  if (count_ < 50)
+    noImprovementMax = schedIni.GetInt(IsFirst ? "ACO_STOP_ITERATIONS_RANGE1"
+                                             : "ACO2P_STOP_ITERATIONS_RANGE1");
+  else if (count_ < 100)
+    noImprovementMax = schedIni.GetInt(IsFirst ? "ACO_STOP_ITERATIONS_RANGE2"
+                                             : "ACO2P_STOP_ITERATIONS_RANGE2");
+  else if (count_ < 1000)
+    noImprovementMax = schedIni.GetInt(IsFirst ? "ACO_STOP_ITERATIONS_RANGE3"
+                                             : "ACO2P_STOP_ITERATIONS_RANGE3");
+  else
+    noImprovementMax = schedIni.GetInt(IsFirst ? "ACO_STOP_ITERATIONS_RANGE4"
+                                             : "ACO2P_STOP_ITERATIONS_RANGE4");
   if (dev_AcoSchdulr)
     dev_AcoSchdulr->noImprovementMax = noImprovementMax;
 
@@ -1025,7 +1078,7 @@ FUNC_RESULT ACOScheduler::FindSchedule(InstSchedule *schedule_out,
 #if USE_ACS
   initialValue_ = 2.0 / ((double)count_ * heuristicCost);
 #else
-  initialValue_ = (double)NUMTHREADS / heuristicCost;
+  initialValue_ = (double)numThreads_ / heuristicCost;
 #endif
   for (int i = 0; i < pheromone_size; i++)
     pheromone_[i] = initialValue_;
@@ -1044,31 +1097,35 @@ FUNC_RESULT ACOScheduler::FindSchedule(InstSchedule *schedule_out,
     printf("Initial schedule is better\n");
   }
   if (bestSchedule) {
-    UpdatePheromone(bestSchedule);
+    UpdatePheromone(bestSchedule, false);
   }
+  bestSchedule->setIsZeroPerp(false);
   int noImprovement = 0; // how many iterations with no improvement
   int iterations = 0;
   InstSchedule *iterationBest = nullptr;
-  SetGlobalBestStalls(std::max(1, bestSchedule->GetCrntLngth() - dataDepGraph_->GetInstCnt()));
+  if (dev_AcoSchdulr)
+    dev_AcoSchdulr->SetGlobalBestStalls(std::max(0, bestSchedule->GetCrntLngth() - dataDepGraph_->GetInstCnt()));
+  else
+    SetGlobalBestStalls(std::max(0, bestSchedule->GetCrntLngth() - dataDepGraph_->GetInstCnt()));
   
-  if (DEV_ACO) { // Run ACO on device
+  if (DEV_ACO && count_ >= REGION_MIN_SIZE) { // Run ACO on device
     size_t memSize;
     // Update pheromones on device
     CopyPheromonesToDevice(dev_AcoSchdulr);
     Logger::Info("Creating and copying schedules to device"); 
     // An array to temporarily hold schedules to be copied over
-    memSize = sizeof(InstSchedule) * NUMTHREADS;
+    memSize = sizeof(InstSchedule) * numThreads_;
     InstSchedule *temp_schedules = (InstSchedule *)malloc(memSize);
     // An array of pointers to schedules which are copied over
-    InstSchedule **host_schedules = new InstSchedule *[NUMTHREADS];
+    InstSchedule **host_schedules = new InstSchedule *[numThreads_];
     // Allocate one large array that will be split up between the dev arrays
     // of all InstSchedules. Massively decrease calls to hipMalloc/Free
     InstCount *dev_temp;
     size_t sizePerSched = bestSchedule->GetSizeOfDevArrays();
-    memSize = sizePerSched * NUMTHREADS * sizeof(InstCount);
+    memSize = sizePerSched * numThreads_ * sizeof(InstCount);
     gpuErrchk(hipMalloc(&dev_temp, memSize));
     memSize = sizeof(InstSchedule);
-    for (int i = 0; i < NUMTHREADS; i++) {
+    for (int i = 0; i < numThreads_; i++) {
       // Create new schedule
       host_schedules[i] = new InstSchedule(machMdl_, dataDepGraph_, true);
       // Pass a dev array to the schedule to be divided up between the required
@@ -1081,7 +1138,7 @@ FUNC_RESULT ACOScheduler::FindSchedule(InstSchedule *schedule_out,
     // Allocate and Copy array of schedules to device
     // A device array of schedules
     InstSchedule *dev_schedules_arr;
-    memSize = sizeof(InstSchedule) * NUMTHREADS;
+    memSize = sizeof(InstSchedule) * numThreads_;
     gpuErrchk(hipMalloc(&dev_schedules_arr, memSize));
     // Copy schedules to device
     gpuErrchk(hipMemcpy(dev_schedules_arr, temp_schedules, memSize,
@@ -1091,9 +1148,9 @@ FUNC_RESULT ACOScheduler::FindSchedule(InstSchedule *schedule_out,
     // Passing and array of schedules and dereferencing the array
     // to get pointers slows down the kernel significantly
     InstSchedule **dev_schedules;
-    memSize = sizeof(InstSchedule *) * NUMTHREADS;
+    memSize = sizeof(InstSchedule *) * numThreads_;
     gpuErrchk(hipMallocManaged(&dev_schedules, memSize));
-    for (int i = 0; i < NUMTHREADS; i++)
+    for (int i = 0; i < numThreads_; i++)
       dev_schedules[i] = &dev_schedules_arr[i];
     gpuErrchk(hipMemPrefetchAsync(dev_schedules, memSize, 0));
     // Copy over best schedule
@@ -1109,17 +1166,17 @@ FUNC_RESULT ACOScheduler::FindSchedule(InstSchedule *schedule_out,
                          hipMemcpyHostToDevice));
     // Create a global mem array for device to use in parallel reduction
     int *dev_blockBestIndex;
-    memSize = (NUMBLOCKS/2) * sizeof(int);
+    memSize = (NUMBLOCKSMANYANTS/2) * sizeof(int);
     gpuErrchk(hipMalloc(&dev_blockBestIndex, memSize));
     // Make sure managed memory is copied to device before kernel start
     memSize = sizeof(ACOScheduler);
     gpuErrchk(hipMemPrefetchAsync(dev_AcoSchdulr, memSize, 0));
-    Logger::Info("Launching Dev_ACO with %d blocks of %d threads", NUMBLOCKS,
+    Logger::Info("Launching Dev_ACO with %d blocks of %d threads", numBlocks_,
                                                            NUMTHREADSPERBLOCK);
     // Using Cooperative Grid Groups requires launching with
     // hipLaunchCooperativeKernel which requires kernel args to be an array
     // of void pointers to host memory locations of the arguments
-    dim3 gridDim(NUMBLOCKS);
+    dim3 gridDim(numBlocks_);
     dim3 blockDim(NUMTHREADSPERBLOCK);
     void *dArgs[7];
     dArgs[0] = (void*)&dev_rgn_;
@@ -1142,7 +1199,7 @@ FUNC_RESULT ACOScheduler::FindSchedule(InstSchedule *schedule_out,
     // Free allocated memory that is no longer needed
     bestSchedule->FreeDeviceArrays();
     hipFree(dev_bestSched);
-    for (int i = 0; i < NUMTHREADS; i++) {
+    for (int i = 0; i < numThreads_; i++) {
       delete host_schedules[i];
     }
     delete[] host_schedules;
@@ -1151,16 +1208,44 @@ FUNC_RESULT ACOScheduler::FindSchedule(InstSchedule *schedule_out,
     hipFree(dev_schedules);
 
   } else { // Run ACO on cpu
-    Logger::Info("Running host ACO with %d ants per iteration", NUMTHREADS);
+    Logger::Info("Running host ACO with %d ants per iteration", numThreads_);
     InstCount RPTarget;
     if (!((BBWithSpill *)rgn_)->needsSLIL())
       RPTarget = bestSchedule->GetSpillCost();
     else
       RPTarget = MaxRPTarget;
+    #ifdef CHECK_DIFFERENT_SCHEDULES
+      std::unordered_map<string, int> schedMap;
+      int diffSchedCount = 0;
+    #endif
     while (noImprovement < noImprovementMax) {
       iterationBest = nullptr;
-      for (int i = 0; i < NUMTHREADS; i++) {
+      for (int i = 0; i < numThreads_; i++) {
         InstSchedule *schedule = FindOneSchedule(RPTarget);
+
+        #ifdef CHECK_DIFFERENT_SCHEDULES
+          // check if schedule is in Map
+          InstCount instNum, cycleNum, slotNum;
+          // get first instruction in string
+          instNum = schedule->GetFrstInst(cycleNum, slotNum);
+          std::string schedString = std::to_string(instNum);
+          // prepare next instruction in comma separated list
+          instNum = schedule->GetNxtInst(cycleNum, slotNum);
+          while (instNum != INVALID_VALUE) {
+            schedString.append(",");
+            schedString.append(std::to_string(instNum));
+            instNum = schedule->GetNxtInst(cycleNum, slotNum);
+          }
+          schedule->ResetInstIter();
+          if (schedMap.find(schedString) == schedMap.end()) {
+            schedMap[schedString] = 1;
+            diffSchedCount++;
+          }
+          else {
+            schedMap[schedString] = schedMap[schedString] + 1;
+          }
+        #endif
+
         if (print_aco_trace)
           PrintSchedule(schedule);
         if (shouldReplaceSchedule(iterationBest, schedule, false)) {
@@ -1174,7 +1259,7 @@ FUNC_RESULT ACOScheduler::FindSchedule(InstSchedule *schedule_out,
       }
 #if !USE_ACS
       if (iterationBest)
-        UpdatePheromone(iterationBest);
+        UpdatePheromone(iterationBest, false);
 #endif
       if (shouldReplaceSchedule(bestSchedule, iterationBest, true)) {
         if (bestSchedule && bestSchedule != InitialSchedule)
@@ -1199,18 +1284,21 @@ FUNC_RESULT ACOScheduler::FindSchedule(InstSchedule *schedule_out,
           // Disable resetting noImp to lock iterations to 10
           noImprovement++;
 #endif
-        if (bestSchedule && ( bestSchedule->GetCost() == 0 || ( !IsFirst && bestSchedule->GetExecCost() == 0 ) ) )
+        if (bestSchedule && ( IsFirst && (bestSchedule->GetNormSpillCost() == 0 ||
+        ((BBWithSpill *)rgn_)->ReturnPeakSpillCost() == 0) ||
+        ( !IsFirst && bestSchedule->GetExecCost() == 0 ) ) )
           break;
       } else {
         delete iterationBest;
         noImprovement++;
       }
 #if USE_ACS
-      UpdatePheromone(bestSchedule);
+      UpdatePheromone(bestSchedule, false);
 #endif
       iterations++;
     }
     Logger::Info("%d ants terminated early", numAntsTerminated_);
+    Logger::Info("%d different schedules for %d total ants", diffSchedCount, (iterations + 1) * numThreads_ - numAntsTerminated_);
   } // End run on CPU
 
   printf("Best schedule: ");
@@ -1219,7 +1307,7 @@ FUNC_RESULT ACOScheduler::FindSchedule(InstSchedule *schedule_out,
   schedule_out->Copy(bestSchedule);
   if (bestSchedule != InitialSchedule)
     delete bestSchedule;
-  if (!DEV_ACO)
+  if (!DEV_ACO || count_ < REGION_MIN_SIZE)
     printf("ACO finished after %d iterations\n", iterations);
 
   return RES_SUCCESS;
@@ -1235,7 +1323,7 @@ double dmin(double d1, double d2) {
 }
 
 __host__ __device__
-void ACOScheduler::UpdatePheromone(InstSchedule *schedule) {
+void ACOScheduler::UpdatePheromone(InstSchedule *schedule, bool isIterationBest) {
 #ifdef __HIP_DEVICE_COMPILE__ // device version of function
 #if (PHER_UPDATE_SCHEME == ONE_PER_ITER)
   // parallel on global level
@@ -1245,17 +1333,26 @@ void ACOScheduler::UpdatePheromone(InstSchedule *schedule) {
   int instNum = hipThreadIdx_x;
 #endif
   // Each thread updates pheromone table for 1 instruction
-  // For the case NUMTHREADS < count_, increase instNum by 
-  // NUMTHREADS at the end of the loop.
+  // For the case numThreads < count_, increase instNum by
+  // numThreads at the end of the loop.
   InstCount lastInstNum = -1;
-  // thrust::maximum<double> dmax;
-  // thrust::minimum<double> dmin;
   pheromone_t portion = schedule->GetCost() / (ScRelMax * 1.5);
   pheromone_t deposition;
-  if (portion < 1)
-    deposition = (1 - portion) * MAX_DEPOSITION_MINUS_MIN + MIN_DEPOSITION;
-  else
-    deposition = MIN_DEPOSITION;
+    if (isIterationBest)
+    deposition = 100000;
+  else {
+    if (portion < 1)
+      deposition = (1 - portion) * MAX_DEPOSITION_MINUS_MIN + MIN_DEPOSITION;
+    else {
+      #if (PHER_UPDATE_SCHEME == ONE_PER_ITER)
+        deposition = MIN_DEPOSITION;
+      #elif (PHER_UPDATE_SCHEME == ONE_PER_BLOCK)
+        deposition = MIN_DEPOSITION / 80;
+      #elif (PHER_UPDATE_SCHEME == ALL)
+        deposition = MIN_DEPOSITION / numThreads_;
+      #endif
+    }
+  }
 
   pheromone_t *pheromone;
   while (instNum < count_) {
@@ -1264,23 +1361,17 @@ void ACOScheduler::UpdatePheromone(InstSchedule *schedule) {
     lastInstNum = schedule->GetPrevInstNum(instNum);
     // Get corresponding pheromone and update it
     pheromone = &Pheromone(lastInstNum, instNum);
-    *pheromone = *pheromone + deposition;
-    // decay pheromone for all trails leading to instNum
-    for (int j = 0; j < count_; j++) {
-      pheromone = &Pheromone(j, instNum);
-      *pheromone *= (1 - decay_factor);
-      *pheromone = dmax(1, dmin(8, *pheromone));
-    }
+    atomicAdd(pheromone, deposition);
 #if (PHER_UPDATE_SCHEME == ONE_PER_ITER)
     // parallel on global level
-    // Increase instNum by NUMTHREADS until over count_
-    instNum += NUMTHREADS;
+    // Increase instNum by numThreads_ until over count_
+    instNum += numThreads_;
 #elif (PHER_UPDATE_SCHEME == ALL || PHER_UPDATE_SCHEME == ONE_PER_BLOCK)
     // parallel on block level
     instNum += NUMTHREADSPERBLOCK;
 #endif
   }
-  if (print_aco_trace)
+  if (print_aco_trace && GLOBALTID==0)
     PrintPheromone();
 
 #else // host version of function
@@ -1318,10 +1409,79 @@ void ACOScheduler::UpdatePheromone(InstSchedule *schedule) {
     for (int j = 0; j < count_; j++) {
       pheromone = &Pheromone(i, j);
       *pheromone *= (1 - decay_factor);
-      *pheromone = fmax(1, fmin(8, *pheromone));
     }
   }
 #endif
+  if (print_aco_trace)
+    PrintPheromone();
+#endif
+}
+
+__host__ __device__
+void ACOScheduler::ScalePheromoneTable() {
+#ifdef __HIP_DEVICE_COMPILE__ // device version of function
+  int instNum = GLOBALTID;
+  dev_totalPherInTable = 0;
+  // Each thread updates pheromone table for 1 instruction
+  // For the case numThreads < count_, increase instNum by
+  // numThreads at the end of the loop.
+  pheromone_t *pheromone;
+  while (instNum < count_) {
+    // decay pheromone for all trails leading to instNum
+    for (int j = 0; j < count_; j++) {
+      pheromone = &Pheromone(j, instNum);
+      *pheromone *= (1 - decay_factor);
+      // clamp pheromone values to be between 1 and 8
+      *pheromone = dmax(1, dmin(8, *pheromone));
+      atomicAdd(&dev_totalPherInTable, *pheromone);
+    }
+    // parallel on global level
+    // Increase instNum by numThreads_ until over count_
+    instNum += numThreads_;
+  }
+  // adjust pheromone table by scaling factor
+  // pheromone_t scalingFactor = (double) (count_ * count_ * 4.5)/dev_totalPherInTable;
+  pheromone_t scalingAdjustment = 4.5 - dev_totalPherInTable / (count_ * count_);
+  instNum = GLOBALTID;
+  while (instNum < count_) {
+    // restrict pheromone for all trails leading to instNum
+    // to be within range
+    for (int j = 0; j < count_; j++) {
+      pheromone = &Pheromone(j, instNum);
+      *pheromone = *pheromone + scalingAdjustment;
+      *pheromone = dmax(1, dmin(8, *pheromone));
+    }
+    // parallel on global level
+    // Increase instNum by numThreads_ until over count_
+    instNum += numThreads_;
+  }
+  if (print_aco_trace && GLOBALTID==0)
+    PrintPheromone();
+
+#else // host version of function
+
+  pheromone_t *pheromone;
+  pheromone_t totalPherInTable;
+  totalPherInTable = 0;
+  // clamp pheromone to range
+  for (int i = 0; i < count_; i++) {
+    for (int j = 0; j < count_; j++) {
+      pheromone = &Pheromone(i, j);
+      *pheromone *= (1 - decay_factor);
+      *pheromone = fmax(1, fmin(8, *pheromone));
+      totalPherInTable += *pheromone;
+    }
+  }
+
+  // pheromone_t scalingFactor = (double) (count_ * count_ * 4.5)/totalPherInTable;
+  pheromone_t scalingAdjustment = 4.5 - totalPherInTable / (count_ * count_);
+  for (int i = 0; i < count_; i++) {
+    for (int j = 0; j < count_; j++) {
+      pheromone = &Pheromone(i, j);
+      *pheromone = *pheromone + scalingAdjustment;
+      *pheromone = fmax(1, fmin(8, *pheromone));
+    }
+  }
   if (print_aco_trace)
     PrintPheromone();
 #endif
@@ -1412,11 +1572,12 @@ inline void ACOScheduler::UpdtRdyLst_(InstCount cycleNum, int slotNum) {
 
 __host__ __device__
 void ACOScheduler::PrintPheromone() {
+  printf("Pher: ");
   for (int i = 0; i < count_; i++) {
     for (int j = 0; j < count_; j++) {
       //std::cerr << std::scientific << std::setprecision(8) << Pheromone(i, j)
       //          << " ";
-      printf("%.10e ", Pheromone(i, j));
+      printf("%.1f ", Pheromone(i, j));
     }
     //std::cerr << std::endl;
     printf("\n");
@@ -1476,42 +1637,42 @@ void ACOScheduler::setInitialSched(InstSchedule *Sched) {
 void ACOScheduler::AllocDevArraysForParallelACO() {
   size_t memSize;
   // Alloc dev array for schduldInstCnt_
-  memSize = sizeof(InstCount) * NUMTHREADS;
+  memSize = sizeof(InstCount) * numThreads_;
   gpuErrchk(hipMalloc(&dev_schduldInstCnt_, memSize));
   // Alloc dev array for crntCycleNum_;
-  memSize = sizeof(InstCount) * NUMTHREADS;
+  memSize = sizeof(InstCount) * numThreads_;
   gpuErrchk(hipMalloc(&dev_crntCycleNum_, memSize));
   // Alloc dev array for crntSlotNum_;
-  memSize = sizeof(InstCount) * NUMTHREADS;
+  memSize = sizeof(InstCount) * numThreads_;
   gpuErrchk(hipMalloc(&dev_crntSlotNum_, memSize));
   // Allo dev array for crntRealSlotNum_
-  memSize = sizeof(InstCount) * NUMTHREADS;
+  memSize = sizeof(InstCount) * numThreads_;
   gpuErrchk(hipMalloc(&dev_crntRealSlotNum_, memSize));
   // Alloc dev array for isCrntCycleBlkd_;
-  memSize = sizeof(bool) * NUMTHREADS;
+  memSize = sizeof(bool) * numThreads_;
   gpuErrchk(hipMalloc(&dev_isCrntCycleBlkd_, memSize));
   
   // Alloc dev array for readyLs;
-  readyLs->AllocDevArraysForParallelACO(NUMTHREADS);
+  readyLs->AllocDevArraysForParallelACO(numThreads_);
   // Alloc dev arrays for MaxScoringInst
-  memSize = sizeof(InstCount) * NUMTHREADS;
+  memSize = sizeof(InstCount) * numThreads_;
   gpuErrchk(hipMalloc(&dev_MaxScoringInst, memSize));
   // Alloc dev array for avlblSlotsInCrntCycle_
-  memSize = sizeof(int16_t *) * NUMTHREADS;
+  memSize = sizeof(int16_t *) * numThreads_;
   gpuErrchk(hipMallocManaged(&dev_avlblSlotsInCrntCycle_, memSize));
   // Alloc dev arrays of avlblSlotsInCrntCycle_ for each thread
   memSize = sizeof(int16_t) * issuTypeCnt_;
-  for (int i = 0; i < NUMTHREADS; i++) {
+  for (int i = 0; i < numThreads_; i++) {
     gpuErrchk(hipMalloc(&dev_avlblSlotsInCrntCycle_[i], memSize));
   }
   // Alloc dev arrays for rsrvSlots_
-  memSize = sizeof(ReserveSlot *) * NUMTHREADS;
+  memSize = sizeof(ReserveSlot *) * numThreads_;
   gpuErrchk(hipMallocManaged(&dev_rsrvSlots_, memSize));
   memSize = sizeof(ReserveSlot) * issuRate_;
-  for (int i = 0; i < NUMTHREADS; i++) {
+  for (int i = 0; i < numThreads_; i++) {
     gpuErrchk(hipMalloc(&dev_rsrvSlots_[i], memSize));
   }
-  memSize = sizeof(int16_t) * NUMTHREADS;
+  memSize = sizeof(int16_t) * numThreads_;
   gpuErrchk(hipMalloc(&dev_rsrvSlotCnt_, memSize));
 }
 
@@ -1565,9 +1726,9 @@ void ACOScheduler::CopyPointersToDevice(ACOScheduler *dev_ACOSchedulr) {
   gpuErrchk(hipMemcpy(dev_ACOSchedulr->dev_kHelper, kHelper, memSize,
 		       hipMemcpyHostToDevice));
   // make sure hipMallocManaged memory is copied to device before kernel start
-  memSize = sizeof(int16_t *) * NUMTHREADS;
+  memSize = sizeof(int16_t *) * numThreads_;
   gpuErrchk(hipMemPrefetchAsync(dev_avlblSlotsInCrntCycle_, memSize, 0));
-  memSize = sizeof(ReserveSlot *) * NUMTHREADS;
+  memSize = sizeof(ReserveSlot *) * numThreads_;
   gpuErrchk(hipMemPrefetchAsync(dev_rsrvSlots_, memSize, 0));
 }
 
@@ -1579,7 +1740,7 @@ void ACOScheduler::FreeDevicePointers() {
   hipFree(dev_isCrntCycleBlkd_);
   hipFree(slotsPerTypePerCycle_);
   hipFree(instCntPerIssuType_);
-  for (int i = 0; i < NUMTHREADS; i++){
+  for (int i = 0; i < numThreads_; i++){
     hipFree(dev_avlblSlotsInCrntCycle_[i]);
     hipFree(dev_rsrvSlots_[i]);
   }

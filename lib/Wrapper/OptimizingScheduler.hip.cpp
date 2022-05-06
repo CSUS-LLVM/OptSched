@@ -32,6 +32,7 @@
 #include "llvm/Support/Path.h"
 #include "llvm/Support/raw_ostream.h"
 #include "opt-sched/Scheduler/dev_defines.h"
+#include "opt-sched/Scheduler/aco.h"
 #include "llvm/Target/TargetMachine.h"
 #include <algorithm>
 #include <chrono>
@@ -403,7 +404,7 @@ void ScheduleDAGOptSched::schedule() {
   addGraphTransformations(BDDG);
 
   // Prepare for device scheduling by increasing heap size and copying machMdl
-  if (DEV_ACO && dev_MM == NULL) {
+  if (DEV_ACO && dev_MM == NULL && NumRegionInstrs + 2 >= REGION_MIN_SIZE) {
     // Copy MachineModel to device for use during DevListSched.
     // Allocate device memory
     gpuErrchk(hipMallocManaged((void**)&dev_MM, sizeof(MachineModel)));
@@ -604,7 +605,7 @@ void ScheduleDAGOptSched::loadOptSchedConfig() {
   EnumStalls = schedIni.GetBool("ENUMERATE_STALLS");
   SCW = schedIni.GetInt("SPILL_COST_WEIGHT");
   LowerBoundAlgorithm = parseLowerBoundAlgorithm();
-  HeuristicPriorities = parseHeuristic(schedIni.GetString("HEURISTIC"));
+  HeuristicPriorities = parseHeuristic(schedIni.GetString("LIST_HEURISTIC"));
   EnumPriorities = parseHeuristic(schedIni.GetString("ENUM_HEURISTIC"));
   SecondPassEnumPriorities =
       parseHeuristic(schedIni.GetString("SECOND_PASS_ENUM_HEURISTIC"));

@@ -25,13 +25,13 @@ namespace opt_sched {
 // setting to 1 locks ACO to iterations_without_improvement iterations
 #define RUNTIME_TESTING 0
 // Minimum region node count. Doesn't make sence to launch DEV_ACO on small rgns
-#define REGION_MIN_SIZE 1
+#define REGION_MIN_SIZE 10
+#define MANY_ANT_MIN_SIZE 100
 // use edge count to approximate memory usage, using nodeCnt reflect
 // memory usage as well. Smaller node count DAGs can use more memory.
 #define REGION_MAX_EDGE_CNT 800000
-#define NUMBLOCKS 80
+#define NUMBLOCKSMANYANTS 160
 #define NUMTHREADSPERBLOCK 32
-#define NUMTHREADS NUMBLOCKS * NUMTHREADSPERBLOCK
 
 enum class DCF_OPT {
   OFF,
@@ -51,9 +51,9 @@ class ACOScheduler : public ConstrainedScheduler {
 public:
   ACOScheduler(DataDepGraph *dataDepGraph, MachineModel *machineModel,
                InstCount upperBound, SchedPriorities priorities,
-               bool vrfySched, bool IsPostBB, SchedRegion *dev_rgn = NULL,
-	       DataDepGraph *dev_DDG = NULL,
-	       MachineModel *dev_MM = NULL, void *dev_states = NULL);
+               bool vrfySched, bool IsPostBB,  int numBlocks,
+               SchedRegion *dev_rgn = NULL, DataDepGraph *dev_DDG = NULL,
+	             MachineModel *dev_MM = NULL, void *dev_states = NULL);
   __host__
   virtual ~ACOScheduler();
   FUNC_RESULT FindSchedule(InstSchedule *schedule, SchedRegion *region, 
@@ -69,7 +69,7 @@ public:
   void CopyPheromonesToDevice(ACOScheduler *dev_AcoSchdulr);
   // Calls hipFree on all arrays/objects that were allocated with hipMalloc
   void FreeDevicePointers();
-  // Allocates device arrays of size NUMTHREADS of dynamic variables to allow
+  // Allocates device arrays of size numThreads_ of dynamic variables to allow
   // each thread to have its own value
   void AllocDevArraysForParallelACO();
   // Finds a schedule, if passed a device side schedule, use that instead
@@ -78,7 +78,9 @@ public:
   InstSchedule *FindOneSchedule(InstCount RPTarget,
                                 InstSchedule *dev_schedule = NULL);
   __host__ __device__
-  void UpdatePheromone(InstSchedule *schedule);
+  void UpdatePheromone(InstSchedule *schedule, bool isIterationBest);
+  __host__ __device__
+  void ScalePheromoneTable();
   // Copies pheromone table to passed shared memory array
   __device__ 
   void CopyPheromonesToSharedMem(double *s_pheromone);
@@ -89,6 +91,14 @@ public:
   InstCount GetNumAntsTerminated() { return numAntsTerminated_; }
   __host__ __device__
   void SetGlobalBestStalls(int stalls) { globalBestStalls_ = stalls; }
+  __host__ __device__
+  void SetScRelMax(pheromone_t inScRelMax) { ScRelMax = inScRelMax; }
+  __host__ __device__
+  int GetNumBlocks() { return numBlocks_; }
+  __host__ __device__
+  int GetNumThreads() { return numThreads_; }
+  __host__ __device__
+  void PrintPheromone();
     // Holds state for each thread for RNG
   void *dev_states_;
 private:
@@ -99,8 +109,6 @@ private:
   __host__ __device__
   pheromone_t Score(InstCount FromId, InstCount ToId, HeurType ToHeuristic);
   DCF_OPT ParseDCFOpt(const std::string &opt);
-  __host__ __device__
-  void PrintPheromone();
   __host__ __device__
   InstCount SelectInstruction(SchedInstruction *lastInst, InstCount totalStalls, 
                               SchedRegion *rgn, bool &unnecessarilyStalling, 
@@ -130,7 +138,6 @@ private:
   double bias_ratio;
   double local_decay;
   double decay_factor;
-  int ants_per_iteration;
   int noImprovementMax;
   bool print_aco_trace;
   InstSchedule *InitialSchedule;
@@ -149,6 +156,7 @@ private:
 
   bool justWaited = false;
   int globalBestStalls_ = 0;
+  int numBlocks_, numThreads_;
 
 };
 

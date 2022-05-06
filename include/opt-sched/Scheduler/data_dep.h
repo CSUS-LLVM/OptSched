@@ -737,6 +737,7 @@ private:
   bool vrfy_;
 
   int totalStalls_, unnecessaryStalls_;
+  bool isZeroPerp_;
 
   bool VerifySlots_(MachineModel *machMdl, DataDepGraph *dataDepGraph);
   bool VerifyDataDeps_(DataDepGraph *dataDepGraph);
@@ -864,6 +865,10 @@ public:
   inline int getTotalStalls() const {return totalStalls_;}
   __host__ __device__
   inline int getUnnecessaryStalls() const {return unnecessaryStalls_;}
+  __host__ __device__
+  void setIsZeroPerp(bool isZeroPerp) { isZeroPerp_ = isZeroPerp; }
+  __host__ __device__
+  bool getIsZeroPerp() { return isZeroPerp_; }
 };
 /*****************************************************************************/
 

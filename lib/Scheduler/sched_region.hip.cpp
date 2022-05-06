@@ -217,6 +217,13 @@ FUNC_RESULT SchedRegion::FindOptimalSchedule(
   bool HeuristicSchedulerEnabled = schedIni.GetBool("HEUR_ENABLED");
   bool AcoSchedulerEnabled = schedIni.GetBool("ACO_ENABLED");
   bool BbSchedulerEnabled = isBbEnabled(schedIni, rgnTimeout);
+  unsigned long randSeed = (unsigned long) schedIni.GetInt("RANDOM_SEED");
+  int numBlocks;
+  if (DEV_ACO && dataDepGraph_->GetInstCnt() >= REGION_MIN_SIZE)
+    numBlocks = schedIni.GetBool("ACO_MANY_ANTS_ENABLED") && dataDepGraph_->GetInstCnt() > MANY_ANT_MIN_SIZE ?
+                schedIni.GetInt("ACO_MANY_ANTS_PER_ITERATION_BLOCKS") : schedIni.GetInt("ACO_DEVICE_ANT_PER_ITERATION_BLOCKS");
+  else
+    numBlocks = schedIni.GetInt("HOST_ANTS");
 
   if (AcoSchedulerEnabled) {
     AcoBeforeEnum = schedIni.GetBool("ACO_BEFORE_ENUM");
@@ -326,7 +333,7 @@ FUNC_RESULT SchedRegion::FindOptimalSchedule(
 
   // This must be done after SetupForSchdulng() or UpdateSetupForSchdulng() to
   // avoid resetting lower bound values.
-  if (!BbSchedulerEnabled)
+  if (!BbSchedulerEnabled && !AcoSchedulerEnabled)
     costLwrBound_ = CmputCostLwrBound();
   else
     CmputLwrBounds_(false);
@@ -340,15 +347,73 @@ FUNC_RESULT SchedRegion::FindOptimalSchedule(
     CmputNormCost_(lstSched, CCM_DYNMC, hurstcExecCost, true);
     hurstcCost_ = lstSched->GetCost();
     InstCount maxIndependentInstructions = 0;
-    for (int i = 0; i < dataDepGraph_->GetInstCnt(); i++) {
-      int independentInstructions = dataDepGraph_->GetInstCnt() - dataDepGraph_->GetInstByIndx(i)->GetRcrsvPrdcsrCnt() - dataDepGraph_->GetInstByIndx(i)->GetRcrsvScsrCnt();
-      maxIndependentInstructions = independentInstructions > maxIndependentInstructions ? independentInstructions : maxIndependentInstructions;
+    std::string readyListUB = schedIni.GetString("ACO_READY_LIST_UB");
+    if (readyListUB == "NO" || readyListUB == "MIN_DEGREE") {
+      for (int i = 0; i < dataDepGraph_->GetInstCnt(); i++) {
+        int independentInstructions = dataDepGraph_->GetInstCnt() - dataDepGraph_->GetInstByIndx(i)->GetRcrsvPrdcsrCnt() - dataDepGraph_->GetInstByIndx(i)->GetRcrsvScsrCnt();
+        maxIndependentInstructions = independentInstructions > maxIndependentInstructions ? independentInstructions : maxIndependentInstructions;
+      }
+      if (readyListUB == "MIN_DEGREE") {
+        dataDepGraph_->SetMaxIndependentInstructions(maxIndependentInstructions);
+      }
+      else {
+        dataDepGraph_->SetMaxIndependentInstructions(dataDepGraph_->GetInstCnt());
+      }
+
+      Logger::Info("Ready List Size is: %d, Percent of total number of instructions: %f", dataDepGraph_->GetMaxIndependentInstructions(), double(maxIndependentInstructions)/double(dataDepGraph_->GetInstCnt()));
     }
-    dataDepGraph_->SetMaxIndependentInstructions(maxIndependentInstructions);
-    Logger::Info("Ready List Size is: %d, Percent of total number of instructions: %f", maxIndependentInstructions, double(maxIndependentInstructions)/double(dataDepGraph_->GetInstCnt()));
+    else if (readyListUB == "ANNIHILATION") {
+      int annihilationNumber;
+      std::vector<int> degreeSequence;
+      for (int i = 0; i < dataDepGraph_->GetInstCnt()-2; i++) {
+        int degree = dataDepGraph_->GetInstByIndx(i)->GetRcrsvPrdcsrCnt() + dataDepGraph_->GetInstByIndx(i)->GetRcrsvScsrCnt();
+        degreeSequence.push_back(degree - 2);
+        int independentInstructions = dataDepGraph_->GetInstCnt() - degree;
+        maxIndependentInstructions = independentInstructions > maxIndependentInstructions ? independentInstructions : maxIndependentInstructions;
+      }
+      std::sort(std::begin(degreeSequence), std::end(degreeSequence), std::greater<int>());
+
+      int frontPointer = 0;
+      int backPointer = dataDepGraph_->GetInstCnt() - 3;
+      int remainder = 0;
+
+      if (degreeSequence[frontPointer] != 0) {
+        while (frontPointer < backPointer) {
+          // delete front element
+          if (remainder == 0) {
+            remainder = degreeSequence[frontPointer];
+            degreeSequence[frontPointer] = 0;
+            frontPointer++;
+          }
+
+          // subtract front from back element
+          if (degreeSequence[backPointer] <= remainder) {
+            remainder -= degreeSequence[backPointer];
+            degreeSequence[backPointer] = 0;
+            backPointer--;
+          }
+          else {
+            degreeSequence[backPointer] -= remainder;
+            remainder = 0;
+          }
+        }
+
+        // if there is no remainder but there is still a single nonzero element left in the array
+        // just increment the counter instead of doing another loop
+        if (remainder == 0 && frontPointer == backPointer)
+          frontPointer++;
+      }
+
+      annihilationNumber = dataDepGraph_->GetInstCnt() - frontPointer - 2;
+      dataDepGraph_->SetMaxIndependentInstructions(std::min(maxIndependentInstructions, annihilationNumber));
+      Logger::Info("Degree bound: %d, Annihilation number: %d", maxIndependentInstructions, annihilationNumber);
+      Logger::Info("Ready List Size is: %d, Percent of total number of instructions: %f", dataDepGraph_->GetMaxIndependentInstructions(),
+                   double(dataDepGraph_->GetMaxIndependentInstructions())/double(dataDepGraph_->GetInstCnt()));
+    }
+
     // This schedule is optimal so ACO will not be run
     // so set bestSched here.
-    if (hurstcCost_ == 0 || maxIndependentInstructions == 1) {
+    if (hurstcCost_ == 0 || maxIndependentInstructions == 1 || (IsSecondPass() && hurstcExecCost == 0)) {
       isLstOptml = true;
       bestSched = bestSched_ = lstSched;
       bestSchedLngth_ = heuristicScheduleLength;
@@ -372,14 +437,36 @@ FUNC_RESULT SchedRegion::FindOptimalSchedule(
 #endif
   }
 
+  // (Chris): If the cost function is SLIL, then the list schedule is considered
+  // optimal if PERP is 0.
+  if (filterByPerp && !isLstOptml && spillCostFunc_ == SCF_SLIL) {
+    const InstCount *regPressures = nullptr;
+    auto regTypeCount = lstSched->GetPeakRegPressures(regPressures);
+    InstCount sumPerp = 0;
+    for (int i = 0; i < regTypeCount; ++i) {
+      int perp = regPressures[i] - machMdl_->GetPhysRegCnt(i);
+      if (perp > 0)
+        sumPerp += perp;
+    }
+    if (sumPerp == 0) {
+      isLstOptml = IsSecondPass() ? lstSched->GetCrntLngth() == schedLwrBound_ : true;
+      bestSched = bestSched_ = lstSched;
+      bestSchedLngth_ = heuristicScheduleLength;
+      bestCost_ = hurstcCost_;
+      if (!IsSecondPass())
+        Logger::Info("Marking SLIL list schedule as optimal due to zero PERP.");
+      else if(isLstOptml)
+        Logger::Info("Marking SLIL list schedule as optimal due to zero PERP and optimal length.");
+    }
+  }
+
   // Step #2: Use ACO to find a schedule if enabled and no optimal schedule is
   // yet to be found.
   // check if region is of appropriate size to execute Dev_ACO on 
   // Defined in aco.h
   // TODO: move to sched.ini
   if (AcoBeforeEnum && 
-      (REGION_MIN_SIZE > 0 && dataDepGraph_->GetInstCnt() < REGION_MIN_SIZE ||
-       REGION_MAX_EDGE_CNT > 0 && 
+      (REGION_MAX_EDGE_CNT > 0 &&
        dataDepGraph_->GetEdgeCnt() > REGION_MAX_EDGE_CNT)) {
     Logger::Info("Skipping ACO (under %d nodes or over %d edges)", 
                   REGION_MIN_SIZE, REGION_MAX_EDGE_CNT);
@@ -390,7 +477,7 @@ FUNC_RESULT SchedRegion::FindOptimalSchedule(
     AcoStart = Utilities::GetProcessorTime();
     AcoSchedule = new InstSchedule(machMdl_, dataDepGraph_, vrfySched_);
 
-    rslt = runACO(AcoSchedule, lstSched, false);
+    rslt = runACO(AcoSchedule, lstSched, false, randSeed, numBlocks);
     if (rslt != RES_SUCCESS) {
       Logger::Fatal("ACO scheduling failed");
       if (lstSchdulr)
@@ -470,23 +557,6 @@ FUNC_RESULT SchedRegion::FindOptimalSchedule(
   dataDepGraph_->PrintLwrBounds(DIR_FRWRD, Logger::GetLogStream(),
                                 "CP Lower Bounds");
 #endif
-
-  // (Chris): If the cost function is SLIL, then the list schedule is considered
-  // optimal if PERP is 0.
-  if (filterByPerp && !isLstOptml && spillCostFunc_ == SCF_SLIL) {
-    const InstCount *regPressures = nullptr;
-    auto regTypeCount = lstSched->GetPeakRegPressures(regPressures);
-    InstCount sumPerp = 0;
-    for (int i = 0; i < regTypeCount; ++i) {
-      int perp = regPressures[i] - machMdl_->GetPhysRegCnt(i);
-      if (perp > 0)
-        sumPerp += perp;
-    }
-    if (sumPerp == 0) {
-      isLstOptml = true;
-      Logger::Info("Marking SLIL list schedule as optimal due to zero PERP.");
-    }
-  }
 
 #if defined(IS_DEBUG_SLIL_OPTIMALITY)
   // (Chris): This code prints a statement when a schedule is SLIL-optimal but
@@ -588,7 +658,7 @@ FUNC_RESULT SchedRegion::FindOptimalSchedule(
     InstSchedule *AcoAfterEnumSchedule =
         new InstSchedule(machMdl_, dataDepGraph_, vrfySched_);
 
-    FUNC_RESULT acoRslt = runACO(AcoAfterEnumSchedule, bestSched, true);
+    FUNC_RESULT acoRslt = runACO(AcoAfterEnumSchedule, bestSched, true, randSeed, numBlocks);
     if (acoRslt != RES_SUCCESS) {
       Logger::Info("Running final ACO failed");
       delete AcoAfterEnumSchedule;
@@ -967,25 +1037,27 @@ void InitCurand(hiprandState_t *dev_states, unsigned long seed, int instCnt) {
 }
 
 FUNC_RESULT SchedRegion::runACO(InstSchedule *ReturnSched,
-                                InstSchedule *InitSched, bool IsPostBB) {
+                                InstSchedule *InitSched, bool IsPostBB,
+                                unsigned long randSeed, int numBlocks) {
   InitForSchdulng();
   FUNC_RESULT Rslt;
+  int numThreads = numBlocks * NUMTHREADSPERBLOCK;
   // Num of edges are used to filter out the few regions that are too large
   // to fit in device memory
   Logger::Info("This DDG has %d edges", dataDepGraph_->GetEdgeCnt());
-  if (DEV_ACO) {
+  if (DEV_ACO && dataDepGraph_->GetInstCnt() >= REGION_MIN_SIZE) {
     // Allocate and Copy data to device for parallel ACO
     size_t memSize;
     // Allocate arrays for parallel ACO execution
     for (int i = 0; i < dataDepGraph_->GetInstCnt(); i++) {
-      dataDepGraph_->GetInstByIndx(i)->AllocDevArraysForParallelACO(NUMTHREADS);
+      dataDepGraph_->GetInstByIndx(i)->AllocDevArraysForParallelACO(numThreads);
     }
     RegisterFile *regFiles = dataDepGraph_->getRegFiles();
     for (int i = 0; i < dataDepGraph_->GetRegTypeCnt(); i++) {
       for (int j = 0; j < regFiles[i].GetRegCnt(); j++)
-        regFiles[i].GetReg(j)->AllocDevArrayForParallelACO(NUMTHREADS);
+        regFiles[i].GetReg(j)->AllocDevArrayForParallelACO(numThreads);
     }
-    ((BBWithSpill*)this)->AllocDevArraysForParallelACO(NUMTHREADS);
+    ((BBWithSpill*)this)->AllocDevArraysForParallelACO(numThreads);
     // Copy DDG and its objects to device
     Logger::Info("Copying DDG and its Instruction to device");
     DataDepGraph *dev_DDG;
@@ -993,7 +1065,7 @@ FUNC_RESULT SchedRegion::runACO(InstSchedule *ReturnSched,
     gpuErrchk(hipMallocManaged(&dev_DDG, memSize));
     gpuErrchk(hipMemcpy(dev_DDG, dataDepGraph_, memSize,
                          hipMemcpyHostToDevice));
-    dataDepGraph_->CopyPointersToDevice(dev_DDG, NUMTHREADS);
+    dataDepGraph_->CopyPointersToDevice(dev_DDG, numThreads);
     Logger::Info("Done Copying DDG and its Instruction to device");
     // Copy this(BBWithSpill) to device
     BBWithSpill *dev_rgn;
@@ -1003,17 +1075,17 @@ FUNC_RESULT SchedRegion::runACO(InstSchedule *ReturnSched,
     // Copy this to device
     gpuErrchk(hipMemcpy(dev_rgn, this, memSize, hipMemcpyHostToDevice));
     dev_rgn->machMdl_ = dev_machMdl_;
-    CopyPointersToDevice(dev_rgn, NUMTHREADS);
+    CopyPointersToDevice(dev_rgn, numThreads);
     // Allocate dev_states for hiprand RNG and run hiprand_init() to initialize
     hiprandState_t *dev_states;
-    memSize = sizeof(hiprandState_t) * NUMTHREADS;
+    memSize = sizeof(hiprandState_t) * numThreads;
     gpuErrchk(hipMalloc(&dev_states, memSize));
-    hipLaunchKernelGGL(InitCurand, NUMBLOCKS, NUMTHREADSPERBLOCK, 0, 0, dev_states, 
-                                                  unsigned(time(NULL)),
-                                                  dataDepGraph_->GetInstCnt());                                       
+    hipLaunchKernelGGL(InitCurand, numBlocks, NUMTHREADSPERBLOCK, 0, 0, dev_states,
+                                                  randSeed == 0 ? unsigned(time(NULL)) : randSeed,
+                                                  dataDepGraph_->GetInstCnt());
     ACOScheduler *AcoSchdulr = new ACOScheduler(
         dataDepGraph_, machMdl_, abslutSchedUprBound_, enumPrirts_,
-        vrfySched_, IsPostBB, (SchedRegion *)dev_rgn, dev_DDG,
+        vrfySched_, IsPostBB, numBlocks, (SchedRegion *)dev_rgn, dev_DDG,
         dev_machMdl_, dev_states);
     AcoSchdulr->setInitialSched(InitSched);
     // Alloc dev arrays for parallel ACO
@@ -1037,9 +1109,9 @@ FUNC_RESULT SchedRegion::runACO(InstSchedule *ReturnSched,
     dev_AcoSchdulr->FreeDevicePointers();
     hipFree(dev_AcoSchdulr);
     delete AcoSchdulr;
-    dev_rgn->FreeDevicePointers(NUMTHREADS);
+    dev_rgn->FreeDevicePointers(numThreads);
     hipFree(dev_rgn);
-    dev_DDG->FreeDevicePointers(NUMTHREADS);
+    dev_DDG->FreeDevicePointers(numThreads);
     hipFree(dev_DDG);
     hipFree(dev_states);
     // For some reason crashed OptSched to have this in the destructor
@@ -1053,7 +1125,7 @@ FUNC_RESULT SchedRegion::runACO(InstSchedule *ReturnSched,
   } else {
     ACOScheduler *AcoSchdulr = 
         new ACOScheduler(dataDepGraph_, machMdl_, abslutSchedUprBound_,
-                         enumPrirts_, vrfySched_, IsPostBB);
+                         enumPrirts_, vrfySched_, IsPostBB, numBlocks);
     AcoSchdulr->setInitialSched(InitSched);
     Rslt = AcoSchdulr->FindSchedule(ReturnSched, this);
     delete AcoSchdulr;
