@@ -86,7 +86,7 @@ public:
   void CopyPheromonesToSharedMem(double *s_pheromone);
   __host__ __device__
   bool shouldReplaceSchedule(InstSchedule *OldSched, InstSchedule *NewSched,
-                             bool IsGlobal);
+                             bool IsGlobal, InstCount RPTarget);
   __host__ __device__
   InstCount GetNumAntsTerminated() { return numAntsTerminated_; }
   __host__ __device__

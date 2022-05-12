@@ -55,6 +55,7 @@ BBWithSpill::BBWithSpill(const OptSchedTarget *OST_, DataDepGraph *dataDepGraph,
   schedCostFactor_ = COST_WGHT_BASE;
   trackLiveRangeLngths_ = true;
   NeedsComputeSLIL = (spillCostFunc == SCF_SLIL);
+  needsComputeTarget = (spillCostFunc == SCF_TARGET);
 
   regTypeCnt_ = OST->MM->GetRegTypeCnt();
   MaxOccLDS_ = ((OptSchedGCNTarget *) OST)->getMaxOccLDS();
@@ -1319,6 +1320,9 @@ InstCount BBWithSpill::UpdtOptmlSched(InstSchedule *crntSched,
 
 __host__ __device__
 bool BBWithSpill::needsSLIL() { return NeedsComputeSLIL; }
+
+__host__ __device__
+bool BBWithSpill::needsTarget() { return needsComputeTarget; }
 
 void BBWithSpill::SetupForSchdulng_() {
   for (int i = 0; i < regTypeCnt_; i++) {

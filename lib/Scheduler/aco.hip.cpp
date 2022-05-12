@@ -36,7 +36,7 @@ double RandDouble(double min, double max) {
 #define MAX_DEPOSITION 6
 #define MAX_DEPOSITION_MINUS_MIN (MAX_DEPOSITION - MIN_DEPOSITION)
 #define ACO_SCHED_STALLS 1
-#define CHECK_DIFFERENT_SCHEDULES 1
+//#define CHECK_DIFFERENT_SCHEDULES 1
 //#define BIASED_CHOICES 10000000
 //#define LOCAL_DECAY 0.1
 
@@ -144,7 +144,7 @@ pheromone_t ACOScheduler::Score(InstCount FromId, InstCount ToId, HeurType ToHeu
 __host__ __device__
 bool ACOScheduler::shouldReplaceSchedule(InstSchedule *OldSched,
                                          InstSchedule *NewSched,
-                                         bool IsGlobal) {
+                                         bool IsGlobal, InstCount RPTarget) {
   // return true if the old schedule is null (eg:there is no old schedule)
   // return false if the new schedule is is NULL
   if (!NewSched) {
@@ -179,8 +179,10 @@ bool ACOScheduler::shouldReplaceSchedule(InstSchedule *OldSched,
   else {
     #ifdef __HIP_DEVICE_COMPILE__
       bool needsSLIL = ((BBWithSpill *)dev_rgn_)->needsSLIL();
+      bool needsTarget = ((BBWithSpill *)dev_rgn_)->needsTarget();
     #else
       bool needsSLIL = ((BBWithSpill *)rgn_)->needsSLIL();
+      bool needsTarget = ((BBWithSpill *)rgn_)->needsTarget();
     #endif
     InstCount NewCost = NewSched->GetExecCost();
     InstCount OldCost = OldSched->GetExecCost();
@@ -188,7 +190,16 @@ bool ACOScheduler::shouldReplaceSchedule(InstSchedule *OldSched,
     InstCount OldSpillCost = OldSched->GetNormSpillCost();
     // if using SLIL and old schedule is 0 PERP, new schedule wins if it
     // is 0 PERP and shorter
-    if (needsSLIL && OldSched->getIsZeroPerp()) {
+    if (needsTarget) {
+      // If both schedules are under occupancy target, then pick shorter one
+      if (NewSpillCost <= RPTarget && OldSpillCost <= RPTarget) {
+        if (NewCost < OldCost)
+          return true;
+        else
+          return false;
+      }
+    }
+    else if (needsSLIL && OldSched->getIsZeroPerp()) {
       if (NewSched->getIsZeroPerp() && NewCost < OldCost)
         return true;
       else if (NewSched->getIsZeroPerp() && NewCost == OldCost && NewSpillCost < OldSpillCost)
@@ -212,7 +223,9 @@ bool ACOScheduler::shouldReplaceSchedule(InstSchedule *OldSched,
 }
 
 __host__ __device__
-InstCount ACOScheduler::SelectInstruction(SchedInstruction *lastInst, InstCount totalStalls, SchedRegion *rgn, bool &unnecessarilyStalling, bool closeToRPTarget, bool currentlyWaiting) {
+InstCount ACOScheduler::SelectInstruction(SchedInstruction *lastInst, InstCount totalStalls,
+                                          SchedRegion *rgn, bool &unnecessarilyStalling,
+                                          bool closeToRPTarget, bool currentlyWaiting) {
 #ifdef __HIP_DEVICE_COMPILE__
   // loop through instructions to see if all fully-ready instructions have a negative effect on RP
   // if there are no fully-ready instructions, then onlyRPNegative will be true
@@ -763,14 +776,14 @@ InstSchedule *ACOScheduler::FindOneSchedule(InstCount RPTarget,
 
 // Reduce to only index of best schedule per 2 blocks in output array
 __inline__ __device__
-void reduceToBestSchedPerBlock(InstSchedule **dev_schedules, int *blockBestIndex, ACOScheduler *dev_AcoSchdulr) {
+void reduceToBestSchedPerBlock(InstSchedule **dev_schedules, int *blockBestIndex, ACOScheduler *dev_AcoSchdulr, InstCount RPTarget) {
   __shared__ int sdata[NUMTHREADSPERBLOCK];
   uint gtid = GLOBALTID;
   uint tid = hipThreadIdx_x;
   int blockSize = NUMTHREADSPERBLOCK;
   
   // load candidate schedules into smem
-  if (dev_AcoSchdulr->shouldReplaceSchedule(dev_schedules[gtid * 2], dev_schedules[gtid * 2 + 1], false))
+  if (dev_AcoSchdulr->shouldReplaceSchedule(dev_schedules[gtid * 2], dev_schedules[gtid * 2 + 1], false, RPTarget))
     sdata[tid] = gtid * 2 + 1;
   else
     sdata[tid] = gtid * 2;
@@ -781,7 +794,7 @@ void reduceToBestSchedPerBlock(InstSchedule **dev_schedules, int *blockBestIndex
     if (tid%(2*s) == 0) {
       if (dev_AcoSchdulr->shouldReplaceSchedule(
           dev_schedules[sdata[tid]], 
-          dev_schedules[sdata[tid + s]], false))
+          dev_schedules[sdata[tid + s]], false, RPTarget))
         sdata[tid] = sdata[tid + s];
     }
     __syncthreads();
@@ -797,7 +810,7 @@ void reduceToBestSchedPerBlock(InstSchedule **dev_schedules, int *blockBestIndex
 // should be in blockBestIndex[0]
 __inline__ __device__
 void reduceToBestSched(InstSchedule **dev_schedules, int *blockBestIndex,
-                       ACOScheduler *dev_AcoSchdulr, int numBlocks) {
+                       ACOScheduler *dev_AcoSchdulr, int numBlocks, InstCount RPTarget) {
   __shared__ int sBestIndex[NUMBLOCKSMANYANTS/4];
   uint tid = hipThreadIdx_x;
   int index, sBestIndex1, sBestIndex2;
@@ -807,7 +820,7 @@ void reduceToBestSched(InstSchedule **dev_schedules, int *blockBestIndex,
   // will have to load in more than one value
   while (tid < numBlocks/4) {
     if (dev_AcoSchdulr->shouldReplaceSchedule(dev_schedules[blockBestIndex[tid * 2]], 
-                                              dev_schedules[blockBestIndex[tid * 2 + 1]], false))
+                                              dev_schedules[blockBestIndex[tid * 2 + 1]], false, RPTarget))
       sBestIndex[tid] = blockBestIndex[tid * 2 + 1];
     else
       sBestIndex[tid] = blockBestIndex[tid * 2];
@@ -829,7 +842,7 @@ void reduceToBestSched(InstSchedule **dev_schedules, int *blockBestIndex,
         sBestIndex2 = sBestIndex[index + s];
         if (dev_AcoSchdulr->shouldReplaceSchedule(
             dev_schedules[sBestIndex1],
-            dev_schedules[sBestIndex2], false))
+            dev_schedules[sBestIndex2], false, RPTarget))
           sBestIndex[index] = sBestIndex2;
       }
       tid += hipBlockDim_x;
@@ -864,6 +877,7 @@ void Dev_ACO(SchedRegion *dev_rgn, DataDepGraph *dev_DDG,
   int dev_iterations;
   bool needsSLIL;
   needsSLIL = ((BBWithSpill *)dev_rgn)->needsSLIL();
+  bool needsTarget = ((BBWithSpill *)dev_rgn)->needsTarget();
   bool IsSecondPass = dev_rgn->IsSecondPass();
   dev_rgn->SetDepGraph(dev_DDG);
   ((BBWithSpill *)dev_rgn)->SetRegFiles(dev_DDG->getRegFiles());
@@ -895,13 +909,13 @@ void Dev_ACO(SchedRegion *dev_rgn, DataDepGraph *dev_DDG,
     globalBestIndex = INVALID_VALUE;
     // reduce dev_schedules to 1 best schedule per block
     if (GLOBALTID < dev_AcoSchdulr->GetNumThreads()/2)
-      reduceToBestSchedPerBlock(dev_schedules, blockBestIndex, dev_AcoSchdulr);
+      reduceToBestSchedPerBlock(dev_schedules, blockBestIndex, dev_AcoSchdulr, RPTarget);
 
     threadGroup.sync();
 
     // one block to reduce blockBest schedules to one best schedule
     if (hipBlockIdx_x == 0)
-      reduceToBestSched(dev_schedules, blockBestIndex, dev_AcoSchdulr, dev_AcoSchdulr->GetNumBlocks());
+      reduceToBestSched(dev_schedules, blockBestIndex, dev_AcoSchdulr, dev_AcoSchdulr->GetNumBlocks(), RPTarget);
 
     threadGroup.sync();    
 
@@ -915,7 +929,7 @@ void Dev_ACO(SchedRegion *dev_rgn, DataDepGraph *dev_DDG,
       if (globalBestIndex != INVALID_VALUE &&
           dev_AcoSchdulr->shouldReplaceSchedule(dev_bestSched, 
                                                 dev_schedules[globalBestIndex], 
-                                                true)) {
+                                                true, RPTarget)) {
         #ifdef DEBUG_0_PERP
           InstCount NewCost = dev_schedules[globalBestIndex]->GetExecCost();
           InstCount OldCost = dev_bestSched->GetExecCost();
@@ -1088,7 +1102,7 @@ FUNC_RESULT ACOScheduler::FindSchedule(InstSchedule *schedule_out,
   // check if heuristic schedule is better than the initial
   // schedule passed from the list scheduler
   if (shouldReplaceSchedule(InitialSchedule, heuristicSched,
-                                /*IsGlobal=*/true)) {
+                                /*IsGlobal=*/true, InitialSchedule->GetSpillCost())) {
     bestSchedule = std::move(heuristicSched);
     printf("Heuristic schedule is better\n");
   }
@@ -1248,7 +1262,7 @@ FUNC_RESULT ACOScheduler::FindSchedule(InstSchedule *schedule_out,
 
         if (print_aco_trace)
           PrintSchedule(schedule);
-        if (shouldReplaceSchedule(iterationBest, schedule, false)) {
+        if (shouldReplaceSchedule(iterationBest, schedule, false, RPTarget)) {
           if (iterationBest)
             delete iterationBest;          
           iterationBest = schedule;
@@ -1261,7 +1275,7 @@ FUNC_RESULT ACOScheduler::FindSchedule(InstSchedule *schedule_out,
       if (iterationBest)
         UpdatePheromone(iterationBest, false);
 #endif
-      if (shouldReplaceSchedule(bestSchedule, iterationBest, true)) {
+      if (shouldReplaceSchedule(bestSchedule, iterationBest, true, RPTarget)) {
         if (bestSchedule && bestSchedule != InitialSchedule)
           delete bestSchedule;
         bestSchedule = std::move(iterationBest);
@@ -1298,7 +1312,9 @@ FUNC_RESULT ACOScheduler::FindSchedule(InstSchedule *schedule_out,
       iterations++;
     }
     Logger::Info("%d ants terminated early", numAntsTerminated_);
+    #ifdef CHECK_DIFFERENT_SCHEDULES
     Logger::Info("%d different schedules for %d total ants", diffSchedCount, (iterations + 1) * numThreads_ - numAntsTerminated_);
+    #endif
   } // End run on CPU
 
   printf("Best schedule: ");

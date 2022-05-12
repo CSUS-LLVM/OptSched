@@ -126,7 +126,7 @@ private:
   // each thread by parallel ACO
   InstCount *dev_slilSpillCost_;
   bool trackLiveRangeLngths_;
-  bool NeedsComputeSLIL;
+  bool NeedsComputeSLIL, needsComputeTarget;
   // variables needed for AMDGPU spill cost function
   unsigned MaxOccLDS_;
   unsigned TargetOccupancy_;
@@ -213,6 +213,12 @@ public:
                            InstCount &execCost, bool trackCnflcts);
   __host__ __device__
   bool needsSLIL();
+  __host__ __device__
+  bool needsTarget();
+  __host__ __device__
+  InstCount getTargetOccupancy() {
+    return TargetOccupancy_;
+  };
   __host__ __device__
   InstCount GetCrntSpillCost();
   // can only compute SLIL if SLIL was the spillCostFunc
