@@ -14,37 +14,7 @@ using namespace llvm::opt_sched;
 using std::string;
 using std::vector;
 
-MachineModel::MachineModel(const std::string &modelFile) {
-  SpecsBuffer buf;
-  buf.Load(modelFile.c_str());
-
-  char buffer[MAX_NAMESIZE];
-
-  buf.ReadSpec("MODEL_NAME:", buffer);
-  mdlName_ = buffer;
-
-  issueRate_ = buf.ReadIntSpec("ISSUE_RATE:");
-
-  int numIssueTypes = buf.ReadIntSpec("ISSUE_TYPE_COUNT:");
-
-  issueTypes_.resize(numIssueTypes > 0 ? numIssueTypes : 1);
-  if (numIssueTypes > 0) {
-    for (size_t j = 0; j < issueTypes_.size(); j++) {
-      int pieceCnt;
-      char *strngs[INBUF_MAX_PIECES_PERLINE];
-      int lngths[INBUF_MAX_PIECES_PERLINE];
-      buf.GetNxtVldLine(pieceCnt, strngs, lngths);
-
-      if (pieceCnt != 2)
-        llvm::report_fatal_error("Invalid issue type spec", false);
-
-      issueTypes_[j].name = strngs[0];
-      issueTypes_[j].slotsCount = atoi(strngs[1]);
-    }
-  }
-}
-
-MachineModel::MachineModel(SpecsBuffer &buf) {
+void MachineModel::parseBuffer(SpecsBuffer &buf) {
   char buffer[MAX_NAMESIZE];
 
   buf.ReadSpec("MODEL_NAME:", buffer);
@@ -115,6 +85,14 @@ MachineModel::MachineModel(SpecsBuffer &buf) {
     it->sprtd = buf.ReadFlagSpec("SUPPORTED:", true);
   }
 }
+
+MachineModel::MachineModel(const std::string &modelFile) {
+  SpecsBuffer buf;
+  buf.Load(modelFile.c_str());
+  parseBuffer(buf);
+}
+
+MachineModel::MachineModel(SpecsBuffer &buf) { parseBuffer(buf); }
 
 InstType MachineModel::GetInstTypeByName(const string &typeName,
                                          const string &prevName) const {
