@@ -189,6 +189,8 @@ protected:
   std::vector<RegTypeInfo> registerTypes_;
   // A vector of issue types with their names and slot counts.
   std::vector<IssueTypeInfo> issueTypes_;
+
+  void parseBuffer(SpecsBuffer &buf);
 };
 
 } // namespace opt_sched
