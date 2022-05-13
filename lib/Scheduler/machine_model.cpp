@@ -14,12 +14,7 @@ using namespace llvm::opt_sched;
 using std::string;
 using std::vector;
 
-MachineModel::MachineModel(const std::string &modelFile) {
-  SpecsBuffer buf;
-  buf.Load(modelFile.c_str());
-}
-
-MachineModel::MachineModel(SpecsBuffer &buf) {
+void MachineModel::parseBuffer(SpecsBuffer &buf) {
   char buffer[MAX_NAMESIZE];
 
   buf.ReadSpec("MODEL_NAME:", buffer);
@@ -90,6 +85,14 @@ MachineModel::MachineModel(SpecsBuffer &buf) {
     it->sprtd = buf.ReadFlagSpec("SUPPORTED:", true);
   }
 }
+
+MachineModel::MachineModel(const std::string &modelFile) {
+  SpecsBuffer buf;
+  buf.Load(modelFile.c_str());
+  parseBuffer(buf);
+}
+
+MachineModel::MachineModel(SpecsBuffer &buf) { parseBuffer(buf); }
 
 InstType MachineModel::GetInstTypeByName(const string &typeName,
                                          const string &prevName) const {
