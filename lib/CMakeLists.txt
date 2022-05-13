@@ -21,6 +21,7 @@ set(OPTSCHED_SRCS Scheduler/aco.cpp
   Scheduler/relaxed_sched.cpp
   Scheduler/sched_basic_data.cpp
   Scheduler/sched_region.cpp
+  Scheduler/simplified_aco_ds.cpp
   Scheduler/stats.cpp
   Wrapper/OptimizingScheduler.cpp
   Wrapper/OptSchedMachineWrapper.cpp
