@@ -6,6 +6,7 @@
 #include "OptSchedDDGWrapperBasic.h"
 #include "OptSchedMachineWrapper.h"
 #include "opt-sched/Scheduler/OptSchedTarget.h"
+#include "opt-sched/Scheduler/config.h"
 #include "opt-sched/Scheduler/defines.h"
 #include "opt-sched/Scheduler/machine_model.h"
 #include "llvm/ADT/STLExtras.h"
@@ -24,29 +25,41 @@ class OptSchedGenericTarget : public OptSchedTarget {
 public:
   std::unique_ptr<OptSchedMachineModel>
   createMachineModel(const char *ConfigPath) override {
-    return llvm::make_unique<OptSchedMachineModel>(ConfigPath);
+    return std::make_unique<OptSchedMachineModel>(ConfigPath);
   }
 
   std::unique_ptr<OptSchedDDGWrapperBase>
   createDDGWrapper(llvm::MachineSchedContext *Context, ScheduleDAGOptSched *DAG,
                    OptSchedMachineModel *MM, LATENCY_PRECISION LatencyPrecision,
                    const std::string &RegionID) override {
-    return llvm::make_unique<OptSchedDDGWrapperBasic>(
+    return std::make_unique<OptSchedDDGWrapperBasic>(
         Context, DAG, MM, LatencyPrecision, RegionID);
   }
 
-  void initRegion(llvm::ScheduleDAGInstrs *DAG, MachineModel *MM_) override {
+  void initRegion(llvm::ScheduleDAGInstrs *DAG, MachineModel *MM_,
+                  Config &OccFile) override {
     MM = MM_;
   }
   void finalizeRegion(const InstSchedule *Schedule) override {}
   // For generic target find total PRP.
   InstCount getCost(const llvm::SmallVectorImpl<unsigned> &PRP) const override;
+
+  void SetOccupancyLimit(int OccupancyLimitParam) override { /*nothing*/
+    ;
+  }
+  void SetShouldLimitOcc(bool ShouldLimitOccParam) override { /*nothing*/
+    ;
+  }
+  void SetOccLimitSource(OCC_LIMIT_TYPE LimitTypeParam) override { /*nothing*/
+    ;
+  }
 };
 
 } // end anonymous namespace
 
 InstCount OptSchedGenericTarget::getCost(
     const llvm::SmallVectorImpl<unsigned> &PRP) const {
+  Logger::Info("in generic get cost");
   InstCount TotalPRP = 0;
   for (int16_t T = 0; T < MM->GetRegTypeCnt(); ++T)
     TotalPRP += PRP[T];
@@ -57,7 +70,7 @@ namespace llvm {
 namespace opt_sched {
 
 std::unique_ptr<OptSchedTarget> createOptSchedGenericTarget() {
-  return llvm::make_unique<OptSchedGenericTarget>();
+  return std::make_unique<OptSchedGenericTarget>();
 }
 
 OptSchedTargetRegistry

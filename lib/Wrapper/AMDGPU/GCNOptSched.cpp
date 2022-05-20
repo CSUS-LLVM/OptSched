@@ -5,6 +5,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "GCNOptSched.h"
+#include "AMDGPUExportClustering.h"
 #include "AMDGPUMacroFusion.h"
 #include "GCNSchedStrategy.h"
 #include "SIMachineFunctionInfo.h"
@@ -19,19 +20,6 @@ static cl::opt<bool>
     GCNLimitOccWithHints("gcn-limit-occ-with-hints",
                          cl::desc("Limit occpancy target using perf hints."),
                          cl::init(false), cl::Hidden);
-
-static ScheduleDAGInstrs *createOptSchedGCN(MachineSchedContext *C) {
-  ScheduleDAGMILive *DAG = new ScheduleDAGOptSchedGCN(
-      C, llvm::make_unique<GCNMaxOccupancySchedStrategy>(C));
-  DAG->addMutation(createLoadClusterDAGMutation(DAG->TII, DAG->TRI));
-  DAG->addMutation(createStoreClusterDAGMutation(DAG->TII, DAG->TRI));
-  return DAG;
-}
-
-// Register the machine scheduler.
-static MachineSchedRegistry
-    OptSchedMIRegistry("gcn-optsched", "Use the GCN OptSched scheduler.",
-                       createOptSchedGCN);
 
 #if !defined(NDEBUG) || defined(LLVM_ENABLE_DUMP)
 static void getRealRegionPressure(MachineBasicBlock::const_iterator Begin,

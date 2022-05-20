@@ -43,7 +43,8 @@ static std::string ComputeDDGDumpPath() {
     // Force the user to set DDG_DUMP_PATH
     if (Path.empty())
       llvm::report_fatal_error(
-          "DDG_DUMP_PATH must be set if trying to DUMP_DDGS.", false);
+          llvm::StringRef("DDG_DUMP_PATH must be set if trying to DUMP_DDGS."),
+          false);
 
     // Do some niceness to the input path to produce the actual path.
     llvm::SmallString<32> FixedPath;
@@ -51,14 +52,16 @@ static std::string ComputeDDGDumpPath() {
         fs::real_path(Path, FixedPath, /* expand_tilde = */ true);
     if (ec)
       llvm::report_fatal_error(
-          "Unable to expand DDG_DUMP_PATH. " + ec.message(), false);
+          llvm::StringRef("Unable to expand DDG_DUMP_PATH. " + ec.message()),
+          false);
     Path.assign(FixedPath.begin(), FixedPath.end());
 
     // The path must be a directory, and it must exist.
     if (!fs::is_directory(Path))
       llvm::report_fatal_error(
-          "DDG_DUMP_PATH is set to a non-existent directory or non-directory " +
-              Path,
+          llvm::StringRef("DDG_DUMP_PATH is set to a non-existent directory or "
+                          "non-directory " +
+                          Path),
           false);
 
     // Force the path to be considered a directory.
@@ -149,7 +152,7 @@ static bool isBbEnabled(Config &schedIni, Milliseconds rgnTimeout) {
 
 static void dumpDDG(DataDepGraph *DDG, llvm::StringRef DDGDumpPath,
                     llvm::StringRef Suffix = "") {
-  std::string Path = DDGDumpPath;
+  std::string Path = DDGDumpPath.data();
   Path += DDG->GetDagID();
 
   if (!Suffix.empty()) {
@@ -233,7 +236,8 @@ FUNC_RESULT SchedRegion::FindOptimalSchedule(
   if (!HeuristicSchedulerEnabled && !AcoBeforeEnum) {
     // Abort if ACO and heuristic algorithms are disabled.
     llvm::report_fatal_error(
-        "Heuristic list scheduler or ACO must be enabled before enumerator.",
+        llvm::StringRef("Heuristic list scheduler or ACO must be enabled "
+                        "before enumerator."),
         false);
     return RES_ERROR;
   }
@@ -295,7 +299,8 @@ FUNC_RESULT SchedRegion::FindOptimalSchedule(
     rslt = lstSchdulr->FindSchedule(lstSched, this);
 
     if (rslt != RES_SUCCESS) {
-      llvm::report_fatal_error("List scheduling failed", false);
+      llvm::report_fatal_error(llvm::StringRef("List scheduling failed"),
+                               false);
       delete lstSchdulr;
       delete lstSched;
       return rslt;
@@ -444,7 +449,7 @@ FUNC_RESULT SchedRegion::FindOptimalSchedule(
 
     rslt = runACO(AcoSchedule, lstSched, false);
     if (rslt != RES_SUCCESS) {
-      llvm::report_fatal_error("ACO scheduling failed", false);
+      llvm::report_fatal_error(llvm::StringRef("ACO scheduling failed"), false);
       if (lstSchdulr)
         delete lstSchdulr;
       if (lstSched)
@@ -803,7 +808,9 @@ FUNC_RESULT SchedRegion::Optimize_(Milliseconds startTime,
   enumBestSched_ = AllocNewSched_();
 
   InstCount initCost = bestCost_;
-  enumrtr = AllocEnumrtr_(lngthTimeout);
+
+  Milliseconds timeout = instTimeout_ ? lngthTimeout : rgnTimeout;
+  enumrtr = AllocEnumrtr_(timeout, TimeoutPerMemblock_);
   rslt = Enumerate_(startTime, rgnTimeout, lngthTimeout);
 
   Milliseconds solutionTime = Utilities::GetProcessorTime() - startTime;

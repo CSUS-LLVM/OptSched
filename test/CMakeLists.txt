@@ -16,7 +16,7 @@ configure_lit_site_cfg(
   )
 
 list(APPEND OPTSCHED_TEST_DEPS
-  OptSched
+  LLVMOptSched
   )
 
 set(OPTSCHED_TEST_PARAMS

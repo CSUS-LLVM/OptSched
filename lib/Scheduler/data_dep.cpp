@@ -11,6 +11,7 @@
 #include "opt-sched/Scheduler/relaxed_sched.h"
 #include "opt-sched/Scheduler/stats.h"
 #include "llvm/ADT/STLExtras.h"
+#include "llvm/CodeGen/ScheduleDAG.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/ErrorHandling.h"
 
@@ -197,7 +198,7 @@ DataDepGraph::DataDepGraph(MachineModel *machMdl, LATENCY_PRECISION ltncyPrcsn)
   entryInstCnt_ = 0;
   exitInstCnt_ = 0;
 
-  RegFiles = llvm::make_unique<RegisterFile[]>(machMdl_->GetRegTypeCnt());
+  RegFiles = std::make_unique<RegisterFile[]>(machMdl_->GetRegTypeCnt());
 }
 
 DataDepGraph::~DataDepGraph() {
@@ -605,7 +606,8 @@ FUNC_RESULT DataDepGraph::ParseF2Nodes_(SpecsBuffer *buf,
     }
 
     CreateNode_(nodeNum, instName, instType, opCode, nodeID, fileSchedOrder,
-                fileSchedCycle, fileInstLwrBound, fileInstUprBound, blkNum);
+                fileSchedCycle, fileInstLwrBound, fileInstUprBound, blkNum,
+                nullptr);
 
     instCntPerType_[instType]++;
     stats::instructionTypeCounts.Increment(
@@ -823,15 +825,18 @@ FUNC_RESULT DataDepGraph::SkipGraph(SpecsBuffer *buf, bool &endOfFileReached) {
   return RES_SUCCESS;
 }
 
-SchedInstruction *DataDepGraph::CreateNode_(
-    InstCount instNum, const char *const instName, InstType instType,
-    const char *const opCode, int nodeID, InstCount fileSchedOrder,
-    InstCount fileSchedCycle, InstCount fileLB, InstCount fileUB, int blkNum) {
+SchedInstruction *
+DataDepGraph::CreateNode_(InstCount instNum, const char *const instName,
+                          InstType instType, const char *const opCode,
+                          int nodeID, InstCount fileSchedOrder,
+                          InstCount fileSchedCycle, InstCount fileLB,
+                          InstCount fileUB, int blkNum, const SUnit *SU) {
 
   SchedInstruction *newInstPtr;
-  newInstPtr = new SchedInstruction(instNum, instName, instType, opCode,
-                                    2 * instCnt_, nodeID, fileSchedOrder,
-                                    fileSchedCycle, fileLB, fileUB, machMdl_);
+  newInstPtr = new SchedInstruction(
+      instNum, instName, instType, opCode, 2 * instCnt_, nodeID, fileSchedOrder,
+      fileSchedCycle, fileLB, fileUB, machMdl_, SU);
+
   if (instNum < 0 || instNum >= instCnt_)
     llvm::report_fatal_error("Invalid instruction number", false);
   //  Logger::Info("Instruction order = %d, instCnt_ = %d", fileSchedOrder,
@@ -839,6 +844,7 @@ SchedInstruction *DataDepGraph::CreateNode_(
   if (fileSchedOrder > maxFileSchedOrder_)
     maxFileSchedOrder_ = fileSchedOrder;
 
+  newInstPtr->setMF(MF_);
   insts_[instNum] = newInstPtr;
 
   return newInstPtr;
@@ -1523,15 +1529,15 @@ void DataDepSubGraph::CreateRootAndLeafInsts_() {
 
   assert(rootInst_ == NULL && leafInst_ == NULL);
 
-  rootInst_ =
-      new SchedInstruction(INVALID_VALUE, "root", instType, " ", maxInstCnt_, 0,
-                           INVALID_VALUE, INVALID_VALUE, 0, 0, machMdl_);
+  rootInst_ = new SchedInstruction(INVALID_VALUE, "root", instType, " ",
+                                   maxInstCnt_, 0, INVALID_VALUE, INVALID_VALUE,
+                                   0, 0, machMdl_, nullptr);
 
   rootInst_->SetIssueType(issuType);
 
-  leafInst_ =
-      new SchedInstruction(INVALID_VALUE, "leaf", instType, " ", maxInstCnt_, 0,
-                           INVALID_VALUE, INVALID_VALUE, 0, 0, machMdl_);
+  leafInst_ = new SchedInstruction(INVALID_VALUE, "leaf", instType, " ",
+                                   maxInstCnt_, 0, INVALID_VALUE, INVALID_VALUE,
+                                   0, 0, machMdl_, nullptr);
 
   leafInst_->SetIssueType(issuType);
 

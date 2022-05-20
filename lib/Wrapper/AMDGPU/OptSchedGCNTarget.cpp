@@ -7,6 +7,7 @@
 #include "SIMachineFunctionInfo.h"
 #include "Wrapper/OptSchedMachineWrapper.h"
 #include "opt-sched/Scheduler/OptSchedTarget.h"
+#include "opt-sched/Scheduler/config.h"
 #include "opt-sched/Scheduler/data_dep.h"
 #include "opt-sched/Scheduler/defines.h"
 #include "opt-sched/Scheduler/machine_model.h"
@@ -23,6 +24,7 @@ using namespace llvm::opt_sched;
 // This is necessary because we cannot perfectly predict the number of registers
 // of each type that will be allocated.
 static const unsigned GPRErrorMargin = 0;
+static const unsigned OCCUnlimited = 10;
 
 #ifndef NDEBUG
 static unsigned getOccupancyWeight(unsigned Occupancy) {
@@ -66,18 +68,19 @@ class OptSchedGCNTarget : public OptSchedTarget {
 public:
   std::unique_ptr<OptSchedMachineModel>
   createMachineModel(const char *ConfigPath) override {
-    return llvm::make_unique<OptSchedMachineModel>(ConfigPath);
+    return std::make_unique<OptSchedMachineModel>(ConfigPath);
   }
 
   std::unique_ptr<OptSchedDDGWrapperBase>
   createDDGWrapper(llvm::MachineSchedContext *Context, ScheduleDAGOptSched *DAG,
                    OptSchedMachineModel *MM, LATENCY_PRECISION LatencyPrecision,
                    const std::string &RegionID) override {
-    return llvm::make_unique<OptSchedDDGWrapperGCN>(Context, DAG, MM,
-                                                    LatencyPrecision, RegionID);
+    return std::make_unique<OptSchedDDGWrapperGCN>(Context, DAG, MM,
+                                                   LatencyPrecision, RegionID);
   }
 
-  void initRegion(llvm::ScheduleDAGInstrs *DAG, MachineModel *MM_) override;
+  void initRegion(llvm::ScheduleDAGInstrs *DAG, MachineModel *MM_,
+                  Config &OccFile) override;
 
   void finalizeRegion(const InstSchedule *Schedule) override;
 
@@ -90,6 +93,18 @@ public:
   // Revert scheduing if we decrease occupancy.
   bool shouldKeepSchedule() override;
 
+  void SetOccupancyLimit(int OccupancyLimitParam) override {
+    OccupancyLimit = OccupancyLimitParam;
+  }
+  void SetShouldLimitOcc(bool ShouldLimitOccParam) override {
+    ShouldLimitOcc = ShouldLimitOccParam;
+  }
+  void SetOccLimitSource(OCC_LIMIT_TYPE LimitTypeParam) override {
+    LimitType = LimitTypeParam;
+  }
+
+  int getOccupancyLimit(Config &OccFile) const;
+
 private:
   const llvm::MachineFunction *MF;
   SIMachineFunctionInfo *MFI;
@@ -100,20 +115,26 @@ private:
   unsigned RegionEndingOccupancy;
   unsigned TargetOccupancy;
 
+  // Limiting occupancy has shown to greatly increase the performance of some
+  // kernels
+  int OccupancyLimit;
+  bool ShouldLimitOcc;
+  OCC_LIMIT_TYPE LimitType;
+
   // Max occupancy with local memory size;
   unsigned MaxOccLDS;
 
   // In RP only (max occupancy) scheduling mode we should try to find
   // a min-RP schedule without considering perf hints which suggest limiting
   // occupancy. Returns true if we should consider perf hints.
-  bool shouldLimitWaves() const;
+  bool shouldLimitWaves(llvm::SIMachineFunctionInfo *MFI) const;
 
   // Find occupancy with spill cost.
   unsigned getOccupancyWithCost(const InstCount Cost) const;
 };
 
 std::unique_ptr<OptSchedTarget> createOptSchedGCNTarget() {
-  return llvm::make_unique<OptSchedGCNTarget>();
+  return std::make_unique<OptSchedGCNTarget>();
 }
 
 } // end anonymous namespace
@@ -144,7 +165,7 @@ void OptSchedGCNTarget::dumpOccupancyInfo(const InstSchedule *Schedule) const {
 #endif
 
 void OptSchedGCNTarget::initRegion(llvm::ScheduleDAGInstrs *DAG_,
-                                   MachineModel *MM_) {
+                                   MachineModel *MM_, Config &OccFile) {
   DAG = static_cast<ScheduleDAGOptSched *>(DAG_);
   MF = &DAG->MF;
   MFI =
@@ -156,23 +177,66 @@ void OptSchedGCNTarget::initRegion(llvm::ScheduleDAGInstrs *DAG_,
   GCNDownwardRPTracker RPTracker(*DAG->getLIS());
   RPTracker.advance(DAG->begin(), DAG->end(), nullptr);
   const GCNRegPressure &P = RPTracker.moveMaxPressure();
-  RegionStartingOccupancy =
-      getAdjustedOccupancy(ST, P.getVGPRNum(), P.getSGPRNum(), MaxOccLDS);
-  TargetOccupancy =
-      shouldLimitWaves() ? MFI->getMinAllowedOccupancy() : MFI->getOccupancy();
+  RegionStartingOccupancy = getAdjustedOccupancy(
+      ST, P.getVGPRNum(ST->hasGFX90AInsts()), P.getSGPRNum(), MaxOccLDS);
 
-  Logger::Event("TargetOccupancy", "region", RegionStartingOccupancy, "target",
-                TargetOccupancy);
+  TargetOccupancy =
+      shouldLimitWaves(MFI) ? getOccupancyLimit(OccFile) : MFI->getOccupancy();
+
+  // Do not attempt to hit a higher occupancy if we are limited by another
+  // region
+  if (TargetOccupancy > MFI->getOccupancy())
+    TargetOccupancy = MFI->getOccupancy();
+
+  Logger::Event("TargetOccupancy", "RegionStarting", RegionStartingOccupancy,
+                "Target", TargetOccupancy);
+
   LLVM_DEBUG(dbgs() << "Region starting occupancy is "
                     << RegionStartingOccupancy << "\n"
                     << "Target occupancy is " << TargetOccupancy << "\n");
 }
 
-bool OptSchedGCNTarget::shouldLimitWaves() const {
+bool OptSchedGCNTarget::shouldLimitWaves(
+    llvm::SIMachineFunctionInfo *MFI) const {
   // FIXME: Consider machine model here as well.
   // FIXME: Return false because perf hints are not currently strong enough to
   // use as a hard cap. Consider 'OccupancyWeight' heuristic here instead.
+  // TODO(Jeff): Limiting occupancy has shown to have a huge impact on
+  // performance. Good heuristics will likely be largely beneficial
+
+  if (ShouldLimitOcc) {
+    switch (LimitType) {
+    case OLT_NONE:
+      return false;
+    case OLT_HEUR:
+      return MFI->isMemoryBound() || MFI->needsWaveLimiter();
+    case OLT_FILE:
+      return true;
+    }
+  }
+
   return false;
+}
+
+int OptSchedGCNTarget::getOccupancyLimit(Config &OccFile) const {
+  switch (LimitType) {
+  case OLT_NONE:
+    return OCCUnlimited;
+  case OLT_HEUR:
+    return MFI->isMemoryBound() || MFI->needsWaveLimiter() ? 4 : OCCUnlimited;
+  case OLT_FILE:
+    std::string functionName = MF->getFunction().getName().data();
+    int limit = OccFile.GetInt(functionName, -1);
+    int AMDHeur =
+        MFI->isMemoryBound() || MFI->needsWaveLimiter() ? 4 : OCCUnlimited;
+    if (limit != -1) {
+      Logger::Event("OccupancyLimits", "File", limit, "AMDHeur", AMDHeur);
+    }
+    if (limit == -1) {
+      limit = OCCUnlimited;
+    }
+    return limit;
+  }
 }
 
 unsigned OptSchedGCNTarget::getOccupancyWithCost(const InstCount Cost) const {
@@ -223,6 +287,9 @@ namespace opt_sched {
 
 OptSchedTargetRegistry OptSchedGCNTargetRegistry("amdgcn",
                                                  createOptSchedGCNTarget);
+
+OptSchedTargetRegistry OptSchedGCNHSATargetRegistry("amdgcn-amd-amdhsa",
+                                                    createOptSchedGCNTarget);
 
 } // namespace opt_sched
 } // namespace llvm

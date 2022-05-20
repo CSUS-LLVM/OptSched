@@ -89,7 +89,7 @@ private:
   InstCount CmputCost_(InstSchedule *sched, COST_COMP_MODE compMode,
                        InstCount &execCost, bool trackCnflcts);
   void CmputSchedUprBound_();
-  Enumerator *AllocEnumrtr_(Milliseconds timeout);
+  Enumerator *AllocEnumrtr_(Milliseconds timeout, int timeoutPerMemblock);
   FUNC_RESULT Enumerate_(Milliseconds startTime, Milliseconds rgnDeadline,
                          Milliseconds lngthDeadline);
   void SetupForSchdulng_();
@@ -118,7 +118,8 @@ public:
               SchedPriorities hurstcPrirts, SchedPriorities enumPrirts,
               bool vrfySched, Pruning PruningStrategy, bool SchedForRPOnly,
               bool enblStallEnum, int SCW, SPILL_COST_FUNCTION spillCostFunc,
-              SchedulerType HeurSchedType, GT_POSITION GraphTransPosition);
+              SchedulerType HeurSchedType, GT_POSITION GraphTransPositionbool,
+              bool isTimeoutPerInst, int TimeoutPerMemblock);
   ~BBWithSpill();
 
   InstCount CmputExecCostLwrBound();

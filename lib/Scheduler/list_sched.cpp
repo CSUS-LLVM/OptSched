@@ -28,6 +28,20 @@ SchedInstruction *ListScheduler::PickInst() const {
   return inst;
 }
 
+bool ListScheduler::CheckForInst(int numToPick) const {
+  SchedInstruction *inst = NULL;
+  int rdyLstSize = rdyLst_->GetInstCnt();
+  for (int i = 0; i < rdyLstSize; i++) {
+    inst = rdyLst_->GetNextPriorityInst();
+    if (inst->GetNum() == numToPick) {
+      rdyLst_->ResetIterator();
+      return true;
+    }
+  }
+  rdyLst_->ResetIterator();
+  return false;
+}
+
 FUNC_RESULT ListScheduler::FindSchedule(InstSchedule *sched, SchedRegion *rgn) {
   InstCount rdyLstSize, maxRdyLstSize = 0, avgRdyLstSize = 0, iterCnt = 0;
   bool isEmptyCycle = true;
@@ -37,6 +51,8 @@ FUNC_RESULT ListScheduler::FindSchedule(InstSchedule *sched, SchedRegion *rgn) {
 
   Initialize_();
 
+  int numToPick = -1;
+  int entry, exit;
   while (!IsSchedComplete_()) {
     UpdtRdyLst_(crntCycleNum_, crntSlotNum_);
     rdyLst_->ResetIterator();
@@ -47,7 +63,27 @@ FUNC_RESULT ListScheduler::FindSchedule(InstSchedule *sched, SchedRegion *rgn) {
       maxRdyLstSize = rdyLstSize;
     avgRdyLstSize += rdyLstSize;
 
-    SchedInstruction *inst = PickInst();
+    SchedInstruction *inst;
+
+    // TODO -- extract this into config variable
+    bool forcedSchedule = false;
+
+    // Force get the schedule in order of best heuristic value (not just best
+    // available/ready)
+
+    if (forcedSchedule) {
+      if (numToPick == -1 || CheckForInst(numToPick)) {
+        inst = PickInst();
+        assert(inst);
+        if (numToPick == -1)
+          entry = inst->GetNum();
+        numToPick += 1;
+        if (numToPick == entry)
+          numToPick += 1;
+      }
+    }
+
+    inst = PickInst();
 
     InstCount instNum;
     // If the ready list is empty.

@@ -217,6 +217,7 @@ IntStat
 IntStat slotCountInfeasibilityHits("Slot count infeasibility hits");
 IntStat forwardLBInfeasibilityHits("Forward LB infeasibility hits");
 IntStat backwardLBInfeasibilityHits("Backward LB infeasibility hits");
+IntStat costInfeasibilityHits("Cost infeasibility hits");
 
 IntStat invalidSchedules("Invalid schedules");
 

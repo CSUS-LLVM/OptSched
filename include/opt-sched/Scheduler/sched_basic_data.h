@@ -13,6 +13,9 @@ Last Update:  Sept. 2013
 #include "opt-sched/Scheduler/hash_table.h"
 #include "opt-sched/Scheduler/machine_model.h"
 #include "llvm/ADT/ArrayRef.h"
+#include "llvm/CodeGen/MachineFunction.h"
+#include "llvm/CodeGen/ScheduleDAG.h"
+#include "llvm/Support/raw_ostream.h"
 #include <string>
 
 namespace llvm {
@@ -141,7 +144,8 @@ public:
   SchedInstruction(InstCount num, const string &name, InstType instType,
                    const string &opCode, InstCount maxInstCnt, int nodeID,
                    InstCount fileSchedCycle, InstCount fileSchedOrder,
-                   InstCount fileLB, InstCount fileUB, MachineModel *model);
+                   InstCount fileLB, InstCount fileUB, MachineModel *model,
+                   const SUnit *SU);
   // Deallocates the memory used by the instruction and destroys the object.
   ~SchedInstruction();
 
@@ -431,7 +435,12 @@ public:
 
   friend class SchedRange;
 
+  void setMF(MachineFunction *MF) { MF_ = MF; }
+  void printMF() { MF_->print(errs()); }
+
 protected:
+  MachineFunction *MF_;
+  const SUnit *SU_;
   // The "name" of this instruction. Usually a string indicating its type.
   string name_;
   // The mnemonic of this instruction, e.g. "add" or "jmp".
