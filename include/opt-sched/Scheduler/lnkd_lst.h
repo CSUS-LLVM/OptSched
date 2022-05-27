@@ -178,9 +178,9 @@ template <class EntryType>
 std::unique_ptr<EntryAllocator<typename EntryType::value_type>>
 makeDynamicOrArenaAllocator(int MaxSize) {
   if (MaxSize == INVALID_VALUE)
-    return llvm::make_unique<DynamicEntryAllocator<EntryType>>();
+    return std::make_unique<DynamicEntryAllocator<EntryType>>();
   else
-    return llvm::make_unique<ArenaEntryAllocator<EntryType>>(MaxSize);
+    return std::make_unique<ArenaEntryAllocator<EntryType>>(MaxSize);
 }
 
 template <class T> class LinkedList;

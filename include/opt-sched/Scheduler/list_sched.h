@@ -32,6 +32,10 @@ protected:
   // ready list.
   void UpdtRdyLst_(InstCount cycleNum, int slotNum);
 
+  // Check whether the next node ID instruction is ready -- used to collect
+  // scheduling stats for LLVM generating schedules
+  bool CheckForInst(int numToPick) const;
+
   // Pick next instruction to be scheduled. Returns NULL if no instructions are
   // ready.
   virtual SchedInstruction *PickInst() const;

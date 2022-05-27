@@ -40,7 +40,8 @@ BBWithSpill::BBWithSpill(const OptSchedTarget *OST_, DataDepGraph *dataDepGraph,
                          bool enblStallEnum, int SCW,
                          SPILL_COST_FUNCTION spillCostFunc,
                          SchedulerType HeurSchedType,
-                         GT_POSITION GraphTransPosition)
+                         GT_POSITION GraphTransPosition, bool isTimeoutPerInst,
+                         int TimeoutPerMemblock)
     : SchedRegion(OST_->MM, dataDepGraph, rgnNum, sigHashSize, lbAlg,
                   hurstcPrirts, enumPrirts, vrfySched, PruningStrategy,
                   HeurSchedType, spillCostFunc, GraphTransPosition),
@@ -74,6 +75,10 @@ BBWithSpill::BBWithSpill(const OptSchedTarget *OST_, DataDepGraph *dataDepGraph,
   schduldEntryInstCnt_ = 0;
   schduldExitInstCnt_ = 0;
   schduldInstCnt_ = 0;
+
+  instTimeout_ = isTimeoutPerInst;
+  TimeoutPerMemblock_ = TimeoutPerMemblock;
+  Logger::Event("FinishedConstBBInterfacer");
 }
 /****************************************************************************/
 
@@ -170,7 +175,7 @@ static InstCount ComputeSLILStaticLowerBound(int64_t regTypeCnt_,
   // already computed it before.
   const auto RegFiles = llvm::makeMutableArrayRef(regFiles_, regTypeCnt_);
   for (RegisterFile &File : RegFiles) {
-    for (Register &Reg : File) {
+    for (llvm::opt_sched::Register &Reg : File) {
       Reg.resetLiveInterval();
     }
   }
@@ -179,7 +184,7 @@ static InstCount ComputeSLILStaticLowerBound(int64_t regTypeCnt_,
   // and uses for each register.
   int naiveLowerBound = 0;
   for (RegisterFile &File : RegFiles) {
-    for (Register &Reg : File) {
+    for (llvm::opt_sched::Register &Reg : File) {
       const auto added_to_interval = [&](const SchedInstruction *instruction) {
         return Reg.AddToInterval(instruction);
       };
@@ -204,7 +209,7 @@ static InstCount ComputeSLILStaticLowerBound(int64_t regTypeCnt_,
     // between the recursive successor list of this instruction and the
     // recursive predecessors of the dependent instruction.
     auto recSuccBV = inst->GetRcrsvNghbrBitVector(DIR_FRWRD);
-    for (Register *def : inst->GetDefs()) {
+    for (llvm::opt_sched::Register *def : inst->GetDefs()) {
       for (const auto &dependentInst : def->GetUseList()) {
         auto recPredBV = const_cast<SchedInstruction *>(dependentInst)
                              ->GetRcrsvNghbrBitVector(DIR_BKWRD);
@@ -230,14 +235,15 @@ static InstCount ComputeSLILStaticLowerBound(int64_t regTypeCnt_,
   // based on the instructions that use more than one register (defined by
   // different instructions).
   int commonUseLowerBound = closureLowerBound;
-  std::vector<std::pair<const SchedInstruction *, Register *>> usedInsts;
+  std::vector<std::pair<const SchedInstruction *, llvm::opt_sched::Register *>>
+      usedInsts;
   for (int i = 0; i < dataDepGraph_->GetInstCnt(); ++i) {
     const auto &inst = dataDepGraph_->GetInstByIndx(i);
 
     // Get a list of instructions that define the registers, in array form.
     usedInsts.clear();
     llvm::transform(inst->GetUses(), std::back_inserter(usedInsts),
-                    [&](Register *reg) {
+                    [&](llvm::opt_sched::Register *reg) {
                       assert(reg->GetDefList().size() == 1 &&
                              "Number of defs for register is not 1!");
                       return std::make_pair(*(reg->GetDefList().begin()), reg);
@@ -488,10 +494,11 @@ void BBWithSpill::UpdateSpillInfoForSchdul_(SchedInstruction *inst,
     physRegNum = use->GetPhysicalNumber();
 
     if (use->IsLive() == false)
-      llvm::report_fatal_error("Reg " + std::to_string(regNum) + " of type " +
-                                   std::to_string(regType) +
-                                   " is used without being defined",
-                               false);
+      llvm::report_fatal_error(
+          llvm::StringRef("Reg " + std::to_string(regNum) + " of type " +
+                          std::to_string(regType) +
+                          " is used without being defined"),
+          false);
 
 #ifdef IS_DEBUG_REG_PRESSURE
     Logger::Info("Inst %d uses reg %d of type %d and %d uses", inst->GetNum(),
@@ -569,6 +576,7 @@ void BBWithSpill::UpdateSpillInfoForSchdul_(SchedInstruction *inst,
 
   for (int16_t i = 0; i < regTypeCnt_; i++) {
     liveRegs = liveRegs_[i].GetWghtedCnt();
+
     // Set current RP for register type "i"
     regPressures_[i] = liveRegs;
     // Update peak RP for register type "i"
@@ -780,7 +788,8 @@ void BBWithSpill::FinishOptml_() {
 }
 /*****************************************************************************/
 
-Enumerator *BBWithSpill::AllocEnumrtr_(Milliseconds timeout) {
+Enumerator *BBWithSpill::AllocEnumrtr_(Milliseconds timeout,
+                                       int timeoutPerMemblock) {
   bool enblStallEnum = enblStallEnum_;
   /*  if (!dataDepGraph_->IncludesUnpipelined()) {
       enblStallEnum = false;
@@ -789,7 +798,7 @@ Enumerator *BBWithSpill::AllocEnumrtr_(Milliseconds timeout) {
   enumrtr_ = new LengthCostEnumerator(
       dataDepGraph_, machMdl_, schedUprBound_, GetSigHashSize(),
       GetEnumPriorities(), GetPruningStrategy(), SchedForRPOnly_, enblStallEnum,
-      timeout, GetSpillCostFunc(), 0, NULL);
+      timeout, timeoutPerMemblock, GetSpillCostFunc(), 0, NULL);
 
   return enumrtr_;
 }
@@ -809,20 +818,21 @@ FUNC_RESULT BBWithSpill::Enumerate_(Milliseconds startTime,
       (rgnTimeout == INVALID_VALUE) ? INVALID_VALUE : startTime + rgnTimeout;
   lngthDeadline =
       (rgnTimeout == INVALID_VALUE) ? INVALID_VALUE : startTime + lngthTimeout;
-  assert(lngthDeadline <= rgnDeadline);
+  // assert(lngthDeadline <= rgnDeadline);
+
+  Milliseconds deadline = instTimeout_ ? lngthDeadline : rgnDeadline;
 
   for (trgtLngth = schedLwrBound_; trgtLngth <= schedUprBound_; trgtLngth++) {
     InitForSchdulng();
     Logger::Event("Enumerating", "target_length", trgtLngth);
 
     rslt = enumrtr_->FindFeasibleSchedule(enumCrntSched_, trgtLngth, this,
-                                          costLwrBound, lngthDeadline);
+                                          costLwrBound, deadline);
     if (rslt == RES_TIMEOUT)
       timeout = true;
     HandlEnumrtrRslt_(rslt, trgtLngth);
 
-    if (GetBestCost() == 0 || rslt == RES_ERROR ||
-        (lngthDeadline == rgnDeadline && rslt == RES_TIMEOUT) ||
+    if (GetBestCost() == 0 || rslt == RES_ERROR || (rslt == RES_TIMEOUT) ||
         (rslt == RES_SUCCESS && IsSecondPass())) {
 
       // If doing two pass optsched and on the second pass then terminate if a
@@ -851,6 +861,10 @@ FUNC_RESULT BBWithSpill::Enumerate_(Milliseconds startTime,
     if (lngthDeadline > rgnDeadline)
       lngthDeadline = rgnDeadline;
   }
+
+  stats::positiveDominationHits.Print(cout);
+  stats::nodeSuperiorityInfeasibilityHits.Print(cout);
+  stats::costInfeasibilityHits.Print(cout);
 
 #ifdef IS_DEBUG_ITERS
   stats::iterations.Record(iterCnt);
@@ -1075,11 +1089,13 @@ bool BBWithSpill::ChkCostFsbltyWghtd(InstCount trgtLngth, EnumTreeNode *node,
     node->SetCostLwrBound(crntCost);
     node->SetPeakSpillCost(peakSpillCost_);
     node->SetSpillCostSum(totSpillCost_);
+    enumCrntSched_->SetSpillCost(crntSpillCost_);
     node->setSpillCost(TmpSpillCost);
     node->setSpillCostLwrBound(TmpSpillCost);
     return true;
   }
 
+  stats::costInfeasibilityHits++;
   return false;
 }
 

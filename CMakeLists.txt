@@ -2,8 +2,9 @@ cmake_minimum_required(VERSION 3.4.3)
 
 project(OptSched)
 
-option(OPTSCHED_INCLUDE_TESTS "Generate build targets for the OptSched unit tests." ON)
-option(OPTSCHED_ENABLE_AMDGPU "Build the AMDGPU code. Requires that the AMDGPU target is supported." OFF)
+option(OPTSCHED_INCLUDE_TESTS "Generate build targets for the OptSched unit tests." OFF)
+option(OPTSCHED_ENABLE_AMDGPU "Build the AMDGPU code. Requires that the AMDGPU target is supported." ON)
+
 set(OPTSCHED_LIT_ARGS "-sv" CACHE STRING "Arguments to pass to lit")
 set(OPTSCHED_EXTRA_LINK_LIBRARIES "" CACHE STRING "Extra link_libraries to pass to OptSched, ;-separated")
 set(OPTSCHED_EXTRA_INCLUDE_DIRS "" CACHE STRING "Extra include_directories to pass to OptSched, ;-separated")
@@ -11,18 +12,18 @@ set(OPTSCHED_EXTRA_INCLUDE_DIRS "" CACHE STRING "Extra include_directories to pa
 # '-DOPTSCHED_EXTRA_DEFINITIONS=-DIS_DEBUG_DEFS_AND_USES;-DIS_DEBUG_DEF_USE_COUNT'
 set(OPTSCHED_EXTRA_DEFINITIONS "" CACHE STRING "Extra add_definitions to pass to OptSched, ;-separated")
 
-if(TARGET LLVMCodeGen)
+if(TARGET LLVMAMDGPUCodeGen OR TARGET LLVMCodeGen OR TARGET LLVMX86CodeGen)
   set(llvm_subproject TRUE)
 else()
   set(llvm_subproject FALSE)
 endif()
 
+# Not supported
 if(NOT llvm_subproject)
   set(llvm_version 6.0)
   if(OPTSCHED_ENABLE_AMDGPU)
     set(llvm_version 9.0)
   endif()
-
   set(OPTSCHED_LLVM_VERSION ${llvm_version} CACHE STRING "The LLVM version to build OptSched with (independent build only)")
 
   find_package(LLVM ${OPTSCHED_LLVM_VERSION} REQUIRED CONFIG)
@@ -36,8 +37,8 @@ endif()
 if(OPTSCHED_ENABLE_AMDGPU)
   if(NOT "AMDGPU" IN_LIST LLVM_ALL_TARGETS)
     message(FATAL_ERROR "Trying to build the AMDGPU code, but AMDGPU is not supported by this build of LLVM")
-  elseif(LLVM_VERSION VERSION_LESS 7.0)
-    message(FATAL_ERROR "OptSched requries LLVM version >= 7.0 to build the AMDGPU scheduler.")
+  elseif(LLVM_VERSION VERSION_LESS 13.0)
+    message(FATAL_ERROR "OptSched requries LLVM version >= 13.0 to build the AMDGPU scheduler.")
   endif()
 endif()
 
@@ -61,10 +62,6 @@ include_directories(
 )
 add_definitions(${OPTSCHED_EXTRA_DEFINITIONS})
 link_directories(${OPTSCHED_EXTRA_LINK_LIBRARIES})
-
-if(LLVM_VERSION VERSION_LESS 7.0)
-  add_definitions(-DLLVM_DEBUG=DEBUG)
-endif()
 
 if(NOT llvm_subproject)
   include(GetLocalLLVM)
@@ -98,9 +95,5 @@ if(OPTSCHED_INCLUDE_TESTS)
     COMMAND
       ${LLVM_TOOLS_BINARY_DIR}/clang ${CMAKE_CURRENT_SOURCE_DIR}/example/helloworld.cpp
       -O3
-      -fplugin=$<TARGET_FILE:OptSched>
-      -mllvm -misched=optsched
-      -mllvm -enable-misched
-      -mllvm -optsched-cfg=${CMAKE_CURRENT_SOURCE_DIR}/example/optsched-cfg
   )
 endif()

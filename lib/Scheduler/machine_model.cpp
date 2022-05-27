@@ -73,9 +73,10 @@ void MachineModel::parseBuffer(SpecsBuffer &buf) {
     IssueType issuType = GetIssueTypeByName(buffer);
 
     if (issuType == INVALID_ISSUE_TYPE) {
-      llvm::report_fatal_error(std::string("Invalid issue type ") + buffer +
-                                   " for inst. type " + it->name,
-                               false);
+      llvm::report_fatal_error(
+          llvm::StringRef(std::string("Invalid issue type ") + buffer +
+                          " for inst. type " + it->name),
+          false);
     }
 
     it->issuType = issuType;
@@ -94,13 +95,16 @@ MachineModel::MachineModel(const std::string &modelFile) {
 
 MachineModel::MachineModel(SpecsBuffer &buf) { parseBuffer(buf); }
 
-InstType MachineModel::GetInstTypeByName(const string &typeName,
+InstType MachineModel::GetInstTypeByName(llvm::StringRef typeName,
                                          const string &prevName) const {
-  string composite = prevName.size() ? typeName + "_after_" + prevName : "";
+  string composite = prevName.size()
+                         ? std::string(typeName.data()) + "_after_" + prevName
+                         : "";
   for (size_t i = 0; i < instTypes_.size(); i++) {
     if (instTypes_[i].isCntxtDep && instTypes_[i].name == composite) {
       return (InstType)i;
-    } else if (!instTypes_[i].isCntxtDep && instTypes_[i].name == typeName) {
+    } else if (!instTypes_[i].isCntxtDep &&
+               instTypes_[i].name == typeName.data()) {
       return (InstType)i;
     }
   }
@@ -109,9 +113,15 @@ InstType MachineModel::GetInstTypeByName(const string &typeName,
 }
 
 int16_t MachineModel::GetRegTypeByName(const char *const regTypeName) const {
+  std::string mapVal;
+  if (regTypeName == "SReg_32")
+    mapVal = "SGPR32";
+  if (regTypeName == "VGPR_32")
+    mapVal = "VGPR32";
   int16_t Type = INVALID_VALUE;
   for (size_t i = 0; i < registerTypes_.size(); i++) {
-    if (regTypeName == registerTypes_[i].name) {
+    if (regTypeName == registerTypes_[i].name ||
+        mapVal.data() == registerTypes_[i].name) {
       Type = (int16_t)i;
       break;
     }

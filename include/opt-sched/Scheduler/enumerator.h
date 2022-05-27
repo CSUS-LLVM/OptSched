@@ -442,6 +442,8 @@ protected:
   // Should we ignore ilp and only schedule for register pressure.
   bool SchedForRPOnly_;
 
+  bool BypassLatencyChecking_;
+
   // (Chris): Store the most recent matching hist node when checking for
   // history domination
   HistEnumTreeNode *mostRecentMatchingHistNode_ = nullptr;
@@ -547,7 +549,7 @@ public:
              InstCount schedUprBound, int16_t sigHashSize,
              SchedPriorities prirts, Pruning PruningStrategy,
              bool SchedForRPOnly, bool enblStallEnum, Milliseconds timeout,
-             InstCount preFxdInstCnt = 0,
+             int TimeoutPerMemblock, InstCount preFxdInstCnt = 0,
              SchedInstruction *preFxdInsts[] = NULL);
   virtual ~Enumerator();
   virtual void Reset();
@@ -561,6 +563,8 @@ public:
   inline bool IsRlxdPrnng();
   virtual bool IsCostEnum() = 0;
 
+  void printRdyLst();
+
   // (Chris)
   inline bool IsSchedForRPOnly() const { return SchedForRPOnly_; }
 
@@ -568,6 +572,8 @@ public:
   FUNC_RESULT FindSchedule(InstSchedule *sched, SchedRegion *rgn) {
     return RES_ERROR;
   }
+
+  inline bool bypassLatencyChecking() { return BypassLatencyChecking_; }
 };
 /*****************************************************************************/
 
@@ -592,7 +598,8 @@ public:
                    InstCount schedUprBound, int16_t sigHashSize,
                    SchedPriorities prirts, Pruning PruningStrategy,
                    bool SchedForRPOnly, bool enblStallEnum,
-                   Milliseconds timeout, InstCount preFxdInstCnt = 0,
+                   Milliseconds timeout, int TimeoutPerMemblock,
+                   InstCount preFxdInstCnt = 0,
                    SchedInstruction *preFxdInsts[] = NULL);
   virtual ~LengthEnumerator();
   void Reset();
@@ -628,7 +635,6 @@ private:
   bool WasObjctvMetFrstPss_();
   bool WasObjctvMetScndPss_();
   bool BackTrack_();
-  InstCount GetBestCost_();
   InstCount getBestSpillCost_();
   InstCount getBestSchedLength_();
   void CreateRootNode_();
@@ -648,12 +654,14 @@ public:
                        InstCount schedUprBound, int16_t sigHashSize,
                        SchedPriorities prirts, Pruning PruningStrategy,
                        bool SchedForRPOnly, bool enblStallEnum,
-                       Milliseconds timeout, SPILL_COST_FUNCTION spillCostFunc,
+                       Milliseconds timeout, int TimeoutPerMemblock,
+                       SPILL_COST_FUNCTION spillCostFunc,
                        InstCount preFxdInstCnt = 0,
                        SchedInstruction *preFxdInsts[] = NULL);
   virtual ~LengthCostEnumerator();
   void Reset();
 
+  InstCount GetBestCost_();
   // Given a schedule with some instructions possibly fixed, find a
   // feasible schedule of the given target length if possible
   FUNC_RESULT FindFeasibleSchedule(InstSchedule *sched, InstCount trgtLngth,
@@ -948,10 +956,9 @@ bool EnumTreeNode::IsLngthFsbl() { return isLngthFsbl_; }
 /*****************************************************************************/
 
 inline bool Enumerator::WasSolnFound_() {
-
   bool isCmplt = IsSchedComplete_();
   assert(crntSched_->GetCrntLngth() <= trgtSchedLngth_);
-  bool isTrgt = crntSched_->GetCrntLngth() == trgtSchedLngth_;
+  bool isTrgt = crntSched_->GetCrntLngth() <= trgtSchedLngth_;
 
   if (isCmplt && isTrgt) {
     fsblSchedCnt_++;

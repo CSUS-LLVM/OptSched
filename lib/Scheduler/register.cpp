@@ -3,78 +3,95 @@
 
 using namespace llvm::opt_sched;
 
-int16_t Register::GetType() const { return type_; }
+int16_t llvm::opt_sched::Register::GetType() const { return type_; }
 
-int Register::GetNum() const { return num_; }
+int llvm::opt_sched::Register::GetNum() const { return num_; }
 
-int Register::GetWght() const { return wght_; }
+int llvm::opt_sched::Register::GetWght() const { return wght_; }
 
-void Register::SetType(int16_t type) { type_ = type; }
+void llvm::opt_sched::Register::SetType(int16_t type) { type_ = type; }
 
-void Register::SetNum(int num) { num_ = num; }
+void llvm::opt_sched::Register::SetNum(int num) { num_ = num; }
 
-void Register::SetWght(int wght) { wght_ = wght; }
+void llvm::opt_sched::Register::SetWght(int wght) { wght_ = wght; }
 
-bool Register::IsPhysical() const { return physicalNumber_ != INVALID_VALUE; }
+bool llvm::opt_sched::Register::IsPhysical() const {
+  return physicalNumber_ != INVALID_VALUE;
+}
 
-int Register::GetPhysicalNumber() const { return physicalNumber_; }
+int llvm::opt_sched::Register::GetPhysicalNumber() const {
+  return physicalNumber_;
+}
 
-void Register::SetPhysicalNumber(int physicalNumber) {
+void llvm::opt_sched::Register::SetPhysicalNumber(int physicalNumber) {
   physicalNumber_ = physicalNumber;
 }
 
-bool Register::IsLive() const {
+bool llvm::opt_sched::Register::IsLive() const {
   assert(crntUseCnt_ <= useCnt_);
   return crntUseCnt_ < useCnt_;
 }
 
-bool Register::IsLiveIn() const { return liveIn_; }
+bool llvm::opt_sched::Register::IsLiveIn() const { return liveIn_; }
 
-bool Register::IsLiveOut() const { return liveOut_; }
+bool llvm::opt_sched::Register::IsLiveOut() const { return liveOut_; }
 
-void Register::SetIsLiveIn(bool liveIn) { liveIn_ = liveIn; }
+void llvm::opt_sched::Register::SetIsLiveIn(bool liveIn) { liveIn_ = liveIn; }
 
-void Register::SetIsLiveOut(bool liveOut) { liveOut_ = liveOut; }
+void llvm::opt_sched::Register::SetIsLiveOut(bool liveOut) {
+  liveOut_ = liveOut;
+}
 
-void Register::ResetCrntUseCnt() { crntUseCnt_ = 0; }
+void llvm::opt_sched::Register::ResetCrntUseCnt() { crntUseCnt_ = 0; }
 
-void Register::AddUse(const SchedInstruction *inst) {
+void llvm::opt_sched::Register::AddUse(const SchedInstruction *inst) {
   uses_.insert(inst);
   useCnt_++;
 }
 
-void Register::AddDef(const SchedInstruction *inst) {
+void llvm::opt_sched::Register::AddDef(const SchedInstruction *inst) {
   defs_.insert(inst);
   defCnt_++;
 }
 
-int Register::GetUseCnt() const { return useCnt_; }
+int llvm::opt_sched::Register::GetUseCnt() const { return useCnt_; }
 
-const Register::InstSetType &Register::GetUseList() const { return uses_; }
+const llvm::opt_sched::Register::InstSetType &
+llvm::opt_sched::Register::GetUseList() const {
+  return uses_;
+}
 
-size_t Register::GetSizeOfUseList() const { return uses_.size(); }
+size_t llvm::opt_sched::Register::GetSizeOfUseList() const {
+  return uses_.size();
+}
 
-int Register::GetDefCnt() const { return defCnt_; }
+int llvm::opt_sched::Register::GetDefCnt() const { return defCnt_; }
 
-const Register::InstSetType &Register::GetDefList() const { return defs_; }
+const llvm::opt_sched::Register::InstSetType &
+llvm::opt_sched::Register::GetDefList() const {
+  return defs_;
+}
 
-size_t Register::GetSizeOfDefList() const { return defs_.size(); }
+size_t llvm::opt_sched::Register::GetSizeOfDefList() const {
+  return defs_.size();
+}
 
-int Register::GetCrntUseCnt() const { return crntUseCnt_; }
+int llvm::opt_sched::Register::GetCrntUseCnt() const { return crntUseCnt_; }
 
-void Register::AddCrntUse() { crntUseCnt_++; }
+void llvm::opt_sched::Register::AddCrntUse() { crntUseCnt_++; }
 
-void Register::DelCrntUse() { crntUseCnt_--; }
+void llvm::opt_sched::Register::DelCrntUse() { crntUseCnt_--; }
 
-void Register::ResetCrntLngth() { crntLngth_ = 0; }
+void llvm::opt_sched::Register::ResetCrntLngth() { crntLngth_ = 0; }
 
-int Register::GetCrntLngth() const { return crntLngth_; }
+int llvm::opt_sched::Register::GetCrntLngth() const { return crntLngth_; }
 
-void Register::IncrmntCrntLngth() { crntLngth_++; }
+void llvm::opt_sched::Register::IncrmntCrntLngth() { crntLngth_++; }
 
-void Register::DcrmntCrntLngth() { crntLngth_--; }
+void llvm::opt_sched::Register::DcrmntCrntLngth() { crntLngth_--; }
 
-Register &Register::operator=(const Register &rhs) {
+llvm::opt_sched::Register &
+llvm::opt_sched::Register::operator=(const llvm::opt_sched::Register &rhs) {
   if (this != &rhs) {
     num_ = rhs.num_;
     type_ = rhs.type_;
@@ -83,54 +100,65 @@ Register &Register::operator=(const Register &rhs) {
   return *this;
 }
 
-void Register::SetupConflicts(int regCnt) { conflicts_.Construct(regCnt); }
+void llvm::opt_sched::Register::SetupConflicts(int regCnt) {
+  conflicts_.Construct(regCnt);
+}
 
-void Register::ResetConflicts() {
+void llvm::opt_sched::Register::ResetConflicts() {
   conflicts_.Reset();
   isSpillCnddt_ = false;
 }
 
-void Register::AddConflict(int regNum, bool isSpillCnddt) {
+void llvm::opt_sched::Register::AddConflict(int regNum, bool isSpillCnddt) {
   assert(regNum != num_);
   assert(regNum >= 0);
   conflicts_.SetBit(regNum, true);
   isSpillCnddt_ = isSpillCnddt_ || isSpillCnddt;
 }
 
-int Register::GetConflictCnt() const { return conflicts_.GetOneCnt(); }
+int llvm::opt_sched::Register::GetConflictCnt() const {
+  return conflicts_.GetOneCnt();
+}
 
-bool Register::IsSpillCandidate() const { return isSpillCnddt_; }
+bool llvm::opt_sched::Register::IsSpillCandidate() const {
+  return isSpillCnddt_;
+}
 
-bool Register::AddToInterval(const SchedInstruction *inst) {
+bool llvm::opt_sched::Register::AddToInterval(const SchedInstruction *inst) {
   return liveIntervalSet_.insert(inst).second;
 }
 
-bool Register::IsInInterval(const SchedInstruction *inst) const {
+bool llvm::opt_sched::Register::IsInInterval(
+    const SchedInstruction *inst) const {
   return liveIntervalSet_.count(inst) != 0;
 }
 
-const Register::InstSetType &Register::GetLiveInterval() const {
+const llvm::opt_sched::Register::InstSetType &
+llvm::opt_sched::Register::GetLiveInterval() const {
   return liveIntervalSet_;
 }
 
-bool Register::AddToPossibleInterval(const SchedInstruction *inst) {
+bool llvm::opt_sched::Register::AddToPossibleInterval(
+    const SchedInstruction *inst) {
   return possibleLiveIntervalSet_.insert(inst).second;
 }
 
-bool Register::IsInPossibleInterval(const SchedInstruction *inst) const {
+bool llvm::opt_sched::Register::IsInPossibleInterval(
+    const SchedInstruction *inst) const {
   return possibleLiveIntervalSet_.count(inst) != 0;
 }
 
-const Register::InstSetType &Register::GetPossibleLiveInterval() const {
+const llvm::opt_sched::Register::InstSetType &
+llvm::opt_sched::Register::GetPossibleLiveInterval() const {
   return possibleLiveIntervalSet_;
 }
 
-void Register::resetLiveInterval() {
+void llvm::opt_sched::Register::resetLiveInterval() {
   liveIntervalSet_.clear();
   possibleLiveIntervalSet_.clear();
 }
 
-Register::Register(int16_t type, int num, int physicalNumber) {
+llvm::opt_sched::Register::Register(int16_t type, int num, int physicalNumber) {
   type_ = type;
   num_ = num;
   wght_ = 1;
@@ -168,9 +196,9 @@ void RegisterFile::ResetCrntLngths() {
   }
 }
 
-Register *RegisterFile::getNext() {
+llvm::opt_sched::Register *RegisterFile::getNext() {
   size_t RegNum = Regs.size();
-  auto Reg = llvm::make_unique<Register>();
+  auto Reg = std::make_unique<Register>();
   Reg->SetType(regType_);
   Reg->SetNum(RegNum);
   Regs.push_back(std::move(Reg));
@@ -183,14 +211,14 @@ void RegisterFile::SetRegCnt(int regCnt) {
 
   Regs.resize(regCnt);
   for (int i = 0; i < getCount(); i++) {
-    auto Reg = llvm::make_unique<Register>();
+    auto Reg = std::make_unique<Register>();
     Reg->SetType(regType_);
     Reg->SetNum(i);
     Regs[i] = std::move(Reg);
   }
 }
 
-Register *RegisterFile::GetReg(int num) const {
+llvm::opt_sched::Register *RegisterFile::GetReg(int num) const {
   if (num >= 0 && num < getCount()) {
     return Regs[num].get();
   } else {
@@ -198,7 +226,7 @@ Register *RegisterFile::GetReg(int num) const {
   }
 }
 
-Register *RegisterFile::FindLiveReg(int physNum) const {
+llvm::opt_sched::Register *RegisterFile::FindLiveReg(int physNum) const {
   for (int i = 0; i < getCount(); i++) {
     if (Regs[i]->GetPhysicalNumber() == physNum && Regs[i]->IsLive() == true)
       return Regs[i].get();

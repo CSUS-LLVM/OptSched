@@ -2,6 +2,7 @@
 #include "opt-sched/Scheduler/logger.h"
 #include "llvm/Support/ErrorHandling.h"
 #include <fstream>
+#include <llvm/ADT/StringRef.h>
 #include <sstream>
 
 using namespace llvm::opt_sched;
@@ -63,7 +64,8 @@ void Config::Load(std::istream &file) {
 string Config::GetString(const string &name) const {
   std::map<string, string>::const_iterator it = settings.find(name);
   if (it == settings.end()) {
-    llvm::report_fatal_error("No value found for setting " + name, false);
+    llvm::report_fatal_error(
+        llvm::StringRef("No value found for setting " + name), false);
     return "";
   } else {
     return it->second;

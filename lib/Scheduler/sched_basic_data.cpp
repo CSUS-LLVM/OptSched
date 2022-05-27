@@ -2,6 +2,7 @@
 #include "opt-sched/Scheduler/register.h"
 #include "opt-sched/Scheduler/stats.h"
 #include "llvm/ADT/STLExtras.h"
+#include "llvm/CodeGen/ScheduleDAG.h"
 #include "llvm/Support/ErrorHandling.h"
 #include <string>
 
@@ -34,8 +35,10 @@ SchedInstruction::SchedInstruction(InstCount num, const string &name,
                                    InstCount maxInstCnt, int nodeID,
                                    InstCount fileSchedOrder,
                                    InstCount fileSchedCycle, InstCount fileLB,
-                                   InstCount fileUB, MachineModel *model)
+                                   InstCount fileUB, MachineModel *model,
+                                   const SUnit *SU)
     : GraphNode(num, maxInstCnt) {
+  SU_ = SU;
   // Static data that is computed only once.
   name_ = name;
   opCode_ = opCode;
@@ -281,27 +284,22 @@ bool SchedInstruction::ApplyPreFxng(LinkedList<SchedInstruction> *tightndLst,
 
 void SchedInstruction::AddDef(Register *reg) {
   if (defCnt_ >= MAX_DEFS_PER_INSTR) {
-    llvm::report_fatal_error("An instruction can't have more than " +
-                                 std::to_string(MAX_DEFS_PER_INSTR) + " defs",
-                             false);
+    llvm::report_fatal_error(
+        llvm::StringRef("An instruction can't have more than " +
+                        std::to_string(MAX_DEFS_PER_INSTR) + " defs"),
+        false);
   }
-  // Logger::Info("Inst %d defines reg %d of type %d and physNum %d and useCnt
-  // %d",
-  // num_, reg->GetNum(), reg->GetType(), reg->GetPhysicalNumber(),
-  // reg->GetUseCnt());
   assert(reg != NULL);
   defs_[defCnt_++] = reg;
 }
 
 void SchedInstruction::AddUse(Register *reg) {
   if (useCnt_ >= MAX_USES_PER_INSTR) {
-    llvm::report_fatal_error("An instruction can't have more than " +
-                                 std::to_string(MAX_USES_PER_INSTR) + " uses",
-                             false);
+    llvm::report_fatal_error(
+        llvm::StringRef("An instruction can't have more than " +
+                        std::to_string(MAX_USES_PER_INSTR) + " uses"),
+        false);
   }
-  // Logger::Info("Inst %d uses reg %d of type %d and physNum %d and useCnt %d",
-  // num_, reg->GetNum(), reg->GetType(), reg->GetPhysicalNumber(),
-  // reg->GetUseCnt());
   assert(reg != NULL);
   uses_[useCnt_++] = reg;
 }

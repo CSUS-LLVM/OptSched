@@ -270,12 +270,13 @@ bool HistEnumTreeNode::DoesDominate_(EnumTreeNode *node,
         lastInsts[indx] = NULL;
       }
     }
-  }
-  // If this node is an absolute dominant that dominates any matching node.
-  if (isAbslutDmnnt)
-    stats::absoluteDominationHits++;
 
-  // PrntPartialSched(enumrtr);
+    // If this node is an absolute dominant that dominates any matching node.
+    if (isAbslutDmnnt)
+      stats::absoluteDominationHits++;
+
+    // PrntPartialSched(enumrtr);
+  }
   return true;
 }
 
@@ -606,6 +607,7 @@ bool CostHistEnumTreeNode::chkCostDmntnForSinglePass(EnumTreeNode *Node,
           spillCostSum_ % instCnt >= Node->GetSpillCostSum() % instCnt;
     }
   }
+
   return ShouldPrune;
 }
 

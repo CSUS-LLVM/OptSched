@@ -17,6 +17,7 @@ Last Update:  Jan. 2020
 #include "opt-sched/Scheduler/data_dep.h"
 // For Enumerator, LengthCostEnumerator, EnumTreeNode and Pruning.
 #include "opt-sched/Scheduler/enumerator.h"
+#include "llvm/CodeGen/MachineFunction.h"
 
 namespace llvm {
 namespace opt_sched {
@@ -278,6 +279,8 @@ protected:
   // TODO(max): Document.
   InstCount crntSlotNum_;
 
+  bool instTimeout_;
+  int TimeoutPerMemblock_;
   bool needsTransitiveClosure(Milliseconds rgnTimeout) const;
 
   // protected accessors:
@@ -336,7 +339,8 @@ protected:
   // TODO(max): Document.
   virtual void CmputSchedUprBound_() = 0;
   // TODO(max): Document.
-  virtual Enumerator *AllocEnumrtr_(Milliseconds timeout) = 0;
+  virtual Enumerator *AllocEnumrtr_(Milliseconds timeout,
+                                    int TimeoutPerMemblock) = 0;
   // Wrapper for the enumerator
   virtual FUNC_RESULT Enumerate_(Milliseconds startTime,
                                  Milliseconds rgnTimeout,

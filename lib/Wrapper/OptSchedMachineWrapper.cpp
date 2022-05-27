@@ -7,6 +7,7 @@ Description:  A wrapper that convert an LLVM target to an OptSched MachineModel.
 #include "opt-sched/Scheduler/logger.h"
 #include "opt-sched/Scheduler/machine_model.h"
 #include "llvm/CodeGen/MachineInstr.h"
+#include "llvm/CodeGen/Register.h"
 #include "llvm/CodeGen/ScheduleDAGInstrs.h"
 #include "llvm/CodeGen/TargetInstrInfo.h"
 #include "llvm/CodeGen/TargetPassConfig.h"
@@ -45,13 +46,13 @@ void dumpInstType(InstTypeInfo &instType, MachineModel *mm) {
 std::unique_ptr<MachineModelGenerator>
 createCortexA7MMGenerator(const llvm::ScheduleDAGInstrs *dag,
                           MachineModel *mm) {
-  return make_unique<CortexA7MMGenerator>(dag, mm);
+  return std::make_unique<CortexA7MMGenerator>(dag, mm);
 }
 
 std::unique_ptr<MachineModelGenerator>
 createCortexA53MMGenerator(const llvm::ScheduleDAGInstrs *dag,
                            MachineModel *mm) {
-  return make_unique<CortexA53MMGenerator>(dag, mm);
+  return std::make_unique<CortexA53MMGenerator>(dag, mm);
 }
 
 } // end anonymous namespace
@@ -183,7 +184,7 @@ IssueType CortexA7MMGenerator::generateIssueType(const InstrStage *E) const {
 
 InstType CortexA7MMGenerator::generateInstrType(const MachineInstr *instr) {
   // Search in the machine model for an instType with this OpCode
-  const std::string instrName = DAG->TII->getName(instr->getOpcode());
+  const std::string instrName = DAG->TII->getName(instr->getOpcode()).data();
   const InstType InstType = MM->GetInstTypeByName(instrName);
 
   // If the machine model does not have instType with this OpCode name,
@@ -242,7 +243,7 @@ void CortexA53MMGenerator::generateProcessorData(std::string *mdlName_,
 InstType
 CortexA53MMGenerator::generateInstrType(const llvm::MachineInstr *instr) {
   // Search in the machine model for an instType with this OpCode
-  const std::string InstrName = DAG->TII->getName(instr->getOpcode());
+  const std::string InstrName = DAG->TII->getName(instr->getOpcode()).data();
   const InstType InstrType = MM->GetInstTypeByName(InstrName);
 
   // If the machine model does not have instType with this OpCode name,

@@ -43,6 +43,18 @@ enum FUNC_RESULT {
   RES_TIMEOUT = 3
 };
 
+// Which mechanism we are using to limit occupancy
+// Limiting occupancy has shown to improve exec perf
+// for some kernels
+enum OCC_LIMIT_TYPE {
+  // NONE
+  OLT_NONE,
+  // AMD's Heuristic
+  OLT_HEUR,
+  // Hardcoded File
+  OLT_FILE,
+};
+
 } // namespace opt_sched
 } // namespace llvm
 

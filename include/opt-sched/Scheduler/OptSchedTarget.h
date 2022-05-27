@@ -9,6 +9,7 @@
 #define LLVM_OPT_SCHED_TARGET_H
 
 #include "opt-sched/Scheduler/OptSchedDDGWrapperBase.h"
+#include "opt-sched/Scheduler/config.h"
 #include "opt-sched/Scheduler/data_dep.h"
 #include "opt-sched/Scheduler/defines.h"
 #include "opt-sched/Scheduler/machine_model.h"
@@ -36,7 +37,8 @@ public:
                    OptSchedMachineModel *MM, LATENCY_PRECISION LatencyPrecision,
                    const std::string &RegionID) = 0;
 
-  virtual void initRegion(ScheduleDAGInstrs *DAG, MachineModel *MM) = 0;
+  virtual void initRegion(ScheduleDAGInstrs *DAG, MachineModel *MM,
+                          Config &OccFile) = 0;
   virtual void finalizeRegion(const InstSchedule *Schedule) = 0;
   // FIXME: This is a shortcut to doing the proper thing and creating a RP class
   // that targets can override. It's hard to justify spending the extra time
@@ -51,6 +53,10 @@ public:
   // Targets that wish to discard the finalized schedule for any reason can
   // override this.
   virtual bool shouldKeepSchedule() { return true; }
+
+  virtual void SetOccupancyLimit(int){/*nothing*/};
+  virtual void SetShouldLimitOcc(bool){/*nothing*/};
+  virtual void SetOccLimitSource(OCC_LIMIT_TYPE){/*nothing*/};
 };
 
 template <typename FactoryT> class OptSchedRegistryNode {
@@ -76,11 +82,15 @@ public:
 
   FactoryT getFactoryWithName(llvm::StringRef Name) {
     FactoryT Factory = nullptr;
-    for (auto I = List; I; I = I->Next)
-      if (I->Name == Name) {
+    std::string Match = std::string(Name.data());
+
+    for (auto I = List; I; I = I->Next) {
+      std::string Temp = std::string(I->Name.data());
+      if (Match.compare(Temp) == 0) {
         Factory = I->Factory;
         break;
       }
+    }
     return Factory;
   }
 

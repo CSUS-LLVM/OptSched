@@ -7,8 +7,8 @@
 #ifndef LLVM_GCN_OPT_SCHED_H
 #define LLVM_GCN_OPT_SCHED_H
 
-#include "../OptimizingScheduler.h"
 #include "GCNRegPressure.h"
+#include "Wrapper/OptimizingScheduler.h"
 
 namespace llvm {
 namespace opt_sched {

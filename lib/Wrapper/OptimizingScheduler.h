@@ -14,7 +14,6 @@
 #include "opt-sched/Scheduler/data_dep.h"
 #include "opt-sched/Scheduler/graph_trans.h"
 #include "opt-sched/Scheduler/sched_region.h"
-#include "llvm/ADT/BitVector.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/CodeGen/MachineScheduler.h"
@@ -61,6 +60,9 @@ protected:
   // Path to the machine model specification file for opt-sched.
   SmallString<128> PathCfgMM;
 
+  // Path to the occupancy limits file for specified kernels using opt-sched
+  SmallString<128> PathCfgOCL;
+
   // Bool value indicating that the scheduler is in the second
   // pass. Used for the two pass scheduling approach.
   bool SecondPass;
@@ -79,6 +81,10 @@ protected:
   // A list of functions that are indicated as candidates for the
   // OptScheduler
   Config HotFunctions;
+
+  // A list of kernels / functions and the occupancy limit the maximizes
+  // performance
+  Config OccupancyLimits;
 
   // Struct for setting the pruning strategy
   Pruning PruningStrategy;
@@ -144,6 +150,13 @@ protected:
   int FirstPassLengthTimeout;
   int SecondPassRegionTimeout;
   int SecondPassLengthTimeout;
+
+  int TimeoutPerMemblock;
+
+  int OccupancyLimit;
+
+  bool ShouldLimitOccupancy;
+  OCC_LIMIT_TYPE OccupancyLimitSource;
 
   // How to interpret the timeout value? Timeout per instruction or
   // timout per block
@@ -243,6 +256,8 @@ protected:
   // Get the GT_POSITION
   static GT_POSITION parseGraphTransPosition(llvm::StringRef Str);
 
+  OCC_LIMIT_TYPE parseOccLimit(const std::string Str);
+
   // Return true if the OptScheduler should be enabled for the function this
   // ScheduleDAG was created for
   bool isOptSchedEnabled() const;
@@ -258,6 +273,9 @@ protected:
 
   // Return true if we should print spill count for the current function
   bool shouldPrintSpills() const;
+
+  // Reset the flags (e.g undef) before reverting scheduling
+  void ResetFlags(SUnit &SU);
 
   // Add node to llvm schedule
   void ScheduleNode(SUnit *SU, unsigned CurCycle);
@@ -289,6 +307,9 @@ public:
 
   // Schedule the current region using the OptScheduler
   void schedule() override;
+
+  // Calculate OptSched scheduling stats based on ordering of SUnits
+  void getOptSchedStats();
 
   // Setup and select schedulers for the two pass scheduling approach.
   virtual void initSchedulers();

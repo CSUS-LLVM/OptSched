@@ -13,6 +13,15 @@
 #      - LLVM_PARALLEL_LINK_JOBS.
 #  - *_EXTRA_CMAKE_ARGS: Passes these CMake arguments on to the corresponding sub-build.
 #  - The flang builds can be configured to use a custom CMAKE_GENERATOR, separate from the superbuild's generator.
+
+
+############################################
+#
+# As of 5/26/2022, the superbuild script is
+# no longer gauranteed to work.
+#
+############################################
+
 cmake_minimum_required(VERSION 3.7)
 
 project(OptSched-SuperBuild)
@@ -99,8 +108,4 @@ add_test(NAME OptSched-CompileHelloWorld
   COMMAND
     ${OPTSCHEDSUPER_LLVM_INSTALL_PREFIX}/bin/clang ${ROOT_DIR}/example/helloworld.cpp
     -O3
-    -fplugin=${OPTSCHEDSUPER_LLVM_INSTALL_PREFIX}/lib/OptSched.so
-    -mllvm -misched=optsched
-    -mllvm -enable-misched
-    -mllvm -optsched-cfg=${ROOT_DIR}/example/optsched-cfg
 )

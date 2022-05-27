@@ -53,6 +53,8 @@ public:
   SetSuffix(const std::shared_ptr<std::vector<SchedInstruction *>> &suffix);
   std::vector<InstCount> GetPrefix() const;
 
+  inline int getInstNum() { return inst_->GetNum(); }
+
 protected:
   HistEnumTreeNode *prevNode_;
 
