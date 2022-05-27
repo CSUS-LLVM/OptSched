@@ -10,10 +10,10 @@ Last Update:  Mar. 2011
 #ifndef OPTSCHED_BASIC_MACHINE_MODEL_H
 #define OPTSCHED_BASIC_MACHINE_MODEL_H
 
+#include "opt-sched/Scheduler/defines.h"
 #include "llvm/ADT/StringRef.h"
 // For class ostream.
 #include <iostream>
-#include "opt-sched/Scheduler/defines.h"
 // For class string.
 #include <string>
 // For class vector.

@@ -90,8 +90,8 @@ void llvm::opt_sched::Register::IncrmntCrntLngth() { crntLngth_++; }
 
 void llvm::opt_sched::Register::DcrmntCrntLngth() { crntLngth_--; }
 
-llvm::opt_sched::Register &llvm::opt_sched::Register::
-operator=(const llvm::opt_sched::Register &rhs) {
+llvm::opt_sched::Register &
+llvm::opt_sched::Register::operator=(const llvm::opt_sched::Register &rhs) {
   if (this != &rhs) {
     num_ = rhs.num_;
     type_ = rhs.type_;
