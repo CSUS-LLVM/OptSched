@@ -23,6 +23,7 @@ using namespace llvm::opt_sched;
 // This is necessary because we cannot perfectly predict the number of registers
 // of each type that will be allocated.
 static const unsigned GPRErrorMargin = 0;
+static const unsigned OCCUnlimited = 10;
 
 namespace {
 
@@ -41,7 +42,7 @@ public:
                                                     LatencyPrecision, RegionID);
   }
 
-  void initRegion(llvm::ScheduleDAGInstrs *DAG, MachineModel *MM_) override;
+  void initRegion(llvm::ScheduleDAGInstrs *DAG, MachineModel *MM_, Config &OccFile) override;
 
   void finalizeRegion(const InstSchedule *Schedule) override;
 
@@ -56,6 +57,12 @@ public:
 
   // Revert scheduing if we decrease occupancy.
   bool shouldKeepSchedule() override;
+
+  void SetOccupancyLimit(int OccupancyLimitParam) override {OccupancyLimit = OccupancyLimitParam;}
+  void SetShouldLimitOcc(bool ShouldLimitOccParam) override {ShouldLimitOcc = ShouldLimitOccParam;}
+  void SetOccLimitSource(OCC_LIMIT_TYPE LimitTypeParam) override {LimitType = LimitTypeParam;}
+
+  int getOccupancyLimit(Config &OccFile) const;
 
   unsigned getMaxOccLDS() const {
     return MaxOccLDS;
@@ -74,13 +81,18 @@ private:
   unsigned RegionEndingOccupancy;
   unsigned TargetOccupancy;
 
+  // Limiting occupancy has shown to greatly increase the performance of some kernels
+  int OccupancyLimit;
+  bool ShouldLimitOcc;
+  OCC_LIMIT_TYPE LimitType;
+
   // Max occupancy with local memory size;
   unsigned MaxOccLDS;
 
   // In RP only (max occupancy) scheduling mode we should try to find
   // a min-RP schedule without considering perf hints which suggest limiting
   // occupancy. Returns true if we should consider perf hints.
-  bool shouldLimitWaves() const;
+  bool shouldLimitWaves(llvm::SIMachineFunctionInfo *MFI) const;
 
   // Find occupancy with spill cost.
   unsigned getOccupancyWithCost(const InstCount Cost) const;

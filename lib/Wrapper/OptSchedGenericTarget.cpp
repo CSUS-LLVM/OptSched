@@ -35,12 +35,16 @@ public:
         Context, DAG, MM, LatencyPrecision, RegionID);
   }
 
-  void initRegion(llvm::ScheduleDAGInstrs *DAG, MachineModel *MM_) override {
+  void initRegion(llvm::ScheduleDAGInstrs *DAG, MachineModel *MM_, Config &OccFile) override {
     MM = MM_;
   }
   void finalizeRegion(const InstSchedule *Schedule) override {}
   // For generic target find total PRP.
   InstCount getCost(const llvm::SmallVectorImpl<unsigned> &PRP) const override;
+
+  void SetOccupancyLimit(int OccupancyLimitParam) override {/*nothing*/;}
+  void SetShouldLimitOcc(bool ShouldLimitOccParam) override {/*nothing*/;}
+  void SetOccLimitSource(OCC_LIMIT_TYPE LimitTypeParam) override {/*nothing*/;}
 };
 
 } // end anonymous namespace
