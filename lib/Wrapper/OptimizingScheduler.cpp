@@ -860,6 +860,8 @@ ScheduleDAGOptSched::parseOccLimit(const std::string Str) {
 
   if (Str == "NONE") {
     return OCC_LIMIT_TYPE::OLT_NONE;
+  } else if (Str = "VALUE") {
+    return OCC_LIMIT_TYPE::OLT_VALUE;
   } else if (Str == "HEURISTIC") {
     return OCC_LIMIT_TYPE::OLT_HEUR;
   } else if (Str == "FILE") {
