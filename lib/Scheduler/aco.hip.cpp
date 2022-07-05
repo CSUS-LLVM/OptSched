@@ -260,7 +260,7 @@ InstCount ACOScheduler::SelectInstruction(SchedInstruction *lastInst, InstCount 
   // this bool is to check if we should currently avoid unnecessary stalls
   // because RP is low or we have too many stalls in the schedule
   bool RPIsHigh = false;
-  bool tooManyStalls = totalStalls >= globalBestStalls_ * 5 / 10;
+  bool tooManyStalls = totalStalls >= globalBestStalls_ * 9 / 10;
   dev_readyLs->dev_ScoreSum[GLOBALTID] = 0;
 
   for (InstCount I = 0; I < dev_readyLs->getReadyListSize(); ++I) {
@@ -279,6 +279,11 @@ InstCount ACOScheduler::SelectInstruction(SchedInstruction *lastInst, InstCount 
     *dev_readyLs->getInstScoreAtIndex(I) = IScore;
     dev_readyLs->dev_ScoreSum[GLOBALTID] += IScore;
 
+    #ifdef DEBUG_INSTR_SELECTION
+    if (GLOBALTID==0)
+      printf("Before Inst: %d, score: %f\n", *dev_readyLs->getInstIdAtIndex(I), IScore);
+    #endif
+
     if (currentlyWaiting) {
       // if currently waiting on an instruction, do not consider semi-ready instructions 
       if (*dev_readyLs->getInstReadyOnAtIndex(I) > dev_crntCycleNum_[GLOBALTID])
@@ -288,17 +293,21 @@ InstCount ACOScheduler::SelectInstruction(SchedInstruction *lastInst, InstCount 
       if (candidateDefs > candidateLUC)
         continue;
     }
-    
+
     // add a score penalty for instructions that are not ready yet
     // unnecessary stalls should not be considered if current RP is low, or if we already have too many stalls
     if (*dev_readyLs->getInstReadyOnAtIndex(I) > dev_crntCycleNum_[GLOBALTID]) {
       if (!onlyRPNegative) {
+        #ifdef DEBUG_INSTR_SELECTION
+        if (GLOBALTID==0)
+          printf("Zeroing out Inst: %d, score: %f, only rp negative: %s, close to RP Target: %s\n", *dev_readyLs->getInstIdAtIndex(I), IScore, onlyRPNegative ? "true" : "false", closeToRPTarget ? "true" : "false");
+        #endif
         IScore = 0.0000001;
       }
       else {
         int cyclesNeededToWait = *dev_readyLs->getInstReadyOnAtIndex(I) - dev_crntCycleNum_[GLOBALTID];
         if (cyclesNeededToWait < globalBestStalls_)
-          IScore = IScore * (globalBestStalls_ - cyclesNeededToWait) / globalBestStalls_;
+          IScore = IScore * (globalBestStalls_ - cyclesNeededToWait * 2) / globalBestStalls_;
         else 
           IScore = IScore / globalBestStalls_;
 
@@ -320,7 +329,7 @@ InstCount ACOScheduler::SelectInstruction(SchedInstruction *lastInst, InstCount 
         // RP is low or we have too many stalls already
         if (!(closeToRPTarget && RPIsHigh) || tooManyStalls) {
           if (globalBestStalls_ > totalStalls)
-            IScore = IScore * (globalBestStalls_ - totalStalls) / globalBestStalls_;
+            IScore = IScore * (globalBestStalls_ - totalStalls * 2) / globalBestStalls_;
           else
             IScore = IScore / globalBestStalls_;
         }
@@ -332,6 +341,10 @@ InstCount ACOScheduler::SelectInstruction(SchedInstruction *lastInst, InstCount 
 
     if (IScore < 0.0000001)
       IScore = 0.0000001;
+    #ifdef DEBUG_INSTR_SELECTION
+    if (GLOBALTID==0)
+      printf("After Inst: %d, score: %f, cycles to wait: %d\n", *dev_readyLs->getInstIdAtIndex(I), IScore, *dev_readyLs->getInstReadyOnAtIndex(I) - dev_crntCycleNum_[GLOBALTID]);
+    #endif
     *dev_readyLs->getInstScoreAtIndex(I) = IScore;
     dev_readyLs->dev_ScoreSum[GLOBALTID] += IScore;
     
@@ -412,7 +425,7 @@ InstCount ACOScheduler::SelectInstruction(SchedInstruction *lastInst, InstCount 
       else {
         int cyclesNeededToWait = *readyLs->getInstReadyOnAtIndex(I) - crntCycleNum_;
         if (cyclesNeededToWait < globalBestStalls_)
-          IScore = IScore * (globalBestStalls_ - cyclesNeededToWait) / globalBestStalls_;
+          IScore = IScore * (globalBestStalls_ - cyclesNeededToWait * 2) / globalBestStalls_;
         else 
           IScore = IScore / globalBestStalls_;
 
@@ -434,7 +447,7 @@ InstCount ACOScheduler::SelectInstruction(SchedInstruction *lastInst, InstCount 
         // RP is low or we have too many stalls already
         if (!(closeToRPTarget && RPIsHigh) || tooManyStalls) {
           if (globalBestStalls_ > totalStalls)
-            IScore = IScore * (globalBestStalls_ - totalStalls) / globalBestStalls_;
+            IScore = IScore * (globalBestStalls_ - totalStalls * 2) / globalBestStalls_;
           else
             IScore = IScore / globalBestStalls_;
         }
@@ -508,6 +521,11 @@ InstCount ACOScheduler::SelectInstruction(SchedInstruction *lastInst, InstCount 
   bool UseMax = (rand < choose_best_chance) || currentlyWaiting;
   size_t indx = UseMax ? MaxScoreIndx : fpIndx;
   #ifdef __HIP_DEVICE_COMPILE__
+    #ifdef DEBUG_INSTR_SELECTION
+    if (GLOBALTID==0) {
+      printf("Selecting: %d\n", *dev_readyLs->getInstIdAtIndex(indx));
+    }
+    #endif
     if (couldAvoidStalling && *dev_readyLs->getInstReadyOnAtIndex(indx) > dev_crntCycleNum_[GLOBALTID])
       unnecessarilyStalling = true;
     else
@@ -563,9 +581,20 @@ InstSchedule *ACOScheduler::FindOneSchedule(InstCount RPTarget,
     // 1)Select the instruction(if we are not waiting on another instruction)
     if (!waitFor && waitUntil <= dev_crntCycleNum_[GLOBALTID]) {
       assert(dev_readyLs->getReadyListSize() > 0 || waitFor != NULL);
+
+      if ( !((BBWithSpill *)dev_rgn_)->needsTarget() ) {
+        InstCount closeToRPCheck = RPTarget - 2 < RPTarget * 9 / 10 ? RPTarget - 2 : RPTarget * 9 / 10;
+        closeToRPTarget = ((BBWithSpill *)dev_rgn_)->GetCrntSpillCost() >= closeToRPCheck;
+      }
+      else
+        closeToRPTarget = ((BBWithSpill *)dev_rgn_)->closeToRPConstraint();
       
-      InstCount closeToRPCheck = RPTarget - 2 < RPTarget * 9 / 10 ? RPTarget - 2 : RPTarget * 9 / 10;
-      closeToRPTarget = ((BBWithSpill *)dev_rgn_)->GetCrntSpillCost() >= closeToRPCheck;
+      #ifdef DEBUG_CLOSE_TO_OCCUPANCY
+      if (GLOBALTID == 0) {
+        printf("cyclenum: %d Close to RP Target: %s\n", dev_crntCycleNum_[GLOBALTID], closeToRPTarget ? "true" : "false");
+      }
+      #endif
+
       // select the instruction and get info on it
       InstCount SelIndx = SelectInstruction(lastInst, schedule->getTotalStalls(), dev_rgn_, unnecessarilyStalling, closeToRPTarget, waitFor ? true: false);
 
@@ -611,6 +640,10 @@ InstSchedule *ACOScheduler::FindOneSchedule(InstCount RPTarget,
     InstCount instNum;
     if (!inst) {
       instNum = SCHD_STALL;
+      #ifdef DEBUG_INSTR_SELECTION
+      if (GLOBALTID==0)
+        printf("Scheduling stall\n");
+      #endif
       schedule->incrementTotalStalls();
       if (unnecessarilyStalling)
         schedule->incrementUnnecessaryStalls();
@@ -947,8 +980,9 @@ void Dev_ACO(SchedRegion *dev_rgn, DataDepGraph *dev_DDG,
         // update RPTarget if we are in second pass and not using SLIL
         if (!needsSLIL)
           RPTarget = dev_bestSched->GetSpillCost();
-        InstCount globalStalls = dev_bestSched->getTotalStalls();
-        dev_AcoSchdulr->SetGlobalBestStalls(globalStalls);
+        int globalStalls = dev_bestSched->getTotalStalls();
+        if (globalStalls < dev_AcoSchdulr->GetGlobalBestStalls())
+          dev_AcoSchdulr->SetGlobalBestStalls(globalStalls);
         printf("New best sched found by thread %d\n", globalBestIndex);
         printf("ACO found schedule "
                "cost:%d, rp cost:%d, exec cost: %d, and "
@@ -1032,8 +1066,12 @@ void Dev_ACO(SchedRegion *dev_rgn, DataDepGraph *dev_DDG,
     // make sure no threads reset schedule before above operations complete
     dev_schedules[GLOBALTID]->resetTotalStalls();
     dev_schedules[GLOBALTID]->resetUnnecessaryStalls();
-    if (GLOBALTID == 0)
+    if (GLOBALTID == 0) {
       dev_iterations++;
+      #ifdef DEBUG_INSTR_SELECTION
+      printf("Iterations: %d\n", dev_iterations);
+      #endif
+    }
   }
   if (GLOBALTID == 0) {
     printf("ACO finished after %d iterations\n", dev_iterations);
@@ -1117,10 +1155,16 @@ FUNC_RESULT ACOScheduler::FindSchedule(InstSchedule *schedule_out,
   int noImprovement = 0; // how many iterations with no improvement
   int iterations = 0;
   InstSchedule *iterationBest = nullptr;
+
+  // set bestStallsValue to max of lower bound or critical path distance
+  InstCount bestStallsValue = std::max(dataDepGraph_->GetSchedLwrBound(), dataDepGraph_->GetRootInst()->GetCrntLwrBound(DIR_BKWRD) + 1)* 6 / 5 - dataDepGraph_->GetInstCnt();
   if (dev_AcoSchdulr)
-    dev_AcoSchdulr->SetGlobalBestStalls(std::max(0, bestSchedule->GetCrntLngth() - dataDepGraph_->GetInstCnt()));
+    // dev_AcoSchdulr->SetGlobalBestStalls(std::max(0, bestSchedule->GetCrntLngth() - dataDepGraph_->GetInstCnt()));
+    dev_AcoSchdulr->SetGlobalBestStalls(std::min(bestStallsValue, bestSchedule->GetCrntLngth() - dataDepGraph_->GetInstCnt()));
   else
-    SetGlobalBestStalls(std::max(0, bestSchedule->GetCrntLngth() - dataDepGraph_->GetInstCnt()));
+    // SetGlobalBestStalls(std::max(0, bestSchedule->GetCrntLngth() - dataDepGraph_->GetInstCnt()));
+    SetGlobalBestStalls(std::min(bestStallsValue, bestSchedule->GetCrntLngth() - dataDepGraph_->GetInstCnt()));
+  printf("bestStallsValue is: %d, initial sched is: %d\n", bestStallsValue, bestSchedule->GetCrntLngth() - dataDepGraph_->GetInstCnt());
   
   if (DEV_ACO && count_ >= REGION_MIN_SIZE) { // Run ACO on device
     size_t memSize;
@@ -1281,7 +1325,10 @@ FUNC_RESULT ACOScheduler::FindSchedule(InstSchedule *schedule_out,
         bestSchedule = std::move(iterationBest);
         if (!((BBWithSpill *)rgn_)->needsSLIL())
           RPTarget = bestSchedule->GetSpillCost();
-        SetGlobalBestStalls(bestSchedule->GetCrntLngth() - dataDepGraph_->GetInstCnt());
+
+        int globalStalls = bestSchedule->getTotalStalls();
+        if (globalStalls < GetGlobalBestStalls())
+          SetGlobalBestStalls(bestSchedule->GetCrntLngth() - dataDepGraph_->GetInstCnt());
         printf("ACO found schedule "
                "cost:%d, rp cost:%d, exec cost: %d, and "
                "iteration:%d"
@@ -1519,8 +1566,18 @@ inline void ACOScheduler::UpdateACOReadyList(SchedInstruction *inst) {
   
   #ifdef __HIP_DEVICE_COMPILE__ // device version of function
     // Notify each successor of this instruction that it has been scheduled.
+    #ifdef DEBUG_INSTR_SELECTION
+    if (GLOBALTID==0) {
+      printf("successors of %d:", inst->GetNum());
+    }
+    #endif
     for (SchedInstruction *crntScsr = inst->GetFrstScsr(&prdcsrNum);
           crntScsr != NULL; crntScsr = inst->GetNxtScsr(&prdcsrNum)) {
+        #ifdef DEBUG_INSTR_SELECTION
+        if (GLOBALTID==0) {
+          printf(" %d,", crntScsr->GetNum());
+        }
+        #endif
         bool wasLastPrdcsr =
             crntScsr->PrdcsrSchduld(prdcsrNum, dev_crntCycleNum_[GLOBALTID], scsrRdyCycle);
 
@@ -1531,7 +1588,11 @@ inline void ACOScheduler::UpdateACOReadyList(SchedInstruction *inst) {
           dev_readyLs->addInstructionToReadyList(ACOReadyListEntry{crntScsr->GetNum(), scsrRdyCycle, HeurWOLuc, 0});
         }
     }
-
+    #ifdef DEBUG_INSTR_SELECTION
+    if (GLOBALTID==0) {
+      printf("\n");
+    }
+    #endif
     // Make sure the scores are valid.  The scheduling of an instruction may
     // have increased another instruction's LUC Score
     PriorityEntry LUCEntry = dev_kHelper->getPriorityEntry(LSH_LUC);

@@ -168,6 +168,14 @@ private:
   void CmputCrntSpillCost_();
   bool ChkSchedule_(InstSchedule *bestSched, InstSchedule *lstSched);
   void CmputCnflcts_(InstSchedule *sched);
+  // returns the occupancy value that is close to being increased
+  __host__ __device__
+  unsigned closeOccupancyWithNumVGPRs(unsigned VGPRs);
+  __host__ __device__
+  unsigned closeOccupancyWithNumSGPRs(unsigned SGPRs);
+  __host__ __device__
+  unsigned getCloseToOccupancy(unsigned VGPRCount, unsigned SGPRCount,
+                               unsigned MaxOccLDS);
 
 public:
   BBWithSpill(const OptSchedTarget *OST_, DataDepGraph *dataDepGraph,
@@ -219,6 +227,8 @@ public:
   InstCount getTargetOccupancy() {
     return TargetOccupancy_;
   };
+  __host__ __device__
+  bool closeToRPConstraint();
   __host__ __device__
   InstCount GetCrntSpillCost();
   // can only compute SLIL if SLIL was the spillCostFunc

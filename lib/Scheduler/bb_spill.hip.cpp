@@ -1223,6 +1223,14 @@ static unsigned getAdjustedOccupancy(unsigned VGPRCount, unsigned SGPRCount,
   unsigned MaxOccVGPR = getOccupancyWithNumVGPRs(VGPRCount);
   unsigned MaxOccSGPR = getOccupancyWithNumSGPRs(SGPRCount);
 
+  #ifdef DEBUG_CLOSE_TO_OCCUPANCY
+  #ifdef __HIP_DEVICE_COMPILE__
+    if (GLOBALTID==0) {
+      printf("Actual MaxOccVGPR Occ: %u, MaxOccSGPR Occ: %u, MaxOccLDS: %u\n", MaxOccVGPR, MaxOccSGPR, MaxOccLDS);
+    }
+  #endif
+  #endif
+
   if (MaxOccLDS <= MaxOccVGPR && MaxOccLDS <= MaxOccSGPR)
     return MaxOccLDS;
   else if (MaxOccVGPR <= MaxOccSGPR)
@@ -1240,6 +1248,84 @@ static InstCount getAMDGPUCost(unsigned ** PRP, unsigned TargetOccupancy,
   // RP cost is the difference between the minimum allowed occupancy for the
   // function, and the current occupancy.
   return Occ >= TargetOccupancy ? 0 : TargetOccupancy - Occ;
+}
+
+__host__ __device__
+unsigned BBWithSpill::closeOccupancyWithNumVGPRs(unsigned VGPRs) {
+  // approximation from llvm/lib/Target/AMDGPUSubtarget.cpp
+  // from this llvm commit fd08dcb9db0df6dc1aaf329f790cc4a7af9e0a91
+  if (VGPRs <= 22)
+    return 11;
+  if (VGPRs <= 25)
+    return 10;
+  if (VGPRs <= 29)
+    return 9;
+  if (VGPRs <= 33)
+    return 8;
+  if (VGPRs <= 37)
+    return 7;
+  if (VGPRs <= 45)
+    return 6;
+  if (VGPRs <= 59)
+    return 5;
+  if (VGPRs <= 78)
+    return 4;
+  if (VGPRs <= 118)
+    return 3;
+  if (VGPRs <= 128)
+    return 2;
+  return 1;
+}
+
+__host__ __device__
+unsigned BBWithSpill::closeOccupancyWithNumSGPRs(unsigned SGPRs) {
+  // copied from llvm/lib/Target/AMDGPU/AMDGPUSubtarget.cpp
+  if (SGPRs <= 76)
+    return 11;
+  if (SGPRs <= 84)
+    return 10;
+  if (SGPRs <= 94)
+    return 9;
+  if (SGPRs <= 100)
+    return 8;
+  return 7;
+}
+
+__host__ __device__
+unsigned BBWithSpill::getCloseToOccupancy(unsigned VGPRCount, unsigned SGPRCount,
+                                     unsigned MaxOccLDS) {
+  unsigned MaxOccVGPR = closeOccupancyWithNumVGPRs(VGPRCount);
+  unsigned MaxOccSGPR = closeOccupancyWithNumSGPRs(SGPRCount);
+
+  #ifdef DEBUG_CLOSE_TO_OCCUPANCY
+  #ifdef __HIP_DEVICE_COMPILE__
+    if (GLOBALTID==0) {
+      printf("Close check: MaxOccVGPR Occ: %u, MaxOccSGPR Occ: %u, MaxOccLDS: %u\n", MaxOccVGPR, MaxOccSGPR, MaxOccLDS + 1);
+    }
+  #endif
+  #endif
+
+  // + 1 to account for being close
+  if (MaxOccLDS + 1 <= MaxOccVGPR && MaxOccLDS + 1 <= MaxOccSGPR)
+    return MaxOccLDS + 1;
+  else if (MaxOccVGPR <= MaxOccSGPR)
+    return MaxOccVGPR;
+  else
+    return MaxOccSGPR;
+}
+
+__host__ __device__
+bool BBWithSpill::closeToRPConstraint() {
+  #ifdef __HIP_DEVICE_COMPILE__
+  auto Occ =
+      getCloseToOccupancy(dev_regPressures_[OptSchedDDGWrapperGCN::VGPR32][GLOBALTID],
+                           dev_regPressures_[OptSchedDDGWrapperGCN::SGPR32][GLOBALTID], MaxOccLDS_);
+  #else
+  auto Occ =
+      getCloseToOccupancy(regPressures_[OptSchedDDGWrapperGCN::VGPR32],
+                           regPressures_[OptSchedDDGWrapperGCN::SGPR32], MaxOccLDS_);
+  #endif
+  return Occ <= TargetOccupancy_;
 }
 
 __device__

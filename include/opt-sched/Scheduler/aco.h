@@ -92,6 +92,8 @@ public:
   __host__ __device__
   void SetGlobalBestStalls(int stalls) { globalBestStalls_ = stalls; }
   __host__ __device__
+  int GetGlobalBestStalls() { return globalBestStalls_; }
+  __host__ __device__
   void SetScRelMax(pheromone_t inScRelMax) { ScRelMax = inScRelMax; }
   __host__ __device__
   int GetNumBlocks() { return numBlocks_; }
