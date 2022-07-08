@@ -222,6 +222,8 @@ int OptSchedGCNTarget::getOccupancyLimit(Config &OccFile) const {
   switch (LimitType) {
   case OLT_NONE:
     return OCCUnlimited;
+  case OLT_VALUE:
+    return OccupancyLimit;
   case OLT_HEUR:
     return MFI->isMemoryBound() || MFI->needsWaveLimiter() ? 4 : OCCUnlimited;
   case OLT_FILE:

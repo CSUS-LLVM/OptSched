@@ -49,6 +49,8 @@ enum FUNC_RESULT {
 enum OCC_LIMIT_TYPE {
   // NONE
   OLT_NONE,
+  // Value provided by sched.ini
+  OLT_VALUE,
   // AMD's Heuristic
   OLT_HEUR,
   // Hardcoded File
