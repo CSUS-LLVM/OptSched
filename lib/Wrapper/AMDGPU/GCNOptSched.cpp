@@ -48,7 +48,18 @@ static void getRealRegionPressure(MachineBasicBlock::const_iterator Begin,
 
 ScheduleDAGOptSchedGCN::ScheduleDAGOptSchedGCN(
     llvm::MachineSchedContext *C, std::unique_ptr<MachineSchedStrategy> S)
-    : ScheduleDAGOptSched(C, std::move(S)) {}
+    : ScheduleDAGOptSched(C, std::move(S)) {
+  SIMachineFunctionInfo *MFI;
+  MFI =
+      const_cast<SIMachineFunctionInfo *>(C->MF->getInfo<SIMachineFunctionInfo>());
+  #ifdef DEBUG_RESET_OCCUPANCY
+    printf("Occ before: %d\n", MFI->getOccupancy());
+  #endif
+  MFI->resetInitialOccupancy(*C->MF);
+  #ifdef DEBUG_RESET_OCCUPANCY
+    printf("Occ after: %d\n", MFI->getOccupancy());
+  #endif
+}
 
 void ScheduleDAGOptSchedGCN::initSchedulers() {
   // Add passes

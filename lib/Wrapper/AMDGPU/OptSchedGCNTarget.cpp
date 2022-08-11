@@ -155,6 +155,9 @@ void OptSchedGCNTarget::finalizeRegion(const InstSchedule *Schedule) {
   LLVM_DEBUG(dumpOccupancyInfo(Schedule));
 
   RegionEndingOccupancy = getOccupancyWithCost(Schedule->GetSpillCost());
+  #ifdef DEBUG_OCCUPANCY
+    printf("Region end occupancy: %d, sched spill cost: %d\n", RegionEndingOccupancy, Schedule->GetSpillCost());
+  #endif
   // If we decrease occupancy we may revert scheduling.
   unsigned RegionOccupancy =
       std::max(RegionStartingOccupancy, RegionEndingOccupancy);
@@ -178,6 +181,9 @@ InstCount OptSchedGCNTarget::getCost(const llvm::SmallVectorImpl<unsigned> &PRP)
 }
 
 bool OptSchedGCNTarget::shouldKeepSchedule() {
+  #ifdef DEBUG_OCCUPANCY
+    printf("Check startOcc: %d, endOcc: %d\n", RegionStartingOccupancy, RegionEndingOccupancy);
+  #endif
   if (RegionEndingOccupancy >= RegionStartingOccupancy ||
       RegionEndingOccupancy >= TargetOccupancy)
     return true;
