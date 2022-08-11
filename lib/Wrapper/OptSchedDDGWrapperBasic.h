@@ -50,6 +50,9 @@ public:
   void convertSUnits(bool IgnoreRealEdges, bool IgnoreArtificialEdges) override;
   void addArtificialEdges();
   void convertRegFiles() override;
+  // Count number of memory operations to calculate ratio
+  // of memory operations to ALU operations to consider skipping a region.
+  InstCount CountMemoryOperations();
 
 protected:
   // A convenience machMdl_ pointer casted to OptSchedMachineModel*.

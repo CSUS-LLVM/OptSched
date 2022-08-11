@@ -516,6 +516,17 @@ void OptSchedDDGWrapperBasic::countBoundaryLiveness(
   }
 }
 
+InstCount OptSchedDDGWrapperBasic::CountMemoryOperations() {
+  InstCount memOps = 0;
+  std::vector<SUnit>::const_iterator I, E;
+  for (I = DAG->SUnits.begin(), E = DAG->SUnits.end(); I != E; ++I) {
+    MachineInstr *MI = I->getInstr();
+    if (MI->mayLoadOrStore())
+      memOps++;
+  }
+  return memOps;
+}
+
 LLVMRegTypeFilter::LLVMRegTypeFilter(
     const MachineModel *MM, const llvm::TargetRegisterInfo *TRI,
     const std::vector<unsigned> &RegionPressure, float RegFilterFactor)

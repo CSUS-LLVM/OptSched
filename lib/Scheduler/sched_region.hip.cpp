@@ -460,6 +460,11 @@ FUNC_RESULT SchedRegion::FindOptimalSchedule(
     }
   }
 
+  InstCount memOps = static_cast<OptSchedDDGWrapperBasic *>(dataDepGraph_)->CountMemoryOperations();
+
+  float memRatio = (float) memOps/ (float) (dataDepGraph_->GetInstCnt() - 2);
+  Logger::Info("Memory Instructions: %d, Memory Ratio: %f, SUnits.size(): %d", memOps, memRatio, dataDepGraph_->GetInstCnt() - 2);
+
   // Step #2: Use ACO to find a schedule if enabled and no optimal schedule is
   // yet to be found.
   // check if region is of appropriate size to execute Dev_ACO on 
@@ -467,10 +472,21 @@ FUNC_RESULT SchedRegion::FindOptimalSchedule(
   // TODO: move to sched.ini
   if (AcoBeforeEnum && 
       (REGION_MAX_EDGE_CNT > 0 &&
-       dataDepGraph_->GetEdgeCnt() > REGION_MAX_EDGE_CNT)) {
+       dataDepGraph_->GetEdgeCnt() > REGION_MAX_EDGE_CNT /*||
+       dataDepGraph_->GetInstCnt() <= 10*/)) {
     Logger::Info("Skipping ACO (under %d nodes or over %d edges)", 
-                  REGION_MIN_SIZE, REGION_MAX_EDGE_CNT);
+                  10, REGION_MAX_EDGE_CNT);
     AcoBeforeEnum = false;
+    bestSched = bestSched_ = lstSched;
+    bestSchedLngth_ = heuristicScheduleLength;
+    bestCost_ = hurstcCost_;
+  }
+  else if (!isLstOptml && AcoBeforeEnum && memOps == 0) {
+    Logger::Info("Skipping ACO (No Mem ops)");
+    AcoBeforeEnum = false;
+    bestSched = bestSched_ = lstSched;
+    bestSchedLngth_ = heuristicScheduleLength;
+    bestCost_ = hurstcCost_;
   }
 
   if (AcoBeforeEnum && !isLstOptml) {
