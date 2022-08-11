@@ -188,8 +188,7 @@ bool ACOScheduler::shouldReplaceSchedule(InstSchedule *OldSched,
     InstCount OldCost = OldSched->GetExecCost();
     InstCount NewSpillCost = NewSched->GetNormSpillCost();
     InstCount OldSpillCost = OldSched->GetNormSpillCost();
-    // if using SLIL and old schedule is 0 PERP, new schedule wins if it
-    // is 0 PERP and shorter
+
     if (needsTarget) {
       // If both schedules are under occupancy target, then pick shorter one
       if (NewSpillCost <= RPTarget && OldSpillCost <= RPTarget) {
@@ -199,6 +198,8 @@ bool ACOScheduler::shouldReplaceSchedule(InstSchedule *OldSched,
           return false;
       }
     }
+    // if using SLIL and old schedule is 0 PERP, new schedule wins if it
+    // is 0 PERP and shorter
     else if (needsSLIL && OldSched->getIsZeroPerp()) {
       if (NewSched->getIsZeroPerp() && NewCost < OldCost)
         return true;
@@ -498,17 +499,27 @@ InstCount ACOScheduler::SelectInstruction(SchedInstruction *lastInst, InstCount 
   //this will diverge if two ants ready lists are of different sizes
 
   // select the instruction index for fp choice
+  size_t fpIndx=0;
   #ifdef __HIP_DEVICE_COMPILE__
-    size_t fpIndx=0;
-    for (size_t i = 0; i < dev_readyLs->getReadyListSize(); ++i) {
-      point -= *dev_readyLs->getInstScoreAtIndex(i);
-      if (point <= 0) {
-        fpIndx = i;
-        break;
+    __shared__ bool dev_useMax;
+    // select useMax for each block
+    if (hipThreadIdx_x == 0)
+      dev_useMax = (rand < choose_best_chance) || currentlyWaiting;
+    __syncthreads();
+    #ifdef DEBUG_EXPLORATION_EXPLOITATION_TOGETHER
+      if (GLOBALTID < 5 )
+        printf("GLOBALTID %d rand: %f, choose_best_chance: %f, useMax: %s\n", GLOBALTID, rand, choose_best_chance, dev_useMax ? "true" : "false");
+    #endif
+    if (!dev_useMax) {
+      for (size_t i = 0; i < dev_readyLs->getReadyListSize(); ++i) {
+        point -= *dev_readyLs->getInstScoreAtIndex(i);
+        if (point <= 0) {
+          fpIndx = i;
+          break;
+        }
       }
     }
   #else
-    size_t fpIndx=0;
     for (size_t i = 0; i < readyLs->getReadyListSize(); ++i) {
       point -= *readyLs->getInstScoreAtIndex(i);
       if (point <= 0) {
@@ -518,8 +529,12 @@ InstCount ACOScheduler::SelectInstruction(SchedInstruction *lastInst, InstCount 
     }
   #endif
   //finally we pick whether we will return the fp choice or max score inst w/o using a branch
-  bool UseMax = (rand < choose_best_chance) || currentlyWaiting;
-  size_t indx = UseMax ? MaxScoreIndx : fpIndx;
+  #ifdef __HIP_DEVICE_COMPILE__
+    size_t indx = dev_useMax ? MaxScoreIndx : fpIndx;
+  #else
+    bool UseMax = (rand < choose_best_chance) || currentlyWaiting;
+    size_t indx = UseMax ? MaxScoreIndx : fpIndx;
+  #endif
   #ifdef __HIP_DEVICE_COMPILE__
     #ifdef DEBUG_INSTR_SELECTION
     if (GLOBALTID==0) {
@@ -1005,7 +1020,7 @@ void Dev_ACO(SchedRegion *dev_rgn, DataDepGraph *dev_DDG,
         // exit the loop after the current iteration is finished
         if ( dev_bestSched && (!IsSecondPass && dev_bestSched->GetNormSpillCost() == 0  || ( IsSecondPass && dev_bestSched->GetExecCost() == 0 ) ) ) {
           lowerBoundSchedFound = true;
-        } else if (!IsSecondPass  && ((BBWithSpill *)dev_rgn)->ReturnPeakSpillCost() == 0) {
+        } else if (!needsTarget && !IsSecondPass  && ((BBWithSpill *)dev_rgn)->ReturnPeakSpillCost() == 0) {
           lowerBoundSchedFound = true;
           printf("Schedule with 0 PERP was found\n");
         }
