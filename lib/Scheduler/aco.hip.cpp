@@ -228,27 +228,9 @@ InstCount ACOScheduler::SelectInstruction(SchedInstruction *lastInst, InstCount 
                                           SchedRegion *rgn, bool &unnecessarilyStalling,
                                           bool closeToRPTarget, bool currentlyWaiting) {
 #ifdef __HIP_DEVICE_COMPILE__
-  // loop through instructions to see if all fully-ready instructions have a negative effect on RP
-  // if there are no fully-ready instructions, then onlyRPNegative will be true
-  bool onlyRPNegative = true;
-  for (InstCount I = 0; I < dev_readyLs->getReadyListSize(); ++I) {
-    // For this, do not consider instructions that are semi-ready,
-    // consider them once they become fully ready
-    if (*dev_readyLs->getInstReadyOnAtIndex(I) > dev_crntCycleNum_[GLOBALTID])
-      continue;
-    
-    InstCount CandidateId = *dev_readyLs->getInstIdAtIndex(I);
-    SchedInstruction *candidateInst = dataDepGraph_->GetInstByIndx(CandidateId);
-    HeurType candidateLUC = candidateInst->GetLastUseCnt();
-    int16_t candidateDefs = candidateInst->GetDefCnt();
-    if (candidateDefs <= candidateLUC) {
-      onlyRPNegative = false;
-      break;
-    }
-  }
   // if we are waiting and have no fully-ready instruction that is 
   // net 0 or benefit to RP, then return -1 to schedule a stall
-  if (currentlyWaiting && onlyRPNegative)
+  if (currentlyWaiting && dev_RP0OrPositiveCount[GLOBALTID] == 0)
     return -1;
 
   // calculate MaxScoringInst, and ScoreSum
@@ -274,7 +256,7 @@ InstCount ACOScheduler::SelectInstruction(SchedInstruction *lastInst, InstCount 
     // compute the score
     HeurType Heur = *dev_readyLs->getInstHeuristicAtIndex(I);
     pheromone_t IScore = Score(lastInstId, *dev_readyLs->getInstIdAtIndex(I), Heur);
-    if (!onlyRPNegative && candidateDefs > candidateLUC)
+    if (dev_RP0OrPositiveCount[GLOBALTID] != 0 && candidateDefs > candidateLUC)
       IScore = IScore * 9/10;
 
     *dev_readyLs->getInstScoreAtIndex(I) = IScore;
@@ -298,10 +280,10 @@ InstCount ACOScheduler::SelectInstruction(SchedInstruction *lastInst, InstCount 
     // add a score penalty for instructions that are not ready yet
     // unnecessary stalls should not be considered if current RP is low, or if we already have too many stalls
     if (*dev_readyLs->getInstReadyOnAtIndex(I) > dev_crntCycleNum_[GLOBALTID]) {
-      if (!onlyRPNegative) {
+      if (dev_RP0OrPositiveCount[GLOBALTID] != 0) {
         #ifdef DEBUG_INSTR_SELECTION
         if (GLOBALTID==0)
-          printf("Zeroing out Inst: %d, score: %f, only rp negative: %s, close to RP Target: %s\n", *dev_readyLs->getInstIdAtIndex(I), IScore, onlyRPNegative ? "true" : "false", closeToRPTarget ? "true" : "false");
+          printf("Zeroing out Inst: %d, score: %f, only rp negative: %s, close to RP Target: %s\n", *dev_readyLs->getInstIdAtIndex(I), IScore, dev_RP0OrPositiveCount[GLOBALTID] ? "true" : "false", closeToRPTarget ? "true" : "false");
         #endif
         IScore = 0.0000001;
       }
@@ -355,27 +337,9 @@ InstCount ACOScheduler::SelectInstruction(SchedInstruction *lastInst, InstCount 
     }
   }
 #else
-  // loop through instructions to see if all fully-ready instructions have a negative effect on RP
-  // if there are no fully-ready instructions, then onlyRPNegative will be true
-  bool onlyRPNegative = true;
-  for (InstCount I = 0; I < readyLs->getReadyListSize(); ++I) {
-    // For this, do not consider instructions that are semi-ready,
-    // consider them once they become fully ready
-    if (*readyLs->getInstReadyOnAtIndex(I) > crntCycleNum_)
-      continue;
-    
-    InstCount CandidateId = *readyLs->getInstIdAtIndex(I);
-    SchedInstruction *candidateInst = dataDepGraph_->GetInstByIndx(CandidateId);
-    HeurType candidateLUC = candidateInst->GetLastUseCnt();
-    int16_t candidateDefs = candidateInst->GetDefCnt();
-    if (candidateDefs <= candidateLUC) {
-      onlyRPNegative = false;
-      break;
-    }
-  }
   // if we are waiting and have no fully-ready instruction that is 
   // net 0 or benefit to RP, then return -1 to schedule a stall
-  if (currentlyWaiting && onlyRPNegative)
+  if (currentlyWaiting && RP0OrPositiveCount == 0)
     return -1;
 
   // calculate MaxScoringInst, and ScoreSum
@@ -401,7 +365,7 @@ InstCount ACOScheduler::SelectInstruction(SchedInstruction *lastInst, InstCount 
     // compute the score
     HeurType Heur = *readyLs->getInstHeuristicAtIndex(I);
     pheromone_t IScore = Score(lastInstId, *readyLs->getInstIdAtIndex(I), Heur);
-    if (!onlyRPNegative && candidateDefs > candidateLUC)
+    if (RP0OrPositiveCount != 0 && candidateDefs > candidateLUC)
       IScore = IScore * 9/10;
 
     *readyLs->getInstScoreAtIndex(I) = IScore;
@@ -420,7 +384,7 @@ InstCount ACOScheduler::SelectInstruction(SchedInstruction *lastInst, InstCount 
     // add a score penalty for instructions that are not ready yet
     // unnecessary stalls should not be considered if current RP is low, or if we already have too many stalls
     if (*readyLs->getInstReadyOnAtIndex(I) > crntCycleNum_) {
-      if (!onlyRPNegative) {
+      if (RP0OrPositiveCount != 0) {
         IScore = 0.0000001;
       }
       else {
@@ -589,8 +553,22 @@ InstSchedule *ACOScheduler::FindOneSchedule(InstCount RPTarget,
   dev_MaxScoringInst[GLOBALTID] = 0;
   lastInst = dataDepGraph_->GetInstByIndx(RootId);
   bool closeToRPTarget = false;
+  dev_RP0OrPositiveCount[GLOBALTID] = 0;
 
   while (!IsSchedComplete_()) {
+    // incrementally calculate if there are any instructions with a neutral
+    // or positive effect on RP
+    for (InstCount I = 0; I < dev_readyLs->getReadyListSize(); ++I) {
+      if (*dev_readyLs->getInstReadyOnAtIndex(I) == dev_crntCycleNum_[GLOBALTID]) {
+        InstCount CandidateId = *dev_readyLs->getInstIdAtIndex(I);
+        SchedInstruction *candidateInst = dataDepGraph_->GetInstByIndx(CandidateId);
+        HeurType candidateLUC = candidateInst->GetLastUseCnt();
+        int16_t candidateDefs = candidateInst->GetDefCnt();
+        if (candidateDefs <= candidateLUC) {
+          dev_RP0OrPositiveCount[GLOBALTID] = dev_RP0OrPositiveCount[GLOBALTID] + 1;
+        }
+      }
+    }
 
     // there are two steps to scheduling an instruction:
     // 1)Select the instruction(if we are not waiting on another instruction)
@@ -729,9 +707,23 @@ InstSchedule *ACOScheduler::FindOneSchedule(InstCount RPTarget,
   MaxScoringInst = 0;
   lastInst = dataDepGraph_->GetInstByIndx(RootId);
   bool closeToRPTarget = false;
+  RP0OrPositiveCount = 0;
 
   SchedInstruction *inst = NULL;
   while (!IsSchedComplete_()) {
+    // incrementally calculate if there are any instructions with a neutral
+    // or positive effect on RP
+    for (InstCount I = 0; I < readyLs->getReadyListSize(); ++I) {
+      if (*readyLs->getInstReadyOnAtIndex(I) == crntCycleNum_) {
+        InstCount CandidateId = *readyLs->getInstIdAtIndex(I);
+        SchedInstruction *candidateInst = dataDepGraph_->GetInstByIndx(CandidateId);
+        HeurType candidateLUC = candidateInst->GetLastUseCnt();
+        int16_t candidateDefs = candidateInst->GetDefCnt();
+        if (candidateDefs <= candidateLUC) {
+          RP0OrPositiveCount = RP0OrPositiveCount + 1;
+        }
+      }
+    }
 
     // there are two steps to scheduling an instruction:
     // 1)Select the instruction(if we are not waiting on another instruction)
@@ -1241,6 +1233,9 @@ FUNC_RESULT ACOScheduler::FindSchedule(InstSchedule *schedule_out,
     int *dev_blockBestIndex;
     memSize = (NUMBLOCKSMANYANTS/2) * sizeof(int);
     gpuErrchk(hipMalloc(&dev_blockBestIndex, memSize));
+    // Allocate array to hold if the only choices we have are negative for RP
+    memSize = sizeof(int) * numThreads_;
+    gpuErrchk(hipMalloc(&dev_AcoSchdulr->dev_RP0OrPositiveCount, memSize));
     // Make sure managed memory is copied to device before kernel start
     memSize = sizeof(ACOScheduler);
     gpuErrchk(hipMemPrefetchAsync(dev_AcoSchdulr, memSize, 0));
@@ -1611,6 +1606,7 @@ inline void ACOScheduler::UpdateACOReadyList(SchedInstruction *inst) {
     // Make sure the scores are valid.  The scheduling of an instruction may
     // have increased another instruction's LUC Score
     PriorityEntry LUCEntry = dev_kHelper->getPriorityEntry(LSH_LUC);
+    dev_RP0OrPositiveCount[GLOBALTID] = 0;
     for (InstCount I = 0; I < dev_readyLs->getReadyListSize(); ++I) {
       //we first get the heuristic without the LUC component, add the LUC
       //LUC component, and then compute the score
@@ -1621,6 +1617,17 @@ inline void ACOScheduler::UpdateACOReadyList(SchedInstruction *inst) {
         HeurType LUCVal = ScsrInst->CmputLastUseCnt();
         LUCVal <<= LUCEntry.Offset;
         Heur &= LUCVal;
+      }
+      if (dev_RP0OrPositiveCount[GLOBALTID]) {
+        if (*dev_readyLs->getInstReadyOnAtIndex(I) > dev_crntCycleNum_[GLOBALTID])
+          continue;
+
+        SchedInstruction *candidateInst = dataDepGraph_->GetInstByIndx(CandidateId);
+        HeurType candidateLUC = candidateInst->GetLastUseCnt();
+        int16_t candidateDefs = candidateInst->GetDefCnt();
+        if (candidateDefs <= candidateLUC) {
+          dev_RP0OrPositiveCount[GLOBALTID] = dev_RP0OrPositiveCount[GLOBALTID] + 1;
+        }
       }
     }
   #else // host version of function
@@ -1641,6 +1648,7 @@ inline void ACOScheduler::UpdateACOReadyList(SchedInstruction *inst) {
     // Make sure the scores are valid.  The scheduling of an instruction may
     // have increased another instruction's LUC Score
     PriorityEntry LUCEntry = kHelper->getPriorityEntry(LSH_LUC);
+    RP0OrPositiveCount = 0;
     for (InstCount I = 0; I < readyLs->getReadyListSize(); ++I) {
       //we first get the heuristic without the LUC component, add the LUC
       //LUC component, and then compute the score
@@ -1651,6 +1659,17 @@ inline void ACOScheduler::UpdateACOReadyList(SchedInstruction *inst) {
         HeurType LUCVal = ScsrInst->CmputLastUseCnt();
         LUCVal <<= LUCEntry.Offset;
         Heur &= LUCVal;
+      }
+      if (RP0OrPositiveCount) {
+        if (*dev_readyLs->getInstReadyOnAtIndex(I) > crntCycleNum_)
+          continue;
+
+        SchedInstruction *candidateInst = dataDepGraph_->GetInstByIndx(CandidateId);
+        HeurType candidateLUC = candidateInst->GetLastUseCnt();
+        int16_t candidateDefs = candidateInst->GetDefCnt();
+        if (candidateDefs <= candidateLUC) {
+          RP0OrPositiveCount = RP0OrPositiveCount + 1;
+        }
       }
     }
   #endif

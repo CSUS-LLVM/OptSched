@@ -30,8 +30,8 @@ namespace opt_sched {
 // use edge count to approximate memory usage, using nodeCnt reflect
 // memory usage as well. Smaller node count DAGs can use more memory.
 #define REGION_MAX_EDGE_CNT 800000
-#define NUMBLOCKSMANYANTS 160
-#define NUMTHREADSPERBLOCK 32
+#define NUMBLOCKSMANYANTS 80
+#define NUMTHREADSPERBLOCK 64
 
 enum class DCF_OPT {
   OFF,
@@ -159,6 +159,8 @@ private:
   bool justWaited = false;
   int globalBestStalls_ = 0;
   int numBlocks_, numThreads_;
+  int *dev_RP0OrPositiveCount;
+  int RP0OrPositiveCount;
 
 };
 
