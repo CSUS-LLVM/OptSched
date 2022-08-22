@@ -68,7 +68,7 @@ ACOScheduler::ACOScheduler(DataDepGraph *dataDepGraph,
   numAntsTerminated_ = 0;
   numBlocks_ = numBlocks;
   numThreads_ = numBlocks_ * NUMTHREADSPERBLOCK;
-  if(!DEV_ACO)
+  if(!DEV_ACO || count_ < REGION_MIN_SIZE)
     numThreads_ = schedIni.GetInt("HOST_ANTS");
 
   use_fixed_bias = schedIni.GetBool("ACO_USE_FIXED_BIAS");
@@ -907,8 +907,9 @@ __device__ int globalBestIndex, dev_noImprovement, dev_schedsUsed, dev_schedsFou
 __device__ pheromone_t dev_totalPherInTable;
 __device__ bool lowerBoundSchedFound, isGlobalBest;
 
-__global__
-void Dev_ACO(SchedRegion *dev_rgn, DataDepGraph *dev_DDG,
+__global__ void
+__launch_bounds__(NUMTHREADSPERBLOCK, 1)
+Dev_ACO(SchedRegion *dev_rgn, DataDepGraph *dev_DDG,
             ACOScheduler *dev_AcoSchdulr, InstSchedule **dev_schedules,
             InstSchedule *dev_bestSched, int noImprovementMax, 
             int *blockBestIndex) {
