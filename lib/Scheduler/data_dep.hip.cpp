@@ -3726,8 +3726,10 @@ void DataDepGraph::CopyPointersToDevice(DataDepGraph *dev_DDG, int numThreads) {
   // count the number of elements in predecessor/successor lists
   // used to malloc the large elements array
   int lngthScsrElmnts = 0;
+  int lengthLatencies = 0;
   for (InstCount i = 0; i < instCnt_; i++) {
     lngthScsrElmnts += insts_[i].GetScsrCnt();
+    lengthLatencies += insts_[i].GetPrdcsrCnt();
   }
   memSize = sizeof(GraphEdge *) * lngthScsrElmnts;
   gpuErrchk(hipMallocManaged(&dev_scsrElmnts_, memSize));
@@ -3735,7 +3737,12 @@ void DataDepGraph::CopyPointersToDevice(DataDepGraph *dev_DDG, int numThreads) {
   memSize = sizeof(unsigned long) * lngthScsrElmnts;
   gpuErrchk(hipMallocManaged(&dev_keys_, memSize));
 
+  memSize = sizeof(InstCount) * lengthLatencies;
+  gpuErrchk(hipMallocManaged(&dev_latencies_, memSize));
+
   int scsrIndex = 0;
+  int latencyIndex = 0;
+
   // Copy SchedInstruction/GraphNode pointers and link them to device inst
   // and update RegFiles pointer to dev_regFiles
   for (InstCount i = 0; i < instCnt_; i++)
@@ -3743,7 +3750,8 @@ void DataDepGraph::CopyPointersToDevice(DataDepGraph *dev_DDG, int numThreads) {
 		                   instCnt_, dev_regFiles, numThreads,
                                    edges_, dev_edges_,
                                    dev_scsrElmnts_,
-                                   dev_keys_, scsrIndex);
+                                   dev_keys_, scsrIndex,
+                                   dev_latencies_, latencyIndex);
   memSize = sizeof(SchedInstruction) * instCnt_;
   gpuErrchk(hipMemPrefetchAsync(dev_insts, memSize, 0));
   memSize = sizeof(RegisterFile) * machMdl_->GetRegTypeCnt();
@@ -3752,6 +3760,8 @@ void DataDepGraph::CopyPointersToDevice(DataDepGraph *dev_DDG, int numThreads) {
   gpuErrchk(hipMemPrefetchAsync(dev_scsrElmnts_, memSize, 0));
   memSize = sizeof(unsigned long) * lngthScsrElmnts;
   gpuErrchk(hipMemPrefetchAsync(dev_keys_, memSize, 0));
+  memSize = sizeof(InstCount) * lengthLatencies;
+  gpuErrchk(hipMemPrefetchAsync(dev_latencies_, memSize, 0));
 }
 
 void DataDepGraph::FreeDevicePointers(int numThreads) {
@@ -3767,6 +3777,8 @@ void DataDepGraph::FreeDevicePointers(int numThreads) {
     insts_[i].FreeDevicePointers(numThreads);
   hipFree(insts_);
   hipFree(nodes_);
+  // hipFree(dev_latencies_);
+  // hipFree(dev_crntRange_);
   // (Josh) These frees are invalid but I am not sure why
   // hipFree(dev_scsrElmnts_);
   // hipFree(dev_keys_);

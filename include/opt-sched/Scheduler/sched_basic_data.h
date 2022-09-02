@@ -552,7 +552,8 @@ public:
 		            InstCount instCnt, RegisterFile *dev_regFiles, 
                             int numThreads, std::vector<GraphEdge *> *edges,
                             GraphEdge *dev_edges, GraphEdge **dev_scsrElmnts_, 
-                            unsigned long *dev_keys, int &scsrIndex);
+                            unsigned long *dev_keys, int &scsrIndex,
+                            InstCount *dev_ltncyPerPrdcsr, int &ltncyIndex);
   // Calls hipFree on all arrays/objects that were allocated with hipMalloc
   void FreeDevicePointers(int numThreads);
   // Allocates arrays used for storing individual values for each thread in

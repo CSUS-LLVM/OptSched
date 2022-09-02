@@ -1062,11 +1062,6 @@ void SchedInstruction::InitializeNode_(InstCount instNum,
   GraphNode::SetNum(instNum);
 }
 
-__device__
-void SchedInstruction::CreateSchedRange() {
-  crntRange_ = new SchedRange(this);
-}
-
 void SchedInstruction::CopyPointersToDevice(SchedInstruction *dev_inst,
                                             GraphNode **dev_nodes,
 					                                  InstCount instCnt, 
@@ -1076,25 +1071,17 @@ void SchedInstruction::CopyPointersToDevice(SchedInstruction *dev_inst,
                                             GraphEdge *dev_edges, 
                                             GraphEdge **dev_scsrElmnts, 
                                             unsigned long *dev_keys, 
-                                            int &scsrIndex) {
+                                            int &scsrIndex,
+                                            InstCount *dev_ltncyPerPrdcsr,
+                                            int &ltncyIndex) {
   dev_inst->RegFiles_ = dev_regFiles;
   size_t memSize;
-  memSize = sizeof(InstCount) * prdcsrCnt_;
-  // Copy ltncyPerPrdcsr 
-  InstCount *dev_ltncyPerPrdcsr;
-  gpuErrchk(hipMalloc(&dev_ltncyPerPrdcsr, memSize));
-  gpuErrchk(hipMemcpy(dev_ltncyPerPrdcsr, ltncyPerPrdcsr_, memSize, 
-		       hipMemcpyHostToDevice));
-  gpuErrchk(hipMemcpy(&dev_inst->ltncyPerPrdcsr_, &dev_ltncyPerPrdcsr,
-		       sizeof(InstCount *), hipMemcpyHostToDevice));
-  // Copy SchedRange
-  SchedRange *dev_crntRange;
-  memSize = sizeof(SchedRange);
-  gpuErrchk(hipMalloc(&dev_crntRange, memSize));
-  gpuErrchk(hipMemcpy(dev_crntRange, crntRange_, memSize,
-		       hipMemcpyHostToDevice));
-  gpuErrchk(hipMemcpy(&dev_inst->crntRange_, &dev_crntRange,
-		       sizeof(SchedRange *), hipMemcpyHostToDevice));
+  dev_inst->ltncyPerPrdcsr_ = &dev_ltncyPerPrdcsr[ltncyIndex];
+  for (InstCount i = 0; i < prdcsrCnt_; i++) {
+    dev_inst->ltncyPerPrdcsr_[i] = ltncyPerPrdcsr_[i];
+  }
+  ltncyIndex += prdcsrCnt_;
+
   // Copy sortedScsrLst_
   GraphNode::CopyPointersToDevice((GraphNode *)dev_inst, dev_nodes, instCnt,
                                   edges, dev_edges, dev_scsrElmnts, 

@@ -437,6 +437,7 @@ protected:
 
   GraphEdge **dev_scsrElmnts_;
   unsigned long *dev_keys_;
+  InstCount *dev_latencies_;
 
   InstCount maxIndependentInstructions_;
 

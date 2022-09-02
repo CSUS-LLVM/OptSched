@@ -253,6 +253,9 @@ public:
   void setMaxOccLDS(unsigned MaxOccLDS) {
     MaxOccLDS_ = MaxOccLDS;
   }
+  // size_t calculateMemoryNeeded() {
+  //   return regTypeCnt_ * sizeof(WeightedBitVector) * numThreads * 2;
+  // }
 protected:
   // (Chris)
   inline virtual const int *GetSLIL_() const {
