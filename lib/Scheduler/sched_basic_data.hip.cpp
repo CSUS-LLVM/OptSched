@@ -181,7 +181,6 @@ bool SchedInstruction::InitForSchdulng(InstCount schedLngth,
   
   for (InstCount i = 0; i < prdcsrCnt_; i++) {
     dev_rdyCyclePerPrdcsr_[GLOBALTID][i] = INVALID_VALUE;
-    dev_prevMinRdyCyclePerPrdcsr_[GLOBALTID][i] = INVALID_VALUE;
   }
 #else
   crntSchedCycle_ = SCHD_UNSCHDULD;
@@ -666,7 +665,6 @@ bool SchedInstruction::PrdcsrSchduld(InstCount prdcsrNum, InstCount cycle,
   assert(prdcsrNum < prdcsrCnt_);
 #ifdef __HIP_DEVICE_COMPILE__
   dev_rdyCyclePerPrdcsr_[GLOBALTID][prdcsrNum] = cycle + ltncyPerPrdcsr_[prdcsrNum];
-  dev_prevMinRdyCyclePerPrdcsr_[GLOBALTID][prdcsrNum] = dev_minRdyCycle_[GLOBALTID];
 
   if (dev_rdyCyclePerPrdcsr_[GLOBALTID][prdcsrNum] > dev_minRdyCycle_[GLOBALTID]) {
     dev_minRdyCycle_[GLOBALTID] = dev_rdyCyclePerPrdcsr_[GLOBALTID][prdcsrNum];
@@ -1089,8 +1087,6 @@ void SchedInstruction::CopyPointersToDevice(SchedInstruction *dev_inst,
   // make sure managed mem is copied to device before kernel start
   memSize = sizeof(InstCount *) * numThreads;
   gpuErrchk(hipMemPrefetchAsync(dev_rdyCyclePerPrdcsr_, memSize, 0));
-  memSize = sizeof(InstCount *) * numThreads;
-  gpuErrchk(hipMemPrefetchAsync(dev_prevMinRdyCyclePerPrdcsr_, memSize, 0));
 }
 
 void SchedInstruction::FreeDevicePointers(int numThreads) {
@@ -1105,8 +1101,6 @@ void SchedInstruction::FreeDevicePointers(int numThreads) {
   hipFree(dev_unschduldScsrCnt_);
   hipFree(dev_rdyCyclePerPrdcsr_[0]);
   hipFree(dev_rdyCyclePerPrdcsr_);
-  hipFree(dev_prevMinRdyCyclePerPrdcsr_[0]);
-  hipFree(dev_prevMinRdyCyclePerPrdcsr_);
   if (rcrsvScsrLst_)
     hipFree(rcrsvScsrLst_->dev_crnt_);
   if (rcrsvPrdcsrLst_)
@@ -1148,15 +1142,6 @@ void SchedInstruction::AllocDevArraysForParallelACO(int numThreads) {
   gpuErrchk(hipMalloc(&temp_arr, memSize));
   for (int i = 0; i < numThreads; i++) {
     dev_rdyCyclePerPrdcsr_[i] = &temp_arr[i * prdcsrCnt_];
-  }
-  // Allocate an array of prevMinRdyCyclePerPrdcsr_ of size numThreads
-  memSize = sizeof(InstCount *) * numThreads;
-  gpuErrchk(hipMallocManaged(&dev_prevMinRdyCyclePerPrdcsr_, memSize));
-  // use same one malloc approach as above
-  memSize = sizeof(InstCount) * prdcsrCnt_ * numThreads;
-  gpuErrchk(hipMalloc(&temp_arr, memSize));
-  for (int i = 0; i < numThreads; i++) {
-    dev_prevMinRdyCyclePerPrdcsr_[i] = &temp_arr[i * prdcsrCnt_];
   }
   // Alloc arrays of iterators for each array list
   // Alloc array of iterators for sortedScsrLst_

@@ -642,9 +642,6 @@ protected:
   // The previous value of the minRdyCycle_, saved before the scheduling of a
   // predecessor to enable backtracking if this predecessor is unscheduled.
   InstCount *prevMinRdyCyclePerPrdcsr_;
-  // pointer to a device array used to store prevMinRdyCyclePerPrdcsr__ for 
-  // each thread by parallel ACO
-  InstCount **dev_prevMinRdyCyclePerPrdcsr_;
   // An array of predecessor latencies indexed by predecessor number.
   InstCount *ltncyPerPrdcsr_;
   // The number of unscheduled predecessors.
