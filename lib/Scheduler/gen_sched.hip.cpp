@@ -183,8 +183,9 @@ void ConstrainedScheduler::SchdulInst_(SchedInstruction *inst, InstCount) {
 
   // Notify each successor of this instruction that it has been scheduled.
   if(!IsACO) {
-    for (SchedInstruction *crntScsr = inst->GetFrstScsr(&prdcsrNum);
-        crntScsr != NULL; crntScsr = inst->GetNxtScsr(&prdcsrNum)) {
+    int i = 0;
+    for (SchedInstruction *crntScsr = inst->GetScsr(i++, &prdcsrNum);
+          crntScsr != NULL; crntScsr = inst->GetScsr(i++, &prdcsrNum)) {
       crntScsr->PrdcsrSchduld(prdcsrNum, dev_crntCycleNum_[GLOBALTID], scsrRdyCycle);
     }
   }
@@ -236,8 +237,10 @@ void ConstrainedScheduler::UnSchdulInst_(SchedInstruction *inst) {
   // The successors are visted in the reverse order so that each one will be
   // at the bottom of its first-ready list (if the scheduling of this
   // instruction has caused it to go there).
-  for (SchedInstruction *crntScsr = inst->GetLastScsr(&prdcsrNum);
-       crntScsr != NULL; crntScsr = inst->GetPrevScsr(&prdcsrNum)) {
+  #ifdef __HIP_DEVICE_COMPILE__
+  int lastScsrNum = inst->GetScsrCnt_();
+    for (SchedInstruction *crntScsr = inst->GetScsr(lastScsrNum--, &prdcsrNum);
+          crntScsr != NULL && lastScsrNum > -1; crntScsr = inst->GetScsr(lastScsrNum--, &prdcsrNum)) {
     bool wasLastPrdcsr = crntScsr->PrdcsrUnSchduld(prdcsrNum, scsrRdyCycle);
 
     if (wasLastPrdcsr) {
@@ -250,6 +253,22 @@ void ConstrainedScheduler::UnSchdulInst_(SchedInstruction *inst) {
       frstRdyLstPerCycle_[scsrRdyCycle]->RmvElmnt(crntScsr->GetNum());
     }
   }
+  #else
+    for (SchedInstruction *crntScsr = inst->GetLastScsr(&prdcsrNum);
+          crntScsr != NULL; crntScsr = inst->GetPrevScsr(&prdcsrNum)) {
+    bool wasLastPrdcsr = crntScsr->PrdcsrUnSchduld(prdcsrNum, scsrRdyCycle);
+
+    if (wasLastPrdcsr) {
+      // If this predecessor was the last to schedule and thus resolved the
+      // cycle in which this successor will become ready, then this successor
+      // must now be taken out of the first ready list for the cycle in which
+      // the scheduling of this instruction has made it ready.
+      assert(scsrRdyCycle < schedUprBound_);
+      assert(frstRdyLstPerCycle_[scsrRdyCycle] != NULL);
+      frstRdyLstPerCycle_[scsrRdyCycle]->RmvElmnt(crntScsr->GetNum());
+    }
+  }
+  #endif
 
   schduldInstCnt_--;
 }
@@ -399,7 +418,6 @@ bool ConstrainedScheduler::IsTriviallyLegal_(
   // slot.
   if (inst->IsRoot() || inst->IsLeaf())
     return true;
-
   return false;
 }
 

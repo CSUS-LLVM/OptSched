@@ -100,7 +100,7 @@ static inline void addDblQuotes(const char *src, int srcLen, char *dest) {
   dest[srcLen + 2] = '\0';
 }
 
-__host__ __device__
+__host__
 InstCount DataDepStruct::CmputRsrcLwrBound_() {
   // Temp limitation
   assert(type_ == DGT_FULL);
@@ -142,7 +142,7 @@ InstCount DataDepStruct::CmputRsrcLwrBound_() {
   return rsrcLwrBound;
 }
 
-__host__ __device__
+__host__
 InstCount DataDepStruct::CmputAbslutUprBound_() {
   InstCount i;
   InstCount ltncySum = 0;
@@ -380,7 +380,7 @@ FUNC_RESULT DataDepGraph::UpdateSetupForSchdulng(bool cmputTrnstvClsr) {
   return RES_SUCCESS;
 }
 
-__host__ __device__
+__host__
 void DataDepGraph::CmputBasicLwrBounds_() {
   for (InstCount i = 0; i < instCnt_; i++) {
     SchedInstruction *inst = GetInstByIndx(i);
@@ -1224,7 +1224,7 @@ bool DataDepGraph::UseFileBounds() {
   return match;
 }
 
-__host__ __device__
+__host__
 void DataDepGraph::CmputRltvCrtclPaths_(DIRECTION dir) {
   InstCount i;
 
@@ -1241,7 +1241,7 @@ void DataDepGraph::CmputRltvCrtclPaths_(DIRECTION dir) {
   }
 }
 
-__host__ __device__
+__host__
 void DataDepGraph::CmputCrtclPathsFrmRcrsvPrdcsr_(SchedInstruction *ref) {
   ArrayList<InstCount> *rcrsvScsrLst = ref->GetRcrsvNghbrLst(DIR_FRWRD);
   SchedInstruction *inst = GetLeafInst();
@@ -1264,7 +1264,7 @@ void DataDepGraph::CmputCrtclPathsFrmRcrsvPrdcsr_(SchedInstruction *ref) {
          ref->GetCrtclPath(DIR_BKWRD));
 }
 
-__host__ __device__
+__host__
 void DataDepGraph::CmputCrtclPathsFrmRcrsvScsr_(SchedInstruction *ref) {
   ArrayList<InstCount> *rcrsvPrdcsrLst = ref->GetRcrsvNghbrLst(DIR_BKWRD);
   SchedInstruction *inst = GetRootInst();
@@ -3465,7 +3465,7 @@ SchedInstruction *DataDepGraph::GetLeafInst() {
   return (SchedInstruction *)leaf_;
 }
 
-__host__ __device__
+__host__
 void DataDepGraph::CmputCrtclPathsFrmRoot_() {
   InstCount i;
 
@@ -3475,7 +3475,7 @@ void DataDepGraph::CmputCrtclPathsFrmRoot_() {
   }
 }
 
-__host__ __device__
+__host__
 void DataDepGraph::CmputCrtclPathsFrmLeaf_() {
   InstCount i;
 
@@ -3485,7 +3485,7 @@ void DataDepGraph::CmputCrtclPathsFrmLeaf_() {
   }
 }
 
-__host__ __device__
+__host__
 void DataDepGraph::CmputCrtclPaths_() {
   CmputCrtclPathsFrmRoot_();
   CmputCrtclPathsFrmLeaf_();
@@ -3704,23 +3704,7 @@ void DataDepGraph::CopyPointersToDevice(DataDepGraph *dev_DDG, int numThreads) {
   // Also copy each RegFile's pointers
   for (InstCount i = 0; i < machMdl_->GetRegTypeCnt(); i++)
     RegFiles[i].CopyPointersToDevice(&dev_DDG->RegFiles[i]);
-  // Collect all GraphEdges into one host array, copy it to device
-  Logger::Info("Copying all edges to device");
-  // First sort the vector of edges to allow for a binary search
-  std::sort(edges_->begin(), edges_->end());
-  memSize = sizeof(GraphEdge) * edges_->size();
-  // Will hold all host edges in one array to be copied to device in one copy
-  GraphEdge *host_edges = (GraphEdge *)malloc(memSize);
-  gpuErrchk(hipMalloc(&dev_edges_, memSize));
-  // iterate through all pointers to edges and copy them into one host array
-  memSize = sizeof(GraphEdge);
-  for (uint i = 0; i < edges_->size(); i++)
-    memcpy(&host_edges[i], edges_->at(i), memSize);
-  // Copy host_edges to device and delete the host_edges array
-  memSize = sizeof(GraphEdge) * edges_->size();
-  gpuErrchk(hipMemcpy(dev_edges_, host_edges, memSize, 
-                       hipMemcpyHostToDevice));
-  free(host_edges);
+  
 
   Logger::Info("Copying SchedInstructions to device");
   // count the number of elements in predecessor/successor lists
@@ -3731,11 +3715,6 @@ void DataDepGraph::CopyPointersToDevice(DataDepGraph *dev_DDG, int numThreads) {
     lngthScsrElmnts += insts_[i].GetScsrCnt();
     lengthLatencies += insts_[i].GetPrdcsrCnt();
   }
-  memSize = sizeof(GraphEdge *) * lngthScsrElmnts;
-  gpuErrchk(hipMallocManaged(&dev_scsrElmnts_, memSize));
-
-  memSize = sizeof(unsigned long) * lngthScsrElmnts;
-  gpuErrchk(hipMallocManaged(&dev_keys_, memSize));
 
   memSize = sizeof(InstCount) * lengthLatencies;
   gpuErrchk(hipMallocManaged(&dev_latencies_, memSize));
@@ -3747,19 +3726,12 @@ void DataDepGraph::CopyPointersToDevice(DataDepGraph *dev_DDG, int numThreads) {
   // and update RegFiles pointer to dev_regFiles
   for (InstCount i = 0; i < instCnt_; i++)
     insts_[i].CopyPointersToDevice(&dev_DDG->insts_[i], dev_DDG->nodes_, 
-		                   instCnt_, dev_regFiles, numThreads,
-                                   edges_, dev_edges_,
-                                   dev_scsrElmnts_,
-                                   dev_keys_, scsrIndex,
+                                   dev_regFiles, numThreads,
                                    dev_latencies_, latencyIndex);
   memSize = sizeof(SchedInstruction) * instCnt_;
   gpuErrchk(hipMemPrefetchAsync(dev_insts, memSize, 0));
   memSize = sizeof(RegisterFile) * machMdl_->GetRegTypeCnt();
   gpuErrchk(hipMemPrefetchAsync(dev_regFiles, memSize, 0));
-  memSize = sizeof(GraphEdge *) * lngthScsrElmnts;
-  gpuErrchk(hipMemPrefetchAsync(dev_scsrElmnts_, memSize, 0));
-  memSize = sizeof(unsigned long) * lngthScsrElmnts;
-  gpuErrchk(hipMemPrefetchAsync(dev_keys_, memSize, 0));
   memSize = sizeof(InstCount) * lengthLatencies;
   gpuErrchk(hipMemPrefetchAsync(dev_latencies_, memSize, 0));
 }

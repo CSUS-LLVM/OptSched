@@ -181,9 +181,9 @@ protected:
 
   bool includesUnpipelined_;
 
-  __host__ __device__
+  __host__
   InstCount CmputRsrcLwrBound_();
-  __host__ __device__
+  __host__
   virtual InstCount CmputAbslutUprBound_();
 };
 
@@ -465,19 +465,19 @@ protected:
 
   FUNC_RESULT Finish_();
 
-  __host__ __device__
+  __host__
   void CmputCrtclPaths_();
-  __host__ __device__
+  __host__
   void CmputCrtclPathsFrmRoot_();
-  __host__ __device__
+  __host__
   void CmputCrtclPathsFrmLeaf_();
-  __host__ __device__
+  __host__
   void CmputCrtclPathsFrmRcrsvScsr_(SchedInstruction *ref);
-  __host__ __device__
+  __host__
   void CmputCrtclPathsFrmRcrsvPrdcsr_(SchedInstruction *ref);
-  __host__ __device__
+  __host__
   void CmputRltvCrtclPaths_(DIRECTION dir);
-  __host__ __device__
+  __host__
   void CmputBasicLwrBounds_();
 
   void WriteNodeInfoToF2File_(FILE *file);

@@ -25,6 +25,7 @@ GraphNode::GraphNode(UDT_GNODES num, UDT_GNODES maxNodeCnt) {
   isRcrsvPrdcsr_ = NULL;
 
   dev_IsRoot = false;
+  dev_IsLeaf = false;
 }
 
 __host__ __device__
@@ -40,6 +41,7 @@ GraphNode::GraphNode() {
   isRcrsvPrdcsr_ = NULL;
 
   dev_IsRoot = false;
+  dev_IsLeaf = false;
 }
 
 __host__
@@ -374,49 +376,8 @@ int compareGEptr(const void * a, const void * b) {
     return 0;
 }
 
-void GraphNode::CopyPointersToDevice(GraphNode *dev_node, GraphNode **dev_nodes,
-                                     InstCount instCnt, 
-                                     std::vector<GraphEdge *> *edges,
-                                     GraphEdge *dev_edges,
-                                     GraphEdge **dev_scsrElmnts, 
-                                     unsigned long *dev_keys, 
-                                     int &scsrIndex) {
-  size_t memSize;
-  int index;
-  void *ptrToEdge;
-  // Copy scsrLst_ to device
-  PriorityArrayList<GraphEdge *> *dev_scsrLst;
-  memSize = sizeof(PriorityArrayList<GraphEdge *>);
-  gpuErrchk(hipMallocManaged(&dev_scsrLst, memSize));
-  gpuErrchk(hipMemcpy(dev_scsrLst, scsrLst_, memSize, hipMemcpyHostToDevice));
-  gpuErrchk(hipMemcpy(&dev_node->scsrLst_, &dev_scsrLst,
-		       sizeof(PriorityArrayList<GraphEdge *> *),
-		       hipMemcpyHostToDevice));
-  // Copy elmnts_ and keys
-  if (scsrLst_->maxSize_ > 0) {
-    dev_node->scsrLst_->keys_ = &dev_keys[scsrIndex];
-    for (InstCount i = 0; i < scsrLst_->size_; i++) {
-      dev_node->scsrLst_->keys_[i] = scsrLst_->keys_[i];
-    }
-    dev_node->scsrLst_->elmnts_ = &dev_scsrElmnts[scsrIndex];
-    scsrIndex += dev_node->scsrLst_->size_;
-    // update elmnts_ pointers to dev array
-    for (InstCount i = 0; i < scsrLst_->size_; i++) {
-      // find the matching pointer in the array of edge pointers
-      ptrToEdge = std::bsearch(&scsrLst_->elmnts_[i], &(*edges)[0], edges->size(),
-		               sizeof(GraphEdge *), compareGEptr);
-      if (!ptrToEdge)
-        Logger::Fatal("Failed to find matching edge in scsrLst");
-      else
-	      index = ((GraphEdge **)ptrToEdge - (GraphEdge **)&(*edges)[0]);
-      // set the dev_scsrElmnts pointer to the corresponding dev_edges pointer
-      dev_node->scsrLst_->elmnts_[i] = &dev_edges[index];
-    }
-    // New dev_edges values are copied before kernel start in DataDepGraph
-  }
-  memSize = sizeof(PriorityArrayList<GraphEdge *>);
-  gpuErrchk(hipMemPrefetchAsync(dev_scsrLst, memSize, 0));
-  
+void GraphNode::CopyPointersToDevice(GraphNode *dev_node, 
+                                     GraphNode **dev_nodes) {  
   //set value of nodes_ to dev_insts_
   dev_node->nodes_ = dev_nodes;
 }

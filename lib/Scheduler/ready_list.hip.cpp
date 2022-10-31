@@ -106,7 +106,11 @@ HeurType KeysHelper::computeKey(SchedInstruction *Inst, bool IncludeDynamic) con
       break;
 
     case LSH_SC:
+      #ifdef __HIP_DEVICE_COMPILE__
+      PriorityValue = Inst->GetScsrCnt_();
+      #else
       PriorityValue = Inst->GetScsrCnt();
+      #endif
       break;
 
     case LSH_LS:

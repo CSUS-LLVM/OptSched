@@ -225,14 +225,14 @@ public:
   //     successor list.
   //   ltncy: the latency from the predecessor to this instruction.
   //   depType: the type of dependence between this node and the predecessor.
-  __host__ __device__
+  __host__
   SchedInstruction *GetFrstPrdcsr(InstCount *scsrNum = NULL,
                                   UDT_GLABEL *ltncy = NULL,
                                   DependenceType *depType = NULL,
 				  InstCount *toNodeNum = NULL);
   // Returns the next predecessor of this instruction node and moves the
   // predecessor iterator forward. Fills parameters as above.
-  __host__ __device__
+  __host__
   SchedInstruction *GetNxtPrdcsr(InstCount *scsrNum = NULL,
                                  UDT_GLABEL *ltncy = NULL,
                                  DependenceType *depType = NULL,
@@ -245,7 +245,7 @@ public:
   //     predecessor list.
   //   ltncy: the latency from this instruction to the successor.
   //   depType: the type of dependence between this node and the successor.
-  __host__ __device__
+  __host__
   SchedInstruction *GetFrstScsr(InstCount *prdcsrNum = NULL,
                                 UDT_GLABEL *ltncy = NULL,
                                 DependenceType *depType = NULL,
@@ -253,7 +253,7 @@ public:
                                 bool *IsArtificial = nullptr);
   // Returns the next successor of this instruction node and moves the
   // successor iterator forward. Fills parameters as above.
-  __host__ __device__
+  __host__
   SchedInstruction *GetNxtScsr(InstCount *prdcsrNum = NULL,
                                UDT_GLABEL *ltncy = NULL,
                                DependenceType *depType = NULL,
@@ -264,24 +264,24 @@ public:
   // successor iterator to the end of the list. If prdcsrNum is provided, this
   // instruction's number (order) in the successor's predecessor list is
   // written to it.
-  __host__ __device__
+  __host__
   SchedInstruction *GetLastScsr(InstCount *prdcsrNum = NULL);
   // Returns the previous predecessor of this instruction node and moves the
   // predecessor iterator backward. Fills prdcsrNum as above.
-  __host__ __device__
+  __host__
   SchedInstruction *GetPrevScsr(InstCount *prdcsrNum = NULL);
 
   // Returns the first predecessor or successor of this instruction node,
   // depending on the value of dir, filling in the latency from the
   // predecessor to this instruction into ltncy, if provided. Resets the
   // predecessor or successor iterator (the two iterator are independent).
-  __host__ __device__
+  __host__
   SchedInstruction *GetFrstNghbr(DIRECTION dir, UDT_GLABEL *ltncy = NULL);
   // Returns the next predecessor or successor of this instruction node,
   // depending on the value of dir, filling in the latency from the
   // predecessor to this instruction into ltncy, if provided. Moves the
   // predecessor iterator forward (the two iterator are independent).
-  __host__ __device__
+  __host__
   SchedInstruction *GetNxtNghbr(DIRECTION dir, UDT_GLABEL *ltncy = NULL);
   /***************************************************************************/
 
@@ -309,13 +309,13 @@ public:
   // Calculates the instruction's critical path distance from the root,
   // assuming that the critical paths of all of its predecessors have been
   // calculated.
-  __host__ __device__
+  __host__
   InstCount CmputCrtclPathFrmRoot();
 
   // Calculates the instruction's critical path distance from the leaf,
   // assuming that the critical paths of all of its successors have been
   // calculated.
-  __host__ __device__
+  __host__
   InstCount CmputCrtclPathFrmLeaf();
 
   // Returns the critical path distance of this instruction from the root of
@@ -400,19 +400,19 @@ public:
   // is added to the given list to be used for efficient untightening. This
   // function returns with false as soon as infeasiblity (w.r.t the given
   // schedule length) is detected, otherwise it returns true.
-  __host__ __device__
+  __host__
   bool TightnLwrBound(DIRECTION dir, InstCount newLwrBound,
                       LinkedList<SchedInstruction> *tightndLst,
                       LinkedList<SchedInstruction> *fxdLst, bool enforce);
   // Like TightnLwrBound(), but also recursively propagates tightening through
   // the subgraph rooted at this instruction.
-  __host__ __device__
+  __host__
   bool TightnLwrBoundRcrsvly(DIRECTION dir, InstCount newLwrBound,
                              LinkedList<SchedInstruction> *tightndLst,
                              LinkedList<SchedInstruction> *fxdLst,
                              bool enforce);
   // Untightens any tightened lower bound.
-  __host__ __device__
+  __host__
   void UnTightnLwrBounds();
   // Marks the instruction as not tightened.
   __host__ __device__
@@ -434,7 +434,7 @@ public:
 
   // Tightens the lower bound and deadline and recursively propagates these
   // tightenings to the neighbors and checking for feasibility at each point.
-  __host__ __device__
+  __host__
   bool ApplyPreFxng(LinkedList<SchedInstruction> *tightndLst,
                     LinkedList<SchedInstruction> *fxdLst);
 
@@ -445,7 +445,7 @@ public:
   // Probes the successors of this instruction to see if their current lower
   // bounds will get tightened (delayed) if this instruction was scheduled in
   // the given cycle.
-  __host__ __device__
+  __host__
   bool ProbeScsrsCrntLwrBounds(InstCount cycle);
 
   /***************************************************************************
@@ -459,13 +459,13 @@ public:
   // Calculates the instruction's critical path distance from the given entry
   // node assuming that the critical paths of all of its predecessors have
   // been calculated.
-  __host__ __device__
+  __host__
   InstCount CmputCrtclPathFrmRcrsvPrdcsr(SchedInstruction *ref);
 
   // Calculates the instruction's critical path distance from the given exit
   // node assuming that the critical paths of all of its successors have been
   // calculated.
-  __host__ __device__
+  __host__
   InstCount CmputCrtclPathFrmRcrsvScsr(SchedInstruction *ref);
   /***************************************************************************/
 
@@ -548,12 +548,12 @@ public:
 
   // Copies pointers to device and links them to device inst. Also uses
   // the device nodes_ array to set nodes_ in GraphNode
-  void CopyPointersToDevice(SchedInstruction *dev_inst, GraphNode **dev_nodes, 
-		            InstCount instCnt, RegisterFile *dev_regFiles, 
-                            int numThreads, std::vector<GraphEdge *> *edges,
-                            GraphEdge *dev_edges, GraphEdge **dev_scsrElmnts_, 
-                            unsigned long *dev_keys, int &scsrIndex,
-                            InstCount *dev_ltncyPerPrdcsr, int &ltncyIndex);
+  void CopyPointersToDevice(SchedInstruction *dev_inst,
+                            GraphNode **dev_nodes,
+                            RegisterFile *dev_regFiles,
+                            int numThreads, 
+                            InstCount *dev_ltncyPerPrdcsr,
+                            int &ltncyIndex);
   // Calls hipFree on all arrays/objects that were allocated with hipMalloc
   void FreeDevicePointers(int numThreads);
   // Allocates arrays used for storing individual values for each thread in
@@ -561,6 +561,29 @@ public:
   void AllocDevArraysForParallelACO(int numThreads);
 
   friend class SchedRange;
+
+  // array of nodes_ indices referring to this instruction's successors.
+  int* scsrs_;
+  // array of latencies of this instruction's successors.
+  int* latencies_;
+  // array of this instruction's order in the predecessor lists of each of its successors.
+  int* predOrder_;
+
+  // Returns the successor of this instruction node given by the scsrNum
+  // (its index in scsrs_). Fills prdcsrNum, ltncy, and scsrNodeNum (the
+  // instruction's index in nodes_) if provided.
+  __host__ __device__
+  SchedInstruction *GetScsr(int scsrNum, 
+                            InstCount *prdcsrNum = NULL, 
+                            UDT_GLABEL *ltncy = NULL,
+                            InstCount *scsrNodeNum = NULL);
+
+  __device__
+  int GetScsrCnt_();
+
+  __host__
+  void SetupForDevice();
+
 
 protected:
   // The "name" of this instruction. Usually a string indicating its type.
@@ -733,7 +756,7 @@ protected:
   bool mustBeInBBExit_;
 
   // TODO(ghassan): Document.
-  __host__ __device__
+  __host__
   InstCount CmputCrtclPath_(DIRECTION dir, SchedInstruction *ref = NULL);
   // Allocate the memory needed for data structures used in this node.
   // Arguments as follows:
@@ -749,11 +772,11 @@ protected:
   void DeAllocMem_();
   // Sets the predecessor order numbers on the edges between this node and its
   // predecessors.
-  __host__ __device__
+  __host__
   void SetPrdcsrNums_();
   // Sets the successor order numbers on the edges between this node and its
   // successors.
-  __host__ __device__
+  __host__
   void SetScsrNums_();
   // Computer the adjusted use count. Update "adjustedUseCnt_".
   __host__ __device__
@@ -792,13 +815,13 @@ public:
   // added to the given list to be used for efficient untightening. This
   // function returns with false as soon as infeasiblity (w.r.t the given
   // schedule length) is detected, otherwise it returns true.
-  __host__ __device__
+  __host__
   bool TightnLwrBound(DIRECTION dir, InstCount newLwrBound,
                       LinkedList<SchedInstruction> *tightndLst,
                       LinkedList<SchedInstruction> *fxdLst, bool enforce);
   // Like TightnLwrBound(), but also recursively propagates tightening through
   // the subgraph rooted at the instruction using this range.
-  __host__ __device__
+  __host__
   bool TightnLwrBoundRcrsvly(DIRECTION dir, InstCount newLwrBound,
                              LinkedList<SchedInstruction> *tightndLst,
                              LinkedList<SchedInstruction> *fxdLst,
@@ -817,13 +840,13 @@ public:
   __host__ __device__
   bool IsFxd() const;
   // Untightens any tightened lower bound.
-  __host__ __device__
+  __host__
   void UnTightnLwrBounds();
   // Marks the range as not tightened.
   __host__ __device__
   void CmtLwrBoundTightnng();
   // TODO(ghassan): Document.
-  __host__ __device__
+  __host__
   bool Fix(InstCount cycle, LinkedList<SchedInstruction> *tightndLst,
            LinkedList<SchedInstruction> *fxdLst);
   // Returns whether the range is tightened in the given direction.

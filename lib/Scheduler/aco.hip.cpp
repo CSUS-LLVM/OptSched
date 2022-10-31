@@ -554,7 +554,6 @@ InstSchedule *ACOScheduler::FindOneSchedule(InstCount RPTarget,
   lastInst = dataDepGraph_->GetInstByIndx(RootId);
   bool closeToRPTarget = false;
   dev_RP0OrPositiveCount[GLOBALTID] = 0;
-
   while (!IsSchedComplete_()) {
     // incrementally calculate if there are any instructions with a neutral
     // or positive effect on RP
@@ -587,7 +586,6 @@ InstSchedule *ACOScheduler::FindOneSchedule(InstCount RPTarget,
         printf("cyclenum: %d Close to RP Target: %s\n", dev_crntCycleNum_[GLOBALTID], closeToRPTarget ? "true" : "false");
       }
       #endif
-
       // select the instruction and get info on it
       InstCount SelIndx = SelectInstruction(lastInst, schedule->getTotalStalls(), dev_rgn_, unnecessarilyStalling, closeToRPTarget, waitFor ? true: false);
 
@@ -1582,8 +1580,9 @@ inline void ACOScheduler::UpdateACOReadyList(SchedInstruction *inst) {
       printf("successors of %d:", inst->GetNum());
     }
     #endif
-    for (SchedInstruction *crntScsr = inst->GetFrstScsr(&prdcsrNum);
-          crntScsr != NULL; crntScsr = inst->GetNxtScsr(&prdcsrNum)) {
+    int i = 0;
+    for (SchedInstruction *crntScsr = inst->GetScsr(i++, &prdcsrNum);
+          crntScsr != NULL; crntScsr = inst->GetScsr(i++, &prdcsrNum)) {
         #ifdef DEBUG_INSTR_SELECTION
         if (GLOBALTID==0) {
           printf(" %d,", crntScsr->GetNum());
