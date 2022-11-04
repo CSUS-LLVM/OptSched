@@ -643,17 +643,11 @@ protected:
    ***************************************************************************/
   // Whether the instruction is currently in the Ready List.
   bool ready_;
-  // pointer to a device array used to store ready_ for each thread
-  // by parallel ACO
-  bool *dev_ready_;
   // Each entry in this array holds the cycle in which this instruction will
   // become partially ready by satisfying the dependence of one predecessor.
   // For a predecessor that has not been scheduled the corresponding entry is
   // set to -1.
   InstCount *rdyCyclePerPrdcsr_;
-  // pointer to a device array used to store rdyCyclePerPrdcsr_ for each thread
-  // by parallel ACO
-  InstCount **dev_rdyCyclePerPrdcsr_;
   // A lower bound on the cycle in which this instruction will be ready. This
   // is the maximum entry in the "readyCyclePerPrdcsr_" array. When all
   // predecessors have been scheduled, this value gives the cycle in which
@@ -674,21 +668,12 @@ protected:
   InstCount *dev_unschduldPrdcsrCnt_;
   // The number of unscheduled successors.
   InstCount unschduldScsrCnt_;
-  // pointer to a device array used to store unschduldScsrCnt__ for each
-  // thread by parallel ACO
-  InstCount *dev_unschduldScsrCnt_;
   /***************************************************************************/
 
   // The cycle in which this instruction is currently scheduled.
   InstCount crntSchedCycle_;
-  // pointer to a device array used to store crntSchedCycle_ for each thread
-  // by parallel ACO
-  InstCount *dev_crntSchedCycle_;
   // The slot in which this instruction is currently scheduled.
   InstCount crntSchedSlot_;
-  // pointer to a device array used to store crntSchedSlot_ for each thread
-  // by parallel ACO
-  InstCount *dev_crntSchedSlot_;
   // TODO(ghassan): Document.
   InstCount crntRlxdCycle_;
 

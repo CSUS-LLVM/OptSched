@@ -175,16 +175,9 @@ __host__ __device__
 bool SchedInstruction::InitForSchdulng(InstCount schedLngth,
                                        LinkedList<SchedInstruction> *fxdLst) {
 #ifdef __HIP_DEVICE_COMPILE__
-  dev_crntSchedCycle_[GLOBALTID] = SCHD_UNSCHDULD;
   dev_lastUseCnt_[GLOBALTID] = 0;
-  dev_ready_[GLOBALTID] = false;
   dev_minRdyCycle_[GLOBALTID] = INVALID_VALUE;
   dev_unschduldPrdcsrCnt_[GLOBALTID] = prdcsrCnt_;
-  dev_unschduldScsrCnt_[GLOBALTID] = scsrCnt_;
-  
-  for (InstCount i = 0; i < prdcsrCnt_; i++) {
-    dev_rdyCyclePerPrdcsr_[GLOBALTID][i] = INVALID_VALUE;
-  }
 #else
   crntSchedCycle_ = SCHD_UNSCHDULD;
   lastUseCnt_ = 0;
@@ -717,10 +710,10 @@ bool SchedInstruction::PrdcsrSchduld(InstCount prdcsrNum, InstCount cycle,
                                      InstCount &rdyCycle) {
   assert(prdcsrNum < prdcsrCnt_);
 #ifdef __HIP_DEVICE_COMPILE__
-  dev_rdyCyclePerPrdcsr_[GLOBALTID][prdcsrNum] = cycle + ltncyPerPrdcsr_[prdcsrNum];
+  auto readyCycleBasedOnPredecessor = cycle + ltncyPerPrdcsr_[prdcsrNum];
 
-  if (dev_rdyCyclePerPrdcsr_[GLOBALTID][prdcsrNum] > dev_minRdyCycle_[GLOBALTID]) {
-    dev_minRdyCycle_[GLOBALTID] = dev_rdyCyclePerPrdcsr_[GLOBALTID][prdcsrNum];
+  if (readyCycleBasedOnPredecessor > dev_minRdyCycle_[GLOBALTID]) {
+    dev_minRdyCycle_[GLOBALTID] = readyCycleBasedOnPredecessor;
   }
 
   rdyCycle = dev_minRdyCycle_[GLOBALTID];
@@ -755,13 +748,8 @@ bool SchedInstruction::PrdcsrUnSchduld(InstCount prdcsrNum,
 
 __host__ __device__
 bool SchedInstruction::ScsrSchduld() {
-#ifdef __HIP_DEVICE_COMPILE__
-  dev_unschduldScsrCnt_[GLOBALTID]--;
-  return dev_unschduldScsrCnt_[GLOBALTID] == 0;
-#else
   unschduldScsrCnt_--;
   return unschduldScsrCnt_ == 0;
-#endif
 }
 
 __host__ __device__
@@ -779,9 +767,6 @@ IssueType SchedInstruction::GetIssueType() const { return issuType_; }
 __host__ __device__
 bool SchedInstruction::IsSchduld(InstCount *cycle) const {
 #ifdef __HIP_DEVICE_COMPILE__
-  if (cycle)
-    *cycle = dev_crntSchedCycle_[GLOBALTID];
-  return dev_crntSchedCycle_[GLOBALTID] != SCHD_UNSCHDULD;
 #else
   if (cycle)
     *cycle = crntSchedCycle_;
@@ -792,7 +777,6 @@ bool SchedInstruction::IsSchduld(InstCount *cycle) const {
 __host__ __device__
 InstCount SchedInstruction::GetSchedCycle() const { 
 #ifdef __HIP_DEVICE_COMPILE__
-  return dev_crntSchedCycle_[GLOBALTID];
 #else
   return crntSchedCycle_;
 #endif
@@ -801,7 +785,6 @@ InstCount SchedInstruction::GetSchedCycle() const {
 __host__ __device__
 InstCount SchedInstruction::GetSchedSlot() const { 
 #ifdef __HIP_DEVICE_COMPILE__
-  return dev_crntSchedSlot_[GLOBALTID];
 #else
   return crntSchedSlot_;
 #endif
@@ -810,7 +793,6 @@ InstCount SchedInstruction::GetSchedSlot() const {
 __host__ __device__
 InstCount SchedInstruction::GetCrntDeadline() const {
 #ifdef __HIP_DEVICE_COMPILE__
-  return IsSchduld() ? dev_crntSchedCycle_[GLOBALTID] : crntRange_->GetDeadline();
 #else
   return IsSchduld() ? crntSchedCycle_ : crntRange_->GetDeadline();
 #endif
@@ -819,7 +801,6 @@ InstCount SchedInstruction::GetCrntDeadline() const {
 __host__ __device__
 InstCount SchedInstruction::GetCrntReleaseTime() const {
 #ifdef __HIP_DEVICE_COMPILE__
-  return IsSchduld() ? dev_crntSchedCycle_[GLOBALTID] : GetCrntLwrBound(DIR_FRWRD);
 #else
   return IsSchduld() ? crntSchedCycle_ : GetCrntLwrBound(DIR_FRWRD);
 #endif
@@ -828,7 +809,6 @@ InstCount SchedInstruction::GetCrntReleaseTime() const {
 __host__ __device__
 InstCount SchedInstruction::GetRlxdCycle() const {
 #ifdef __HIP_DEVICE_COMPILE__
-  return IsSchduld() ? dev_crntSchedCycle_[GLOBALTID] : crntRlxdCycle_;
 #else
   return IsSchduld() ? crntSchedCycle_ : crntRlxdCycle_;
 #endif
@@ -839,42 +819,26 @@ void SchedInstruction::SetRlxdCycle(InstCount cycle) { crntRlxdCycle_ = cycle; }
 
 __host__ __device__
 void SchedInstruction::Schedule(InstCount cycleNum, InstCount slotNum) {
-#ifdef __HIP_DEVICE_COMPILE__
-  assert(dev_crntSchedCycle_[GLOBALTID] == SCHD_UNSCHDULD);
-  dev_crntSchedCycle_[GLOBALTID] = cycleNum;
-  dev_crntSchedSlot_[GLOBALTID] = slotNum;
-#else
-  assert(crntSchedCycle_ == SCHD_UNSCHDULD);
-  crntSchedCycle_ = cycleNum;
-  crntSchedSlot_ = slotNum;
-#endif
+  #ifndef __HIP_DEVICE_COMPILE__
+    assert(crntSchedCycle_ == SCHD_UNSCHDULD);
+    crntSchedCycle_ = cycleNum;
+    crntSchedSlot_ = slotNum;
+  #endif
 }
 
 __host__ __device__
 bool SchedInstruction::IsInReadyList() const { 
-#ifdef __HIP_DEVICE_COMPILE__
-  return dev_ready_[GLOBALTID];
-#else
   return ready_;
-#endif
 }
 
 __host__ __device__
 void SchedInstruction::PutInReadyList() { 
-#ifdef __HIP_DEVICE_COMPILE__
-  dev_ready_[GLOBALTID] = true;
-#else
   ready_ = true;
-#endif
 }
 
 __host__ __device__
 void SchedInstruction::RemoveFromReadyList() { 
-#ifdef __HIP_DEVICE_COMPILE__
-  dev_ready_[GLOBALTID] = false;
-#else
   ready_ = false;
-#endif
 }
 
 __host__ __device__
@@ -1167,24 +1131,14 @@ void SchedInstruction::CopyPointersToDevice(SchedInstruction *dev_inst,
   ltncyIndex += prdcsrCnt_;
 
   GraphNode::CopyPointersToDevice((GraphNode *)dev_inst, dev_nodes);
-  
-  // make sure managed mem is copied to device before kernel start
-  memSize = sizeof(InstCount *) * numThreads;
-  gpuErrchk(hipMemPrefetchAsync(dev_rdyCyclePerPrdcsr_, memSize, 0));
 }
 
 void SchedInstruction::FreeDevicePointers(int numThreads) {
   hipFree(ltncyPerPrdcsr_);
   hipFree(crntRange_);
-  hipFree(dev_crntSchedCycle_);
-  hipFree(dev_crntSchedSlot_);
   hipFree(dev_lastUseCnt_);
-  hipFree(dev_ready_);
   hipFree(dev_minRdyCycle_);
   hipFree(dev_unschduldPrdcsrCnt_);
-  hipFree(dev_unschduldScsrCnt_);
-  hipFree(dev_rdyCyclePerPrdcsr_[0]);
-  hipFree(dev_rdyCyclePerPrdcsr_);
   if (rcrsvScsrLst_)
     hipFree(rcrsvScsrLst_->dev_crnt_);
   if (rcrsvPrdcsrLst_)
@@ -1198,39 +1152,15 @@ void SchedInstruction::FreeDevicePointers(int numThreads) {
 }
 
 void SchedInstruction::AllocDevArraysForParallelACO(int numThreads) {
-  // Create an array of size numThreads for each thread
-  // to hold crntSchedCycle_ indexed by its GLOBALTID
-  size_t memSize = sizeof(InstCount) * numThreads;
-  gpuErrchk(hipMalloc(&dev_crntSchedCycle_, memSize));
   // allocate an array of lastUseCnt_ of size numThreads
-  memSize = sizeof(int16_t) * numThreads;
+  size_t memSize = sizeof(int16_t) * numThreads;
   gpuErrchk(hipMalloc(&dev_lastUseCnt_, memSize));
-  // Allocate an array of crntSchedSlot_ of size numThreads
-  memSize = sizeof(InstCount) * numThreads;
-  gpuErrchk(hipMalloc(&dev_crntSchedSlot_, memSize));
-  // Allocate an array of ready_ of size numThreads
-  memSize = sizeof(bool) * numThreads;
-  gpuErrchk(hipMalloc(&dev_ready_, memSize));
   // Allocate an array of minRdyCycle_ of size numThreads
   memSize = sizeof(InstCount) * numThreads;
   gpuErrchk(hipMalloc(&dev_minRdyCycle_, memSize));
   // Allocate an array of unschduldPrdcsrCnt_ of size numThreads
   memSize = sizeof(InstCount) * numThreads;
   gpuErrchk(hipMalloc(&dev_unschduldPrdcsrCnt_, memSize));
-  // Allocate an array of unschduldScsrCnt_ of size numThreads
-  memSize = sizeof(InstCount) * numThreads;
-  gpuErrchk(hipMalloc(&dev_unschduldScsrCnt_, memSize));
-  // Allocate an array of rdyCyclePerPrdcsr_ of size numThreads
-  memSize = sizeof(InstCount *) * numThreads;
-  gpuErrchk(hipMallocManaged(&dev_rdyCyclePerPrdcsr_, memSize));
-  // Trying new approach, malloc one huge array and set every multiple
-  // of prdscrCnt_ as another index in the array of arrays
-  memSize = sizeof(InstCount) * prdcsrCnt_ * numThreads;
-  InstCount *temp_arr;
-  gpuErrchk(hipMalloc(&temp_arr, memSize));
-  for (int i = 0; i < numThreads; i++) {
-    dev_rdyCyclePerPrdcsr_[i] = &temp_arr[i * prdcsrCnt_];
-  }
 }
 
 /******************************************************************************
