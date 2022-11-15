@@ -184,8 +184,8 @@ void ConstrainedScheduler::SchdulInst_(SchedInstruction *inst, InstCount) {
   // Notify each successor of this instruction that it has been scheduled.
   if(!IsACO) {
     int i = 0;
-    for (SchedInstruction *crntScsr = inst->GetScsr(i++, &prdcsrNum);
-          crntScsr != NULL; crntScsr = inst->GetScsr(i++, &prdcsrNum)) {
+    for (SchedInstruction *crntScsr = GetScsr(inst, i++, &prdcsrNum);
+          crntScsr != NULL; crntScsr = GetScsr(inst, i++, &prdcsrNum)) {
       crntScsr->PrdcsrSchduld(prdcsrNum, dev_crntCycleNum_[GLOBALTID], scsrRdyCycle);
     }
   }
@@ -239,8 +239,8 @@ void ConstrainedScheduler::UnSchdulInst_(SchedInstruction *inst) {
   // instruction has caused it to go there).
   #ifdef __HIP_DEVICE_COMPILE__
   int lastScsrNum = inst->GetScsrCnt_();
-    for (SchedInstruction *crntScsr = inst->GetScsr(lastScsrNum--, &prdcsrNum);
-          crntScsr != NULL && lastScsrNum > -1; crntScsr = inst->GetScsr(lastScsrNum--, &prdcsrNum)) {
+    for (SchedInstruction *crntScsr = GetScsr(inst, lastScsrNum--, &prdcsrNum);
+          crntScsr != NULL && lastScsrNum > -1; crntScsr = GetScsr(inst, lastScsrNum--, &prdcsrNum)) {
     bool wasLastPrdcsr = crntScsr->PrdcsrUnSchduld(prdcsrNum, scsrRdyCycle);
 
     if (wasLastPrdcsr) {
@@ -495,4 +495,31 @@ void ConstrainedScheduler::UpdtSlotAvlblty_(SchedInstruction *inst) {
   assert(avlblSlotsInCrntCycle_[issuType] > 0);
   avlblSlotsInCrntCycle_[issuType]--;
 #endif
+}
+
+__device__
+SchedInstruction *ConstrainedScheduler::GetScsr(SchedInstruction *inst,
+                                       int scsrNum, 
+                                       InstCount *prdcsrNum, 
+                                       UDT_GLABEL *ltncy, 
+                                       InstCount *scsrNodeNum) {
+  int ddgInstIndex = inst->ddgIndex;
+
+  if (scsrNum >= inst->GetScsrCnt_()) {
+    return NULL;
+  }
+
+  if (prdcsrNum) {
+    *prdcsrNum = dataDepGraph_->predOrder_[ddgInstIndex + scsrNum];
+  }
+
+  if (ltncy) {
+    *ltncy = dataDepGraph_->latencies_[ddgInstIndex + scsrNum];
+  }
+
+  if (scsrNodeNum) {
+    *scsrNodeNum = dataDepGraph_->scsrs_[ddgInstIndex + scsrNum];
+  }
+
+  return dataDepGraph_->GetInstByIndx(dataDepGraph_->scsrs_[ddgInstIndex + scsrNum]);
 }

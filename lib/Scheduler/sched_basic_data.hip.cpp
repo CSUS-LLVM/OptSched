@@ -55,10 +55,6 @@ SchedInstruction::SchedInstruction(InstCount num, const char *name,
   crtclPathFrmRoot_ = INVALID_VALUE;
   crtclPathFrmLeaf_ = INVALID_VALUE;
 
-  int* scsrs_;
-  int* predOrder_;
-  int* latencies_;
-
   ltncyPerPrdcsr_ = NULL;
   memAllocd_ = false;
   sortedPrdcsrLst_ = NULL;
@@ -424,33 +420,21 @@ int SchedInstruction::GetNodeID() const { return nodeID_; }
 __host__ __device__
 void SchedInstruction::SetNodeID(int nodeID) { nodeID_ = nodeID; }
 
-// TODO(bruce) consider storing this value in SetupForDevice instead of recomputing
 __host__ __device__
 int SchedInstruction::GetLtncySum() const {
   #ifdef __HIP_DEVICE_COMPILE__
-  int sum = 0;
-  for (int i = 0; i < scsrCnt_; i++) {
-    sum += latencies_[i];
-  }
-  return sum;
+  return dev_latencySum_;
   #else 
   return GetScsrLblSum(); 
   #endif
   }
 
-// TODO(bruce) consider storing this value in SetupForDevice instead of recomputing
 __host__ __device__
 int SchedInstruction::GetMaxLtncy() const { 
   #ifdef __HIP_DEVICE_COMPILE__
-  int max = 0;
-  for (int i = 0; i < scsrCnt_; i++) {
-    if (latencies_[i] > max) {
-      max = latencies_[i];
-    }
-  }
-  return max;
+  return dev_maxLatency_;
   #else  
-  return GetMaxEdgeLabel();
+    return GetMaxEdgeLabel();
   #endif
   }
 
@@ -504,28 +488,6 @@ SchedInstruction *SchedInstruction::GetNxtPrdcsr(InstCount *scsrNum,
 __device__
 int SchedInstruction::GetScsrCnt_() {
   return scsrCnt_;
-}
-
-__host__ __device__
-SchedInstruction *SchedInstruction::GetScsr(int scsrNum, 
-                                            InstCount *prdcsrNum, 
-                                            UDT_GLABEL *ltncy,
-                                            InstCount *scsrNodeNum) {
-  if (scsrNum >= scsrCnt_) {
-    return NULL;
-  } 
-
-  if (prdcsrNum) {
-    *prdcsrNum = predOrder_[scsrNum];
-  }
-  if (ltncy) {
-    *ltncy = latencies_[scsrNum];
-  }
-  if (scsrNodeNum) {
-    *scsrNodeNum = scsrs_[scsrNum];
-  }
-  return (SchedInstruction *) nodes_[scsrs_[scsrNum]];
-
 }
 
 __host__
@@ -1002,6 +964,8 @@ int16_t SchedInstruction::CmputLastUseCnt() {
 #endif
 }
 
+
+// TODO(bruce): is this actually run on the device?
 __host__ __device__
 void SchedInstruction::InitializeNode_(InstCount instNum, 
 		         const char *const instName,
@@ -1077,52 +1041,25 @@ void SchedInstruction::InitializeNode_(InstCount instNum,
   GraphNode::SetNum(instNum);
 }
 
-// Preprocessing necessary to avoid GraphEdges on device.
-__host__
-void SchedInstruction::SetupForDevice() {
-  int prdcsrNum, latency, toNodeNum;
-  DependenceType _dep; // Not used here.
-  int _numScsrs = GetScsrCnt();
-  
-  scsrs_ = new int[_numScsrs];
-  latencies_ = new int[_numScsrs];
-  predOrder_ = new int[_numScsrs];
-
-  int i = 0;
-
-  for (SchedInstruction *crntScsr = GetFrstScsr(&prdcsrNum, 
-                                                &latency,
-                                                &_dep, 
-                                                &toNodeNum);
-       crntScsr != NULL; 
-       crntScsr = GetNxtScsr(&prdcsrNum, &latency, &_dep, &toNodeNum)) {
-         scsrs_[i] = toNodeNum;
-         latencies_[i] = latency;
-         predOrder_[i++] = prdcsrNum;
-       }
-}
-
 void SchedInstruction::CopyPointersToDevice(SchedInstruction *dev_inst,
                                             GraphNode **dev_nodes,
 					                                  RegisterFile *dev_regFiles,
                                             int numThreads, 
                                             InstCount *dev_ltncyPerPrdcsr,
                                             int &ltncyIndex) {
-  SetupForDevice();
-  size_t memSize;
-  memSize = sizeof(InstCount) * scsrCnt_;
-  if (memSize) {
-    gpuErrchk(hipMallocManaged(&(dev_inst->scsrs_), memSize));
-    gpuErrchk(hipMallocManaged(&(dev_inst->latencies_), memSize));
-    gpuErrchk(hipMallocManaged(&(dev_inst->predOrder_), memSize));
-	
-    gpuErrchk(hipMemcpy(dev_inst->scsrs_, scsrs_, memSize, hipMemcpyHostToDevice));
-    gpuErrchk(hipMemcpy(dev_inst->latencies_, latencies_, memSize, hipMemcpyHostToDevice));
-    gpuErrchk(hipMemcpy(dev_inst->predOrder_, predOrder_, memSize, hipMemcpyHostToDevice));
 
-  }
+  // Store these on the device instruction--we won't be able to compute them without
+  // GraphEdges.
+  dev_inst->dev_maxLatency_ = GetMaxEdgeLabel();
+  dev_inst->dev_latencySum_ = GetScsrLblSum();
+
+  // Index of this instruction's partition in DDG's scsrs_, latencies_, predOrder_.
+  dev_inst->ddgIndex = ddgIndex;
+
   // Make sure instruction knows whether it's a leaf on device for legality checking.
   dev_inst->SetDevIsLeaf(scsrCnt_ == 0);
+
+  // TODO(bruce): Investigate possibility of removing below.
   dev_inst->RegFiles_ = dev_regFiles;
   dev_inst->ltncyPerPrdcsr_ = &dev_ltncyPerPrdcsr[ltncyIndex];
   for (InstCount i = 0; i < prdcsrCnt_; i++) {
@@ -1143,12 +1080,6 @@ void SchedInstruction::FreeDevicePointers(int numThreads) {
     hipFree(rcrsvScsrLst_->dev_crnt_);
   if (rcrsvPrdcsrLst_)
     hipFree(rcrsvPrdcsrLst_->dev_crnt_);
-
-  if (scsrCnt_ > 0) { 
-    hipFree(scsrs_);
-    hipFree(latencies_);
-    hipFree(predOrder_);
-  }
 }
 
 void SchedInstruction::AllocDevArraysForParallelACO(int numThreads) {

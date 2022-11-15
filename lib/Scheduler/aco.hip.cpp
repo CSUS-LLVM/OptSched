@@ -1569,6 +1569,7 @@ void ACOScheduler::CopyPheromonesToSharedMem(double *s_pheromone) {
     toInstNum += NUMTHREADSPERBLOCK;
   }
 }
+
 __host__ __device__
 inline void ACOScheduler::UpdateACOReadyList(SchedInstruction *inst) {
   InstCount prdcsrNum, scsrRdyCycle;
@@ -1581,8 +1582,8 @@ inline void ACOScheduler::UpdateACOReadyList(SchedInstruction *inst) {
     }
     #endif
     int i = 0;
-    for (SchedInstruction *crntScsr = inst->GetScsr(i++, &prdcsrNum);
-          crntScsr != NULL; crntScsr = inst->GetScsr(i++, &prdcsrNum)) {
+    for (SchedInstruction *crntScsr = GetScsr(inst, i++, &prdcsrNum);
+          crntScsr != NULL; crntScsr = GetScsr(inst, i++, &prdcsrNum)) {
         #ifdef DEBUG_INSTR_SELECTION
         if (GLOBALTID==0) {
           printf(" %d,", crntScsr->GetNum());

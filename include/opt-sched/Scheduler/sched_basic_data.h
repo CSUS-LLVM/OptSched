@@ -562,21 +562,9 @@ public:
 
   friend class SchedRange;
 
-  // array of nodes_ indices referring to this instruction's successors.
-  int* scsrs_;
-  // array of latencies of this instruction's successors.
-  int* latencies_;
-  // array of this instruction's order in the predecessor lists of each of its successors.
-  int* predOrder_;
-
-  // Returns the successor of this instruction node given by the scsrNum
-  // (its index in scsrs_). Fills prdcsrNum, ltncy, and scsrNodeNum (the
-  // instruction's index in nodes_) if provided.
-  __host__ __device__
-  SchedInstruction *GetScsr(int scsrNum, 
-                            InstCount *prdcsrNum = NULL, 
-                            UDT_GLABEL *ltncy = NULL,
-                            InstCount *scsrNodeNum = NULL);
+  // This instruction's index in the scsrs_, latencies_, predOrder_ arrays
+  // in the DDG.
+  int ddgIndex;
 
   __device__
   int GetScsrCnt_();
@@ -605,6 +593,9 @@ protected:
   InstCount prdcsrCnt_;
   // The number of successors of this instruction.
   InstCount scsrCnt_;
+
+  int dev_maxLatency_;
+  int dev_latencySum_;
 
   // The minimum cycle in which this instruction can be scheduled, given its
   // data and resource constraints.

@@ -346,6 +346,11 @@ public:
   Register *getRegByTuple(RegIndxTuple *tuple) { 
     return RegFiles[tuple->regType_].GetReg(tuple->regNum_); 
   }
+
+  int* scsrs_;
+  int* latencies_;
+  int* predOrder_;
+
   // Deep Copies DDG's arrays to device and links them to device DDG pointer
   void CopyPointersToDevice(DataDepGraph *dev_DDG, int numThreads = 0);
   // Calls hipFree on all arrays/objects that were allocated with hipMalloc
