@@ -2,6 +2,7 @@
 
 // Formula for determining global thread ID on device
 #define GLOBALTID hipBlockIdx_x * hipBlockDim_x + hipThreadIdx_x
+//#define DEBUG_ACO_CRASH_LOCATIONS 0
 
 // Check for and print out errors on CUDA API calls
 #define gpuErrchk(ans) { gpuAssert((ans), __FILE__, __LINE__); }

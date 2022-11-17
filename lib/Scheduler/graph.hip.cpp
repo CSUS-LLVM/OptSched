@@ -376,11 +376,6 @@ int compareGEptr(const void * a, const void * b) {
     return 0;
 }
 
-void GraphNode::CopyPointersToDevice(GraphNode *dev_node, 
-                                     GraphNode **dev_nodes) {  
-  //set value of nodes_ to dev_insts_
-  dev_node->nodes_ = dev_nodes;
-}
 
 void GraphNode::FreeDevicePointers() {
   if (scsrLst_)

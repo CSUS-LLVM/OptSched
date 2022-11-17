@@ -914,7 +914,7 @@ SchedInstruction *DataDepGraph::CreateNode_(
   insts_[instNum].InitializeNode_(instNum, instName, instType, opCode,
                                   2 * instCnt_, nodeID, fileSchedOrder,
                                   fileSchedCycle, fileLB, fileUB, machMdl_,
-				  nodes_, RegFiles);
+				  nodes_, insts_, RegFiles);
 
   if ((instNum < 0 || instNum >= instCnt_) && instNum != UNINITIATED_NUM)
     printf("Invalid instruction number\n");
@@ -996,14 +996,14 @@ void DataDepGraph::CreateEdge_(InstCount frmNodeNum, InstCount toNodeNum,
   GraphEdge *edge;
 
   assert(frmNodeNum < instCnt_);
-  assert(nodes_[frmNodeNum] != NULL);
+  assert(insts_ + frmNodeNum != NULL);
 
   assert(toNodeNum < instCnt_);
 
-  assert(nodes_[toNodeNum] != NULL);
+  assert(insts_ + toNodeNum != NULL);
 
-  GraphNode *frmNode = nodes_[frmNodeNum];
-  GraphNode *toNode = nodes_[toNodeNum];
+  GraphNode *frmNode = insts_ + frmNodeNum;
+  GraphNode *toNode = insts_ +toNodeNum;
   
 #ifdef IS_DEBUG_LATENCIES
   stats::dependenceTypeLatencies.Add(GetDependenceTypeName(depType), ltncy);
@@ -3668,31 +3668,6 @@ void DataDepGraph::CopyPointersToDevice(DataDepGraph *dev_DDG, int numThreads) {
   SchedInstruction *dev_leaf = &dev_insts[leaf_->GetNum()];
   gpuErrchk(hipMemcpy(&dev_DDG->leaf_, &dev_leaf, memSize,
 	               hipMemcpyHostToDevice));
-  // Copy nodes_ to device
-  SchedInstruction **dev_nodes;
-  memSize = sizeof(SchedInstruction *) * instCnt_;
-  gpuErrchk(hipMallocManaged(&dev_nodes, memSize));
-  gpuErrchk(hipMemcpy(dev_nodes, nodes_, memSize, hipMemcpyHostToDevice));
-  gpuErrchk(hipMemcpy(&dev_DDG->nodes_, &dev_nodes,
-		       sizeof(SchedInstruction **),
-	  	       hipMemcpyHostToDevice));
-  // update nodes_ values on device
-  for (InstCount i = 0; i < instCnt_; i++) 
-    dev_DDG->nodes_[i] = &dev_insts[i];
-  gpuErrchk(hipMemPrefetchAsync(dev_DDG->nodes_, memSize, 0));
-  // Copy tplgclOrdr_ to device
-  SchedInstruction **dev_tplgclOrdr;
-  memSize = sizeof(SchedInstruction *) * instCnt_;
-  gpuErrchk(hipMallocManaged(&dev_tplgclOrdr, memSize));
-  gpuErrchk(hipMemcpy(dev_tplgclOrdr, tplgclOrdr_, memSize,
-                       hipMemcpyHostToDevice));
-  gpuErrchk(hipMemcpy(&dev_DDG->tplgclOrdr_, &dev_tplgclOrdr,
-                       sizeof(SchedInstruction **),
-                       hipMemcpyHostToDevice));
-  // update tplgclOrdr values on device
-  for (InstCount i = 0; i < instCnt_; i++) 
-    dev_DDG->tplgclOrdr_[i] = &dev_insts[tplgclOrdr_[i]->GetNum()];
-  gpuErrchk(hipMemPrefetchAsync(dev_DDG->tplgclOrdr_, memSize, 0));
   // Copy RegFiles
   RegisterFile *dev_regFiles;
   memSize = sizeof(RegisterFile) * machMdl_->GetRegTypeCnt();
@@ -3721,7 +3696,6 @@ void DataDepGraph::CopyPointersToDevice(DataDepGraph *dev_DDG, int numThreads) {
 
   int scsrIndex = 0;
   int latencyIndex = 0;
-
   scsrs_ = new int[lngthScsrElmnts];
   latencies_ = new int[lngthScsrElmnts];
   predOrder_ = new int[lngthScsrElmnts];
@@ -3746,7 +3720,7 @@ void DataDepGraph::CopyPointersToDevice(DataDepGraph *dev_DDG, int numThreads) {
 
     // Copy SchedInstruction/GraphNode pointers and link them to device inst
     // and update RegFiles pointer to dev_regFiles
-    insts_[i].CopyPointersToDevice(&dev_DDG->insts_[i], dev_DDG->nodes_, 
+    insts_[i].CopyPointersToDevice(&dev_DDG->insts_[i], dev_DDG->insts_,
                                    dev_regFiles, numThreads,
                                    dev_latencies_, latencyIndex);
   }
@@ -3779,7 +3753,6 @@ void DataDepGraph::FreeDevicePointers(int numThreads) {
   for (InstCount i = 0; i < instCnt_; i++)
     insts_[i].FreeDevicePointers(numThreads);
   hipFree(insts_);
-  hipFree(nodes_);
   hipFree(scsrs_);
   hipFree(latencies_);
   hipFree(predOrder_);

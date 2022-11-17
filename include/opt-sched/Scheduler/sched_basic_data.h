@@ -537,7 +537,7 @@ public:
 		       InstCount maxNodeCnt, int nodeID, 
 		       InstCount fileSchedOrder, InstCount fileSchedCycle, 
 		       InstCount fileLB, InstCount fileUB, MachineModel *model,
-		       GraphNode **nodes, RegisterFile *regFiles);
+		       GraphNode **nodes, SchedInstruction *insts, RegisterFile *regFiles);
   // Creates a new SchedRange for the inst. used after it is copied to device
   __device__
   void CreateSchedRange();
@@ -549,7 +549,7 @@ public:
   // Copies pointers to device and links them to device inst. Also uses
   // the device nodes_ array to set nodes_ in GraphNode
   void CopyPointersToDevice(SchedInstruction *dev_inst,
-                            GraphNode **dev_nodes,
+                            SchedInstruction *dev_instsArray,
                             RegisterFile *dev_regFiles,
                             int numThreads, 
                             InstCount *dev_ltncyPerPrdcsr,
@@ -730,6 +730,11 @@ protected:
 
   bool mustBeInBBEntry_;
   bool mustBeInBBExit_;
+
+  // A pointer to the full array of instructions. Needed in order to save
+  // succs/preds and GraphEdge pointers as instNums instead. This allows for
+  // much faster copying to the Device
+  SchedInstruction *insts_;
 
   // TODO(ghassan): Document.
   __host__
