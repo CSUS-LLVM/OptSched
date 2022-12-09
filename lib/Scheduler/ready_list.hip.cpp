@@ -75,7 +75,7 @@ void KeysHelper::initForRegion(DataDepGraph *DDG) {
 
 // compute key
 __host__ __device__
-HeurType KeysHelper::computeKey(SchedInstruction *Inst, bool IncludeDynamic) const {
+HeurType KeysHelper::computeKey(SchedInstruction *Inst, bool IncludeDynamic, RegisterFile *RegFiles) const {
   assert(WasInitialized);
 
   HeurType Key= 0;
@@ -89,7 +89,7 @@ HeurType KeysHelper::computeKey(SchedInstruction *Inst, bool IncludeDynamic) con
       break;
 
     case LSH_LUC:
-      PriorityValue = IncludeDynamic ? Inst->CmputLastUseCnt() : 0;
+      PriorityValue = IncludeDynamic ? Inst->CmputLastUseCnt(RegFiles) : 0;
       break;
 
     case LSH_UC:

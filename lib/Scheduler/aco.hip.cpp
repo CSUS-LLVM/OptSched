@@ -555,7 +555,7 @@ InstSchedule *ACOScheduler::FindOneSchedule(InstCount RPTarget,
   // initialize the aco ready list so that the start instruction is ready
   // The luc component is 0 since the root inst uses no instructions
   InstCount RootId = rootInst_->GetNum();
-  HeurType RootHeuristic = dev_kHelper->computeKey(rootInst_, true);
+  HeurType RootHeuristic = dev_kHelper->computeKey(rootInst_, true, dev_DDG_->RegFiles);
   pheromone_t RootScore = Score(-1, RootId, RootHeuristic);
   ACOReadyListEntry InitialRoot{RootId, 0, RootHeuristic, RootScore};
   dev_readyLs->addInstructionToReadyList(InitialRoot);
@@ -735,7 +735,7 @@ InstSchedule *ACOScheduler::FindOneSchedule(InstCount RPTarget,
   // initialize the aco ready list so that the start instruction is ready
   // The luc component is 0 since the root inst uses no instructions
   InstCount RootId = rootInst_->GetNum();
-  HeurType RootHeuristic = kHelper->computeKey(rootInst_, true);
+  HeurType RootHeuristic = kHelper->computeKey(rootInst_, true, dataDepGraph_->RegFiles);
   pheromone_t RootScore = Score(-1, RootId, RootHeuristic);
   ACOReadyListEntry InitialRoot{RootId, 0, RootHeuristic, RootScore};
   readyLs->addInstructionToReadyList(InitialRoot);
@@ -1677,12 +1677,12 @@ inline void ACOScheduler::UpdateACOReadyList(SchedInstruction *inst) {
         }
         #endif
         bool wasLastPrdcsr =
-            crntScsr->PrdcsrSchduld(prdcsrNum, dev_crntCycleNum_[GLOBALTID], scsrRdyCycle);
+            crntScsr->PrdcsrSchduld(prdcsrNum, dev_crntCycleNum_[GLOBALTID], scsrRdyCycle, dev_DDG_->ltncyPerPrdcsr_);
 
         if (wasLastPrdcsr) {
           // If all other predecessors of this successor have been scheduled then
           // we now know in which cycle this successor will become ready.
-          HeurType HeurWOLuc = dev_kHelper->computeKey(crntScsr, false);
+          HeurType HeurWOLuc = dev_kHelper->computeKey(crntScsr, false, dev_DDG_->RegFiles);
           dev_readyLs->addInstructionToReadyList(ACOReadyListEntry{crntScsr->GetNum(), scsrRdyCycle, HeurWOLuc, 0});
         }
     }
@@ -1702,7 +1702,7 @@ inline void ACOScheduler::UpdateACOReadyList(SchedInstruction *inst) {
       InstCount CandidateId = *dev_readyLs->getInstIdAtIndex(I);
       if (LUCEntry.Width) {
         SchedInstruction *ScsrInst = dataDepGraph_->GetInstByIndx(CandidateId);
-        HeurType LUCVal = ScsrInst->CmputLastUseCnt();
+        HeurType LUCVal = ScsrInst->CmputLastUseCnt(dev_DDG_->RegFiles);
         LUCVal <<= LUCEntry.Offset;
         Heur &= LUCVal;
       }
@@ -1728,7 +1728,7 @@ inline void ACOScheduler::UpdateACOReadyList(SchedInstruction *inst) {
         if (wasLastPrdcsr) {
           // If all other predecessors of this successor have been scheduled then
           // we now know in which cycle this successor will become ready.
-          HeurType HeurWOLuc = kHelper->computeKey(crntScsr, false);
+          HeurType HeurWOLuc = kHelper->computeKey(crntScsr, false, dataDepGraph_->RegFiles);
           readyLs->addInstructionToReadyList(ACOReadyListEntry{crntScsr->GetNum(), scsrRdyCycle, HeurWOLuc, 0});
         }
     }
@@ -1744,7 +1744,7 @@ inline void ACOScheduler::UpdateACOReadyList(SchedInstruction *inst) {
       InstCount CandidateId = *readyLs->getInstIdAtIndex(I);
       if (LUCEntry.Width) {
         SchedInstruction *ScsrInst = dataDepGraph_->GetInstByIndx(CandidateId);
-        HeurType LUCVal = ScsrInst->CmputLastUseCnt();
+        HeurType LUCVal = ScsrInst->CmputLastUseCnt(dataDepGraph_->RegFiles);
         LUCVal <<= LUCEntry.Offset;
         Heur &= LUCVal;
       }

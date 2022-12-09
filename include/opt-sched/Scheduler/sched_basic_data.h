@@ -330,7 +330,8 @@ public:
   // instruction will become ready. Otherwise it will return false and set
   // rdyCycle to -1, indicating that it isn't yet known when it will be ready.
   __host__ __device__
-  bool PrdcsrSchduld(InstCount prdcsrNum, InstCount cycle, InstCount &rdyCycle);
+  bool PrdcsrSchduld(InstCount prdcsrNum, InstCount cycle, InstCount &rdyCycle,
+                     InstCount *ltncyPerPrdcsr = NULL);
   // Undoes the effect of PrdcsrSchduld().
   __host__ __device__
   bool PrdcsrUnSchduld(InstCount prdcsrNum, InstCount &rdyCycle);
@@ -521,7 +522,7 @@ public:
   void ComputeAdjustedUseCnt(SchedInstruction *inst);
 
   __host__ __device__
-  int16_t CmputLastUseCnt();
+  int16_t CmputLastUseCnt(RegisterFile *RegFiles);
   __host__ __device__
   int16_t GetLastUseCnt();
   //def to cuda_sched_basic_data.cu for nvcc compilation
@@ -550,10 +551,7 @@ public:
   // the device nodes_ array to set nodes_ in GraphNode
   void CopyPointersToDevice(SchedInstruction *dev_inst,
                             SchedInstruction *dev_instsArray,
-                            RegisterFile *dev_regFiles,
-                            int numThreads, 
-                            InstCount *dev_ltncyPerPrdcsr,
-                            int &ltncyIndex);
+                            RegisterFile *dev_regFiles);
   // Calls hipFree on all arrays/objects that were allocated with hipMalloc
   void FreeDevicePointers(int numThreads);
   // Allocates arrays used for storing individual values for each thread in
@@ -565,6 +563,9 @@ public:
   // This instruction's index in the scsrs_, latencies_, predOrder_ arrays
   // in the DDG.
   int ddgIndex;
+
+  // This instruction's index in the ltncyPerPrdcsr_ array in the DDG.
+  int ddgPredecessorIndex;
 
   __device__
   int GetScsrCnt_();

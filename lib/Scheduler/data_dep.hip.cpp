@@ -3691,19 +3691,19 @@ void DataDepGraph::CopyPointersToDevice(DataDepGraph *dev_DDG, int numThreads) {
     lengthLatencies += insts_[i].GetPrdcsrCnt();
   }
 
-  memSize = sizeof(InstCount) * lengthLatencies;
-  gpuErrchk(hipMallocManaged(&dev_latencies_, memSize));
-
-  int scsrIndex = 0;
-  int latencyIndex = 0;
   scsrs_ = new int[lngthScsrElmnts];
   latencies_ = new int[lngthScsrElmnts];
   predOrder_ = new int[lngthScsrElmnts];
+  ltncyPerPrdcsr_ = new int[lengthLatencies];
+
   int indexOffset = 0;
+  int indexPredecessorOffset = 0;
 
   for (InstCount i = 0; i < instCnt_; i++) {
     DependenceType _dep;
     insts_[i].ddgIndex = indexOffset;
+    insts_[i].ddgPredecessorIndex = indexPredecessorOffset;
+
     int prdcsrNum, latency, toNodeNum;
     // Partition scsrs_, latencies_, predOrder_ for each SchedInstruction.
     for (SchedInstruction *crntScsr = insts_[i].GetFrstScsr(&prdcsrNum, 
@@ -3718,11 +3718,22 @@ void DataDepGraph::CopyPointersToDevice(DataDepGraph *dev_DDG, int numThreads) {
         indexOffset += 1;
     }
 
+    // Partition ltncyPerPrdcsr_ for each SchedInstruction.
+    int scsrNum;
+    for (SchedInstruction *crntPrdcsr = insts_[i].GetFrstPrdcsr(&scsrNum, 
+                                              &latency,
+                                              &_dep, 
+                                              &toNodeNum);
+      crntPrdcsr != NULL; 
+      crntPrdcsr = insts_[i].GetNxtPrdcsr(&scsrNum, &latency, &_dep, &toNodeNum)) {
+        ltncyPerPrdcsr_[indexPredecessorOffset] = latency;
+        indexPredecessorOffset += 1;
+    }
+
     // Copy SchedInstruction/GraphNode pointers and link them to device inst
     // and update RegFiles pointer to dev_regFiles
     insts_[i].CopyPointersToDevice(&dev_DDG->insts_[i], dev_DDG->insts_,
-                                   dev_regFiles, numThreads,
-                                   dev_latencies_, latencyIndex);
+                                   dev_regFiles);
   }
   memSize = sizeof(int) * lngthScsrElmnts;
   gpuErrchk(hipMalloc(&(dev_DDG->scsrs_), memSize));
@@ -3733,12 +3744,14 @@ void DataDepGraph::CopyPointersToDevice(DataDepGraph *dev_DDG, int numThreads) {
   gpuErrchk(hipMemcpy(dev_DDG->latencies_, latencies_, memSize, hipMemcpyHostToDevice));
   gpuErrchk(hipMemcpy(dev_DDG->predOrder_, predOrder_, memSize, hipMemcpyHostToDevice));
 
+  memSize = sizeof(int) * lengthLatencies;
+  gpuErrchk(hipMalloc(&(dev_DDG->ltncyPerPrdcsr_), memSize));
+  gpuErrchk(hipMemcpy(dev_DDG->ltncyPerPrdcsr_, ltncyPerPrdcsr_, memSize, hipMemcpyHostToDevice));
+
   memSize = sizeof(SchedInstruction) * instCnt_;
   gpuErrchk(hipMemPrefetchAsync(dev_insts, memSize, 0));
   memSize = sizeof(RegisterFile) * machMdl_->GetRegTypeCnt();
   gpuErrchk(hipMemPrefetchAsync(dev_regFiles, memSize, 0));
-  memSize = sizeof(InstCount) * lengthLatencies;
-  gpuErrchk(hipMemPrefetchAsync(dev_latencies_, memSize, 0));
 }
 
 void DataDepGraph::FreeDevicePointers(int numThreads) {
@@ -3756,11 +3769,7 @@ void DataDepGraph::FreeDevicePointers(int numThreads) {
   hipFree(scsrs_);
   hipFree(latencies_);
   hipFree(predOrder_);
-  // hipFree(dev_latencies_);
-  // hipFree(dev_crntRange_);
-  // (Josh) These frees are invalid but I am not sure why
-  // hipFree(dev_scsrElmnts_);
-  // hipFree(dev_keys_);
+  hipFree(ltncyPerPrdcsr_);
 }
 
 void DataDepGraph::FreeDevEdges() {
