@@ -178,64 +178,7 @@ void Register::AllocDevArrayForParallelACO(int numThreads) {
   gpuErrchk(hipMalloc(&dev_crntUseCnt_, memSize));
 }
 
-void Register::CopyPointersToDevice(Register *dev_reg) {
-  size_t memSize;
-  // Copy conflicts->vctr_ to device
-  unsigned long *dev_vctr;
-  if (conflicts_.GetUnitCnt() > 0) {
-    memSize = sizeof(unsigned long) * conflicts_.GetUnitCnt();
-    gpuErrchk(hipMalloc(&dev_vctr, memSize));
-    gpuErrchk(hipMemcpy(dev_vctr, conflicts_.vctr_, memSize,
-                         hipMemcpyHostToDevice));
-    gpuErrchk(hipMemcpy(&dev_reg->conflicts_.vctr_, &dev_vctr,
-                         sizeof(unsigned long *), hipMemcpyHostToDevice));
-  }
-  // Copy uses_.elmnt array
-  InstCount *dev_elmnt;
-  if (uses_.alloc_ > 0) {
-    memSize = sizeof(InstCount) * uses_.alloc_;
-    gpuErrchk(hipMalloc(&dev_elmnt, memSize));
-    gpuErrchk(hipMemcpy(dev_elmnt, uses_.elmnt, memSize,
-			 hipMemcpyHostToDevice));
-    gpuErrchk(hipMemcpy(&dev_reg->uses_.elmnt, &dev_elmnt,
-			 sizeof(InstCount *), hipMemcpyHostToDevice));
-  }
-  // Copy defs_.elmnt array
-  if (defs_.alloc_ > 0) {
-    memSize = sizeof(InstCount) * defs_.alloc_;
-    gpuErrchk(hipMalloc(&dev_elmnt, memSize));
-    gpuErrchk(hipMemcpy(dev_elmnt, defs_.elmnt, memSize,
-                         hipMemcpyHostToDevice));
-    gpuErrchk(hipMemcpy(&dev_reg->defs_.elmnt, &dev_elmnt,
-                         sizeof(InstCount *), hipMemcpyHostToDevice));
-  }
-  // Copy liveIntervalSet_.elmnt array
-  if (liveIntervalSet_.alloc_ > 0) {
-    memSize = sizeof(InstCount) * liveIntervalSet_.alloc_;
-    gpuErrchk(hipMalloc(&dev_elmnt, memSize));
-    gpuErrchk(hipMemcpy(dev_elmnt, liveIntervalSet_.elmnt, memSize,
-                         hipMemcpyHostToDevice));
-    gpuErrchk(hipMemcpy(&dev_reg->liveIntervalSet_.elmnt, &dev_elmnt,
-                         sizeof(InstCount *), hipMemcpyHostToDevice));
-  }
-
-  // Copy possibleLiveIntervalSet_.elmnt array
-  if (possibleLiveIntervalSet_.alloc_ > 0) {
-    memSize = sizeof(InstCount) * possibleLiveIntervalSet_.alloc_;
-    gpuErrchk(hipMalloc(&dev_elmnt, memSize));
-    gpuErrchk(hipMemcpy(dev_elmnt, possibleLiveIntervalSet_.elmnt, memSize,
-			 hipMemcpyHostToDevice));
-    gpuErrchk(hipMemcpy(&dev_reg->possibleLiveIntervalSet_.elmnt, &dev_elmnt,
-			 sizeof(InstCount *), hipMemcpyHostToDevice));
-  }
-}
-
 void Register::FreeDevicePointers() {
-  hipFree(conflicts_.vctr_);
-  hipFree(uses_.elmnt);
-  hipFree(defs_.elmnt);
-  hipFree(liveIntervalSet_.elmnt);
-  hipFree(possibleLiveIntervalSet_.elmnt);
   hipFree(dev_crntUseCnt_);
 }
 
@@ -439,7 +382,6 @@ void RegisterFile::CopyPointersToDevice(RegisterFile *dev_regFile) {
     //copy register to device
     gpuErrchk(hipMemcpy(dev_reg, Regs[i], sizeof(Register), 
 			 hipMemcpyHostToDevice));
-    Regs[i]->CopyPointersToDevice(dev_reg);
     //update dev_regs pointer
     gpuErrchk(hipMemcpy(&dev_regs[i], &dev_reg, sizeof(Register *), 
 			 hipMemcpyHostToDevice));
