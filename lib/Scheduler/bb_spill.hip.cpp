@@ -573,18 +573,20 @@ void BBWithSpill::UpdateSpillInfoForSchdul_(SchedInstruction *inst,
   InstCount newSpillCost;
   InstCount perpValueForSlil;
 
-  defCnt = inst->GetDefs(defs);
-  useCnt = inst->GetUses(uses);
-
 #ifdef __HIP_DEVICE_COMPILE__ // Device Version of function
 #ifdef IS_DEBUG_REG_PRESSURE
   Logger::Info("Updating reg pressure after scheduling Inst %d",
                inst->GetNum());
 #endif
 
+  defCnt = inst->GetDefCnt();
+  useCnt = inst->GetUseCnt();
+
   // Update Live regs after uses
+  // TODO(bruce): convert to dev uses
+  int useStart = inst->ddgUseIndex;
   for (int i = 0; i < useCnt; i++) {
-    use = dataDepGraph_->getRegByTuple(&uses[i]);
+    use = dataDepGraph_->getRegByTuple(dataDepGraph_->getUseByIndex(useStart + i));
     regType = use->GetType();
     regNum = use->GetNum();
     physRegNum = use->GetPhysicalNumber();
@@ -622,8 +624,10 @@ void BBWithSpill::UpdateSpillInfoForSchdul_(SchedInstruction *inst,
   }
 
   // Update Live regs after defs
+  // TODO(bruce): convert to dev defs
+  int defStart = inst->ddgDefIndex;
   for (int i = 0; i < defCnt; i++) {
-    def = dataDepGraph_->getRegByTuple(&defs[i]);
+    def = dataDepGraph_->getRegByTuple(dataDepGraph_->getDefByIndex(defStart + i));
     regType = def->GetType();
     regNum = def->GetNum();
     physRegNum = def->GetPhysicalNumber();
@@ -724,6 +728,9 @@ void BBWithSpill::UpdateSpillInfoForSchdul_(SchedInstruction *inst,
   Logger::Info("Updating reg pressure after scheduling Inst %d",
                inst->GetNum());
 #endif
+
+  defCnt = inst->GetDefs(defs);
+  useCnt = inst->GetUses(uses);
 
   // Update Live regs after uses
   for (int i = 0; i < useCnt; i++) {

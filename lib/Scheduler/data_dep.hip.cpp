@@ -3686,23 +3686,37 @@ void DataDepGraph::CopyPointersToDevice(DataDepGraph *dev_DDG, int numThreads) {
   // used to malloc the large elements array
   int lngthScsrElmnts = 0;
   int lengthLatencies = 0;
+  int lengthUses = 0;
+  int lengthDefs = 0;
+  // TODO(bruce): remove
+  RegIndxTuple *_defs, *_uses;
   for (InstCount i = 0; i < instCnt_; i++) {
     lngthScsrElmnts += insts_[i].GetScsrCnt();
     lengthLatencies += insts_[i].GetPrdcsrCnt();
+    lengthUses += insts_[i].GetUses(_uses);
+    lengthDefs += insts_[i].GetDefs(_defs);
   }
 
   scsrs_ = new int[lngthScsrElmnts];
   latencies_ = new int[lngthScsrElmnts];
   predOrder_ = new int[lngthScsrElmnts];
+  // TODO(bruce): free
+  uses_ = new RegIndxTuple[lengthUses];
+  defs_ = new RegIndxTuple[lengthDefs];
   ltncyPerPrdcsr_ = new int[lengthLatencies];
 
   int indexOffset = 0;
   int indexPredecessorOffset = 0;
+  int indexUseOffset = 0;
+  int indexDefOffset = 0;
 
   for (InstCount i = 0; i < instCnt_; i++) {
     DependenceType _dep;
     insts_[i].ddgIndex = indexOffset;
     insts_[i].ddgPredecessorIndex = indexPredecessorOffset;
+    insts_[i].ddgUseIndex = indexUseOffset;
+    insts_[i].ddgDefIndex = indexDefOffset;
+
 
     int prdcsrNum, latency, toNodeNum;
     // Partition scsrs_, latencies_, predOrder_ for each SchedInstruction.
@@ -3716,6 +3730,24 @@ void DataDepGraph::CopyPointersToDevice(DataDepGraph *dev_DDG, int numThreads) {
         latencies_[indexOffset] = latency;
         predOrder_[indexOffset] = prdcsrNum;
         indexOffset += 1;
+    }
+
+    // Partition uses_ for each SchedInstruction.
+    RegIndxTuple *myUses;
+    int numUses;
+    numUses = insts_[i].GetUses(myUses);
+    for (int j = 0; j < numUses; j++) {
+      uses_[indexUseOffset++] = myUses[j]; 
+      // TODO(bruce): set SchedInstruction field accordingly
+    }
+
+    // Partition defs_ for each SchedInstruction.
+    RegIndxTuple *myDefs;
+    int numDefs;
+    numDefs = insts_[i].GetDefs(myDefs);
+    for (int j = 0; j < numDefs; j++) {
+      defs_[indexDefOffset++] = myDefs[j]; 
+      // TODO(bruce): set SchedInstruction field accordingly
     }
 
     // Partition ltncyPerPrdcsr_ for each SchedInstruction.
@@ -3744,6 +3776,17 @@ void DataDepGraph::CopyPointersToDevice(DataDepGraph *dev_DDG, int numThreads) {
   gpuErrchk(hipMemcpy(dev_DDG->latencies_, latencies_, memSize, hipMemcpyHostToDevice));
   gpuErrchk(hipMemcpy(dev_DDG->predOrder_, predOrder_, memSize, hipMemcpyHostToDevice));
 
+  memSize = sizeof(RegIndxTuple) * lengthUses;
+  gpuErrchk(hipMalloc(&(dev_DDG->uses_), memSize));
+  gpuErrchk(hipMemcpy(dev_DDG->uses_, uses_, memSize, hipMemcpyHostToDevice));
+
+  memSize = sizeof(RegIndxTuple) * lengthDefs;
+  gpuErrchk(hipMalloc(&(dev_DDG->defs_), memSize));
+  gpuErrchk(hipMemcpy(dev_DDG->defs_, defs_, memSize, hipMemcpyHostToDevice));
+
+  delete uses_;
+  delete defs_;
+
   memSize = sizeof(int) * lengthLatencies;
   gpuErrchk(hipMalloc(&(dev_DDG->ltncyPerPrdcsr_), memSize));
   gpuErrchk(hipMemcpy(dev_DDG->ltncyPerPrdcsr_, ltncyPerPrdcsr_, memSize, hipMemcpyHostToDevice));
@@ -3769,6 +3812,8 @@ void DataDepGraph::FreeDevicePointers(int numThreads) {
   hipFree(scsrs_);
   hipFree(latencies_);
   hipFree(predOrder_);
+  hipFree(uses_);
+  hipFree(defs_);
   hipFree(ltncyPerPrdcsr_);
 }
 

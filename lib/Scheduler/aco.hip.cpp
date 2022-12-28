@@ -301,11 +301,13 @@ InstCount ACOScheduler::SelectInstruction(SchedInstruction *lastInst, InstCount 
 
         // check if any reg types used by the instructions are above the physical register limit
         SchedInstruction *tempInst = dataDepGraph_->GetInstByIndx(*dev_readyLs->getInstIdAtIndex(I));
+        // TODO(bruce): convert to dev uses
         RegIndxTuple *uses;
         Register *use;
-        uint16_t usesCount = tempInst->GetUses(uses);
+        uint16_t usesCount = tempInst->GetUseCnt();
+        int useStart = tempInst->ddgUseIndex;
         for (uint16_t i = 0; i < usesCount; i++) {
-          use = dataDepGraph_->getRegByTuple(&uses[i]);
+          use = dataDepGraph_->getRegByTuple(dataDepGraph_->getUseByIndex(useStart + i));
           int16_t regType = use->GetType();
           if ( ((BBWithSpill *)rgn)->IsRPHigh(regType) ) {
             RPIsHigh = true;

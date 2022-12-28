@@ -48,6 +48,11 @@ SchedInstruction::SchedInstruction(InstCount num, const char *name,
 
   instType_ = instType;
 
+  #ifndef __HIP_DEVICE_COMPILE__
+    defs_ = new RegIndxTuple[MAX_DEFS_PER_INSTR];
+    uses_ = new RegIndxTuple[MAX_USES_PER_INSTR]; 
+  #endif
+
   frwrdLwrBound_ = INVALID_VALUE;
   bkwrdLwrBound_ = INVALID_VALUE;
   abslutFrwrdLwrBound_ = INVALID_VALUE;
@@ -102,6 +107,8 @@ SchedInstruction::~SchedInstruction() {
   if (memAllocd_)
     DeAllocMem_();
 
+  delete defs_;
+  delete uses_;
   delete crntRange_;
 }
 
@@ -304,7 +311,7 @@ bool SchedInstruction::ApplyPreFxng(LinkedList<SchedInstruction> *tightndLst,
   return crntRange_->Fix(preFxdCycle_, tightndLst, fxdLst);
 }
 
-__host__ __device__
+__host__
 void SchedInstruction::AddDef(Register *reg) {
   if (defCnt_ >= MAX_DEFS_PER_INSTR) {
 #ifndef __HIP_DEVICE_COMPILE__
@@ -325,7 +332,7 @@ void SchedInstruction::AddDef(Register *reg) {
   defCnt_++;
 }
 
-__host__ __device__
+__host__
 void SchedInstruction::AddUse(Register *reg) {
   if (useCnt_ >= MAX_USES_PER_INSTR) {
 #ifndef __HIP_DEVICE_COMPILE__
@@ -372,15 +379,15 @@ bool SchedInstruction::FindUse(Register *reg) const {
   return false;
 }
 
-__host__ __device__
+__host__
 int16_t SchedInstruction::GetDefs(RegIndxTuple *&defs) {
-  defs = (RegIndxTuple *)&defs_;
+  defs = defs_;
   return defCnt_;
 }
 
-__host__ __device__
+__host__
 int16_t SchedInstruction::GetUses(RegIndxTuple *&uses) {
-  uses = (RegIndxTuple *)&uses_;
+  uses = uses_;
   return useCnt_;
 }
 
@@ -883,7 +890,7 @@ bool SchedInstruction::ProbeScsrsCrntLwrBounds(InstCount cycle) {
   return false;
 }
 
-__host__ __device__
+__host__
 void SchedInstruction::ComputeAdjustedUseCnt_() {
   RegIndxTuple *uses;
   int useCnt = GetUses(uses);
@@ -971,7 +978,6 @@ else
 }
 
 
-// TODO(bruce): is this actually run on the device?
 __host__ __device__
 void SchedInstruction::InitializeNode_(InstCount instNum, 
 		         const char *const instName,
@@ -1027,6 +1033,11 @@ void SchedInstruction::InitializeNode_(InstCount instNum,
   blksCycle_ = model->BlocksCycle(instType);
   pipelined_ = model->IsPipelined(instType);
 
+  #ifndef __HIP_DEVICE_COMPILE__
+    defs_ = new RegIndxTuple[MAX_DEFS_PER_INSTR];
+    uses_ = new RegIndxTuple[MAX_USES_PER_INSTR]; 
+  #endif
+
   defCnt_ = 0;
   useCnt_ = 0;
 
@@ -1062,6 +1073,9 @@ void SchedInstruction::CopyPointersToDevice(SchedInstruction *dev_inst,
 
   // Index of this instruction's partition in DDG's ltncyPerPrdcsr_.
   dev_inst->ddgPredecessorIndex = ddgPredecessorIndex;
+
+  dev_inst->ddgUseIndex = ddgUseIndex;
+  dev_inst->ddgDefIndex = ddgDefIndex;
 
   // Make sure instruction knows whether it's a leaf on device for legality checking.
   dev_inst->SetDevIsLeaf(scsrCnt_ == 0);

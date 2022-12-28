@@ -346,10 +346,21 @@ public:
   Register *getRegByTuple(RegIndxTuple *tuple) { 
     return RegFiles[tuple->regType_].GetReg(tuple->regNum_); 
   }
+  __host__ __device__
+  RegIndxTuple *getUseByIndex(int index) {
+    return uses_ + index;
+  }
+
+  __host__ __device__
+  RegIndxTuple *getDefByIndex(int index) {
+    return defs_ + index;
+  }
 
   int* scsrs_;
   int* latencies_;
   int* predOrder_;
+  RegIndxTuple* uses_;
+  RegIndxTuple* defs_;
   int* ltncyPerPrdcsr_;
 
   // Tracks all registers in the scheduling region. Each RegisterFile
