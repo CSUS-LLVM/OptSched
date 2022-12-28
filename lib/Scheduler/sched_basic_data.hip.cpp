@@ -107,8 +107,8 @@ SchedInstruction::~SchedInstruction() {
   if (memAllocd_)
     DeAllocMem_();
 
-  delete defs_;
-  delete uses_;
+  delete[] uses_;
+  delete[] defs_;
   delete crntRange_;
 }
 

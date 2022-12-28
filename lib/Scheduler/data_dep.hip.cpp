@@ -3688,13 +3688,11 @@ void DataDepGraph::CopyPointersToDevice(DataDepGraph *dev_DDG, int numThreads) {
   int lengthLatencies = 0;
   int lengthUses = 0;
   int lengthDefs = 0;
-  // TODO(bruce): remove
-  RegIndxTuple *_defs, *_uses;
   for (InstCount i = 0; i < instCnt_; i++) {
     lngthScsrElmnts += insts_[i].GetScsrCnt();
     lengthLatencies += insts_[i].GetPrdcsrCnt();
-    lengthUses += insts_[i].GetUses(_uses);
-    lengthDefs += insts_[i].GetDefs(_defs);
+    lengthUses += insts_[i].GetUseCnt();
+    lengthDefs += insts_[i].GetDefCnt();
   }
 
   scsrs_ = new int[lngthScsrElmnts];
@@ -3784,8 +3782,8 @@ void DataDepGraph::CopyPointersToDevice(DataDepGraph *dev_DDG, int numThreads) {
   gpuErrchk(hipMalloc(&(dev_DDG->defs_), memSize));
   gpuErrchk(hipMemcpy(dev_DDG->defs_, defs_, memSize, hipMemcpyHostToDevice));
 
-  delete uses_;
-  delete defs_;
+  delete[] uses_;
+  delete[] defs_;
 
   memSize = sizeof(int) * lengthLatencies;
   gpuErrchk(hipMalloc(&(dev_DDG->ltncyPerPrdcsr_), memSize));
