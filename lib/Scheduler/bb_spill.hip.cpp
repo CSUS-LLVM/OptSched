@@ -351,8 +351,6 @@ __device__
 void BBWithSpill::Dev_InitForSchdulng() {
   InitForCostCmputtn_();
 
-  dev_schduldEntryInstCnt_[GLOBALTID] = 0;
-  dev_schduldExitInstCnt_[GLOBALTID] = 0;
   dev_schduldInstCnt_[GLOBALTID] = 0;
 }
 
@@ -376,9 +374,6 @@ void BBWithSpill::InitForCostCmputtn_() {
 
   for (i = 0; i < regTypeCnt_; i++) {
     dev_liveRegs_[i][GLOBALTID].Dev_Reset();
-
-    if (regFiles_[i].GetPhysRegCnt() > 0)
-      dev_livePhysRegs_[i][GLOBALTID].Dev_Reset();
 
     dev_peakRegPressures_[i][GLOBALTID] = 0;
     dev_regPressures_[i][GLOBALTID] = 0;
@@ -615,9 +610,6 @@ void BBWithSpill::UpdateSpillInfoForSchdul_(SchedInstruction *inst,
       printf("Reg type %d now has %d live regs\n", regType,
              dev_liveRegs_[regType][GLOBALTID].GetOneCnt());
 #endif
-
-      if (regFiles_[regType].GetPhysRegCnt() > 0 && physRegNum >= 0)
-        dev_livePhysRegs_[regType][GLOBALTID].SetBit(physRegNum, false, use->GetWght());
     }
   }
 
@@ -644,8 +636,6 @@ void BBWithSpill::UpdateSpillInfoForSchdul_(SchedInstruction *inst,
            dev_liveRegs_[regType][GLOBALTID].GetOneCnt());
 #endif
 
-    if (regFiles_[regType].GetPhysRegCnt() > 0 && physRegNum >= 0)
-      dev_livePhysRegs_[regType][GLOBALTID].SetBit(physRegNum, true, def->GetWght());
     def->ResetCrntUseCnt();
   }
 
@@ -714,10 +704,6 @@ void BBWithSpill::UpdateSpillInfoForSchdul_(SchedInstruction *inst,
   CmputCrntSpillCost_();
 
   dev_schduldInstCnt_[GLOBALTID]++;
-  if (inst->MustBeInBBEntry())
-    dev_schduldEntryInstCnt_[GLOBALTID]++;
-  if (inst->MustBeInBBExit())
-    dev_schduldExitInstCnt_[GLOBALTID]++;
 
 #else // Host Version of function
 #ifdef IS_DEBUG_REG_PRESSURE
@@ -1624,12 +1610,9 @@ void BBWithSpill::AllocDevArraysForParallelACO(int numThreads) {
     hipMalloc(&dev_dynamicSlilLowerBound_, memSize);
   }
   memSize = sizeof(int) * numThreads;
-  hipMalloc(&dev_schduldEntryInstCnt_, memSize);
-  hipMalloc(&dev_schduldExitInstCnt_, memSize);
   hipMalloc(&dev_schduldInstCnt_, memSize);
   memSize = sizeof(WeightedBitVector *) * regTypeCnt_;
   hipMallocManaged(&dev_liveRegs_, memSize);
-  hipMallocManaged(&dev_livePhysRegs_, memSize);
   memSize = sizeof(InstCount *) * regTypeCnt_;
   hipMallocManaged(&dev_peakRegPressures_, memSize);
   memSize = sizeof(InstCount) * regTypeCnt_ * numThreads;
@@ -1717,62 +1700,9 @@ void BBWithSpill::CopyPointersToDevice(SchedRegion* dev_rgn, int numThreads) {
   memSize = regTypeCnt_ * sizeof(WeightedBitVector) * numThreads;
   gpuErrchk(hipMemPrefetchAsync(dev_temp_liveRegs, memSize, 0));
 
-  // copy livePhysRegs to device in the same manner we handled liveRegs
-  // this will hold the array of all liveRegs for all threads on the device
-  // temporarily before the pointers are assigned to dev_livePhysRegs_
-  WeightedBitVector *dev_temp_livePhysRegs;
-  // Find totUnitCnt to determine size of vctr for all livePhysRegs_
-  totUnitCnt = 0;
-  for (int i = 0; i < regTypeCnt_; i++) {
-    totUnitCnt += livePhysRegs_[i].GetUnitCnt();
-    // set one bit, so oneCnt_ is nonzero to force reset of vctrs on device
-    if (livePhysRegs_[i].GetUnitCnt() > 0)
-      livePhysRegs_[i].SetBit(0,true,1);
-  }
-  // Allocate vctr for all dev_livePhysRegs
-  memSize = totUnitCnt * sizeof(unsigned int) * numThreads;
-  gpuErrchk(hipMalloc((void**)&dev_vctr, memSize));
-  // prepare temp host array to copy all dev_livePhysRegs in one call
-  memSize = regTypeCnt_ * sizeof(WeightedBitVector) * numThreads;
-  gpuErrchk(hipMallocManaged((void**)&dev_temp_livePhysRegs, memSize));
-  temp_bv = (WeightedBitVector *)malloc(memSize);
-  // temp array laid out in the format temp_bv[liveRegIndx][TID]
-  // so that all of the threads have their copy of livePhysRegs
-  // next to each other in memory
-  memSize = sizeof(WeightedBitVector);
-  for (int i = 0; i < regTypeCnt_; i++)
-    for (int j = 0; j < numThreads; j++)
-      memcpy(&temp_bv[(i * numThreads) + j], &livePhysRegs_[i], memSize);
-  // copy formatted host array to device
-  memSize = regTypeCnt_ * sizeof(WeightedBitVector) * numThreads;
-  gpuErrchk(hipMemcpy(dev_temp_livePhysRegs, temp_bv, memSize,
-                       hipMemcpyHostToDevice));
-  // free the temp host array
-  free(temp_bv);
-  // make sure host also have copy of the device pointers
-  gpuErrchk(hipMemPrefetchAsync(dev_temp_livePhysRegs, memSize, hipCpuDeviceId));
-  // assign each dev_temp_liveReg a portion of the dev_vctr allocation
-  // and then set the dev_livePhysRegs_[index] pointers to each group of
-  // dev_temp_livePhysRegs
-  indx = 0;
-  for (int i = 0; i < regTypeCnt_; i++) {
-    unitCnt = livePhysRegs_[i].GetUnitCnt();
-    for (int j = 0; j < numThreads; j++) {
-      if (unitCnt > 0) {
-        dev_temp_livePhysRegs[(i * numThreads) + j].vctr_ = &dev_vctr[indx];
-        indx += unitCnt;
-      }
-    }
-    //update device pointer
-    ((BBWithSpill *)
-    dev_rgn)->dev_livePhysRegs_[i] = &dev_temp_livePhysRegs[i * numThreads];
-  }
   // make sure managed mem is updated on device before kernel start
-  memSize = regTypeCnt_ * sizeof(WeightedBitVector) * numThreads;
-  gpuErrchk(hipMemPrefetchAsync(dev_temp_livePhysRegs, memSize, 0));
   memSize = sizeof(WeightedBitVector *) * regTypeCnt_;
   gpuErrchk(hipMemPrefetchAsync(dev_liveRegs_, memSize, 0));
-  gpuErrchk(hipMemPrefetchAsync(dev_livePhysRegs_, memSize, 0));
   memSize = sizeof(InstCount *) * regTypeCnt_;
   gpuErrchk(hipMemPrefetchAsync(dev_peakRegPressures_, memSize, 0));
   memSize = sizeof(unsigned *) * regTypeCnt_;
@@ -1788,9 +1718,6 @@ void BBWithSpill::CopyPointersToDevice(SchedRegion* dev_rgn, int numThreads) {
 void BBWithSpill::FreeDevicePointers(int numThreads) {
   hipFree(dev_liveRegs_[0][0].vctr_);
   hipFree(dev_liveRegs_[0]);
-  hipFree(dev_livePhysRegs_[0][0].vctr_);
-  hipFree(dev_livePhysRegs_[0]);
-  hipFree(dev_livePhysRegs_);
   hipFree(dev_liveRegs_);
   hipFree(dev_crntCycleNum_);
   hipFree(dev_crntSlotNum_);
@@ -1804,8 +1731,6 @@ void BBWithSpill::FreeDevicePointers(int numThreads) {
     hipFree(dev_sumOfLiveIntervalLengths_[0]);
     hipFree(dev_sumOfLiveIntervalLengths_);
   }
-  hipFree(dev_schduldEntryInstCnt_);
-  hipFree(dev_schduldExitInstCnt_);
   hipFree(dev_schduldInstCnt_);
   hipFree(dev_peakRegPressures_[0]);
   hipFree(dev_peakRegPressures_);

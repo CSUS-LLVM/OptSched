@@ -1844,9 +1844,6 @@ void ACOScheduler::AllocDevArraysForParallelACO() {
   // Alloc dev array for crntSlotNum_;
   memSize = sizeof(InstCount) * numThreads_;
   gpuErrchk(hipMalloc(&dev_crntSlotNum_, memSize));
-  // Allo dev array for crntRealSlotNum_
-  memSize = sizeof(InstCount) * numThreads_;
-  gpuErrchk(hipMalloc(&dev_crntRealSlotNum_, memSize));
   // Alloc dev array for isCrntCycleBlkd_;
   memSize = sizeof(bool) * numThreads_;
   gpuErrchk(hipMalloc(&dev_isCrntCycleBlkd_, memSize));
@@ -1935,7 +1932,6 @@ void ACOScheduler::FreeDevicePointers() {
   hipFree(dev_schduldInstCnt_);
   hipFree(dev_crntCycleNum_);
   hipFree(dev_crntSlotNum_);
-  hipFree(dev_crntRealSlotNum_);
   hipFree(dev_isCrntCycleBlkd_);
   hipFree(slotsPerTypePerCycle_);
   hipFree(instCntPerIssuType_);

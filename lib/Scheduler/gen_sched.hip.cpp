@@ -137,7 +137,6 @@ bool ConstrainedScheduler::Initialize_(InstCount trgtSchedLngth,
   dev_rsrvSlotCnt_[GLOBALTID] = 0;
   dev_schduldInstCnt_[GLOBALTID] = 0;
   dev_crntSlotNum_[GLOBALTID] = 0;
-  dev_crntRealSlotNum_[GLOBALTID] = 0;
   dev_crntCycleNum_[GLOBALTID] = 0;
   dev_isCrntCycleBlkd_[GLOBALTID] = false;
 #else
@@ -320,8 +319,7 @@ bool InstScheduler::IsSchedComplete_() {
 __host__ __device__
 void ConstrainedScheduler::InitNewCycle_() {
 #ifdef __HIP_DEVICE_COMPILE__
-  assert(dev_crntSlotNum_[GLOBALTID] == 0 && 
-         dev_crntRealSlotNum_[GLOBALTID] == 0);
+  assert(dev_crntSlotNum_[GLOBALTID] == 0);
   for (int i = 0; i < issuTypeCnt_; i++) {
     dev_avlblSlotsInCrntCycle_[GLOBALTID][i] = slotsPerTypePerCycle_[i];
   }
@@ -342,12 +340,9 @@ bool ConstrainedScheduler::MovToNxtSlot_(SchedInstruction *inst) {
   if (dev_crntSlotNum_[GLOBALTID] == (issuRate_ - 1)) {
     dev_crntCycleNum_[GLOBALTID]++;
     dev_crntSlotNum_[GLOBALTID] = 0;
-    dev_crntRealSlotNum_[GLOBALTID] = 0;
     return true;
   } else {
     dev_crntSlotNum_[GLOBALTID]++;
-    if (inst && machMdl_->IsRealInst(inst->GetInstType()))
-      dev_crntRealSlotNum_[GLOBALTID]++;
     return false;
   }
 #else
@@ -369,8 +364,6 @@ bool ConstrainedScheduler::MovToNxtSlot_(SchedInstruction *inst) {
 __host__ __device__
 bool ConstrainedScheduler::MovToPrevSlot_(int prevRealSlotNum) {
 #ifdef __HIP_DEVICE_COMPILE__
-  dev_crntRealSlotNum_[GLOBALTID] = prevRealSlotNum;
-
   // If we are currently in the last slot of the current cycle.
   if (dev_crntSlotNum_[GLOBALTID] == 0) {
     dev_crntCycleNum_[GLOBALTID]--;

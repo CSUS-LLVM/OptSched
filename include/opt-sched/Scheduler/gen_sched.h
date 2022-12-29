@@ -153,9 +153,6 @@ protected:
   InstCount *dev_crntSlotNum_;
   // As above, but only for "real" instructions, as opposed to artificial.
   InstCount crntRealSlotNum_;
-  // pointer to a device array used to store crntRealSlotNum_ for
-  // each thread by parallel ACO
-  InstCount *dev_crntRealSlotNum_;
   // The current number of consecutive empty cycles (filled only with stalls)
   // since an instruction was scheduled.
   InstCount consecEmptyCycles_;

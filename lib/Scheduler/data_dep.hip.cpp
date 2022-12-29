@@ -3617,38 +3617,6 @@ int DataDepGraph::GetFileCostUprBound() { return fileCostUprBound_; }
 void DataDepGraph::CopyPointersToDevice(DataDepGraph *dev_DDG, int numThreads) {
   // use to hold size of array
   size_t memSize;
-  // Copy instCntPerType_ to device
-  InstCount *dev_instCntPerType;
-  memSize = sizeof(InstCount) * instTypeCnt_;
-  gpuErrchk(hipMalloc(&dev_instCntPerType, memSize));
-  gpuErrchk(hipMemcpy(dev_instCntPerType, instCntPerType_, memSize,
-		       hipMemcpyHostToDevice));
-  gpuErrchk(hipMemcpy(&dev_DDG->instCntPerType_, &dev_instCntPerType,
-		       sizeof(InstCount *), hipMemcpyHostToDevice));
-  // Copy instCntPerIssuType_
-  InstCount *dev_instCntPerIssuType;
-  memSize = sizeof(InstCount) * issuTypeCnt_;
-  gpuErrchk(hipMalloc(&dev_instCntPerIssuType, memSize));
-  gpuErrchk(hipMemcpy(dev_instCntPerIssuType, instCntPerIssuType_, memSize,
-                       hipMemcpyHostToDevice));
-  gpuErrchk(hipMemcpy(&dev_DDG->instCntPerIssuType_, &dev_instCntPerIssuType,
-                       sizeof(InstCount *), hipMemcpyHostToDevice));
-  // Copy frwrdLwrBounds_ to device
-  InstCount *dev_frwrdLwrBounds;
-  memSize = sizeof(InstCount) * instCnt_;
-  gpuErrchk(hipMalloc(&dev_frwrdLwrBounds, memSize));
-  gpuErrchk(hipMemcpy(dev_frwrdLwrBounds, frwrdLwrBounds_, memSize,
-                       hipMemcpyHostToDevice));
-  gpuErrchk(hipMemcpy(&dev_DDG->frwrdLwrBounds_, &dev_frwrdLwrBounds,
-                       sizeof(InstCount *), hipMemcpyHostToDevice));
-  // Copy bkwardLwrBounds_ to device
-  InstCount *dev_bkwrdLwrBounds;
-  memSize = sizeof(InstCount) * instCnt_;
-  gpuErrchk(hipMalloc(&dev_bkwrdLwrBounds, memSize));
-  gpuErrchk(hipMemcpy(dev_bkwrdLwrBounds, bkwrdLwrBounds_, memSize,
-                       hipMemcpyHostToDevice));
-  gpuErrchk(hipMemcpy(&dev_DDG->bkwrdLwrBounds_, &dev_bkwrdLwrBounds,
-                       sizeof(InstCount *), hipMemcpyHostToDevice));
   // Copy insts_ to device
   SchedInstruction *dev_insts;
   memSize = sizeof(SchedInstruction) * instCnt_;
@@ -3755,11 +3723,6 @@ void DataDepGraph::CopyPointersToDevice(DataDepGraph *dev_DDG, int numThreads) {
 }
 
 void DataDepGraph::FreeDevicePointers(int numThreads) {
-  hipFree(instCntPerType_);
-  hipFree(instCntPerIssuType_);
-  hipFree(frwrdLwrBounds_);
-  hipFree(bkwrdLwrBounds_);
-  hipFree(tplgclOrdr_);
   for (InstCount i = 0; i < machMdl_->GetRegTypeCnt(); i++)
     RegFiles[i].FreeDevicePointers();
   hipFree(RegFiles);
