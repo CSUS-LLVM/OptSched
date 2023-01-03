@@ -380,16 +380,16 @@ void BBWithSpill::InitForCostCmputtn_() {
     if (regFiles_[i].GetPhysRegCnt() > 0)
       dev_livePhysRegs_[i][GLOBALTID].Dev_Reset();
 
-    dev_peakRegPressures_[GLOBALTID*regTypeCnt_+i] = 0;
-    dev_regPressures_[GLOBALTID*regTypeCnt_+i] = 0;
+    dev_peakRegPressures_[i*NUMTHREADS+GLOBALTID] = 0;
+    dev_regPressures_[i*NUMTHREADS+GLOBALTID] = 0;
   }
   
   int _instCnt = dataDepGraph_->GetInstCnt();
   for (i = 0; i < _instCnt; i++)
-    dev_spillCosts_[GLOBALTID*_instCnt+i] = 0;
+    dev_spillCosts_[i*NUMTHREADS+GLOBALTID] = 0;
   if (needsSLIL()) {
     for (int i = 0; i < regTypeCnt_; i++)
-      dev_sumOfLiveIntervalLengths_[i][GLOBALTID] = 0;
+      dev_sumOfLiveIntervalLengths_[i*NUMTHREADS+GLOBALTID] = 0;
 
     dev_dynamicSlilLowerBound_[GLOBALTID] = staticSlilLowerBound_;
   }
@@ -607,7 +607,7 @@ void BBWithSpill::UpdateSpillInfoForSchdul_(SchedInstruction *inst,
       // consider the last use of a register. Thus, an additional increment must
       // happen here.
       if (needsSLIL()) {
-        dev_sumOfLiveIntervalLengths_[regType][GLOBALTID]++;
+        dev_sumOfLiveIntervalLengths_[regType*NUMTHREADS+GLOBALTID]++;
       }
 
       dev_liveRegs_[regType][GLOBALTID].SetBit(regNum, false, use->GetWght());
@@ -657,7 +657,7 @@ void BBWithSpill::UpdateSpillInfoForSchdul_(SchedInstruction *inst,
     printf("Printing live range lengths for instruction BEFORE calculation.\n");
     for (int j = 0; j < regTypeCnt_; j++) {
       printf("SLIL for regType %d %s is currently %d\n", j,
-             dev_sumOfLiveIntervalLengths_[j][GLOBALTID]);
+             dev_sumOfLiveIntervalLengths_[j*NUMTHREADS+GLOBALTID]);
     }
     printf("Now computing spill cost for instruction.\n");
   }
@@ -666,14 +666,14 @@ void BBWithSpill::UpdateSpillInfoForSchdul_(SchedInstruction *inst,
   for (int16_t i = 0; i < regTypeCnt_; i++) {
     liveRegs = dev_liveRegs_[i][GLOBALTID].GetWghtedCnt();
     // Set current RP for register type "i"
-    dev_regPressures_[GLOBALTID*regTypeCnt_+i] = liveRegs;
+    dev_regPressures_[i*NUMTHREADS+GLOBALTID] = liveRegs;
     // Update peak RP for register type "i"
-    if (liveRegs > dev_peakRegPressures_[GLOBALTID*regTypeCnt_+i])
-      dev_peakRegPressures_[GLOBALTID*regTypeCnt_+i] = liveRegs;
+    if (liveRegs > dev_peakRegPressures_[i*NUMTHREADS+GLOBALTID])
+      dev_peakRegPressures_[i*NUMTHREADS+GLOBALTID] = liveRegs;
 
     // (Chris): Compute sum of live range lengths at this point
     if (needsSLIL()) {
-      dev_sumOfLiveIntervalLengths_[i][GLOBALTID] += 
+      dev_sumOfLiveIntervalLengths_[i*NUMTHREADS+GLOBALTID] += 
 	               dev_liveRegs_[i][GLOBALTID].GetOneCnt();
     }
   }
@@ -695,13 +695,13 @@ void BBWithSpill::UpdateSpillInfoForSchdul_(SchedInstruction *inst,
     printf("Printing live range lengths for instruction AFTER calculation.\n");
     for (int j = 0; j < regTypeCnt_; j++) {
       printf("SLIL for regType %d is currently %d\n", j,
-             dev_sumOfLiveIntervalLengths_[j][GLOBALTID]);
+             dev_sumOfLiveIntervalLengths_[j*NUMTHREADS+GLOBALTID]);
     }
   }
 #endif
 
   dev_crntStepNum_[GLOBALTID]++;
-  dev_spillCosts_[GLOBALTID*dataDepGraph_->GetInstCnt() + dev_crntStepNum_[GLOBALTID]] = newSpillCost;
+  dev_spillCosts_[dev_crntStepNum_[GLOBALTID]*NUMTHREADS+GLOBALTID] = newSpillCost;
 
 #ifdef IS_DEBUG_REG_PRESSURE
   printf("Spill cost at step  %d = %d\n", dev_crntStepNum_[GLOBALTID], newSpillCost);
@@ -1244,8 +1244,8 @@ __device__
 static InstCount getAMDGPUCost(unsigned * PRP, unsigned TargetOccupancy,
                                unsigned MaxOccLDS, int16_t regTypeCnt) {
   auto Occ =
-      getAdjustedOccupancy(PRP[GLOBALTID*regTypeCnt+OptSchedDDGWrapperGCN::VGPR32],
-                           PRP[GLOBALTID*regTypeCnt+OptSchedDDGWrapperGCN::SGPR32], MaxOccLDS);
+      getAdjustedOccupancy(PRP[OptSchedDDGWrapperGCN::VGPR32*NUMTHREADS+GLOBALTID],
+                           PRP[OptSchedDDGWrapperGCN::SGPR32*NUMTHREADS+GLOBALTID], MaxOccLDS);
   // RP cost is the difference between the minimum allowed occupancy for the
   // function, and the current occupancy.
   return Occ >= TargetOccupancy ? 0 : TargetOccupancy - Occ;
@@ -1319,8 +1319,8 @@ __host__ __device__
 bool BBWithSpill::closeToRPConstraint() {
   #ifdef __HIP_DEVICE_COMPILE__
   auto Occ =
-      getCloseToOccupancy(dev_regPressures_[GLOBALTID*regTypeCnt_+OptSchedDDGWrapperGCN::VGPR32],
-                           dev_regPressures_[GLOBALTID*regTypeCnt_+OptSchedDDGWrapperGCN::SGPR32], MaxOccLDS_);
+      getCloseToOccupancy(dev_regPressures_[OptSchedDDGWrapperGCN::VGPR32*NUMTHREADS+GLOBALTID],
+                           dev_regPressures_[OptSchedDDGWrapperGCN::SGPR32*NUMTHREADS+GLOBALTID], MaxOccLDS_);
   #else
   auto Occ =
       getCloseToOccupancy(regPressures_[OptSchedDDGWrapperGCN::VGPR32],
@@ -1339,20 +1339,20 @@ InstCount BBWithSpill::Dev_CmputCostForFunction(SPILL_COST_FUNCTION SpillCF) {
   case SCF_SLIL: {
     InstCount SLILCost = 0; 
     for (int i = 0; i < regTypeCnt_; i++)
-      SLILCost += dev_sumOfLiveIntervalLengths_[i][GLOBALTID];
+      SLILCost += dev_sumOfLiveIntervalLengths_[i*NUMTHREADS+GLOBALTID];
     return SLILCost;
   }
   case SCF_PRP: {
     InstCount PRPCost = 0; 
     for (int i = 0; i < regTypeCnt_; i ++)
-      PRPCost += dev_regPressures_[GLOBALTID*regTypeCnt_+i];
+      PRPCost += dev_regPressures_[i*NUMTHREADS+GLOBALTID];
     return PRPCost;
   }
   case SCF_PEAK_PER_TYPE: {
     InstCount SC = 0; 
     InstCount inc;
     for (int i = 0; i < regTypeCnt_; i++) {
-      inc = dev_peakRegPressures_[GLOBALTID*regTypeCnt_+i] - machMdl_->GetPhysRegCnt(i);
+      inc = dev_peakRegPressures_[i*NUMTHREADS+GLOBALTID] - machMdl_->GetPhysRegCnt(i);
       if (inc > 0) 
         SC += inc; 
     }    
@@ -1363,7 +1363,7 @@ InstCount BBWithSpill::Dev_CmputCostForFunction(SPILL_COST_FUNCTION SpillCF) {
     InstCount inc;
     InstCount SC = 0;
     for (int i = 0; i < regTypeCnt_; i ++) {
-      inc = dev_regPressures_[GLOBALTID*regTypeCnt_+i] - machMdl_->GetPhysRegCnt(i);
+      inc = dev_regPressures_[i*NUMTHREADS+GLOBALTID] - machMdl_->GetPhysRegCnt(i);
       if (inc > 0) 
         SC += inc;
     }
@@ -1649,12 +1649,12 @@ void BBWithSpill::AllocDevArraysForParallelACO(int numThreads) {
   // for (int i = 0; i < dataDepGraph_->GetInstCnt(); i++)
   //   dev_spillCosts_[i] = &temp[i * numThreads];
   if (needsSLIL()) {
-    memSize = sizeof(int *) * regTypeCnt_;
-    hipMallocManaged(&dev_sumOfLiveIntervalLengths_, memSize);
     memSize = sizeof(int) * regTypeCnt_ * numThreads;
-    hipMalloc(&temp, memSize);
-    for (int i = 0; i < regTypeCnt_; i++)
-      dev_sumOfLiveIntervalLengths_[i] = &temp[i * numThreads];
+    hipMalloc(&dev_sumOfLiveIntervalLengths_, memSize);
+    // memSize = sizeof(int) * regTypeCnt_ * numThreads;
+    // hipMalloc(&temp, memSize);
+    // for (int i = 0; i < regTypeCnt_; i++)
+    //   dev_sumOfLiveIntervalLengths_[i] = &temp[i * numThreads];
   }
 }
 
@@ -1781,7 +1781,7 @@ void BBWithSpill::CopyPointersToDevice(SchedRegion* dev_rgn, int numThreads) {
   //gpuErrchk(hipMemPrefetchAsync(dev_spillCosts_, memSize, 0));
   if (needsSLIL()) {
     memSize = sizeof(int *) * regTypeCnt_;
-    gpuErrchk(hipMemPrefetchAsync(dev_sumOfLiveIntervalLengths_, memSize, 0));
+    //gpuErrchk(hipMemPrefetchAsync(dev_sumOfLiveIntervalLengths_, memSize, 0));
   }
 }
 
@@ -1801,7 +1801,7 @@ void BBWithSpill::FreeDevicePointers(int numThreads) {
   if (needsSLIL()) {
     hipFree(dev_slilSpillCost_);
     hipFree(dev_dynamicSlilLowerBound_);
-    hipFree(dev_sumOfLiveIntervalLengths_[0]);
+    //hipFree(dev_sumOfLiveIntervalLengths_[0]);
     hipFree(dev_sumOfLiveIntervalLengths_);
   }
   hipFree(dev_schduldEntryInstCnt_);

@@ -9,6 +9,10 @@ Last Update:  Apr. 2011
 #ifndef OPTSCHED_SPILL_BB_SPILL_H
 #define OPTSCHED_SPILL_BB_SPILL_H
 
+#ifndef NUMTHREADS
+#define NUMTHREADS hipBlockDim_x * hipGridDim_x
+#endif
+
 #include "opt-sched/Scheduler/OptSchedTarget.h"
 #include "opt-sched/Scheduler/defines.h"
 #include "opt-sched/Scheduler/sched_region.h"
@@ -68,7 +72,7 @@ private:
   int *sumOfLiveIntervalLengths_;
   // pointer to a device array used to store sumOfLiveIntervalLengths_ for
   // each thread by parallel ACO
-  int **dev_sumOfLiveIntervalLengths_;
+  int *dev_sumOfLiveIntervalLengths_;
 
   InstCount staticSlilLowerBound_ = 0;
 
@@ -242,7 +246,7 @@ public:
   __host__ __device__
   bool IsRPHigh(int regType) const {
     #ifdef __HIP_DEVICE_COMPILE__
-    return dev_regPressures_[GLOBALTID*regTypeCnt_+regType] > (unsigned int) machMdl_->GetPhysRegCnt(regType);
+    return dev_regPressures_[regType*NUMTHREADS+GLOBALTID] > (unsigned int) machMdl_->GetPhysRegCnt(regType);
     #else
       return regPressures_[regType] > (unsigned int) machMdl_->GetPhysRegCnt(regType);
     #endif
