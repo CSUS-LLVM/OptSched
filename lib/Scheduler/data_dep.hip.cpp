@@ -3016,9 +3016,10 @@ void InstSchedule::SetPeakRegPressures(InstCount peakRegPressures[]) {
 }
 
 __device__
-void InstSchedule::Dev_SetPeakRegPressures(InstCount **peakRegPressures) {
-  for (InstCount i = 0; i < dev_machMdl_->GetRegTypeCnt(); i++) {
-    dev_peakRegPressures_[i] = peakRegPressures[i][GLOBALTID];
+void InstSchedule::Dev_SetPeakRegPressures(InstCount *peakRegPressures) {
+  int regTypeCount = dev_machMdl_->GetRegTypeCnt();
+  for (InstCount i = 0; i < regTypeCount; i++) {
+    dev_peakRegPressures_[i] = peakRegPressures[GLOBALTID*regTypeCount+i];
   }
 }
 

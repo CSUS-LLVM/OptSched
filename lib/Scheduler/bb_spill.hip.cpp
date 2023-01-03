@@ -380,7 +380,7 @@ void BBWithSpill::InitForCostCmputtn_() {
     if (regFiles_[i].GetPhysRegCnt() > 0)
       dev_livePhysRegs_[i][GLOBALTID].Dev_Reset();
 
-    dev_peakRegPressures_[i][GLOBALTID] = 0;
+    dev_peakRegPressures_[GLOBALTID*regTypeCnt_+i] = 0;
     dev_regPressures_[i][GLOBALTID] = 0;
   }
 
@@ -667,8 +667,8 @@ void BBWithSpill::UpdateSpillInfoForSchdul_(SchedInstruction *inst,
     // Set current RP for register type "i"
     dev_regPressures_[i][GLOBALTID] = liveRegs;
     // Update peak RP for register type "i"
-    if (liveRegs > dev_peakRegPressures_[i][GLOBALTID])
-      dev_peakRegPressures_[i][GLOBALTID] = liveRegs;
+    if (liveRegs > dev_peakRegPressures_[GLOBALTID*regTypeCnt_+i])
+      dev_peakRegPressures_[GLOBALTID*regTypeCnt_+i] = liveRegs;
 
     // (Chris): Compute sum of live range lengths at this point
     if (needsSLIL()) {
@@ -1351,7 +1351,7 @@ InstCount BBWithSpill::Dev_CmputCostForFunction(SPILL_COST_FUNCTION SpillCF) {
     InstCount SC = 0; 
     InstCount inc;
     for (int i = 0; i < regTypeCnt_; i++) {
-      inc = dev_peakRegPressures_[i][GLOBALTID] - machMdl_->GetPhysRegCnt(i);
+      inc = dev_peakRegPressures_[GLOBALTID*regTypeCnt_+i] - machMdl_->GetPhysRegCnt(i);
       if (inc > 0) 
         SC += inc; 
     }    
@@ -1630,12 +1630,12 @@ void BBWithSpill::AllocDevArraysForParallelACO(int numThreads) {
   memSize = sizeof(WeightedBitVector *) * regTypeCnt_;
   hipMallocManaged(&dev_liveRegs_, memSize);
   hipMallocManaged(&dev_livePhysRegs_, memSize);
-  memSize = sizeof(InstCount *) * regTypeCnt_;
-  hipMallocManaged(&dev_peakRegPressures_, memSize);
   memSize = sizeof(InstCount) * regTypeCnt_ * numThreads;
-  hipMalloc(&temp, memSize);
-  for (int i = 0; i < regTypeCnt_; i++)
-    dev_peakRegPressures_[i] = &temp[i * numThreads];
+  hipMalloc(&dev_peakRegPressures_, memSize);
+  //memSize = sizeof(InstCount) * regTypeCnt_ * numThreads;
+  //hipMalloc(&temp, memSize);
+  //for (int i = 0; i < regTypeCnt_; i++)
+  //  dev_peakRegPressures_[i] = &temp[i * numThreads];
   memSize = sizeof(unsigned *) * regTypeCnt_;
   hipMallocManaged(&dev_regPressures_, memSize);
   memSize = sizeof(unsigned) * regTypeCnt_ * numThreads;
@@ -1773,8 +1773,8 @@ void BBWithSpill::CopyPointersToDevice(SchedRegion* dev_rgn, int numThreads) {
   memSize = sizeof(WeightedBitVector *) * regTypeCnt_;
   gpuErrchk(hipMemPrefetchAsync(dev_liveRegs_, memSize, 0));
   gpuErrchk(hipMemPrefetchAsync(dev_livePhysRegs_, memSize, 0));
-  memSize = sizeof(InstCount *) * regTypeCnt_;
-  gpuErrchk(hipMemPrefetchAsync(dev_peakRegPressures_, memSize, 0));
+  //memSize = sizeof(InstCount *) * regTypeCnt_;
+  //gpuErrchk(hipMemPrefetchAsync(dev_peakRegPressures_, memSize, 0));
   memSize = sizeof(unsigned *) * regTypeCnt_;
   gpuErrchk(hipMemPrefetchAsync(dev_regPressures_, memSize, 0));
   memSize = sizeof(InstCount *) * dataDepGraph_->GetInstCnt();
@@ -1807,7 +1807,7 @@ void BBWithSpill::FreeDevicePointers(int numThreads) {
   hipFree(dev_schduldEntryInstCnt_);
   hipFree(dev_schduldExitInstCnt_);
   hipFree(dev_schduldInstCnt_);
-  hipFree(dev_peakRegPressures_[0]);
+  //hipFree(dev_peakRegPressures_[0]);
   hipFree(dev_peakRegPressures_);
   hipFree(dev_regPressures_[0]);
   hipFree(dev_regPressures_);

@@ -107,7 +107,7 @@ private:
   InstCount *peakRegPressures_;
   // pointer to a device array used to store peakRegPressures_ for
   // each thread by parallel ACO
-  InstCount **dev_peakRegPressures_;
+  InstCount *dev_peakRegPressures_;
 
   InstCount crntStepNum_;
   // pointer to a device array used to store crntStepNum_ for

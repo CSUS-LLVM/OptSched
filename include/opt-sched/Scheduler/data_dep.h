@@ -823,7 +823,7 @@ public:
   void SetPeakRegPressures(InstCount *regPressures);
   // Device version of PeakRegPressures
   __device__
-  void Dev_SetPeakRegPressures(InstCount **regPressures);
+  void Dev_SetPeakRegPressures(InstCount *regPressures);
   InstCount GetPeakRegPressures(const InstCount *&regPressures) const;
   __host__ __device__
   InstCount GetSpillCost(InstCount stepNum);
