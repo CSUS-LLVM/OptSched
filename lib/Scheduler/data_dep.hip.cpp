@@ -2994,11 +2994,11 @@ void InstSchedule::SetSpillCosts(InstCount spillCosts[]) {
 }
 
 __device__
-void InstSchedule::Dev_SetSpillCosts(InstCount **spillCosts) {
+void InstSchedule::Dev_SetSpillCosts(InstCount *spillCosts) {
   totSpillCost_ = 0;
   for (InstCount i = 0; i < totInstCnt_; i++) {
-    dev_spillCosts_[i] = spillCosts[i][GLOBALTID];
-    totSpillCost_ += spillCosts[i][GLOBALTID];
+    dev_spillCosts_[i] = spillCosts[GLOBALTID*totInstCnt_+i];
+    totSpillCost_ += spillCosts[GLOBALTID*totInstCnt_+i];
   }  
 }
 

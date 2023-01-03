@@ -98,7 +98,7 @@ private:
   InstCount *spillCosts_;
   // pointer to a device array used to store spillCosts_ for
   // each thread by parallel ACO
-  InstCount **dev_spillCosts_;
+  InstCount *dev_spillCosts_;
   // Current register pressure for each register type.
   SmallVector<unsigned, 8> regPressures_;
   // pointer to a device array used to store regPressures_ for

@@ -818,7 +818,7 @@ public:
   void SetSpillCosts(InstCount *spillCosts);
   // Device version of set spill costs
   __device__
-  void Dev_SetSpillCosts(InstCount **spillCosts);
+  void Dev_SetSpillCosts(InstCount *spillCosts);
   __host__ __device__
   void SetPeakRegPressures(InstCount *regPressures);
   // Device version of PeakRegPressures
