@@ -323,7 +323,7 @@ void ConstrainedScheduler::InitNewCycle_() {
   assert(dev_crntSlotNum_[GLOBALTID] == 0 && 
          dev_crntRealSlotNum_[GLOBALTID] == 0);
   for (int i = 0; i < issuTypeCnt_; i++) {
-    dev_avlblSlotsInCrntCycle_[GLOBALTID][i] = slotsPerTypePerCycle_[i];
+    dev_avlblSlotsInCrntCycle_[GLOBALTID*issuTypeCnt_+i] = slotsPerTypePerCycle_[i];
   }
   dev_isCrntCycleBlkd_[GLOBALTID] = false;
 #else
@@ -448,9 +448,9 @@ bool ConstrainedScheduler::ChkInstLglty_(SchedInstruction *inst) const {
 
   IssueType issuType = inst->GetIssueType();
   assert(issuType < issuTypeCnt_);
-  assert(dev_avlblSlotsInCrntCycle_[GLOBALTID][issuType] >= 0);
+  assert(dev_avlblSlotsInCrntCycle_[GLOBALTID*issuTypeCnt_+issuType] >= 0);
   // Logger::Info("avlblSlots = %d", avlblSlotsInCrntCycle_[issuType]);
-  return (dev_avlblSlotsInCrntCycle_[GLOBALTID][issuType] > 0);
+  return (dev_avlblSlotsInCrntCycle_[GLOBALTID*issuTypeCnt_+issuType] > 0);
 #else
   // Account for instructions that block the whole cycle.
   if (isCrntCycleBlkd_)
@@ -489,8 +489,8 @@ void ConstrainedScheduler::UpdtSlotAvlblty_(SchedInstruction *inst) {
   IssueType issuType = inst->GetIssueType();
   assert(issuType < issuTypeCnt_);
 #ifdef __HIP_DEVICE_COMPILE__
-  assert(dev_avlblSlotsInCrntCycle_[GLOBALTID][issuType] > 0);
-  dev_avlblSlotsInCrntCycle_[GLOBALTID][issuType]--;
+  assert(dev_avlblSlotsInCrntCycle_[GLOBALTID*issuTypeCnt_+issuType] > 0);
+  dev_avlblSlotsInCrntCycle_[GLOBALTID*issuTypeCnt_+issuType]--;
 #else
   assert(avlblSlotsInCrntCycle_[issuType] > 0);
   avlblSlotsInCrntCycle_[issuType]--;
