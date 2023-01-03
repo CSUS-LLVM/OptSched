@@ -103,7 +103,7 @@ private:
   SmallVector<unsigned, 8> regPressures_;
   // pointer to a device array used to store regPressures_ for
   // each thread by parallel ACO
-  unsigned **dev_regPressures_;
+  unsigned *dev_regPressures_;
   InstCount *peakRegPressures_;
   // pointer to a device array used to store peakRegPressures_ for
   // each thread by parallel ACO
@@ -242,7 +242,7 @@ public:
   __host__ __device__
   bool IsRPHigh(int regType) const {
     #ifdef __HIP_DEVICE_COMPILE__
-    return dev_regPressures_[regType][GLOBALTID] > (unsigned int) machMdl_->GetPhysRegCnt(regType);
+    return dev_regPressures_[GLOBALTID*regTypeCnt_+regType] > (unsigned int) machMdl_->GetPhysRegCnt(regType);
     #else
       return regPressures_[regType] > (unsigned int) machMdl_->GetPhysRegCnt(regType);
     #endif

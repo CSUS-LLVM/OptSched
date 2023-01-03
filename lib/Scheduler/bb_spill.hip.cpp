@@ -381,7 +381,7 @@ void BBWithSpill::InitForCostCmputtn_() {
       dev_livePhysRegs_[i][GLOBALTID].Dev_Reset();
 
     dev_peakRegPressures_[GLOBALTID*regTypeCnt_+i] = 0;
-    dev_regPressures_[i][GLOBALTID] = 0;
+    dev_regPressures_[GLOBALTID*regTypeCnt_+i] = 0;
   }
 
   for (i = 0; i < dataDepGraph_->GetInstCnt(); i++)
@@ -665,7 +665,7 @@ void BBWithSpill::UpdateSpillInfoForSchdul_(SchedInstruction *inst,
   for (int16_t i = 0; i < regTypeCnt_; i++) {
     liveRegs = dev_liveRegs_[i][GLOBALTID].GetWghtedCnt();
     // Set current RP for register type "i"
-    dev_regPressures_[i][GLOBALTID] = liveRegs;
+    dev_regPressures_[GLOBALTID*regTypeCnt_+i] = liveRegs;
     // Update peak RP for register type "i"
     if (liveRegs > dev_peakRegPressures_[GLOBALTID*regTypeCnt_+i])
       dev_peakRegPressures_[GLOBALTID*regTypeCnt_+i] = liveRegs;
@@ -1240,11 +1240,11 @@ static unsigned getAdjustedOccupancy(unsigned VGPRCount, unsigned SGPRCount,
 }
 
 __device__
-static InstCount getAMDGPUCost(unsigned ** PRP, unsigned TargetOccupancy,
-                               unsigned MaxOccLDS) {
+static InstCount getAMDGPUCost(unsigned * PRP, unsigned TargetOccupancy,
+                               unsigned MaxOccLDS, int16_t regTypeCnt) {
   auto Occ =
-      getAdjustedOccupancy(PRP[OptSchedDDGWrapperGCN::VGPR32][GLOBALTID],
-                           PRP[OptSchedDDGWrapperGCN::SGPR32][GLOBALTID], MaxOccLDS);
+      getAdjustedOccupancy(PRP[GLOBALTID*regTypeCnt+OptSchedDDGWrapperGCN::VGPR32],
+                           PRP[GLOBALTID*regTypeCnt+OptSchedDDGWrapperGCN::SGPR32], MaxOccLDS);
   // RP cost is the difference between the minimum allowed occupancy for the
   // function, and the current occupancy.
   return Occ >= TargetOccupancy ? 0 : TargetOccupancy - Occ;
@@ -1318,8 +1318,8 @@ __host__ __device__
 bool BBWithSpill::closeToRPConstraint() {
   #ifdef __HIP_DEVICE_COMPILE__
   auto Occ =
-      getCloseToOccupancy(dev_regPressures_[OptSchedDDGWrapperGCN::VGPR32][GLOBALTID],
-                           dev_regPressures_[OptSchedDDGWrapperGCN::SGPR32][GLOBALTID], MaxOccLDS_);
+      getCloseToOccupancy(dev_regPressures_[GLOBALTID*regTypeCnt_+OptSchedDDGWrapperGCN::VGPR32],
+                           dev_regPressures_[GLOBALTID*regTypeCnt_+OptSchedDDGWrapperGCN::SGPR32], MaxOccLDS_);
   #else
   auto Occ =
       getCloseToOccupancy(regPressures_[OptSchedDDGWrapperGCN::VGPR32],
@@ -1333,7 +1333,7 @@ InstCount BBWithSpill::Dev_CmputCostForFunction(SPILL_COST_FUNCTION SpillCF) {
   // return the requested cost
   switch (SpillCF) {
   case SCF_TARGET: {
-    return getAMDGPUCost(dev_regPressures_, TargetOccupancy_, MaxOccLDS_);
+    return getAMDGPUCost(dev_regPressures_, TargetOccupancy_, MaxOccLDS_, regTypeCnt_);
   }
   case SCF_SLIL: {
     InstCount SLILCost = 0; 
@@ -1344,7 +1344,7 @@ InstCount BBWithSpill::Dev_CmputCostForFunction(SPILL_COST_FUNCTION SpillCF) {
   case SCF_PRP: {
     InstCount PRPCost = 0; 
     for (int i = 0; i < regTypeCnt_; i ++)
-      PRPCost += dev_regPressures_[i][GLOBALTID];
+      PRPCost += dev_regPressures_[GLOBALTID*regTypeCnt_+i];
     return PRPCost;
   }
   case SCF_PEAK_PER_TYPE: {
@@ -1362,7 +1362,7 @@ InstCount BBWithSpill::Dev_CmputCostForFunction(SPILL_COST_FUNCTION SpillCF) {
     InstCount inc;
     InstCount SC = 0;
     for (int i = 0; i < regTypeCnt_; i ++) {
-      inc = dev_regPressures_[i][GLOBALTID] - machMdl_->GetPhysRegCnt(i);
+      inc = dev_regPressures_[GLOBALTID*regTypeCnt_+i] - machMdl_->GetPhysRegCnt(i);
       if (inc > 0) 
         SC += inc;
     }
@@ -1636,12 +1636,11 @@ void BBWithSpill::AllocDevArraysForParallelACO(int numThreads) {
   //hipMalloc(&temp, memSize);
   //for (int i = 0; i < regTypeCnt_; i++)
   //  dev_peakRegPressures_[i] = &temp[i * numThreads];
-  memSize = sizeof(unsigned *) * regTypeCnt_;
-  hipMallocManaged(&dev_regPressures_, memSize);
   memSize = sizeof(unsigned) * regTypeCnt_ * numThreads;
-  hipMalloc(&u_temp, memSize);
-  for (int i = 0; i < regTypeCnt_; i++)
-    dev_regPressures_[i] = &u_temp[i * numThreads];
+  hipMalloc(&dev_regPressures_, memSize);
+  // hipMalloc(&u_temp, memSize);
+  // for (int i = 0; i < regTypeCnt_; i++)
+  //   dev_regPressures_[i] = &u_temp[i * numThreads];
   memSize = sizeof(InstCount *) * dataDepGraph_->GetInstCnt();
   hipMallocManaged(&dev_spillCosts_, memSize);
   memSize = sizeof(InstCount) * dataDepGraph_->GetInstCnt() * numThreads;
@@ -1776,7 +1775,7 @@ void BBWithSpill::CopyPointersToDevice(SchedRegion* dev_rgn, int numThreads) {
   //memSize = sizeof(InstCount *) * regTypeCnt_;
   //gpuErrchk(hipMemPrefetchAsync(dev_peakRegPressures_, memSize, 0));
   memSize = sizeof(unsigned *) * regTypeCnt_;
-  gpuErrchk(hipMemPrefetchAsync(dev_regPressures_, memSize, 0));
+  //gpuErrchk(hipMemPrefetchAsync(dev_regPressures_, memSize, 0));
   memSize = sizeof(InstCount *) * dataDepGraph_->GetInstCnt();
   gpuErrchk(hipMemPrefetchAsync(dev_spillCosts_, memSize, 0));
   if (needsSLIL()) {
@@ -1809,7 +1808,7 @@ void BBWithSpill::FreeDevicePointers(int numThreads) {
   hipFree(dev_schduldInstCnt_);
   //hipFree(dev_peakRegPressures_[0]);
   hipFree(dev_peakRegPressures_);
-  hipFree(dev_regPressures_[0]);
+  //hipFree(dev_regPressures_[0]);
   hipFree(dev_regPressures_);
   hipFree(dev_spillCosts_[0]);
   hipFree(dev_spillCosts_);
