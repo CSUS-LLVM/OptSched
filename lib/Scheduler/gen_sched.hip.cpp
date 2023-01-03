@@ -56,11 +56,11 @@ __host__ __device__
 void ConstrainedScheduler::ResetRsrvSlots_() {
   assert(includesUnpipelined_);
 #ifdef __HIP_DEVICE_COMPILE__
-  assert(dev_rsrvSlots_[GLOBALTID] != NULL);
+  //assert(dev_rsrvSlots_[GLOBALTID*issuRate] != NULL);
 
   for (int i = 0; i < issuRate_; i++) {
-    dev_rsrvSlots_[GLOBALTID][i].strtCycle = INVALID_VALUE;
-    dev_rsrvSlots_[GLOBALTID][i].endCycle = INVALID_VALUE;
+    dev_rsrvSlots_[GLOBALTID*issuRate_+i].strtCycle = INVALID_VALUE;
+    dev_rsrvSlots_[GLOBALTID*issuRate_+i].endCycle = INVALID_VALUE;
   }
 
   dev_rsrvSlotCnt_[GLOBALTID] = 0;
@@ -439,10 +439,11 @@ bool ConstrainedScheduler::ChkInstLglty_(SchedInstruction *inst) const {
   if (inst->BlocksCycle() && dev_crntSlotNum_[GLOBALTID] != 0)
     return false;
   // Logger::Info("Does not block cycle");
-  if (includesUnpipelined_ && dev_rsrvSlots_[GLOBALTID] &&
-      dev_rsrvSlots_[GLOBALTID][dev_crntSlotNum_[GLOBALTID]].strtCycle != INVALID_VALUE &&
+  // TODO(bruce): make sure nothing is broken here
+  if (includesUnpipelined_ &&
+      dev_rsrvSlots_[GLOBALTID*issuRate_+dev_crntSlotNum_[GLOBALTID]].strtCycle != INVALID_VALUE &&
       dev_crntCycleNum_[GLOBALTID] <= 
-      dev_rsrvSlots_[GLOBALTID][dev_crntSlotNum_[GLOBALTID]].endCycle) {
+      dev_rsrvSlots_[GLOBALTID*issuRate_+dev_crntSlotNum_[GLOBALTID]].endCycle) {
     return false;
   }
 

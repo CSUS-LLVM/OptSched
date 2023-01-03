@@ -1865,12 +1865,11 @@ void ACOScheduler::AllocDevArraysForParallelACO() {
   //   gpuErrchk(hipMalloc(&dev_avlblSlotsInCrntCycle_[i], memSize));
   // }
   // Alloc dev arrays for rsrvSlots_
-  memSize = sizeof(ReserveSlot *) * numThreads_;
-  gpuErrchk(hipMallocManaged(&dev_rsrvSlots_, memSize));
-  memSize = sizeof(ReserveSlot) * issuRate_;
-  for (int i = 0; i < numThreads_; i++) {
-    gpuErrchk(hipMalloc(&dev_rsrvSlots_[i], memSize));
-  }
+  memSize = sizeof(ReserveSlot) * issuRate_ * numThreads_;
+  gpuErrchk(hipMalloc(&dev_rsrvSlots_, memSize));
+  // for (int i = 0; i < numThreads_; i++) {
+  //   gpuErrchk(hipMalloc(&dev_rsrvSlots_[i], memSize));
+  // }
   memSize = sizeof(int16_t) * numThreads_;
   gpuErrchk(hipMalloc(&dev_rsrvSlotCnt_, memSize));
 }
@@ -1927,8 +1926,8 @@ void ACOScheduler::CopyPointersToDevice(ACOScheduler *dev_ACOSchedulr) {
   // make sure hipMallocManaged memory is copied to device before kernel start
   //memSize = sizeof(int16_t *) * numThreads_;
   //gpuErrchk(hipMemPrefetchAsync(dev_avlblSlotsInCrntCycle_, memSize, 0));
-  memSize = sizeof(ReserveSlot *) * numThreads_;
-  gpuErrchk(hipMemPrefetchAsync(dev_rsrvSlots_, memSize, 0));
+  //memSize = sizeof(ReserveSlot *) * numThreads_;
+  //gpuErrchk(hipMemPrefetchAsync(dev_rsrvSlots_, memSize, 0));
 }
 
 void ACOScheduler::FreeDevicePointers() {
@@ -1941,7 +1940,7 @@ void ACOScheduler::FreeDevicePointers() {
   hipFree(instCntPerIssuType_);
   for (int i = 0; i < numThreads_; i++){
     //hipFree(dev_avlblSlotsInCrntCycle_[i]);
-    hipFree(dev_rsrvSlots_[i]);
+    //hipFree(dev_rsrvSlots_[i]);
   }
   hipFree(dev_MaxScoringInst);
   readyLs->FreeDevicePointers();

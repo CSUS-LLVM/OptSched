@@ -187,7 +187,7 @@ protected:
   // pointer to a device array used to store rsrvSlots_ for
   // each thread by parallel ACO
   // TODO(bruce): refactor
-  ReserveSlot **dev_rsrvSlots_;
+  ReserveSlot *dev_rsrvSlots_;
   // The number of elements in rsrvSlots_.
   int16_t rsrvSlotCnt_;
   // pointer to a device array used to store rsrvSlotCnt_ for
