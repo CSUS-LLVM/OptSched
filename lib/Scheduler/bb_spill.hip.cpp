@@ -1633,28 +1633,13 @@ void BBWithSpill::AllocDevArraysForParallelACO(int numThreads) {
   hipMallocManaged(&dev_livePhysRegs_, memSize);
   memSize = sizeof(InstCount) * regTypeCnt_ * numThreads;
   hipMalloc(&dev_peakRegPressures_, memSize);
-  //memSize = sizeof(InstCount) * regTypeCnt_ * numThreads;
-  //hipMalloc(&temp, memSize);
-  //for (int i = 0; i < regTypeCnt_; i++)
-  //  dev_peakRegPressures_[i] = &temp[i * numThreads];
   memSize = sizeof(unsigned) * regTypeCnt_ * numThreads;
   hipMalloc(&dev_regPressures_, memSize);
-  // hipMalloc(&u_temp, memSize);
-  // for (int i = 0; i < regTypeCnt_; i++)
-  //   dev_regPressures_[i] = &u_temp[i * numThreads];
   memSize = sizeof(InstCount) * dataDepGraph_->GetInstCnt() * numThreads;
   hipMalloc(&dev_spillCosts_, memSize);
-  // memSize = sizeof(InstCount) * dataDepGraph_->GetInstCnt() * numThreads;
-  // hipMalloc(&temp, memSize);
-  // for (int i = 0; i < dataDepGraph_->GetInstCnt(); i++)
-  //   dev_spillCosts_[i] = &temp[i * numThreads];
   if (needsSLIL()) {
     memSize = sizeof(int) * regTypeCnt_ * numThreads;
     hipMalloc(&dev_sumOfLiveIntervalLengths_, memSize);
-    // memSize = sizeof(int) * regTypeCnt_ * numThreads;
-    // hipMalloc(&temp, memSize);
-    // for (int i = 0; i < regTypeCnt_; i++)
-    //   dev_sumOfLiveIntervalLengths_[i] = &temp[i * numThreads];
   }
 }
 
@@ -1773,16 +1758,6 @@ void BBWithSpill::CopyPointersToDevice(SchedRegion* dev_rgn, int numThreads) {
   memSize = sizeof(WeightedBitVector *) * regTypeCnt_;
   gpuErrchk(hipMemPrefetchAsync(dev_liveRegs_, memSize, 0));
   gpuErrchk(hipMemPrefetchAsync(dev_livePhysRegs_, memSize, 0));
-  //memSize = sizeof(InstCount *) * regTypeCnt_;
-  //gpuErrchk(hipMemPrefetchAsync(dev_peakRegPressures_, memSize, 0));
-  memSize = sizeof(unsigned *) * regTypeCnt_;
-  //gpuErrchk(hipMemPrefetchAsync(dev_regPressures_, memSize, 0));
-  memSize = sizeof(InstCount *) * dataDepGraph_->GetInstCnt();
-  //gpuErrchk(hipMemPrefetchAsync(dev_spillCosts_, memSize, 0));
-  if (needsSLIL()) {
-    memSize = sizeof(int *) * regTypeCnt_;
-    //gpuErrchk(hipMemPrefetchAsync(dev_sumOfLiveIntervalLengths_, memSize, 0));
-  }
 }
 
 void BBWithSpill::FreeDevicePointers(int numThreads) {
@@ -1801,16 +1776,12 @@ void BBWithSpill::FreeDevicePointers(int numThreads) {
   if (needsSLIL()) {
     hipFree(dev_slilSpillCost_);
     hipFree(dev_dynamicSlilLowerBound_);
-    //hipFree(dev_sumOfLiveIntervalLengths_[0]);
     hipFree(dev_sumOfLiveIntervalLengths_);
   }
   hipFree(dev_schduldEntryInstCnt_);
   hipFree(dev_schduldExitInstCnt_);
   hipFree(dev_schduldInstCnt_);
-  //hipFree(dev_peakRegPressures_[0]);
   hipFree(dev_peakRegPressures_);
-  //hipFree(dev_regPressures_[0]);
   hipFree(dev_regPressures_);
-  //hipFree(dev_spillCosts_[0]);
   hipFree(dev_spillCosts_);
 }

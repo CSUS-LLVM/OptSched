@@ -439,7 +439,6 @@ bool ConstrainedScheduler::ChkInstLglty_(SchedInstruction *inst) const {
   if (inst->BlocksCycle() && dev_crntSlotNum_[GLOBALTID] != 0)
     return false;
   // Logger::Info("Does not block cycle");
-  // TODO(bruce): make sure nothing is broken here
   if (includesUnpipelined_ &&
       dev_rsrvSlots_[GLOBALTID*issuRate_+dev_crntSlotNum_[GLOBALTID]].strtCycle != INVALID_VALUE &&
       dev_crntCycleNum_[GLOBALTID] <= 
