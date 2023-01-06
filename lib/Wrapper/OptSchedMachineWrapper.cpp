@@ -12,7 +12,7 @@ Description:  A wrapper that convert an LLVM target to an OptSched MachineModel.
 #include "llvm/CodeGen/TargetPassConfig.h"
 #include "llvm/CodeGen/TargetRegisterInfo.h"
 #include "llvm/MC/MCInstrItineraries.h"
-#include "llvm/Support/TargetRegistry.h"
+#include "llvm/MC/TargetRegistry.h"
 #include "llvm/Target/TargetMachine.h"
 #include <memory>
 

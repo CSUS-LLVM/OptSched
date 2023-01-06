@@ -104,10 +104,10 @@ static void getRealCfgPathCL(SmallString<128> &Path) {
 static void reportCfgDirPathError(std::error_code EC,
                                   llvm::StringRef OptSchedCfg) {
   if (OptSchedCfg == DEFAULT_CFG_DIR)
-    llvm::report_fatal_error(EC.message() +
+    llvm::report_fatal_error(llvm::StringRef(EC.message() +
                                  ": Error searching for the OptSched config "
                                  "directory in the default location: " +
-                                 DEFAULT_CFG_DIR,
+                                 DEFAULT_CFG_DIR),
                              false);
   else
     llvm::report_fatal_error(EC.message() + ": " + OptSchedCfg, false);

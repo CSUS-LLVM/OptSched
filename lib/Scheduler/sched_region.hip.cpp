@@ -45,23 +45,23 @@ static std::string ComputeDDGDumpPath() {
   if (GetDumpDDGs()) {
     // Force the user to set DDG_DUMP_PATH
     if (Path.empty())
-      llvm::report_fatal_error(
-          "DDG_DUMP_PATH must be set if trying to DUMP_DDGS.", false);
+      llvm::report_fatal_error(llvm::StringRef(
+          "DDG_DUMP_PATH must be set if trying to DUMP_DDGS."), false);
 
     // Do some niceness to the input path to produce the actual path.
     llvm::SmallString<32> FixedPath;
     const std::error_code ec =
         fs::real_path(Path, FixedPath, /* expand_tilde = */ true);
     if (ec)
-      llvm::report_fatal_error(
-          "Unable to expand DDG_DUMP_PATH %s. " + ec.message(), false);
+      llvm::report_fatal_error(llvm::StringRef(
+          "Unable to expand DDG_DUMP_PATH %s. " + ec.message()), false);
     Path.assign(FixedPath.begin(), FixedPath.end());
 
     // The path must be a directory, and it must exist.
     if (!fs::is_directory(Path))
-      llvm::report_fatal_error(
+      llvm::report_fatal_error(llvm::StringRef(
           "DDG_DUMP_PATH is set to a non-existent directory or non-directory " +
-              Path,
+              Path),
           false);
 
     // Force the path to be considered a directory.

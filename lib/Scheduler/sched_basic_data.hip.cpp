@@ -2,6 +2,8 @@
 #include "opt-sched/Scheduler/register.h"
 #include "opt-sched/Scheduler/stats.h"
 #include "opt-sched/Scheduler/dev_defines.h"
+#include "llvm/ADT/SmallString.h"
+#include "llvm/Support/ErrorHandling.h"
 
 using namespace llvm::opt_sched;
 
@@ -23,8 +25,8 @@ SPILL_COST_FUNCTION llvm::opt_sched::ParseSCFName(const std::string &name) {
     return SCF_TARGET;
   }
 
-  llvm::report_fatal_error(
-      "Unrecognized option for SPILL_COST_FUNCTION setting: " + name, false);
+  llvm::report_fatal_error(llvm::StringRef(
+      "Unrecognized option for SPILL_COST_FUNCTION setting: " + name), false);
 }
 
 __host__
