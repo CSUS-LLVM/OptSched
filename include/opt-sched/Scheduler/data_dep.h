@@ -346,6 +346,27 @@ public:
   Register *getRegByTuple(RegIndxTuple *tuple) { 
     return RegFiles[tuple->regType_].GetReg(tuple->regNum_); 
   }
+  __host__ __device__
+  RegIndxTuple *getUseByIndex(int index) {
+    return uses_ + index;
+  }
+
+  __host__ __device__
+  RegIndxTuple *getDefByIndex(int index) {
+    return defs_ + index;
+  }
+
+  int* scsrs_;
+  int* latencies_;
+  int* predOrder_;
+  RegIndxTuple* uses_;
+  RegIndxTuple* defs_;
+  int* ltncyPerPrdcsr_;
+
+  // Tracks all registers in the scheduling region. Each RegisterFile
+  // object holds all registers for a given register type.
+  RegisterFile *RegFiles;
+
   // Deep Copies DDG's arrays to device and links them to device DDG pointer
   void CopyPointersToDevice(DataDepGraph *dev_DDG, int numThreads = 0);
   // Calls hipFree on all arrays/objects that were allocated with hipMalloc
@@ -430,14 +451,6 @@ protected:
 
   LATENCY_PRECISION ltncyPrcsn_;
   int edgeCntPerLtncy_[MAX_LATENCY_VALUE + 1];
-
-  // Tracks all registers in the scheduling region. Each RegisterFile
-  // object holds all registers for a given register type.
-  RegisterFile *RegFiles;
-
-  GraphEdge **dev_scsrElmnts_;
-  unsigned long *dev_keys_;
-  InstCount *dev_latencies_;
 
   InstCount maxIndependentInstructions_;
 

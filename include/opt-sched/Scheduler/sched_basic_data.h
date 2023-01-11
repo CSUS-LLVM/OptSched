@@ -330,7 +330,8 @@ public:
   // instruction will become ready. Otherwise it will return false and set
   // rdyCycle to -1, indicating that it isn't yet known when it will be ready.
   __host__ __device__
-  bool PrdcsrSchduld(InstCount prdcsrNum, InstCount cycle, InstCount &rdyCycle);
+  bool PrdcsrSchduld(InstCount prdcsrNum, InstCount cycle, InstCount &rdyCycle,
+                     InstCount *ltncyPerPrdcsr = NULL);
   // Undoes the effect of PrdcsrSchduld().
   __host__ __device__
   bool PrdcsrUnSchduld(InstCount prdcsrNum, InstCount &rdyCycle);
@@ -487,10 +488,10 @@ public:
   void SetMustBeInBBExit(bool val);
 
   // Add a register definition to this instruction node.
-  __host__ __device__
+  __host__
   void AddDef(Register *reg);
   // Add a register usage to this instruction node.
-  __host__ __device__
+  __host__
   void AddUse(Register *reg);
   // Returns whether this instruction defines the specified register.
   __host__ __device__
@@ -501,11 +502,11 @@ public:
   
   // Retrieves the list of registers defined by this node. The array is put
   // into defs and the number of elements is returned.
-  __host__ __device__
+  __host__
   int16_t GetDefs(RegIndxTuple *&defs);
   // Retrieves the list of registers used by this node. The array is put
   // into uses and the number of elements is returned.
-  __host__ __device__
+  __host__
   int16_t GetUses(RegIndxTuple *&uses);
 
   __host__ __device__
@@ -517,11 +518,11 @@ public:
   __host__ __device__
   int16_t GetAdjustedUseCnt() { return adjustedUseCnt_; }
   // Computer the adjusted use count. Update "adjustedUseCnt_".
-  __host__ __device__
+  __host__
   void ComputeAdjustedUseCnt(SchedInstruction *inst);
 
   __host__ __device__
-  int16_t CmputLastUseCnt();
+  int16_t CmputLastUseCnt(RegisterFile *RegFiles);
   __host__ __device__
   int16_t GetLastUseCnt();
   //def to cuda_sched_basic_data.cu for nvcc compilation
@@ -537,7 +538,7 @@ public:
 		       InstCount maxNodeCnt, int nodeID, 
 		       InstCount fileSchedOrder, InstCount fileSchedCycle, 
 		       InstCount fileLB, InstCount fileUB, MachineModel *model,
-		       GraphNode **nodes, RegisterFile *regFiles);
+		       GraphNode **nodes, SchedInstruction *insts, RegisterFile *regFiles);
   // Creates a new SchedRange for the inst. used after it is copied to device
   __device__
   void CreateSchedRange();
@@ -549,11 +550,8 @@ public:
   // Copies pointers to device and links them to device inst. Also uses
   // the device nodes_ array to set nodes_ in GraphNode
   void CopyPointersToDevice(SchedInstruction *dev_inst,
-                            GraphNode **dev_nodes,
-                            RegisterFile *dev_regFiles,
-                            int numThreads, 
-                            InstCount *dev_ltncyPerPrdcsr,
-                            int &ltncyIndex);
+                            SchedInstruction *dev_instsArray,
+                            RegisterFile *dev_regFiles);
   // Calls hipFree on all arrays/objects that were allocated with hipMalloc
   void FreeDevicePointers(int numThreads);
   // Allocates arrays used for storing individual values for each thread in
@@ -562,21 +560,16 @@ public:
 
   friend class SchedRange;
 
-  // array of nodes_ indices referring to this instruction's successors.
-  int* scsrs_;
-  // array of latencies of this instruction's successors.
-  int* latencies_;
-  // array of this instruction's order in the predecessor lists of each of its successors.
-  int* predOrder_;
+  // This instruction's index in the scsrs_, latencies_, predOrder_ arrays
+  // in the DDG.
+  int ddgIndex;
 
-  // Returns the successor of this instruction node given by the scsrNum
-  // (its index in scsrs_). Fills prdcsrNum, ltncy, and scsrNodeNum (the
-  // instruction's index in nodes_) if provided.
-  __host__ __device__
-  SchedInstruction *GetScsr(int scsrNum, 
-                            InstCount *prdcsrNum = NULL, 
-                            UDT_GLABEL *ltncy = NULL,
-                            InstCount *scsrNodeNum = NULL);
+  // This instruction's index in the ltncyPerPrdcsr_ array in the DDG.
+  int ddgPredecessorIndex;
+
+  // This instruction's indices for the uses_ and defs_ arrays in the DDG.
+  int ddgUseIndex;
+  int ddgDefIndex;
 
   __device__
   int GetScsrCnt_();
@@ -605,6 +598,9 @@ protected:
   InstCount prdcsrCnt_;
   // The number of successors of this instruction.
   InstCount scsrCnt_;
+
+  int dev_maxLatency_;
+  int dev_latencySum_;
 
   // The minimum cycle in which this instruction can be scheduled, given its
   // data and resource constraints.
@@ -713,11 +709,11 @@ protected:
   // Pointer to RegFiles
   RegisterFile *RegFiles_;
   // The registers defined by this instruction node.
-  RegIndxTuple defs_[MAX_DEFS_PER_INSTR];
+  RegIndxTuple *defs_;
   // The number of elements in defs.
   int16_t defCnt_;
   // The registers used by this instruction node.
-  RegIndxTuple uses_[MAX_USES_PER_INSTR];
+  RegIndxTuple *uses_;
   // The number of elements in uses.
   int16_t useCnt_;
   // The number of uses minus live-out registers. Live-out registers are uses
@@ -739,6 +735,11 @@ protected:
 
   bool mustBeInBBEntry_;
   bool mustBeInBBExit_;
+
+  // A pointer to the full array of instructions. Needed in order to save
+  // succs/preds and GraphEdge pointers as instNums instead. This allows for
+  // much faster copying to the Device
+  SchedInstruction *insts_;
 
   // TODO(ghassan): Document.
   __host__
@@ -764,7 +765,7 @@ protected:
   __host__
   void SetScsrNums_();
   // Computer the adjusted use count. Update "adjustedUseCnt_".
-  __host__ __device__
+  __host__
   void ComputeAdjustedUseCnt_();
 };
 

@@ -117,6 +117,13 @@ public:
   __host__
   virtual ~ConstrainedScheduler();
 
+  __device__
+  SchedInstruction *GetScsr(SchedInstruction* inst,
+                            int scsrNum, 
+                            InstCount *prdcsrNum = NULL, 
+                            UDT_GLABEL *ltncy = NULL, 
+                            InstCount *scsrNodeNum = NULL);
+
   // Calculates the schedule and returns it in the passed argument.
   //__host__ __device__
   //FUNC_RESULT FindSchedule(InstSchedule *sched, SchedRegion *rgn) = 0;

@@ -228,6 +228,11 @@ InstCount ACOScheduler::SelectInstruction(SchedInstruction *lastInst, InstCount 
                                           SchedRegion *rgn, bool &unnecessarilyStalling,
                                           bool closeToRPTarget, bool currentlyWaiting) {
 #ifdef __HIP_DEVICE_COMPILE__
+  #ifdef DEBUG_ACO_CRASH_LOCATIONS
+    if (hipThreadIdx_x == 0) {
+      printf("Crash Beginning of SelectInstruction()\n");
+    }
+  #endif
   // if we are waiting and have no fully-ready instruction that is 
   // net 0 or benefit to RP, then return -1 to schedule a stall
   if (currentlyWaiting && dev_RP0OrPositiveCount[GLOBALTID] == 0)
@@ -296,11 +301,13 @@ InstCount ACOScheduler::SelectInstruction(SchedInstruction *lastInst, InstCount 
 
         // check if any reg types used by the instructions are above the physical register limit
         SchedInstruction *tempInst = dataDepGraph_->GetInstByIndx(*dev_readyLs->getInstIdAtIndex(I));
+        // TODO(bruce): convert to dev uses
         RegIndxTuple *uses;
         Register *use;
-        uint16_t usesCount = tempInst->GetUses(uses);
+        uint16_t usesCount = tempInst->GetUseCnt();
+        int useStart = tempInst->ddgUseIndex;
         for (uint16_t i = 0; i < usesCount; i++) {
-          use = dataDepGraph_->getRegByTuple(&uses[i]);
+          use = dataDepGraph_->getRegByTuple(dataDepGraph_->getUseByIndex(useStart + i));
           int16_t regType = use->GetType();
           if ( ((BBWithSpill *)rgn)->IsRPHigh(regType) ) {
             RPIsHigh = true;
@@ -509,6 +516,11 @@ InstCount ACOScheduler::SelectInstruction(SchedInstruction *lastInst, InstCount 
       unnecessarilyStalling = true;
     else
       unnecessarilyStalling = false;
+  #ifdef DEBUG_ACO_CRASH_LOCATIONS
+    if (hipThreadIdx_x == 0) {
+      printf("End of SelectInstruction()\n");
+    }
+  #endif
   #else
     if (couldAvoidStalling && *readyLs->getInstReadyOnAtIndex(indx) > crntCycleNum_)
       unnecessarilyStalling = true;
@@ -545,7 +557,7 @@ InstSchedule *ACOScheduler::FindOneSchedule(InstCount RPTarget,
   // initialize the aco ready list so that the start instruction is ready
   // The luc component is 0 since the root inst uses no instructions
   InstCount RootId = rootInst_->GetNum();
-  HeurType RootHeuristic = dev_kHelper->computeKey(rootInst_, true);
+  HeurType RootHeuristic = dev_kHelper->computeKey(rootInst_, true, dev_DDG_->RegFiles);
   pheromone_t RootScore = Score(-1, RootId, RootHeuristic);
   ACOReadyListEntry InitialRoot{RootId, 0, RootHeuristic, RootScore};
   dev_readyLs->addInstructionToReadyList(InitialRoot);
@@ -554,6 +566,11 @@ InstSchedule *ACOScheduler::FindOneSchedule(InstCount RPTarget,
   lastInst = dataDepGraph_->GetInstByIndx(RootId);
   bool closeToRPTarget = false;
   dev_RP0OrPositiveCount[GLOBALTID] = 0;
+  #ifdef DEBUG_ACO_CRASH_LOCATIONS
+    if (hipThreadIdx_x == 0) {
+      printf("Crash before while loop inside FindOneSchedule()\n");
+    }
+  #endif
   while (!IsSchedComplete_()) {
     // incrementally calculate if there are any instructions with a neutral
     // or positive effect on RP
@@ -588,12 +605,21 @@ InstSchedule *ACOScheduler::FindOneSchedule(InstCount RPTarget,
       #endif
       // select the instruction and get info on it
       InstCount SelIndx = SelectInstruction(lastInst, schedule->getTotalStalls(), dev_rgn_, unnecessarilyStalling, closeToRPTarget, waitFor ? true: false);
-
+      #ifdef DEBUG_ACO_CRASH_LOCATIONS
+        if (hipThreadIdx_x == 0) {
+          printf("After SelectInstruction()\n");
+        }
+      #endif
       if (SelIndx != -1) {
         LastInstInfo = dev_readyLs->removeInstructionAtIndex(SelIndx);
         
         InstCount InstId = LastInstInfo.InstId;
         inst = dataDepGraph_->GetInstByIndx(InstId);
+        #ifdef DEBUG_ACO_CRASH_LOCATIONS
+          if (hipThreadIdx_x == 0) {
+            printf("After Test Print()\n");
+          }
+        #endif
         // potentially wait on the current instruction
         if (LastInstInfo.ReadyOn > crntCycleNum_ || !ChkInstLglty_(inst)) {
           waitUntil = LastInstInfo.ReadyOn;
@@ -664,14 +690,28 @@ InstSchedule *ACOScheduler::FindOneSchedule(InstCount RPTarget,
       DoRsrvSlots_(inst);
       // this is annoying
       UpdtSlotAvlblty_(inst);
-
+      #ifdef DEBUG_ACO_CRASH_LOCATIONS
+        if (hipThreadIdx_x == 0) {
+          printf("Before UpdateACOReadyList()\n");
+        }
+      #endif
       // new readylist update
       UpdateACOReadyList(inst);
+      #ifdef DEBUG_ACO_CRASH_LOCATIONS
+        if (hipThreadIdx_x == 0) {
+          printf("After UpdateACOReadyList()\n");
+        }
+      #endif
     }
     schedule->AppendInst(instNum);
     if (MovToNxtSlot_(inst))
       InitNewCycle_();
   }
+  #ifdef DEBUG_ACO_CRASH_LOCATIONS
+    if (hipThreadIdx_x == 0) {
+      printf("After while loop inside FindOneSchedule()\n");
+    }
+  #endif
   dev_rgn_->UpdateScheduleCost(schedule);
   schedule->setIsZeroPerp( ((BBWithSpill *)dev_rgn_)->ReturnPeakSpillCost() == 0 );
   return schedule;
@@ -697,7 +737,7 @@ InstSchedule *ACOScheduler::FindOneSchedule(InstCount RPTarget,
   // initialize the aco ready list so that the start instruction is ready
   // The luc component is 0 since the root inst uses no instructions
   InstCount RootId = rootInst_->GetNum();
-  HeurType RootHeuristic = kHelper->computeKey(rootInst_, true);
+  HeurType RootHeuristic = kHelper->computeKey(rootInst_, true, dataDepGraph_->RegFiles);
   pheromone_t RootScore = Score(-1, RootId, RootHeuristic);
   ACOReadyListEntry InitialRoot{RootId, 0, RootHeuristic, RootScore};
   readyLs->addInstructionToReadyList(InitialRoot);
@@ -911,6 +951,11 @@ Dev_ACO(SchedRegion *dev_rgn, DataDepGraph *dev_DDG,
             ACOScheduler *dev_AcoSchdulr, InstSchedule **dev_schedules,
             InstSchedule *dev_bestSched, int noImprovementMax, 
             int *blockBestIndex) {
+  #ifdef DEBUG_ACO_CRASH_LOCATIONS
+    if (hipThreadIdx_x == 0) {
+      printf("Crash very beginning\n");
+    }
+  #endif
   // holds cost and index of bestSched per block
   __shared__ int bestIndex;
   int dev_iterations;
@@ -937,27 +982,51 @@ Dev_ACO(SchedRegion *dev_rgn, DataDepGraph *dev_DDG,
   else
     RPTarget = INT_MAX;
 
+  #ifdef DEBUG_ACO_CRASH_LOCATIONS
+    if (hipThreadIdx_x == 0) {
+      printf("Crash before while loop\n");
+    }
+  #endif
   // Start ACO
   while (dev_noImprovement < noImprovementMax && !lowerBoundSchedFound) {
     // Reset schedules to post constructor state
     dev_schedules[GLOBALTID]->Initialize();
+    #ifdef DEBUG_ACO_CRASH_LOCATIONS
+    if (hipThreadIdx_x == 0) {
+      printf("Before FindOneSchedule() loop\n");
+    }
+    #endif
     dev_AcoSchdulr->FindOneSchedule(RPTarget,
                                     dev_schedules[GLOBALTID]);
     // Sync threads after schedule creation
     threadGroup.sync();
+    #ifdef DEBUG_ACO_CRASH_LOCATIONS
+    if (hipThreadIdx_x == 0) {
+      printf("After FindOneSchedule()\n");
+    }
+    #endif
     globalBestIndex = INVALID_VALUE;
     // reduce dev_schedules to 1 best schedule per block
     if (GLOBALTID < dev_AcoSchdulr->GetNumThreads()/2)
       reduceToBestSchedPerBlock(dev_schedules, blockBestIndex, dev_AcoSchdulr, RPTarget);
 
     threadGroup.sync();
-
+    #ifdef DEBUG_ACO_CRASH_LOCATIONS
+    if (hipThreadIdx_x == 0) {
+      printf("After reduceToBestSchedPerBlock() loop\n");
+    }
+    #endif
     // one block to reduce blockBest schedules to one best schedule
     if (hipBlockIdx_x == 0)
       reduceToBestSched(dev_schedules, blockBestIndex, dev_AcoSchdulr, dev_AcoSchdulr->GetNumBlocks(), RPTarget);
 
-    threadGroup.sync();    
+    threadGroup.sync();
 
+    #ifdef DEBUG_ACO_CRASH_LOCATIONS
+    if (hipThreadIdx_x == 0) {
+      printf("After reduceToBestSched() loop\n");
+    }
+    #endif
     if (GLOBALTID == 0 && 
         dev_schedules[blockBestIndex[0]]->GetCost() != INVALID_VALUE)
       globalBestIndex = blockBestIndex[0];
@@ -1021,6 +1090,11 @@ Dev_ACO(SchedRegion *dev_rgn, DataDepGraph *dev_DDG,
         if (dev_noImprovement > noImprovementMax)
           break;
       }
+      #ifdef DEBUG_ACO_CRASH_LOCATIONS
+        if (hipThreadIdx_x == 0) {
+          printf("After Global TID 0 selects best schedule\n");
+        }
+      #endif
     }
     // perform pheremone update based on selected scheme
 #if (PHER_UPDATE_SCHEME == ONE_PER_ITER)
@@ -1066,9 +1140,19 @@ Dev_ACO(SchedRegion *dev_rgn, DataDepGraph *dev_DDG,
     }
   #endif
     threadGroup.sync();
+    #ifdef DEBUG_ACO_CRASH_LOCATIONS
+    if (hipThreadIdx_x == 0) {
+      printf("After UpdatePheromone() loop\n");
+    }
+    #endif
     dev_AcoSchdulr->ScalePheromoneTable();
     // wait for other blocks to finish before starting next iteration
     threadGroup.sync();
+    #ifdef DEBUG_ACO_CRASH_LOCATIONS
+    if (hipThreadIdx_x == 0) {
+      printf("After ScalePheromoneTable() loop\n");
+    }
+    #endif
     // make sure no threads reset schedule before above operations complete
     dev_schedules[GLOBALTID]->resetTotalStalls();
     dev_schedules[GLOBALTID]->resetUnnecessaryStalls();
@@ -1569,6 +1653,7 @@ void ACOScheduler::CopyPheromonesToSharedMem(double *s_pheromone) {
     toInstNum += NUMTHREADSPERBLOCK;
   }
 }
+
 __host__ __device__
 inline void ACOScheduler::UpdateACOReadyList(SchedInstruction *inst) {
   InstCount prdcsrNum, scsrRdyCycle;
@@ -1580,21 +1665,26 @@ inline void ACOScheduler::UpdateACOReadyList(SchedInstruction *inst) {
       printf("successors of %d:", inst->GetNum());
     }
     #endif
+    #ifdef DEBUG_ACO_CRASH_LOCATIONS
+      if (hipThreadIdx_x == 0) {
+        printf("Before for loop inside UpdateACOReadyList()\n");
+      }
+    #endif
     int i = 0;
-    for (SchedInstruction *crntScsr = inst->GetScsr(i++, &prdcsrNum);
-          crntScsr != NULL; crntScsr = inst->GetScsr(i++, &prdcsrNum)) {
+    for (SchedInstruction *crntScsr = GetScsr(inst, i++, &prdcsrNum);
+          crntScsr != NULL; crntScsr = GetScsr(inst, i++, &prdcsrNum)) {
         #ifdef DEBUG_INSTR_SELECTION
         if (GLOBALTID==0) {
           printf(" %d,", crntScsr->GetNum());
         }
         #endif
         bool wasLastPrdcsr =
-            crntScsr->PrdcsrSchduld(prdcsrNum, dev_crntCycleNum_[GLOBALTID], scsrRdyCycle);
+            crntScsr->PrdcsrSchduld(prdcsrNum, dev_crntCycleNum_[GLOBALTID], scsrRdyCycle, dev_DDG_->ltncyPerPrdcsr_);
 
         if (wasLastPrdcsr) {
           // If all other predecessors of this successor have been scheduled then
           // we now know in which cycle this successor will become ready.
-          HeurType HeurWOLuc = dev_kHelper->computeKey(crntScsr, false);
+          HeurType HeurWOLuc = dev_kHelper->computeKey(crntScsr, false, dev_DDG_->RegFiles);
           dev_readyLs->addInstructionToReadyList(ACOReadyListEntry{crntScsr->GetNum(), scsrRdyCycle, HeurWOLuc, 0});
         }
     }
@@ -1614,7 +1704,7 @@ inline void ACOScheduler::UpdateACOReadyList(SchedInstruction *inst) {
       InstCount CandidateId = *dev_readyLs->getInstIdAtIndex(I);
       if (LUCEntry.Width) {
         SchedInstruction *ScsrInst = dataDepGraph_->GetInstByIndx(CandidateId);
-        HeurType LUCVal = ScsrInst->CmputLastUseCnt();
+        HeurType LUCVal = ScsrInst->CmputLastUseCnt(dev_DDG_->RegFiles);
         LUCVal <<= LUCEntry.Offset;
         Heur &= LUCVal;
       }
@@ -1640,7 +1730,7 @@ inline void ACOScheduler::UpdateACOReadyList(SchedInstruction *inst) {
         if (wasLastPrdcsr) {
           // If all other predecessors of this successor have been scheduled then
           // we now know in which cycle this successor will become ready.
-          HeurType HeurWOLuc = kHelper->computeKey(crntScsr, false);
+          HeurType HeurWOLuc = kHelper->computeKey(crntScsr, false, dataDepGraph_->RegFiles);
           readyLs->addInstructionToReadyList(ACOReadyListEntry{crntScsr->GetNum(), scsrRdyCycle, HeurWOLuc, 0});
         }
     }
@@ -1656,7 +1746,7 @@ inline void ACOScheduler::UpdateACOReadyList(SchedInstruction *inst) {
       InstCount CandidateId = *readyLs->getInstIdAtIndex(I);
       if (LUCEntry.Width) {
         SchedInstruction *ScsrInst = dataDepGraph_->GetInstByIndx(CandidateId);
-        HeurType LUCVal = ScsrInst->CmputLastUseCnt();
+        HeurType LUCVal = ScsrInst->CmputLastUseCnt(dataDepGraph_->RegFiles);
         LUCVal <<= LUCEntry.Offset;
         Heur &= LUCVal;
       }

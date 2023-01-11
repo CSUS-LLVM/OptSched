@@ -117,6 +117,7 @@ private:
                               bool closeToRPTarget, bool currentlyWaiting);
   __host__ __device__
   void UpdateACOReadyList(SchedInstruction *Inst);
+
   DeviceVector<pheromone_t> pheromone_;
   // new ds representations
   ACOReadyList *readyLs;

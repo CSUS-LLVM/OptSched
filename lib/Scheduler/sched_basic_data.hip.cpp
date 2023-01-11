@@ -48,16 +48,17 @@ SchedInstruction::SchedInstruction(InstCount num, const char *name,
 
   instType_ = instType;
 
+  #ifndef __HIP_DEVICE_COMPILE__
+    defs_ = new RegIndxTuple[MAX_DEFS_PER_INSTR];
+    uses_ = new RegIndxTuple[MAX_USES_PER_INSTR]; 
+  #endif
+
   frwrdLwrBound_ = INVALID_VALUE;
   bkwrdLwrBound_ = INVALID_VALUE;
   abslutFrwrdLwrBound_ = INVALID_VALUE;
   abslutBkwrdLwrBound_ = INVALID_VALUE;
   crtclPathFrmRoot_ = INVALID_VALUE;
   crtclPathFrmLeaf_ = INVALID_VALUE;
-
-  int* scsrs_;
-  int* predOrder_;
-  int* latencies_;
 
   ltncyPerPrdcsr_ = NULL;
   memAllocd_ = false;
@@ -106,6 +107,8 @@ SchedInstruction::~SchedInstruction() {
   if (memAllocd_)
     DeAllocMem_();
 
+  delete[] uses_;
+  delete[] defs_;
   delete crntRange_;
 }
 
@@ -280,7 +283,7 @@ InstCount SchedInstruction::CmputCrtclPath_(DIRECTION dir,
        edg = nghbrLst->GetNxtElmnt()) {
     UDT_GLABEL edgLbl = edg->label;
     SchedInstruction *nghbr = (SchedInstruction *)
-	    (nodes_[edg->GetOtherNodeNum(this->GetNum())]);
+	    (insts_ + edg->GetOtherNodeNum(this->GetNum()));
 
     InstCount nghbrCrtclPath;
     if (ref == NULL) {
@@ -308,7 +311,7 @@ bool SchedInstruction::ApplyPreFxng(LinkedList<SchedInstruction> *tightndLst,
   return crntRange_->Fix(preFxdCycle_, tightndLst, fxdLst);
 }
 
-__host__ __device__
+__host__
 void SchedInstruction::AddDef(Register *reg) {
   if (defCnt_ >= MAX_DEFS_PER_INSTR) {
 #ifndef __HIP_DEVICE_COMPILE__
@@ -329,7 +332,7 @@ void SchedInstruction::AddDef(Register *reg) {
   defCnt_++;
 }
 
-__host__ __device__
+__host__
 void SchedInstruction::AddUse(Register *reg) {
   if (useCnt_ >= MAX_USES_PER_INSTR) {
 #ifndef __HIP_DEVICE_COMPILE__
@@ -376,15 +379,15 @@ bool SchedInstruction::FindUse(Register *reg) const {
   return false;
 }
 
-__host__ __device__
+__host__
 int16_t SchedInstruction::GetDefs(RegIndxTuple *&defs) {
-  defs = (RegIndxTuple *)&defs_;
+  defs = defs_;
   return defCnt_;
 }
 
-__host__ __device__
+__host__
 int16_t SchedInstruction::GetUses(RegIndxTuple *&uses) {
-  uses = (RegIndxTuple *)&uses_;
+  uses = uses_;
   return useCnt_;
 }
 
@@ -424,33 +427,21 @@ int SchedInstruction::GetNodeID() const { return nodeID_; }
 __host__ __device__
 void SchedInstruction::SetNodeID(int nodeID) { nodeID_ = nodeID; }
 
-// TODO(bruce) consider storing this value in SetupForDevice instead of recomputing
 __host__ __device__
 int SchedInstruction::GetLtncySum() const {
   #ifdef __HIP_DEVICE_COMPILE__
-  int sum = 0;
-  for (int i = 0; i < scsrCnt_; i++) {
-    sum += latencies_[i];
-  }
-  return sum;
+  return dev_latencySum_;
   #else 
   return GetScsrLblSum(); 
   #endif
   }
 
-// TODO(bruce) consider storing this value in SetupForDevice instead of recomputing
 __host__ __device__
 int SchedInstruction::GetMaxLtncy() const { 
   #ifdef __HIP_DEVICE_COMPILE__
-  int max = 0;
-  for (int i = 0; i < scsrCnt_; i++) {
-    if (latencies_[i] > max) {
-      max = latencies_[i];
-    }
-  }
-  return max;
+  return dev_maxLatency_;
   #else  
-  return GetMaxEdgeLabel();
+    return GetMaxEdgeLabel();
   #endif
   }
 
@@ -479,7 +470,7 @@ SchedInstruction *SchedInstruction::GetFrstPrdcsr(InstCount *scsrNum,
     *depType = (DependenceType)edge->label2;
   if (toNodeNum)
     *toNodeNum = edge->from;
-  return (SchedInstruction *)(nodes_[edge->from]);
+  return insts_ + edge->from;
 }
 
 __host__
@@ -498,34 +489,12 @@ SchedInstruction *SchedInstruction::GetNxtPrdcsr(InstCount *scsrNum,
     *depType = (DependenceType)edge->label2;
   if (toNodeNum)
     *toNodeNum = edge->from;
-  return (SchedInstruction *)(nodes_[edge->from]);
+  return insts_ + edge->from;
 }
 
 __device__
 int SchedInstruction::GetScsrCnt_() {
   return scsrCnt_;
-}
-
-__host__ __device__
-SchedInstruction *SchedInstruction::GetScsr(int scsrNum, 
-                                            InstCount *prdcsrNum, 
-                                            UDT_GLABEL *ltncy,
-                                            InstCount *scsrNodeNum) {
-  if (scsrNum >= scsrCnt_) {
-    return NULL;
-  } 
-
-  if (prdcsrNum) {
-    *prdcsrNum = predOrder_[scsrNum];
-  }
-  if (ltncy) {
-    *ltncy = latencies_[scsrNum];
-  }
-  if (scsrNodeNum) {
-    *scsrNodeNum = scsrs_[scsrNum];
-  }
-  return (SchedInstruction *) nodes_[scsrs_[scsrNum]];
-
 }
 
 __host__
@@ -547,7 +516,7 @@ SchedInstruction *SchedInstruction::GetFrstScsr(InstCount *prdcsrNum,
     *toNodeNum = edge->to;
   if (IsArtificial)
     *IsArtificial = edge->IsArtificial;
-  return (SchedInstruction *)(nodes_[edge->to]);
+  return insts_ + edge->to;
 }
 
 __host__
@@ -569,7 +538,7 @@ SchedInstruction *SchedInstruction::GetNxtScsr(InstCount *prdcsrNum,
     *toNodeNum = edge->to;
   if (IsArtificial)
     *IsArtificial = edge->IsArtificial;
-  return (SchedInstruction *)(nodes_[edge->to]);
+  return insts_ + edge->to;
 }
 
 __host__
@@ -579,7 +548,7 @@ SchedInstruction *SchedInstruction::GetLastScsr(InstCount *prdcsrNum) {
     return NULL;
   if (prdcsrNum)
     *prdcsrNum = edge->predOrder;
-  return (SchedInstruction *)(nodes_[edge->to]);
+  return insts_ + edge->to;
 }
 
 __host__
@@ -589,7 +558,7 @@ SchedInstruction *SchedInstruction::GetPrevScsr(InstCount *prdcsrNum) {
     return NULL;
   if (prdcsrNum)
     *prdcsrNum = edge->predOrder;
-  return (SchedInstruction *)(nodes_[edge->to]);
+  return insts_ + edge->to;
 }
 
 __host__
@@ -600,8 +569,7 @@ SchedInstruction *SchedInstruction::GetFrstNghbr(DIRECTION dir,
     return NULL;
   if (ltncy)
     *ltncy = edge->label;
-  return (SchedInstruction *)
-	  ((dir == DIR_FRWRD) ? nodes_[edge->to] : nodes_[edge->from]);
+  return (dir == DIR_FRWRD) ? insts_ + edge->to : insts_ + edge->from;
 }
 
 __host__
@@ -612,8 +580,7 @@ SchedInstruction *SchedInstruction::GetNxtNghbr(DIRECTION dir,
     return NULL;
   if (ltncy)
     *ltncy = edge->label;
-  return (SchedInstruction *)
-	  ((dir == DIR_FRWRD) ? nodes_[edge->to] : nodes_[edge->from]);
+  return (dir == DIR_FRWRD) ? insts_ + edge->to : insts_ + edge->from;
 }
 
 __host__
@@ -707,10 +674,10 @@ void SchedInstruction::SetBounds(InstCount flb, InstCount blb) {
 
 __host__ __device__
 bool SchedInstruction::PrdcsrSchduld(InstCount prdcsrNum, InstCount cycle,
-                                     InstCount &rdyCycle) {
+                                     InstCount &rdyCycle, InstCount *ltncyPerPrdcsr) {
   assert(prdcsrNum < prdcsrCnt_);
 #ifdef __HIP_DEVICE_COMPILE__
-  auto readyCycleBasedOnPredecessor = cycle + ltncyPerPrdcsr_[prdcsrNum];
+  auto readyCycleBasedOnPredecessor = cycle + ltncyPerPrdcsr[ddgPredecessorIndex + prdcsrNum];
 
   if (readyCycleBasedOnPredecessor > dev_minRdyCycle_[GLOBALTID]) {
     dev_minRdyCycle_[GLOBALTID] = readyCycleBasedOnPredecessor;
@@ -911,7 +878,7 @@ bool SchedInstruction::ProbeScsrsCrntLwrBounds(InstCount cycle) {
        edg = GetNxtScsrEdge()) {
     UDT_GLABEL edgLbl = edg->label;
     SchedInstruction *nghbr = (SchedInstruction *)
-	    (nodes_[edg->GetOtherNodeNum(this->GetNum())]);
+	    (insts_ + edg->GetOtherNodeNum(this->GetNum()));
     InstCount nghbrNewLwrBound = cycle + edgLbl;
 
     // If this neighbor will get delayed by scheduling this instruction in the
@@ -923,7 +890,7 @@ bool SchedInstruction::ProbeScsrsCrntLwrBounds(InstCount cycle) {
   return false;
 }
 
-__host__ __device__
+__host__
 void SchedInstruction::ComputeAdjustedUseCnt_() {
   RegIndxTuple *uses;
   int useCnt = GetUses(uses);
@@ -978,15 +945,23 @@ void SchedInstruction::SetPrdcsrNums_() {
 }
 
 __host__ __device__
-int16_t SchedInstruction::CmputLastUseCnt() {
+int16_t SchedInstruction::CmputLastUseCnt(RegisterFile *RegFiles) {
 #ifdef __HIP_DEVICE_COMPILE__
   dev_lastUseCnt_[GLOBALTID] = 0;
 #else
   lastUseCnt_ = 0;
 #endif
 
+// if we are on device or passing in RegFiles, use those
+// otherwise, assume we can get regFiles from SchedInstruction itself
+RegisterFile *registerFiles;
+if (RegFiles)
+  registerFiles = RegFiles;
+else
+  registerFiles = RegFiles_;
+
   for (int i = 0; i < useCnt_; i++) {
-    Register *reg = RegFiles_[uses_[i].regType_].GetReg(uses_[i].regNum_);
+    Register *reg = registerFiles[uses_[i].regType_].GetReg(uses_[i].regNum_);
     assert(reg->GetCrntUseCnt() < reg->GetUseCnt());
     if (reg->GetCrntUseCnt() + 1 == reg->GetUseCnt())
 #ifdef __HIP_DEVICE_COMPILE__
@@ -1002,6 +977,7 @@ int16_t SchedInstruction::CmputLastUseCnt() {
 #endif
 }
 
+
 __host__ __device__
 void SchedInstruction::InitializeNode_(InstCount instNum, 
 		         const char *const instName,
@@ -1010,9 +986,10 @@ void SchedInstruction::InitializeNode_(InstCount instNum,
 			 InstCount fileSchedOrder, InstCount fileSchedCycle, 
 			 InstCount fileLB, InstCount fileUB, 
 			 MachineModel *model, GraphNode **nodes,
-			 RegisterFile *RegFiles) {
+       SchedInstruction *insts, RegisterFile *RegFiles) {
   RegFiles_ = RegFiles;
   nodes_ = nodes;
+  insts_ = insts;
   int i = 0;
   do {
     name_[i] = instName[i];}
@@ -1056,6 +1033,11 @@ void SchedInstruction::InitializeNode_(InstCount instNum,
   blksCycle_ = model->BlocksCycle(instType);
   pipelined_ = model->IsPipelined(instType);
 
+  #ifndef __HIP_DEVICE_COMPILE__
+    defs_ = new RegIndxTuple[MAX_DEFS_PER_INSTR];
+    uses_ = new RegIndxTuple[MAX_USES_PER_INSTR]; 
+  #endif
+
   defCnt_ = 0;
   useCnt_ = 0;
 
@@ -1077,65 +1059,29 @@ void SchedInstruction::InitializeNode_(InstCount instNum,
   GraphNode::SetNum(instNum);
 }
 
-// Preprocessing necessary to avoid GraphEdges on device.
-__host__
-void SchedInstruction::SetupForDevice() {
-  int prdcsrNum, latency, toNodeNum;
-  DependenceType _dep; // Not used here.
-  int _numScsrs = GetScsrCnt();
-  
-  scsrs_ = new int[_numScsrs];
-  latencies_ = new int[_numScsrs];
-  predOrder_ = new int[_numScsrs];
-
-  int i = 0;
-
-  for (SchedInstruction *crntScsr = GetFrstScsr(&prdcsrNum, 
-                                                &latency,
-                                                &_dep, 
-                                                &toNodeNum);
-       crntScsr != NULL; 
-       crntScsr = GetNxtScsr(&prdcsrNum, &latency, &_dep, &toNodeNum)) {
-         scsrs_[i] = toNodeNum;
-         latencies_[i] = latency;
-         predOrder_[i++] = prdcsrNum;
-       }
-}
-
 void SchedInstruction::CopyPointersToDevice(SchedInstruction *dev_inst,
-                                            GraphNode **dev_nodes,
-					                                  RegisterFile *dev_regFiles,
-                                            int numThreads, 
-                                            InstCount *dev_ltncyPerPrdcsr,
-                                            int &ltncyIndex) {
-  SetupForDevice();
-  size_t memSize;
-  memSize = sizeof(InstCount) * scsrCnt_;
-  if (memSize) {
-    gpuErrchk(hipMallocManaged(&(dev_inst->scsrs_), memSize));
-    gpuErrchk(hipMallocManaged(&(dev_inst->latencies_), memSize));
-    gpuErrchk(hipMallocManaged(&(dev_inst->predOrder_), memSize));
-	
-    gpuErrchk(hipMemcpy(dev_inst->scsrs_, scsrs_, memSize, hipMemcpyHostToDevice));
-    gpuErrchk(hipMemcpy(dev_inst->latencies_, latencies_, memSize, hipMemcpyHostToDevice));
-    gpuErrchk(hipMemcpy(dev_inst->predOrder_, predOrder_, memSize, hipMemcpyHostToDevice));
+                                            SchedInstruction *dev_nodes,
+					                                  RegisterFile *dev_regFiles) {
 
-  }
+  // Store these on the device instruction--we won't be able to compute them without
+  // GraphEdges.
+  dev_inst->dev_maxLatency_ = GetMaxEdgeLabel();
+  dev_inst->dev_latencySum_ = GetScsrLblSum();
+
+  // Index of this instruction's partition in DDG's scsrs_, latencies_, predOrder_.
+  dev_inst->ddgIndex = ddgIndex;
+
+  // Index of this instruction's partition in DDG's ltncyPerPrdcsr_.
+  dev_inst->ddgPredecessorIndex = ddgPredecessorIndex;
+
+  dev_inst->ddgUseIndex = ddgUseIndex;
+  dev_inst->ddgDefIndex = ddgDefIndex;
+
   // Make sure instruction knows whether it's a leaf on device for legality checking.
   dev_inst->SetDevIsLeaf(scsrCnt_ == 0);
-  dev_inst->RegFiles_ = dev_regFiles;
-  dev_inst->ltncyPerPrdcsr_ = &dev_ltncyPerPrdcsr[ltncyIndex];
-  for (InstCount i = 0; i < prdcsrCnt_; i++) {
-    dev_inst->ltncyPerPrdcsr_[i] = ltncyPerPrdcsr_[i];
-  }
-  ltncyIndex += prdcsrCnt_;
-
-  GraphNode::CopyPointersToDevice((GraphNode *)dev_inst, dev_nodes);
 }
 
 void SchedInstruction::FreeDevicePointers(int numThreads) {
-  hipFree(ltncyPerPrdcsr_);
-  hipFree(crntRange_);
   hipFree(dev_lastUseCnt_);
   hipFree(dev_minRdyCycle_);
   hipFree(dev_unschduldPrdcsrCnt_);
@@ -1143,12 +1089,6 @@ void SchedInstruction::FreeDevicePointers(int numThreads) {
     hipFree(rcrsvScsrLst_->dev_crnt_);
   if (rcrsvPrdcsrLst_)
     hipFree(rcrsvPrdcsrLst_->dev_crnt_);
-
-  if (scsrCnt_ > 0) { 
-    hipFree(scsrs_);
-    hipFree(latencies_);
-    hipFree(predOrder_);
-  }
 }
 
 void SchedInstruction::AllocDevArraysForParallelACO(int numThreads) {
@@ -1254,8 +1194,7 @@ bool SchedRange::TightnLwrBoundRcrsvly(DIRECTION dir, InstCount newBound,
                                            : inst_->GetFrstPrdcsrEdge();
          edg != NULL; edg = getNextNeighbor(*this)) {
       UDT_GLABEL edgLbl = edg->label;
-      SchedInstruction *nghbr = (SchedInstruction *)
-	      (inst_->nodes_[edg->GetOtherNodeNum(inst_->GetNum())]);
+      SchedInstruction *nghbr = inst_->insts_ + edg->GetOtherNodeNum(inst_->GetNum());
       InstCount nghbrNewBound = newBound + edgLbl;
 
       if (nghbrNewBound > nghbr->GetCrntLwrBound(dir)) {
