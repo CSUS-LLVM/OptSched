@@ -1861,17 +1861,9 @@ void ACOScheduler::AllocDevArraysForParallelACO() {
   // Alloc dev array for avlblSlotsInCrntCycle_
   memSize = sizeof(int16_t) * issuTypeCnt_ * numThreads_;
   gpuErrchk(hipMalloc(&dev_avlblSlotsInCrntCycle_, memSize));
-  // Alloc dev arrays of avlblSlotsInCrntCycle_ for each thread
-  // memSize = sizeof(int16_t) * issuTypeCnt_;
-  // for (int i = 0; i < numThreads_; i++) {
-  //   gpuErrchk(hipMalloc(&dev_avlblSlotsInCrntCycle_[i], memSize));
-  // }
   // Alloc dev arrays for rsrvSlots_
   memSize = sizeof(ReserveSlot) * issuRate_ * numThreads_;
   gpuErrchk(hipMalloc(&dev_rsrvSlots_, memSize));
-  // for (int i = 0; i < numThreads_; i++) {
-  //   gpuErrchk(hipMalloc(&dev_rsrvSlots_[i], memSize));
-  // }
   memSize = sizeof(int16_t) * numThreads_;
   gpuErrchk(hipMalloc(&dev_rsrvSlotCnt_, memSize));
 }
@@ -1925,11 +1917,6 @@ void ACOScheduler::CopyPointersToDevice(ACOScheduler *dev_ACOSchedulr) {
   gpuErrchk(hipMalloc(&dev_ACOSchedulr->dev_kHelper, memSize));
   gpuErrchk(hipMemcpy(dev_ACOSchedulr->dev_kHelper, kHelper, memSize,
 		       hipMemcpyHostToDevice));
-  // make sure hipMallocManaged memory is copied to device before kernel start
-  //memSize = sizeof(int16_t *) * numThreads_;
-  //gpuErrchk(hipMemPrefetchAsync(dev_avlblSlotsInCrntCycle_, memSize, 0));
-  //memSize = sizeof(ReserveSlot *) * numThreads_;
-  //gpuErrchk(hipMemPrefetchAsync(dev_rsrvSlots_, memSize, 0));
 }
 
 void ACOScheduler::FreeDevicePointers() {
@@ -1940,10 +1927,6 @@ void ACOScheduler::FreeDevicePointers() {
   hipFree(dev_isCrntCycleBlkd_);
   hipFree(slotsPerTypePerCycle_);
   hipFree(instCntPerIssuType_);
-  for (int i = 0; i < numThreads_; i++){
-    //hipFree(dev_avlblSlotsInCrntCycle_[i]);
-    //hipFree(dev_rsrvSlots_[i]);
-  }
   hipFree(dev_MaxScoringInst);
   readyLs->FreeDevicePointers();
   hipFree(dev_avlblSlotsInCrntCycle_);

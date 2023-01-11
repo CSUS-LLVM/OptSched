@@ -179,12 +179,14 @@ protected:
   int16_t *avlblSlotsInCrntCycle_;
   // pointer to a device array used to store avlblSlotsInCrntCycle_ for
   // each thread by parallel ACO
+  // Indexed by GLOBALTID * num issue types + issue type
   int16_t *dev_avlblSlotsInCrntCycle_;
 
   // The reserved scheduling slots.
   ReserveSlot *rsrvSlots_;
   // pointer to a device array used to store rsrvSlots_ for
   // each thread by parallel ACO
+  // Indexed by GLOBALTID * issue rate + issue slot number
   ReserveSlot *dev_rsrvSlots_;
   // The number of elements in rsrvSlots_.
   int16_t rsrvSlotCnt_;

@@ -72,6 +72,7 @@ private:
   int *sumOfLiveIntervalLengths_;
   // pointer to a device array used to store sumOfLiveIntervalLengths_ for
   // each thread by parallel ACO
+  // Indexed by register type * NUMTHREADS + GLOBALTID
   int *dev_sumOfLiveIntervalLengths_;
 
   InstCount staticSlilLowerBound_ = 0;
@@ -102,15 +103,18 @@ private:
   InstCount *spillCosts_;
   // pointer to a device array used to store spillCosts_ for
   // each thread by parallel ACO
+  // Indexed by instruction number * NUMTHREADS + GLOBALTID
   InstCount *dev_spillCosts_;
   // Current register pressure for each register type.
   SmallVector<unsigned, 8> regPressures_;
   // pointer to a device array used to store regPressures_ for
   // each thread by parallel ACO
+  // Indexed by register type * NUMTHREADS + GLOBALTID
   unsigned *dev_regPressures_;
   InstCount *peakRegPressures_;
   // pointer to a device array used to store peakRegPressures_ for
   // each thread by parallel ACO
+  // Indexed by register type * NUMTHREADS + GLOBALTID
   InstCount *dev_peakRegPressures_;
 
   InstCount crntStepNum_;
