@@ -3699,7 +3699,6 @@ void DataDepGraph::CopyPointersToDevice(DataDepGraph *dev_DDG, int numThreads) {
   scsrs_ = new int[lngthScsrElmnts];
   latencies_ = new int[lngthScsrElmnts];
   predOrder_ = new int[lngthScsrElmnts];
-  // TODO(bruce): free
   uses_ = new RegIndxTuple[lengthUses];
   defs_ = new RegIndxTuple[lengthDefs];
   ltncyPerPrdcsr_ = new int[lengthLatencies];
@@ -3737,7 +3736,6 @@ void DataDepGraph::CopyPointersToDevice(DataDepGraph *dev_DDG, int numThreads) {
     numUses = insts_[i].GetUses(myUses);
     for (int j = 0; j < numUses; j++) {
       uses_[indexUseOffset++] = myUses[j]; 
-      // TODO(bruce): set SchedInstruction field accordingly
     }
 
     // Partition defs_ for each SchedInstruction.
@@ -3746,7 +3744,6 @@ void DataDepGraph::CopyPointersToDevice(DataDepGraph *dev_DDG, int numThreads) {
     numDefs = insts_[i].GetDefs(myDefs);
     for (int j = 0; j < numDefs; j++) {
       defs_[indexDefOffset++] = myDefs[j]; 
-      // TODO(bruce): set SchedInstruction field accordingly
     }
 
     // Partition ltncyPerPrdcsr_ for each SchedInstruction.

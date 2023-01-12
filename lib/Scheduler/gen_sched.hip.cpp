@@ -56,7 +56,6 @@ __host__ __device__
 void ConstrainedScheduler::ResetRsrvSlots_() {
   assert(includesUnpipelined_);
 #ifdef __HIP_DEVICE_COMPILE__
-  //assert(dev_rsrvSlots_[GLOBALTID*issuRate] != NULL);
 
   for (int i = 0; i < issuRate_; i++) {
     dev_rsrvSlots_[GLOBALTID*issuRate_+i].strtCycle = INVALID_VALUE;
