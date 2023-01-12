@@ -3003,8 +3003,8 @@ __device__
 void InstSchedule::Dev_SetSpillCosts(InstCount *spillCosts) {
   totSpillCost_ = 0;
   for (InstCount i = 0; i < totInstCnt_; i++) {
-    dev_spillCosts_[i] = spillCosts[i*NUMTHREADS+GLOBALTID];
-    totSpillCost_ += spillCosts[i*NUMTHREADS+GLOBALTID];
+    dev_spillCosts_[i] = spillCosts[i*numThreads_+GLOBALTID];
+    totSpillCost_ += spillCosts[i*numThreads_+GLOBALTID];
   }  
 }
 
@@ -3025,7 +3025,7 @@ __device__
 void InstSchedule::Dev_SetPeakRegPressures(InstCount *peakRegPressures) {
   int regTypeCount = dev_machMdl_->GetRegTypeCnt();
   for (InstCount i = 0; i < regTypeCount; i++) {
-    dev_peakRegPressures_[i] = peakRegPressures[i*NUMTHREADS+GLOBALTID];
+    dev_peakRegPressures_[i] = peakRegPressures[i*numThreads_+GLOBALTID];
   }
 }
 
