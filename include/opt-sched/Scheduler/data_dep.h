@@ -363,6 +363,9 @@ public:
   RegIndxTuple* defs_;
   int* ltncyPerPrdcsr_;
 
+  // Number of threads used by parallel ACO.
+  int numThreads_;
+
   // Tracks all registers in the scheduling region. Each RegisterFile
   // object holds all registers for a given register type.
   RegisterFile *RegFiles;

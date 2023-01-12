@@ -13,6 +13,7 @@
 #include "opt-sched/Scheduler/stats.h"
 #include "opt-sched/Scheduler/dev_defines.h"
 #include "opt-sched/Scheduler/aco.h"
+#include "opt-sched/Scheduler/config.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/Debug.h"
 #include <hip/hip_runtime.h>
@@ -228,6 +229,11 @@ DataDepGraph::DataDepGraph(MachineModel *machMdl, LATENCY_PRECISION ltncyPrcsn)
 #endif
 
   RegFiles = new RegisterFile[machMdl_->GetRegTypeCnt()];
+
+  Config &schedIni = SchedulerOptions::getInstance();
+  numThreads_ = numBlocks_ * NUMTHREADSPERBLOCK;
+  if(!DEV_ACO || count_ < REGION_MIN_SIZE)
+    numThreads_ = schedIni.GetInt("HOST_ANTS");
 }
 
 __host__

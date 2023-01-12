@@ -9,10 +9,6 @@ Last Update:  Apr. 2011
 #ifndef OPTSCHED_SPILL_BB_SPILL_H
 #define OPTSCHED_SPILL_BB_SPILL_H
 
-#ifndef NUMTHREADS
-#define NUMTHREADS hipBlockDim_x * hipGridDim_x
-#endif
-
 #include "opt-sched/Scheduler/OptSchedTarget.h"
 #include "opt-sched/Scheduler/defines.h"
 #include "opt-sched/Scheduler/sched_region.h"
@@ -52,6 +48,9 @@ private:
 
   int16_t regTypeCnt_;
   RegisterFile *regFiles_;
+
+  // Number of threads used by parallel ACO.
+  int numThreads_;
 
   // A bit vector indexed by register number indicating whether that
   // register is live
