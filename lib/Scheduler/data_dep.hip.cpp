@@ -3780,9 +3780,6 @@ void DataDepGraph::CopyPointersToDevice(DataDepGraph *dev_DDG, int numThreads) {
   gpuErrchk(hipMalloc(&(dev_DDG->defs_), memSize));
   gpuErrchk(hipMemcpy(dev_DDG->defs_, defs_, memSize, hipMemcpyHostToDevice));
 
-  delete[] uses_;
-  delete[] defs_;
-
   memSize = sizeof(int) * lengthLatencies;
   gpuErrchk(hipMalloc(&(dev_DDG->ltncyPerPrdcsr_), memSize));
   gpuErrchk(hipMemcpy(dev_DDG->ltncyPerPrdcsr_, ltncyPerPrdcsr_, memSize, hipMemcpyHostToDevice));
@@ -3791,6 +3788,14 @@ void DataDepGraph::CopyPointersToDevice(DataDepGraph *dev_DDG, int numThreads) {
   gpuErrchk(hipMemPrefetchAsync(dev_insts, memSize, 0));
   memSize = sizeof(RegisterFile) * machMdl_->GetRegTypeCnt();
   gpuErrchk(hipMemPrefetchAsync(dev_regFiles, memSize, 0));
+
+  // Clean up temporary host arrays
+  delete[] scsrs_;
+  delete[] latencies_;
+  delete[] predOrder_;
+  delete[] ltncyPerPrdcsr_;
+  delete[] uses_;
+  delete[] defs_;
 }
 
 void DataDepGraph::FreeDevicePointers(int numThreads) {
