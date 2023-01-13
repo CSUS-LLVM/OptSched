@@ -222,7 +222,7 @@ public:
 private:
   int16_t regType_;
   int physRegCnt_;
-  mutable Register **Regs;
+  mutable Register *Regs;
   int Regs_alloc_;
   int Regs_size_;
 };

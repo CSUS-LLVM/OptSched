@@ -115,6 +115,8 @@ Register &Register::operator=(const Register &rhs) {
   if (this != &rhs) {
     num_ = rhs.num_;
     type_ = rhs.type_;
+    useCnt_ = rhs.useCnt_;
+    defCnt_ = rhs.defCnt_;
   }
 
   return *this;
@@ -207,8 +209,6 @@ RegisterFile::RegisterFile() {
 __host__
 RegisterFile::~RegisterFile() {
   if (Regs) {
-    for (int i = 0; i < Regs_size_; i++)
-      delete Regs[i];
     delete[] Regs;
   }
 }
@@ -225,31 +225,26 @@ void RegisterFile::SetRegType(int16_t regType) { regType_ = regType; }
 __host__ __device__
 void RegisterFile::ResetCrntUseCnts() {
   for (int i = 0; i < getCount(); i++) {
-    Regs[i]->ResetCrntUseCnt();
+    (Regs + i)->ResetCrntUseCnt();
   }
 }
 
 __host__ __device__
 void RegisterFile::ResetCrntLngths() {
   for (int i = 0; i < getCount(); i++) {
-    Regs[i]->ResetCrntLngth();
+    (Regs + i)->ResetCrntLngth();
   }
 }
 
 Register *RegisterFile::getNext() {
   size_t RegNum = Regs_size_;
-  Register *Reg = new Register;
-  Reg->SetType(regType_);
-  Reg->SetNum(RegNum);
-  //Regs.push_back(std::move(Reg));
-
   if (Regs_alloc_ == Regs_size_) {
     if (Regs_alloc_ > 0)
       Regs_alloc_ *= 2;
     else
       Regs_alloc_ = 2;
 
-    Register **resized = new Register *[Regs_alloc_];
+    Register *resized = new Register [Regs_alloc_];
     //copy contents of old array
     for (int i = 0; i < Regs_size_; i++)
       resized[i] = Regs[i];
@@ -257,9 +252,10 @@ Register *RegisterFile::getNext() {
     delete[] Regs;
     Regs = resized;
   }
-  Regs[Regs_size_++] = std::move(Reg);
+  Regs[Regs_size_].SetType(regType_);
+  Regs[Regs_size_++].SetNum(RegNum);
 
-  return Regs[RegNum];
+  return Regs + RegNum;
 }
 
 __host__
@@ -271,20 +267,18 @@ void RegisterFile::SetRegCnt(int regCnt) {
   if (Regs_size_ > 0)
     delete[] Regs;
   Regs_size_ = Regs_alloc_ = regCnt;
-  Regs = new Register *[Regs_alloc_];
+  Regs = new Register [Regs_alloc_];
 
   for (int i = 0; i < getCount(); i++) {
-    Register *Reg = new Register;
-    Reg->SetType(regType_);
-    Reg->SetNum(i);
-    Regs[i] = Reg;
+    Regs[i].SetType(regType_);
+    Regs[i].SetNum(i);
   }
 }
 
 __host__ __device__
 Register *RegisterFile::GetReg(int num) const {
   if (num >= 0 && num < getCount()) {
-    return Regs[num];
+    return Regs + num;
   } else {
     return NULL;
   }
@@ -292,8 +286,8 @@ Register *RegisterFile::GetReg(int num) const {
 
 Register *RegisterFile::FindLiveReg(int physNum) const {
   for (int i = 0; i < getCount(); i++) {
-    if (Regs[i]->GetPhysicalNumber() == physNum && Regs[i]->IsLive() == true)
-      return Regs[i];
+    if ((Regs + i)->GetPhysicalNumber() == physNum && (Regs + i)->IsLive() == true)
+      return Regs + i;
   }
   return NULL;
 }
@@ -302,9 +296,9 @@ Register *RegisterFile::FindLiveReg(int physNum) const {
 int RegisterFile::FindPhysRegCnt() {
   int maxPhysNum = -1;
   for (int i = 0; i < getCount(); i++) {
-    if (Regs[i]->GetPhysicalNumber() != INVALID_VALUE &&
-        Regs[i]->GetPhysicalNumber() > maxPhysNum)
-      maxPhysNum = Regs[i]->GetPhysicalNumber();
+    if ((Regs + i)->GetPhysicalNumber() != INVALID_VALUE &&
+        (Regs + i)->GetPhysicalNumber() > maxPhysNum)
+      maxPhysNum = (Regs + i)->GetPhysicalNumber();
   }
 
   // Assume that physical registers are given sequential numbers
@@ -318,19 +312,19 @@ int RegisterFile::GetPhysRegCnt() const { return physRegCnt_; }
 
 void RegisterFile::SetupConflicts() {
   for (int i = 0; i < getCount(); i++)
-    Regs[i]->SetupConflicts(getCount());
+    (Regs + i)->SetupConflicts(getCount());
 }
 
 __host__ __device__
 void RegisterFile::ResetConflicts() {
   for (int i = 0; i < getCount(); i++)
-    Regs[i]->ResetConflicts();
+    (Regs + i)->ResetConflicts();
 }
 
 int RegisterFile::GetConflictCnt() {
   int cnflctCnt = 0;
   for (int i = 0; i < getCount(); i++) {
-    cnflctCnt += Regs[i]->GetConflictCnt();
+    cnflctCnt += (Regs + i)->GetConflictCnt();
   }
   return cnflctCnt;
 }
@@ -340,9 +334,9 @@ void RegisterFile::AddConflictsWithLiveRegs(int regNum, int liveRegCnt) {
   bool isSpillCnddt = (liveRegCnt + 1) > physRegCnt_;
   int conflictCnt = 0;
   for (int i = 0; i < getCount(); i++) {
-    if (i != regNum && Regs[i]->IsLive() == true) {
-      Regs[i]->AddConflict(regNum, isSpillCnddt);
-      Regs[regNum]->AddConflict(i, isSpillCnddt);
+    if (i != regNum && (Regs + i)->IsLive() == true) {
+      (Regs + i)->AddConflict(regNum, isSpillCnddt);
+      (Regs + regNum)->AddConflict(i, isSpillCnddt);
       conflictCnt++;
     }
     if (conflictCnt == liveRegCnt)
@@ -357,8 +351,8 @@ void RegisterFile::Reset() {
   ResetCrntLngths();
   
   for (int i = 0; i < getCount(); i++) {
-    Regs[i]->ResetDefsAndUses();
-    Regs[i]->ResetLiveIntervals();
+    (Regs + i)->ResetDefsAndUses();
+    (Regs + i)->ResetLiveIntervals();
   }
 }
 
@@ -366,36 +360,23 @@ void RegisterFile::CopyPointersToDevice(RegisterFile *dev_regFile) {
   //remove reference to host pointer
   dev_regFile->Regs = NULL;
   //declare and allocate array of pointers
-  Register **dev_regs = NULL;
+  Register *dev_regs = NULL;
   size_t memSize;
   //allocate device memory
-  memSize = getCount() * sizeof(Register *);
-  gpuErrchk(hipMallocManaged((void**)&dev_regs, memSize));
+  memSize = getCount() * sizeof(Register);
+  gpuErrchk(hipMallocManaged(&dev_regs, memSize));
   //copy array of host pointers to device
   gpuErrchk(hipMemcpy(dev_regs, Regs, memSize, hipMemcpyHostToDevice));
   //copy each register to device and update its pointer in dev_regs
-  Register *dev_reg = NULL;
-  for (int i = 0; i < getCount(); i++) {
-    //allocate device memory
-    // managed for deleting later
-    gpuErrchk(hipMallocManaged((void**)&dev_reg, sizeof(Register)));
-    //copy register to device
-    gpuErrchk(hipMemcpy(dev_reg, Regs[i], sizeof(Register), 
-			 hipMemcpyHostToDevice));
-    //update dev_regs pointer
-    gpuErrchk(hipMemcpy(&dev_regs[i], &dev_reg, sizeof(Register *), 
-			 hipMemcpyHostToDevice));
-  }
   //update dev_regFile->Regs pointer
   dev_regFile->Regs = dev_regs;
-  memSize = getCount() * sizeof(Register *);
+  memSize = getCount() * sizeof(Register);
   //gpuErrchk(hipMemPrefetchAsync(dev_regs, memSize, 0));
 }
 
 void RegisterFile::FreeDevicePointers() {
   for (int i = 0; i < getCount(); i++) {
-    Regs[i]->FreeDevicePointers();
-    hipFree(Regs[i]);
+    (Regs + i)->FreeDevicePointers();
   }
   hipFree(Regs);
 }

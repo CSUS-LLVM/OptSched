@@ -573,7 +573,7 @@ void BBWithSpill::UpdateSpillInfoForSchdul_(SchedInstruction *inst,
 
 #ifdef __HIP_DEVICE_COMPILE__ // Device Version of function
 #ifdef IS_DEBUG_REG_PRESSURE
-  Logger::Info("Updating reg pressure after scheduling Inst %d",
+  printf("Updating reg pressure after scheduling Inst %d\n",
                inst->GetNum());
 #endif
 
