@@ -13,6 +13,7 @@
 #include "opt-sched/Scheduler/stats.h"
 #include "opt-sched/Scheduler/dev_defines.h"
 #include "opt-sched/Scheduler/aco.h"
+#include "opt-sched/Scheduler/config.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/Debug.h"
 #include <hip/hip_runtime.h>
@@ -236,6 +237,10 @@ DataDepGraph::~DataDepGraph() {
     delete[] insts_;
   }
   delete[] instCntPerType_;
+}
+
+void DataDepGraph::SetNumThreads(int numThreads) {
+  numThreads_ = numThreads;
 }
 
 __host__
@@ -2790,6 +2795,11 @@ bool InstSchedule::operator==(InstSchedule &b) const {
 }
 
 __host__ __device__
+void InstSchedule::SetNumThreads(int numThreads) {
+  numThreads_ = numThreads;
+}
+
+__host__ __device__
 bool InstSchedule::AppendInst(InstCount instNum) {
 #ifdef __HIP_DEVICE_COMPILE__
   assert(crntSlotNum_ < totSlotCnt_);
@@ -2994,11 +3004,11 @@ void InstSchedule::SetSpillCosts(InstCount spillCosts[]) {
 }
 
 __device__
-void InstSchedule::Dev_SetSpillCosts(InstCount **spillCosts) {
+void InstSchedule::Dev_SetSpillCosts(InstCount *spillCosts) {
   totSpillCost_ = 0;
   for (InstCount i = 0; i < totInstCnt_; i++) {
-    dev_spillCosts_[i] = spillCosts[i][GLOBALTID];
-    totSpillCost_ += spillCosts[i][GLOBALTID];
+    dev_spillCosts_[i] = spillCosts[i*numThreads_+GLOBALTID];
+    totSpillCost_ += spillCosts[i*numThreads_+GLOBALTID];
   }  
 }
 
@@ -3016,9 +3026,10 @@ void InstSchedule::SetPeakRegPressures(InstCount peakRegPressures[]) {
 }
 
 __device__
-void InstSchedule::Dev_SetPeakRegPressures(InstCount **peakRegPressures) {
-  for (InstCount i = 0; i < dev_machMdl_->GetRegTypeCnt(); i++) {
-    dev_peakRegPressures_[i] = peakRegPressures[i][GLOBALTID];
+void InstSchedule::Dev_SetPeakRegPressures(InstCount *peakRegPressures) {
+  int regTypeCount = dev_machMdl_->GetRegTypeCnt();
+  for (InstCount i = 0; i < regTypeCount; i++) {
+    dev_peakRegPressures_[i] = peakRegPressures[i*numThreads_+GLOBALTID];
   }
 }
 
@@ -3654,23 +3665,34 @@ void DataDepGraph::CopyPointersToDevice(DataDepGraph *dev_DDG, int numThreads) {
   // used to malloc the large elements array
   int lngthScsrElmnts = 0;
   int lengthLatencies = 0;
+  int lengthUses = 0;
+  int lengthDefs = 0;
   for (InstCount i = 0; i < instCnt_; i++) {
     lngthScsrElmnts += insts_[i].GetScsrCnt();
     lengthLatencies += insts_[i].GetPrdcsrCnt();
+    lengthUses += insts_[i].GetUseCnt();
+    lengthDefs += insts_[i].GetDefCnt();
   }
 
   scsrs_ = new int[lngthScsrElmnts];
   latencies_ = new int[lngthScsrElmnts];
   predOrder_ = new int[lngthScsrElmnts];
+  uses_ = new RegIndxTuple[lengthUses];
+  defs_ = new RegIndxTuple[lengthDefs];
   ltncyPerPrdcsr_ = new int[lengthLatencies];
 
   int indexOffset = 0;
   int indexPredecessorOffset = 0;
+  int indexUseOffset = 0;
+  int indexDefOffset = 0;
 
   for (InstCount i = 0; i < instCnt_; i++) {
     DependenceType _dep;
     insts_[i].ddgIndex = indexOffset;
     insts_[i].ddgPredecessorIndex = indexPredecessorOffset;
+    insts_[i].ddgUseIndex = indexUseOffset;
+    insts_[i].ddgDefIndex = indexDefOffset;
+
 
     int prdcsrNum, latency, toNodeNum;
     // Partition scsrs_, latencies_, predOrder_ for each SchedInstruction.
@@ -3684,6 +3706,22 @@ void DataDepGraph::CopyPointersToDevice(DataDepGraph *dev_DDG, int numThreads) {
         latencies_[indexOffset] = latency;
         predOrder_[indexOffset] = prdcsrNum;
         indexOffset += 1;
+    }
+
+    // Partition uses_ for each SchedInstruction.
+    RegIndxTuple *myUses;
+    int numUses;
+    numUses = insts_[i].GetUses(myUses);
+    for (int j = 0; j < numUses; j++) {
+      uses_[indexUseOffset++] = myUses[j]; 
+    }
+
+    // Partition defs_ for each SchedInstruction.
+    RegIndxTuple *myDefs;
+    int numDefs;
+    numDefs = insts_[i].GetDefs(myDefs);
+    for (int j = 0; j < numDefs; j++) {
+      defs_[indexDefOffset++] = myDefs[j]; 
     }
 
     // Partition ltncyPerPrdcsr_ for each SchedInstruction.
@@ -3712,6 +3750,14 @@ void DataDepGraph::CopyPointersToDevice(DataDepGraph *dev_DDG, int numThreads) {
   gpuErrchk(hipMemcpy(dev_DDG->latencies_, latencies_, memSize, hipMemcpyHostToDevice));
   gpuErrchk(hipMemcpy(dev_DDG->predOrder_, predOrder_, memSize, hipMemcpyHostToDevice));
 
+  memSize = sizeof(RegIndxTuple) * lengthUses;
+  gpuErrchk(hipMalloc(&(dev_DDG->uses_), memSize));
+  gpuErrchk(hipMemcpy(dev_DDG->uses_, uses_, memSize, hipMemcpyHostToDevice));
+
+  memSize = sizeof(RegIndxTuple) * lengthDefs;
+  gpuErrchk(hipMalloc(&(dev_DDG->defs_), memSize));
+  gpuErrchk(hipMemcpy(dev_DDG->defs_, defs_, memSize, hipMemcpyHostToDevice));
+
   memSize = sizeof(int) * lengthLatencies;
   gpuErrchk(hipMalloc(&(dev_DDG->ltncyPerPrdcsr_), memSize));
   gpuErrchk(hipMemcpy(dev_DDG->ltncyPerPrdcsr_, ltncyPerPrdcsr_, memSize, hipMemcpyHostToDevice));
@@ -3720,6 +3766,14 @@ void DataDepGraph::CopyPointersToDevice(DataDepGraph *dev_DDG, int numThreads) {
   gpuErrchk(hipMemPrefetchAsync(dev_insts, memSize, 0));
   memSize = sizeof(RegisterFile) * machMdl_->GetRegTypeCnt();
   gpuErrchk(hipMemPrefetchAsync(dev_regFiles, memSize, 0));
+
+  // Clean up temporary host arrays
+  delete[] scsrs_;
+  delete[] latencies_;
+  delete[] predOrder_;
+  delete[] ltncyPerPrdcsr_;
+  delete[] uses_;
+  delete[] defs_;
 }
 
 void DataDepGraph::FreeDevicePointers(int numThreads) {
@@ -3732,6 +3786,8 @@ void DataDepGraph::FreeDevicePointers(int numThreads) {
   hipFree(scsrs_);
   hipFree(latencies_);
   hipFree(predOrder_);
+  hipFree(uses_);
+  hipFree(defs_);
   hipFree(ltncyPerPrdcsr_);
 }
 

@@ -65,7 +65,8 @@ private:
   int *sumOfLiveIntervalLengths_;
   // pointer to a device array used to store sumOfLiveIntervalLengths_ for
   // each thread by parallel ACO
-  int **dev_sumOfLiveIntervalLengths_;
+  // Indexed by register type * numThreads_ + GLOBALTID
+  int *dev_sumOfLiveIntervalLengths_;
 
   InstCount staticSlilLowerBound_ = 0;
 
@@ -89,16 +90,19 @@ private:
   InstCount *spillCosts_;
   // pointer to a device array used to store spillCosts_ for
   // each thread by parallel ACO
-  InstCount **dev_spillCosts_;
+  // Indexed by instruction number * numThreads_ + GLOBALTID
+  InstCount *dev_spillCosts_;
   // Current register pressure for each register type.
   SmallVector<unsigned, 8> regPressures_;
   // pointer to a device array used to store regPressures_ for
   // each thread by parallel ACO
-  unsigned **dev_regPressures_;
+  // Indexed by register type * numThreads_ + GLOBALTID
+  unsigned *dev_regPressures_;
   InstCount *peakRegPressures_;
   // pointer to a device array used to store peakRegPressures_ for
   // each thread by parallel ACO
-  InstCount **dev_peakRegPressures_;
+  // Indexed by register type * numThreads_ + GLOBALTID
+  InstCount *dev_peakRegPressures_;
 
   InstCount crntStepNum_;
   // pointer to a device array used to store crntStepNum_ for
@@ -178,6 +182,10 @@ public:
 	      MachineModel *dev_machMdl);
   ~BBWithSpill();
 
+  __device__
+  InstCount getAMDGPUCost(unsigned * PRP, unsigned TargetOccupancy,
+                               unsigned MaxOccLDS, int16_t regTypeCnt);
+
   InstCount CmputCostLwrBound();
   InstCount CmputExecCostLwrBound();
   InstCount CmputRPCostLwrBound();
@@ -233,7 +241,7 @@ public:
   __host__ __device__
   bool IsRPHigh(int regType) const {
     #ifdef __HIP_DEVICE_COMPILE__
-    return dev_regPressures_[regType][GLOBALTID] > (unsigned int) machMdl_->GetPhysRegCnt(regType);
+    return dev_regPressures_[regType*numThreads_+GLOBALTID] > (unsigned int) machMdl_->GetPhysRegCnt(regType);
     #else
       return regPressures_[regType] > (unsigned int) machMdl_->GetPhysRegCnt(regType);
     #endif

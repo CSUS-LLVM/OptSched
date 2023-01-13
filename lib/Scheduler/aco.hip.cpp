@@ -70,6 +70,10 @@ ACOScheduler::ACOScheduler(DataDepGraph *dataDepGraph,
   numThreads_ = numBlocks_ * NUMTHREADSPERBLOCK;
   if(!DEV_ACO || count_ < REGION_MIN_SIZE)
     numThreads_ = schedIni.GetInt("HOST_ANTS");
+  else {
+    dev_rgn_->SetNumThreads(numThreads_);
+    dev_DDG_->SetNumThreads(numThreads_);
+  }
 
   use_fixed_bias = schedIni.GetBool("ACO_USE_FIXED_BIAS");
   use_tournament = schedIni.GetBool("ACO_TOURNAMENT");
@@ -301,11 +305,13 @@ InstCount ACOScheduler::SelectInstruction(SchedInstruction *lastInst, InstCount 
 
         // check if any reg types used by the instructions are above the physical register limit
         SchedInstruction *tempInst = dataDepGraph_->GetInstByIndx(*dev_readyLs->getInstIdAtIndex(I));
+        // TODO(bruce): convert to dev uses
         RegIndxTuple *uses;
         Register *use;
-        uint16_t usesCount = tempInst->GetUses(uses);
+        uint16_t usesCount = tempInst->GetUseCnt();
+        int useStart = tempInst->ddgUseIndex;
         for (uint16_t i = 0; i < usesCount; i++) {
-          use = dataDepGraph_->getRegByTuple(&uses[i]);
+          use = dataDepGraph_->getRegByTuple(dataDepGraph_->getUseByIndex(useStart + i));
           int16_t regType = use->GetType();
           if ( ((BBWithSpill *)rgn)->IsRPHigh(regType) ) {
             RPIsHigh = true;
@@ -536,6 +542,7 @@ InstSchedule *ACOScheduler::FindOneSchedule(InstCount RPTarget,
   SchedInstruction *lastInst = NULL;
   ACOReadyListEntry LastInstInfo;
   InstSchedule *schedule = dev_schedule;
+  schedule->SetNumThreads(numThreads_);
   bool IsSecondPass = dev_rgn_->IsSecondPass();
   dev_readyLs->clearReadyList();
   ScRelMax = dev_rgn_->GetHeuristicCost();
@@ -1854,20 +1861,11 @@ void ACOScheduler::AllocDevArraysForParallelACO() {
   memSize = sizeof(InstCount) * numThreads_;
   gpuErrchk(hipMalloc(&dev_MaxScoringInst, memSize));
   // Alloc dev array for avlblSlotsInCrntCycle_
-  memSize = sizeof(int16_t *) * numThreads_;
-  gpuErrchk(hipMallocManaged(&dev_avlblSlotsInCrntCycle_, memSize));
-  // Alloc dev arrays of avlblSlotsInCrntCycle_ for each thread
-  memSize = sizeof(int16_t) * issuTypeCnt_;
-  for (int i = 0; i < numThreads_; i++) {
-    gpuErrchk(hipMalloc(&dev_avlblSlotsInCrntCycle_[i], memSize));
-  }
+  memSize = sizeof(int16_t) * issuTypeCnt_ * numThreads_;
+  gpuErrchk(hipMalloc(&dev_avlblSlotsInCrntCycle_, memSize));
   // Alloc dev arrays for rsrvSlots_
-  memSize = sizeof(ReserveSlot *) * numThreads_;
-  gpuErrchk(hipMallocManaged(&dev_rsrvSlots_, memSize));
-  memSize = sizeof(ReserveSlot) * issuRate_;
-  for (int i = 0; i < numThreads_; i++) {
-    gpuErrchk(hipMalloc(&dev_rsrvSlots_[i], memSize));
-  }
+  memSize = sizeof(ReserveSlot) * issuRate_ * numThreads_;
+  gpuErrchk(hipMalloc(&dev_rsrvSlots_, memSize));
   memSize = sizeof(int16_t) * numThreads_;
   gpuErrchk(hipMalloc(&dev_rsrvSlotCnt_, memSize));
 }
@@ -1921,11 +1919,6 @@ void ACOScheduler::CopyPointersToDevice(ACOScheduler *dev_ACOSchedulr) {
   gpuErrchk(hipMalloc(&dev_ACOSchedulr->dev_kHelper, memSize));
   gpuErrchk(hipMemcpy(dev_ACOSchedulr->dev_kHelper, kHelper, memSize,
 		       hipMemcpyHostToDevice));
-  // make sure hipMallocManaged memory is copied to device before kernel start
-  memSize = sizeof(int16_t *) * numThreads_;
-  gpuErrchk(hipMemPrefetchAsync(dev_avlblSlotsInCrntCycle_, memSize, 0));
-  memSize = sizeof(ReserveSlot *) * numThreads_;
-  gpuErrchk(hipMemPrefetchAsync(dev_rsrvSlots_, memSize, 0));
 }
 
 void ACOScheduler::FreeDevicePointers() {
@@ -1935,10 +1928,6 @@ void ACOScheduler::FreeDevicePointers() {
   hipFree(dev_isCrntCycleBlkd_);
   hipFree(slotsPerTypePerCycle_);
   hipFree(instCntPerIssuType_);
-  for (int i = 0; i < numThreads_; i++){
-    hipFree(dev_avlblSlotsInCrntCycle_[i]);
-    hipFree(dev_rsrvSlots_[i]);
-  }
   hipFree(dev_MaxScoringInst);
   readyLs->FreeDevicePointers();
   hipFree(dev_avlblSlotsInCrntCycle_);

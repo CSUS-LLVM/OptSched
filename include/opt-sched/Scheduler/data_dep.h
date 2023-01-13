@@ -199,6 +199,8 @@ public:
   __host__
   virtual ~DataDepGraph();
 
+  void SetNumThreads(int numThreads);
+
   //Prevent DDG from being abstract, these should not actually be invoked
   virtual void convertSUnits(bool IgnoreRealEdges, bool IgnoreArtificialEdges) {
     Logger::Fatal("Wrong convertSUnits called");
@@ -346,11 +348,25 @@ public:
   Register *getRegByTuple(RegIndxTuple *tuple) { 
     return RegFiles[tuple->regType_].GetReg(tuple->regNum_); 
   }
+  __host__ __device__
+  RegIndxTuple *getUseByIndex(int index) {
+    return uses_ + index;
+  }
+
+  __host__ __device__
+  RegIndxTuple *getDefByIndex(int index) {
+    return defs_ + index;
+  }
 
   int* scsrs_;
   int* latencies_;
   int* predOrder_;
+  RegIndxTuple* uses_;
+  RegIndxTuple* defs_;
   int* ltncyPerPrdcsr_;
+
+  // Number of threads used by parallel ACO.
+  int numThreads_;
 
   // Tracks all registers in the scheduling region. Each RegisterFile
   // object holds all registers for a given register type.
@@ -742,6 +758,9 @@ private:
   int totalStalls_, unnecessaryStalls_;
   bool isZeroPerp_;
 
+  // Number of threads used by parallel ACO.
+  int numThreads_;
+
   bool VerifySlots_(MachineModel *machMdl, DataDepGraph *dataDepGraph);
   bool VerifyDataDeps_(DataDepGraph *dataDepGraph);
   __host__ __device__
@@ -818,12 +837,12 @@ public:
   void SetSpillCosts(InstCount *spillCosts);
   // Device version of set spill costs
   __device__
-  void Dev_SetSpillCosts(InstCount **spillCosts);
+  void Dev_SetSpillCosts(InstCount *spillCosts);
   __host__ __device__
   void SetPeakRegPressures(InstCount *regPressures);
   // Device version of PeakRegPressures
   __device__
-  void Dev_SetPeakRegPressures(InstCount **regPressures);
+  void Dev_SetPeakRegPressures(InstCount *regPressures);
   InstCount GetPeakRegPressures(const InstCount *&regPressures) const;
   __host__ __device__
   InstCount GetSpillCost(InstCount stepNum);
@@ -853,6 +872,10 @@ public:
   // Copies device arrays to host
   void CopyArraysToHost();
   void FreeDeviceArrays();
+
+  __host__ __device__
+  void SetNumThreads(int numThreads);
+
   // Initializes schedules on device, used between iterations of ACO
   __device__
   void Initialize();
