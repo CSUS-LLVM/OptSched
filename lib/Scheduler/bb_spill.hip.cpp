@@ -77,11 +77,6 @@ BBWithSpill::BBWithSpill(const OptSchedTarget *OST_, DataDepGraph *dataDepGraph,
   schduldEntryInstCnt_ = 0;
   schduldExitInstCnt_ = 0;
   schduldInstCnt_ = 0;
-
-  Config &schedIni = SchedulerOptions::getInstance();
-  numThreads_ = numBlocks_ * NUMTHREADSPERBLOCK;
-  if(!DEV_ACO || count_ < REGION_MIN_SIZE)
-    numThreads_ = schedIni.GetInt("HOST_ANTS");
 }
 /****************************************************************************/
 
@@ -96,6 +91,7 @@ BBWithSpill::~BBWithSpill() {
   delete[] spillCosts_;
   delete[] peakRegPressures_;
 }
+
 /*****************************************************************************/
 
 bool BBWithSpill::EnableEnum_() {
@@ -391,7 +387,7 @@ void BBWithSpill::InitForCostCmputtn_() {
   
   int _instCnt = dataDepGraph_->GetInstCnt();
   for (i = 0; i < _instCnt; i++)
-    dev_spillCosts_[i*numThreads_GLOBALTID] = 0;
+    dev_spillCosts_[i*numThreads_+GLOBALTID] = 0;
   if (needsSLIL()) {
     for (int i = 0; i < regTypeCnt_; i++)
       dev_sumOfLiveIntervalLengths_[i*numThreads_+GLOBALTID] = 0;
@@ -1253,7 +1249,7 @@ static unsigned getAdjustedOccupancy(unsigned VGPRCount, unsigned SGPRCount,
 }
 
 __device__
-static InstCount getAMDGPUCost(unsigned * PRP, unsigned TargetOccupancy,
+InstCount BBWithSpill::getAMDGPUCost(unsigned * PRP, unsigned TargetOccupancy,
                                unsigned MaxOccLDS, int16_t regTypeCnt) {
   auto Occ =
       getAdjustedOccupancy(PRP[OptSchedDDGWrapperGCN::VGPR32*numThreads_+GLOBALTID],

@@ -49,9 +49,6 @@ private:
   int16_t regTypeCnt_;
   RegisterFile *regFiles_;
 
-  // Number of threads used by parallel ACO.
-  int numThreads_;
-
   // A bit vector indexed by register number indicating whether that
   // register is live
   WeightedBitVector *liveRegs_;
@@ -71,7 +68,7 @@ private:
   int *sumOfLiveIntervalLengths_;
   // pointer to a device array used to store sumOfLiveIntervalLengths_ for
   // each thread by parallel ACO
-  // Indexed by register type * NUMTHREADS + GLOBALTID
+  // Indexed by register type * numThreads_ + GLOBALTID
   int *dev_sumOfLiveIntervalLengths_;
 
   InstCount staticSlilLowerBound_ = 0;
@@ -102,18 +99,18 @@ private:
   InstCount *spillCosts_;
   // pointer to a device array used to store spillCosts_ for
   // each thread by parallel ACO
-  // Indexed by instruction number * NUMTHREADS + GLOBALTID
+  // Indexed by instruction number * numThreads_ + GLOBALTID
   InstCount *dev_spillCosts_;
   // Current register pressure for each register type.
   SmallVector<unsigned, 8> regPressures_;
   // pointer to a device array used to store regPressures_ for
   // each thread by parallel ACO
-  // Indexed by register type * NUMTHREADS + GLOBALTID
+  // Indexed by register type * numThreads_ + GLOBALTID
   unsigned *dev_regPressures_;
   InstCount *peakRegPressures_;
   // pointer to a device array used to store peakRegPressures_ for
   // each thread by parallel ACO
-  // Indexed by register type * NUMTHREADS + GLOBALTID
+  // Indexed by register type * numThreads_ + GLOBALTID
   InstCount *dev_peakRegPressures_;
 
   InstCount crntStepNum_;
@@ -194,6 +191,10 @@ public:
 	      MachineModel *dev_machMdl);
   ~BBWithSpill();
 
+  __device__
+  InstCount getAMDGPUCost(unsigned * PRP, unsigned TargetOccupancy,
+                               unsigned MaxOccLDS, int16_t regTypeCnt);
+
   InstCount CmputCostLwrBound();
   InstCount CmputExecCostLwrBound();
   InstCount CmputRPCostLwrBound();
@@ -249,7 +250,7 @@ public:
   __host__ __device__
   bool IsRPHigh(int regType) const {
     #ifdef __HIP_DEVICE_COMPILE__
-    return dev_regPressures_[regType*NUMTHREADS+GLOBALTID] > (unsigned int) machMdl_->GetPhysRegCnt(regType);
+    return dev_regPressures_[regType*numThreads_+GLOBALTID] > (unsigned int) machMdl_->GetPhysRegCnt(regType);
     #else
       return regPressures_[regType] > (unsigned int) machMdl_->GetPhysRegCnt(regType);
     #endif

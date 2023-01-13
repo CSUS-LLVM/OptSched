@@ -122,6 +122,10 @@ void SchedRegion::UseFileBounds_() {
   schedLwrBound_ = fileLwrBound;
 }
 
+void SchedRegion::SetNumThreads(int numThreads) {
+  numThreads_ = numThreads;
+}
+
 InstSchedule *SchedRegion::AllocNewSched_() {
   InstSchedule *newSched =
       new InstSchedule(machMdl_, dataDepGraph_, vrfySched_);

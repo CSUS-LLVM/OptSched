@@ -199,6 +199,8 @@ public:
   __host__
   virtual ~DataDepGraph();
 
+  void SetNumThreads(int numThreads);
+
   //Prevent DDG from being abstract, these should not actually be invoked
   virtual void convertSUnits(bool IgnoreRealEdges, bool IgnoreArtificialEdges) {
     Logger::Fatal("Wrong convertSUnits called");
@@ -756,6 +758,9 @@ private:
   int totalStalls_, unnecessaryStalls_;
   bool isZeroPerp_;
 
+  // Number of threads used by parallel ACO.
+  int numThreads_;
+
   bool VerifySlots_(MachineModel *machMdl, DataDepGraph *dataDepGraph);
   bool VerifyDataDeps_(DataDepGraph *dataDepGraph);
   __host__ __device__
@@ -867,6 +872,10 @@ public:
   // Copies device arrays to host
   void CopyArraysToHost();
   void FreeDeviceArrays();
+
+  __host__ __device__
+  void SetNumThreads(int numThreads);
+
   // Initializes schedules on device, used between iterations of ACO
   __device__
   void Initialize();

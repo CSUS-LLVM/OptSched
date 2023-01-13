@@ -70,6 +70,10 @@ ACOScheduler::ACOScheduler(DataDepGraph *dataDepGraph,
   numThreads_ = numBlocks_ * NUMTHREADSPERBLOCK;
   if(!DEV_ACO || count_ < REGION_MIN_SIZE)
     numThreads_ = schedIni.GetInt("HOST_ANTS");
+  else {
+    dev_rgn_->SetNumThreads(numThreads_);
+    dev_DDG_->SetNumThreads(numThreads_);
+  }
 
   use_fixed_bias = schedIni.GetBool("ACO_USE_FIXED_BIAS");
   use_tournament = schedIni.GetBool("ACO_TOURNAMENT");
@@ -538,6 +542,7 @@ InstSchedule *ACOScheduler::FindOneSchedule(InstCount RPTarget,
   SchedInstruction *lastInst = NULL;
   ACOReadyListEntry LastInstInfo;
   InstSchedule *schedule = dev_schedule;
+  schedule->SetNumThreads(numThreads_);
   bool IsSecondPass = dev_rgn_->IsSecondPass();
   dev_readyLs->clearReadyList();
   ScRelMax = dev_rgn_->GetHeuristicCost();

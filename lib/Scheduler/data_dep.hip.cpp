@@ -229,11 +229,6 @@ DataDepGraph::DataDepGraph(MachineModel *machMdl, LATENCY_PRECISION ltncyPrcsn)
 #endif
 
   RegFiles = new RegisterFile[machMdl_->GetRegTypeCnt()];
-
-  Config &schedIni = SchedulerOptions::getInstance();
-  numThreads_ = numBlocks_ * NUMTHREADSPERBLOCK;
-  if(!DEV_ACO || count_ < REGION_MIN_SIZE)
-    numThreads_ = schedIni.GetInt("HOST_ANTS");
 }
 
 __host__
@@ -242,6 +237,10 @@ DataDepGraph::~DataDepGraph() {
     delete[] insts_;
   }
   delete[] instCntPerType_;
+}
+
+void DataDepGraph::SetNumThreads(int numThreads) {
+  numThreads_ = numThreads;
 }
 
 __host__
@@ -2793,6 +2792,11 @@ bool InstSchedule::operator==(InstSchedule &b) const {
       return false;
   }
   return true;
+}
+
+__host__ __device__
+void InstSchedule::SetNumThreads(int numThreads) {
+  numThreads_ = numThreads;
 }
 
 __host__ __device__
