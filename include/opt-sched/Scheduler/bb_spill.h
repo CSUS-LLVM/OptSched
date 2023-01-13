@@ -59,9 +59,6 @@ private:
   // A bit vector indexed by physical register number indicating whether
   // that physical register is live
   WeightedBitVector *livePhysRegs_;
-  // pointer to a device array used to store livePhysRegs_ for
-  // each thread by parallel ACO
-  WeightedBitVector **dev_livePhysRegs_;
 
   // Sum of lengths of live ranges. This array is indexed by register type,
   // and each type will have its sum of live interval lengths computed.
@@ -84,13 +81,7 @@ private:
   int entryInstCnt_;
   int exitInstCnt_;
   int schduldEntryInstCnt_;
-  // pointer to a device array used to store schduldEntryInstCnt_ for
-  // each thread by parallel ACO
-  int *dev_schduldEntryInstCnt_;
   int schduldExitInstCnt_;
-  // pointer to a device array used to store schduldExitInstCnt_ for
-  // each thread by parallel ACO
-  int *dev_schduldExitInstCnt_;
   int schduldInstCnt_;
   // pointer to a device array used to store schduldInstCnt_ for
   // each thread by parallel ACO

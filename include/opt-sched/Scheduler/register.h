@@ -125,8 +125,6 @@ public:
   void ResetLiveIntervals();
   // Allocates a device array that holds values for each parallel thread
   void AllocDevArrayForParallelACO(int numThreads);
-  // Copies all array/objects to device and links them to device pointer
-  void CopyPointersToDevice(Register *dev_reg);
   // Calls hipFree on all arrays/objects that were allocated with hipMalloc
   void FreeDevicePointers();
 
