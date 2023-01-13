@@ -55,6 +55,8 @@ public:
   // Destroys the region. Must be overriden by child classes.
   virtual ~SchedRegion() {}
 
+  void SetNumThreads(int numThreads_);
+
   // Returns the dependence graph of this region.
   inline DataDepGraph *GetDepGraph() { return dataDepGraph_; }
   //for updating DDG pointer to DDG created on device
@@ -186,6 +188,8 @@ protected:
   MachineModel *machMdl_;
   // Pointer to machMdl_ on the device
   MachineModel *dev_machMdl_;
+
+  int numThreads_;
 
   // The schedule currently used by the enumerator
   InstSchedule *enumCrntSched_;

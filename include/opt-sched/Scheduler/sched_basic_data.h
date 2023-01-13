@@ -488,10 +488,10 @@ public:
   void SetMustBeInBBExit(bool val);
 
   // Add a register definition to this instruction node.
-  __host__ __device__
+  __host__
   void AddDef(Register *reg);
   // Add a register usage to this instruction node.
-  __host__ __device__
+  __host__
   void AddUse(Register *reg);
   // Returns whether this instruction defines the specified register.
   __host__ __device__
@@ -502,11 +502,11 @@ public:
   
   // Retrieves the list of registers defined by this node. The array is put
   // into defs and the number of elements is returned.
-  __host__ __device__
+  __host__
   int16_t GetDefs(RegIndxTuple *&defs);
   // Retrieves the list of registers used by this node. The array is put
   // into uses and the number of elements is returned.
-  __host__ __device__
+  __host__
   int16_t GetUses(RegIndxTuple *&uses);
 
   __host__ __device__
@@ -518,7 +518,7 @@ public:
   __host__ __device__
   int16_t GetAdjustedUseCnt() { return adjustedUseCnt_; }
   // Computer the adjusted use count. Update "adjustedUseCnt_".
-  __host__ __device__
+  __host__
   void ComputeAdjustedUseCnt(SchedInstruction *inst);
 
   __host__ __device__
@@ -566,6 +566,10 @@ public:
 
   // This instruction's index in the ltncyPerPrdcsr_ array in the DDG.
   int ddgPredecessorIndex;
+
+  // This instruction's indices for the uses_ and defs_ arrays in the DDG.
+  int ddgUseIndex;
+  int ddgDefIndex;
 
   __device__
   int GetScsrCnt_();
@@ -705,11 +709,11 @@ protected:
   // Pointer to RegFiles
   RegisterFile *RegFiles_;
   // The registers defined by this instruction node.
-  RegIndxTuple defs_[MAX_DEFS_PER_INSTR];
+  RegIndxTuple *defs_;
   // The number of elements in defs.
   int16_t defCnt_;
   // The registers used by this instruction node.
-  RegIndxTuple uses_[MAX_USES_PER_INSTR];
+  RegIndxTuple *uses_;
   // The number of elements in uses.
   int16_t useCnt_;
   // The number of uses minus live-out registers. Live-out registers are uses
@@ -761,7 +765,7 @@ protected:
   __host__
   void SetScsrNums_();
   // Computer the adjusted use count. Update "adjustedUseCnt_".
-  __host__ __device__
+  __host__
   void ComputeAdjustedUseCnt_();
 };
 
