@@ -84,124 +84,43 @@ nvcc --version
 nvidia-smi
 ```
 
-## Manual Build
+## Build Instructions
 
-To manually build this, such as if you want to place OptSched inside an existing clone of flang llvm.
 
-**1. Set up install directory and clone the [Flang LLVM source code] from GitHub.**
+**1. Clone our [Modified llvm] from GitHub.**
 
 ```
-mkdir -p v7flang/flang-install
-cd v7flang/flang-install
-FLANG_INSTALL=`pwd`
-cd ..
-git clone https://github.com/flang-compiler/llvm.git
+git clone https://github.com/JoshHuttonCode/llvm-project.git
 ```
 
-**2. Checkout Flang LLVM release 7.**
+**2. Checkout HIP_llvm15.**
 
 `
-cd llvm && git checkout release_70
+cd llvm-project && git checkout HIP_llvm15
 `
 
-**3. Clone OptSched into the projects directory and checkout GPU_ACO branch.**
+**3. Clone OptSched into the AMDGPU directory and checkout HIP_ACO_llvm15 branch.**
 
 ```
-cd projects && git clone https://github.com/CSUS-LLVM/OptSched
-cd OptSched && git checkout GPU_ACO
-cd ../..
+cd llvm/lib/Target/AMDGPU
+git clone https://github.com/JoshHuttonCode/OptSched.git
+cd OptSched && git checkout HIP_ACO_llvm15
 ```
 
-**4. Create a build directory.**
+**4. Navigate back to llvm-project and create a build directory.**
 
 `
+cd ../../../../..
 mkdir build && cd build
 `
 
-**5. Apply [this patch][spilling-info-patch] to print spilling info.**
+**5. Build LLVM and OptSched using Ninja. Building LLVM in debug mode is not guaranteed to work, asserts may be outdated. The build was only tested with the clang and clang++ bundled with rocm, but other versions should work, just change the paths as needed**
+
+`cmake -GNinja -DCMAKE_C_COMPILER=/opt/rocm-5.4.1/llvm/bin/clang -DCMAKE_CXX_COMPILER=/opt/rocm-5.4.1/llvm/bin/clang++ -DLLVM_ENABLE_ASSERTIONS=False '-DLLVM_TARGETS_TO_BUILD=AMDGPU;X86' -DLLVM_ENABLE_Z3_SOLVER=OFF -DLLVM_CCACHE_BUILD=ON -DLLVM_CCACHE_DIR=$(pwd) -DLLVM_ENABLE_PROJECTS="clang;lld;compiler-rt" -DLLVM_AMDGPU_ALLOW_NPI_TARGETS=ON -DCMAKE_CXX_FLAGS="-O3" -DBUILD_SHARED_LIBS=ON ../llvm/ -DCMAKE_BUILD_TYPE=Release`
 
 `
-git am ../projects/OptSched/patches/llvm7.0/flang-llvm7-print-spilling-info.patch
+ninja
 `
-
-**6. Move PointerIntPair to public from protected.**
-###### I am not sure why this is required, but the project will not build if `PointerIntPair<InstrTy*, 1, bool> I;` is in protected. Open the file in vim, move the `PointerIntPair<InstrTy*, 1, bool> I;` to public, and save your work with `:wq`
-
-`
-vim ../include/llvm/IR/CallSite.h
-`
-
-**6.1 Disable use of posix_spawn() to allow kernel profiling with NCU.**
-###### Without this change, the clone() system call is used to create new processes which is not supported by NCU. Open the file specified below, and change the macro `#ifdef HAVE_POSIX_SPAWN` to `#ifdef HAVE_POSIX_SPAWN_NO` in the three places it appears in the file and save your work. This variable will not be defined and posix_spawn() will be disabled allowing fork+exec to be used instead.
-
-`
-vim ../lib/Support/Unix/Program.inc
-`
-
-**7. Build LLVM and OptSched using Ninja**
-###### Note: You must change the -DCMAKE_CUDA_ARCHITECTURES flag to match the Compute Capability of your GPU. The Tesla T4 is CC 7.5.The -DCMAKE_CXX_FLAGS_INIT flag must point to your CUDA install's include folder, the default directory is used here. If you want to build the device code in debug mode, replace -lineinfo with -G in the -DCMAKE_CUDA_FLAGS_INIT variable. Building LLVM in debug mode is not guaranteed to work, asserts may be outdated.
-
-```
-cmake -GNinja -DCMAKE_CUDA_ARCHITECTURES=75 -DCMAKE_CUDA_FLAGS_INIT='-lineinfo --ptxas-options=-v' -DCMAKE_CXX_FLAGS_INIT='-isystem/usr/local/cuda/include' -DCMAKE_INSTALL_PREFIX=$FLANG_INSTALL -DCMAKE_BUILD_TYPE=Release -DLLVM_TARGETS_TO_BUILD='X86;AArch64' ..
-ninja install
-#go back to the directory v7flang
-cd ../..
-```
-
-**8. Install flang-driver**
-###### Note: you can modify `make -j2 install` to use as many threads as you have available, using `-j2` only uses 2 threads.
-
-```
-git clone https://github.com/flang-compiler/flang-driver.git
-cd flang-driver
-git checkout release_70
-mkdir build
-cd build
-cmake -DCMAKE_INSTALL_PREFIX=$FLANG_INSTALL -DLLVM_CONFIG=$FLANG_INSTALL/bin/llvm-config -DCMAKE_BUILD_TYPE=Release ..
-make -j2 install
-#get back to v7flang
-cd ../../
-```
-**9. Install flang openmp**
-
-```
-git clone https://github.com/llvm-mirror/openmp.git
-cd openmp
-git checkout release_70
-mkdir build
-cd build
-cmake -DCMAKE_INSTALL_PREFIX=$FLANG_INSTALL -DCMAKE_CXX_COMPILER=$FLANG_INSTALL/bin/clang++ -DCMAKE_C_COMPILER=$FLANG_INSTALL/bin/clang -DCMAKE_BUILD_TYPE=Release ..
-make -j2 install
-#get back to v7flang
-cd ../..
-```
-
-**10. Build Flang**
-```
-#build libpgmath
-git clone https://github.com/flang-compiler/flang.git
-cd flang/runtime/libpgmath
-mkdir build
-cd build
-cmake -DCMAKE_INSTALL_PREFIX=$FLANG_INSTALL -DCMAKE_CXX_COMPILER=$FLANG_INSTALL/bin/clang++ -DCMAKE_C_COMPILER=$FLANG_INSTALL/bin/clang -DCMAKE_BUILD_TYPE=Release ..
-make -j2 install
-#go back to v7flang/flang
-cd ../../..
-#build Flang
-mkdir build
-cd build
-cmake -DCMAKE_INSTALL_PREFIX=$FLANG_INSTALL -DLLVM_CONFIG=$FLANG_INSTALL/bin/llvm-config -DCMAKE_CXX_COMPILER=$FLANG_INSTALL/bin/clang++ -DCMAKE_C_COMPILER=$FLANG_INSTALL/bin/clang -DCMAKE_Fortran_COMPILER=$FLANG_INSTALL/bin/flang -DCMAKE_BUILD_TYPE=Release ..
-make -j2 install
-#back out of the directory structure we just created
-cd ../../..
-```
-
-**11. Add $FLANG_INSTALL to your .bashrc and add the fortran runtime to your library path. (Optional)**
-```
-echo "export FLANG_INSTALL=$FLANG_INSTALL" >> ~/.bashrc
-echo 'export LD_LIBRARY_PATH=$FLANG_INSTALL/lib:$LD_LIBRARY_PATH' >> ~/.bashrc
-```
-You now have all of the requirements to run CPU2017. Clang and Flang are located in $FLANG_INSTALL/bin (v7flang/flang-install/bin/) and the OptSched.so plugin is located at v7flang/llvm/build/lib/OptSched.so.
 
 <!-- Outside links -->
 [ubuntu 20.04]: http://releases.ubuntu.com/20.04/
@@ -210,6 +129,5 @@ You now have all of the requirements to run CPU2017. Clang and Flang are located
 [homebrew]: https://brew.sh/
 [cmake downloads page]: https://cmake.org/download/
 [ninja]: https://ninja-build.org/
-[flang llvm source code]: https://github.com/flang-compiler/llvm.git
+[Modified llvm]: https://github.com/JoshHuttonCode/llvm-project/tree/HIP_llvm15
 [building with cmake]: https://llvm.org/docs/CMake.html
-[spilling-info-patch]: patches/llvm7.0/llvm7-print-spilling-info.patch
