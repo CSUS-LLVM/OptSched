@@ -235,7 +235,7 @@ ScheduleDAGOptSched::ScheduleDAGOptSched(
 }
 
 ScheduleDAGOptSched::~ScheduleDAGOptSched() {
-  if (DEV_ACO && dev_MM) {
+  if (DeviceACOEnabled && dev_MM) {
     dev_MM->FreeDevicePointers();
     hipFree(dev_MM);
   }
@@ -421,7 +421,8 @@ void ScheduleDAGOptSched::schedule() {
   addGraphTransformations(BDDG);
 
   // Prepare for device scheduling by increasing heap size and copying machMdl
-  if (DEV_ACO && dev_MM == NULL && NumRegionInstrs + 2 >= REGION_MIN_SIZE) {
+  bool dev_ACOEnabled = schedIni.GetBool("DEV_ACO");
+  if (dev_ACOEnabled && dev_MM == NULL && NumRegionInstrs + 2 >= REGION_MIN_SIZE) {
     // Copy MachineModel to device for use during DevListSched.
     // Allocate device memory
     gpuErrchk(hipMallocManaged((void**)&dev_MM, sizeof(MachineModel)));
@@ -649,6 +650,8 @@ void ScheduleDAGOptSched::loadOptSchedConfig() {
   OccupancyLimitSource = OCC_LIMIT_TYPE::OLT_NONE;
   if (ShouldLimitOccupancy)
     OccupancyLimitSource = parseOccLimit(schedIni.GetString("OCCUPANCY_LIMIT_SOURCE"));
+
+  DeviceACOEnabled = schedIni.GetInt("DEV_ACO");
 }
 
 bool ScheduleDAGOptSched::isOptSchedEnabled() const {

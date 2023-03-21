@@ -976,14 +976,6 @@ void DataDepGraph::CreateEdge(SchedInstruction *frmNode,
 
   GraphEdge *newEdg = new GraphEdge(frmNode->GetNum(), toNode->GetNum(), 
 		                    ltncy, depType);
-  // If compiling on device, keep track of the pointers to all edges
-  // Set instCnt_ comparison to REGION_MIN_SIZE
-  if (DEV_ACO && instCnt_ >= REGION_MIN_SIZE) {
-    // if the edges_ vector has not been created, create it
-    if (!edges_)
-      edges_ = new std::vector<GraphEdge *>();
-    edges_->push_back(newEdg);
-  }
 
   edgeCnt_++;
   frmNode->AddScsr(newEdg);
@@ -1028,14 +1020,6 @@ void DataDepGraph::CreateEdge_(InstCount frmNodeNum, InstCount toNodeNum,
 #endif
     edge = new GraphEdge(frmNode->GetNum(), toNode->GetNum(), ltncy, depType,
                          IsArtificial);
-    // If compiling on device, keep track of the pointers to all edges
-    // Set instCnt_ comparison to REGION_MIN_SIZE
-    if (DEV_ACO && instCnt_ >= REGION_MIN_SIZE) {
-      // if the edges_ vector has not been created, create it
-      if (!edges_)
-        edges_ = new std::vector<GraphEdge *>();
-      edges_->push_back(edge);
-    }
     edgeCnt_++;
     frmNode->AddScsr(edge);
     toNode->AddPrdcsr(edge);

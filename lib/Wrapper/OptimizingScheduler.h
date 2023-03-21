@@ -133,6 +133,8 @@ protected:
   bool ShouldLimitOccupancy;
   OCC_LIMIT_TYPE OccupancyLimitSource;
 
+  bool DeviceACOEnabled;
+
   // How to interpret the timeout value? Timeout per instruction or
   // timout per block
   bool IsTimeoutPerInst;

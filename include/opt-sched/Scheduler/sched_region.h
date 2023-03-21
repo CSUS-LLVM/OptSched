@@ -292,7 +292,8 @@ protected:
   virtual const int GetSLIL_size_() const = 0;
 
   FUNC_RESULT runACO(InstSchedule *ReturnSched, InstSchedule *InitSched,
-                     bool IsPostBB, unsigned long randSeed, int numBlocks);
+                     bool IsPostBB, unsigned long randSeed, int numBlocks,
+                     bool devACOEnabled);
 };
 
 } // namespace opt_sched

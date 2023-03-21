@@ -222,8 +222,9 @@ FUNC_RESULT SchedRegion::FindOptimalSchedule(
   bool AcoSchedulerEnabled = schedIni.GetBool("ACO_ENABLED");
   bool BbSchedulerEnabled = isBbEnabled(schedIni, rgnTimeout);
   unsigned long randSeed = (unsigned long) schedIni.GetInt("RANDOM_SEED");
+  bool devACOEnabled = schedIni.GetBool("DEV_ACO");
   int numBlocks;
-  if (DEV_ACO && dataDepGraph_->GetInstCnt() >= REGION_MIN_SIZE)
+  if (devACOEnabled && dataDepGraph_->GetInstCnt() >= REGION_MIN_SIZE)
     numBlocks = schedIni.GetBool("ACO_MANY_ANTS_ENABLED") && dataDepGraph_->GetInstCnt() > MANY_ANT_MIN_SIZE ?
                 schedIni.GetInt("ACO_MANY_ANTS_PER_ITERATION_BLOCKS") : schedIni.GetInt("ACO_DEVICE_ANT_PER_ITERATION_BLOCKS");
   else
@@ -497,7 +498,7 @@ FUNC_RESULT SchedRegion::FindOptimalSchedule(
     AcoStart = Utilities::GetProcessorTime();
     AcoSchedule = new InstSchedule(machMdl_, dataDepGraph_, vrfySched_);
 
-    rslt = runACO(AcoSchedule, lstSched, false, randSeed, numBlocks);
+    rslt = runACO(AcoSchedule, lstSched, false, randSeed, numBlocks, devACOEnabled);
     if (rslt != RES_SUCCESS) {
       Logger::Fatal("ACO scheduling failed");
       if (lstSchdulr)
@@ -678,7 +679,7 @@ FUNC_RESULT SchedRegion::FindOptimalSchedule(
     InstSchedule *AcoAfterEnumSchedule =
         new InstSchedule(machMdl_, dataDepGraph_, vrfySched_);
 
-    FUNC_RESULT acoRslt = runACO(AcoAfterEnumSchedule, bestSched, true, randSeed, numBlocks);
+    FUNC_RESULT acoRslt = runACO(AcoAfterEnumSchedule, bestSched, true, randSeed, numBlocks, devACOEnabled);
     if (acoRslt != RES_SUCCESS) {
       Logger::Info("Running final ACO failed");
       delete AcoAfterEnumSchedule;
@@ -1058,7 +1059,8 @@ void InitCurand(hiprandState_t *dev_states, unsigned long seed, int instCnt) {
 
 FUNC_RESULT SchedRegion::runACO(InstSchedule *ReturnSched,
                                 InstSchedule *InitSched, bool IsPostBB,
-                                unsigned long randSeed, int numBlocks) {
+                                unsigned long randSeed, int numBlocks,
+                                bool devACOEnabled) {
   InitForSchdulng();
   FUNC_RESULT Rslt;
   int numThreads = numBlocks * NUMTHREADSPERBLOCK;
@@ -1066,7 +1068,7 @@ FUNC_RESULT SchedRegion::runACO(InstSchedule *ReturnSched,
   // to fit in device memory
   Logger::Info("This DDG has %d edges", dataDepGraph_->GetEdgeCnt());
   Logger::Info("CP Distance: %d", dataDepGraph_->GetRootInst()->GetCrntLwrBound(DIR_BKWRD) + 1);
-  if (DEV_ACO && dataDepGraph_->GetInstCnt() >= REGION_MIN_SIZE) {
+  if (devACOEnabled && dataDepGraph_->GetInstCnt() >= REGION_MIN_SIZE) {
     // Allocate and Copy data to device for parallel ACO
     size_t memSize;
     // Allocate arrays for parallel ACO execution

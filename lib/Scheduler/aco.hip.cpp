@@ -68,7 +68,9 @@ ACOScheduler::ACOScheduler(DataDepGraph *dataDepGraph,
   numAntsTerminated_ = 0;
   numBlocks_ = numBlocks;
   numThreads_ = numBlocks_ * NUMTHREADSPERBLOCK;
-  if(!DEV_ACO || count_ < REGION_MIN_SIZE)
+
+  use_dev_ACO = schedIni.GetBool("DEV_ACO");
+  if(!use_dev_ACO || count_ < REGION_MIN_SIZE)
     numThreads_ = schedIni.GetInt("HOST_ANTS");
   else {
     dev_rgn_->SetNumThreads(numThreads_);
@@ -268,9 +270,6 @@ InstCount ACOScheduler::SelectInstruction(SchedInstruction *lastInst, InstCount 
     if (dev_RP0OrPositiveCount[GLOBALTID] != 0 && candidateDefs > candidateLUC)
       IScore = IScore * 9/10;
 
-    *dev_readyLs->getInstScoreAtIndex(I) = IScore;
-    dev_readyLs->dev_ScoreSum[GLOBALTID] += IScore;
-
     #ifdef DEBUG_INSTR_SELECTION
     if (GLOBALTID==0)
       printf("Before Inst: %d, score: %f\n", *dev_readyLs->getInstIdAtIndex(I), IScore);
@@ -378,9 +377,6 @@ InstCount ACOScheduler::SelectInstruction(SchedInstruction *lastInst, InstCount 
     pheromone_t IScore = Score(lastInstId, *readyLs->getInstIdAtIndex(I), Heur);
     if (RP0OrPositiveCount != 0 && candidateDefs > candidateLUC)
       IScore = IScore * 9/10;
-
-    *readyLs->getInstScoreAtIndex(I) = IScore;
-    readyLs->ScoreSum += IScore;
 
     if (currentlyWaiting) {
       // if currently waiting on an instruction, do not consider semi-ready instructions 
@@ -562,7 +558,7 @@ InstSchedule *ACOScheduler::FindOneSchedule(InstCount RPTarget,
   // initialize the aco ready list so that the start instruction is ready
   // The luc component is 0 since the root inst uses no instructions
   InstCount RootId = rootInst_->GetNum();
-  HeurType RootHeuristic = dev_kHelper->computeKey(rootInst_, true, dev_DDG_->RegFiles);
+  HeurType RootHeuristic = dev_kHelper->computeKey(rootInst_, true, dev_DDG_->RegFiles, dev_DDG_);
   pheromone_t RootScore = Score(-1, RootId, RootHeuristic);
   ACOReadyListEntry InitialRoot{RootId, 0, RootHeuristic, RootScore};
   dev_readyLs->addInstructionToReadyList(InitialRoot);
@@ -1261,7 +1257,7 @@ FUNC_RESULT ACOScheduler::FindSchedule(InstSchedule *schedule_out,
     SetGlobalBestStalls(std::min(bestStallsValue, bestSchedule->GetCrntLngth() - dataDepGraph_->GetInstCnt()));
   printf("bestStallsValue is: %d, initial sched is: %d\n", bestStallsValue, bestSchedule->GetCrntLngth() - dataDepGraph_->GetInstCnt());
   
-  if (DEV_ACO && count_ >= REGION_MIN_SIZE) { // Run ACO on device
+  if (use_dev_ACO && count_ >= REGION_MIN_SIZE) { // Run ACO on device
     size_t memSize;
     // Update pheromones on device
     CopyPheromonesToDevice(dev_AcoSchdulr);
@@ -1468,7 +1464,7 @@ FUNC_RESULT ACOScheduler::FindSchedule(InstSchedule *schedule_out,
   schedule_out->Copy(bestSchedule);
   if (bestSchedule != InitialSchedule)
     delete bestSchedule;
-  if (!DEV_ACO || count_ < REGION_MIN_SIZE)
+  if (!use_dev_ACO || count_ < REGION_MIN_SIZE)
     printf("ACO finished after %d iterations\n", iterations);
 
   return RES_SUCCESS;
@@ -1689,7 +1685,7 @@ inline void ACOScheduler::UpdateACOReadyList(SchedInstruction *inst) {
         if (wasLastPrdcsr) {
           // If all other predecessors of this successor have been scheduled then
           // we now know in which cycle this successor will become ready.
-          HeurType HeurWOLuc = dev_kHelper->computeKey(crntScsr, false, dev_DDG_->RegFiles);
+          HeurType HeurWOLuc = dev_kHelper->computeKey(crntScsr, false, dev_DDG_->RegFiles, dev_DDG_);
           dev_readyLs->addInstructionToReadyList(ACOReadyListEntry{crntScsr->GetNum(), scsrRdyCycle, HeurWOLuc, 0});
         }
     }
@@ -1709,7 +1705,7 @@ inline void ACOScheduler::UpdateACOReadyList(SchedInstruction *inst) {
       InstCount CandidateId = *dev_readyLs->getInstIdAtIndex(I);
       if (LUCEntry.Width) {
         SchedInstruction *ScsrInst = dataDepGraph_->GetInstByIndx(CandidateId);
-        HeurType LUCVal = ScsrInst->CmputLastUseCnt(dev_DDG_->RegFiles);
+        HeurType LUCVal = ScsrInst->CmputLastUseCnt(dev_DDG_->RegFiles, dev_DDG_);
         LUCVal <<= LUCEntry.Offset;
         Heur &= LUCVal;
       }

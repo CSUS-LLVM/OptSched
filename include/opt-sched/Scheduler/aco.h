@@ -20,8 +20,6 @@ Last Update:  Jan. 2020
 namespace llvm {
 namespace opt_sched {
 
-// If set to 1 ACO is run on device
-#define DEV_ACO 1
 // setting to 1 locks ACO to iterations_without_improvement iterations
 #define RUNTIME_TESTING 0
 // Minimum region node count. Doesn't make sence to launch DEV_ACO on small rgns
@@ -137,6 +135,7 @@ private:
   int count_;
   int heuristicImportance_;
   bool use_tournament;
+  bool use_dev_ACO;
   int fixed_bias;
   double bias_ratio;
   double local_decay;

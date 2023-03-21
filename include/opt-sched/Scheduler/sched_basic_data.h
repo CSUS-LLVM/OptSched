@@ -522,7 +522,7 @@ public:
   void ComputeAdjustedUseCnt(SchedInstruction *inst);
 
   __host__ __device__
-  int16_t CmputLastUseCnt(RegisterFile *RegFiles);
+  int16_t CmputLastUseCnt(RegisterFile *RegFiles, DataDepGraph *ddg = NULL);
   __host__ __device__
   int16_t GetLastUseCnt();
   //def to cuda_sched_basic_data.cu for nvcc compilation

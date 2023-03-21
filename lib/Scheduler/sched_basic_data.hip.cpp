@@ -1,4 +1,5 @@
 #include "opt-sched/Scheduler/sched_basic_data.h"
+#include "opt-sched/Scheduler/data_dep.h"
 #include "opt-sched/Scheduler/register.h"
 #include "opt-sched/Scheduler/stats.h"
 #include "opt-sched/Scheduler/dev_defines.h"
@@ -947,7 +948,7 @@ void SchedInstruction::SetPrdcsrNums_() {
 }
 
 __host__ __device__
-int16_t SchedInstruction::CmputLastUseCnt(RegisterFile *RegFiles) {
+int16_t SchedInstruction::CmputLastUseCnt(RegisterFile *RegFiles, DataDepGraph *ddg) {
 #ifdef __HIP_DEVICE_COMPILE__
   dev_lastUseCnt_[GLOBALTID] = 0;
 #else
@@ -962,19 +963,24 @@ if (RegFiles)
 else
   registerFiles = RegFiles_;
 
+#ifdef __HIP_DEVICE_COMPILE__
+  RegIndxTuple* use;
+  for (int i = 0; i < useCnt_; i++) {
+    // batched uses array is stored in DDG, access this instruction's uses through the DDG
+    use = ddg->getUseByIndex(ddgUseIndex + i);
+    Register *reg = registerFiles[use->regType_].GetReg(use->regNum_);
+    assert(reg->GetCrntUseCnt() < reg->GetUseCnt());
+    if (reg->GetCrntUseCnt() + 1 == reg->GetUseCnt())
+      dev_lastUseCnt_[GLOBALTID]++;
+  }
+  return dev_lastUseCnt_[GLOBALTID];
+#else
   for (int i = 0; i < useCnt_; i++) {
     Register *reg = registerFiles[uses_[i].regType_].GetReg(uses_[i].regNum_);
     assert(reg->GetCrntUseCnt() < reg->GetUseCnt());
     if (reg->GetCrntUseCnt() + 1 == reg->GetUseCnt())
-#ifdef __HIP_DEVICE_COMPILE__
-      dev_lastUseCnt_[GLOBALTID]++;
-#else
       lastUseCnt_++;
-#endif
   }
-#ifdef __HIP_DEVICE_COMPILE__
-  return dev_lastUseCnt_[GLOBALTID];
-#else
   return lastUseCnt_;
 #endif
 }
