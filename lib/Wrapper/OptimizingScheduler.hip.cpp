@@ -669,7 +669,7 @@ void ScheduleDAGOptSched::schedule() {
       OST.get(), static_cast<DataDepGraph *>(DDG.get()), RegionNumber, HistTableHashBits,
       LowerBoundAlgorithm, HeuristicPriorities, EnumPriorities, VerifySchedule,
       PruningStrategy, SchedForRPOnly, EnumStalls, SCW, SCF, HeurSchedType,
-      dev_MM);
+      dev_MM, AcoPriorities1, AcoPriorities2);
 
   bool IsEasy = false;
   InstCount NormBestCost = 0;
@@ -888,6 +888,11 @@ void ScheduleDAGOptSched::loadOptSchedConfig() {
   EnumPriorities = parseHeuristic(schedIni.GetString("ENUM_HEURISTIC"));
   SecondPassEnumPriorities =
       parseHeuristic(schedIni.GetString("SECOND_PASS_ENUM_HEURISTIC"));
+  AcoPriorities1 = parseHeuristic(schedIni.GetString("ACO_HEURISTIC"));
+  SecondPassAcoPriorities1 =
+      parseHeuristic(schedIni.GetString("ACO_HEURISTIC_SECOND_PASS1"));
+  SecondPassAcoPriorities2 =
+      parseHeuristic(schedIni.GetString("ACO_HEURISTIC_SECOND_PASS2"));
   SCF = parseSpillCostFunc();
   RegionTimeout = schedIni.GetInt("REGION_TIMEOUT");
   FirstPassRegionTimeout = schedIni.GetInt("FIRST_PASS_REGION_TIMEOUT");
@@ -1174,6 +1179,10 @@ void ScheduleDAGOptSched::scheduleOptSchedBalanced() {
 
   // Set the heuristic for the enumerator in the second pass.
   EnumPriorities = SecondPassEnumPriorities;
+
+  // Set the heuristic for ACO in the second pass
+  AcoPriorities1 = SecondPassAcoPriorities1;
+  AcoPriorities2 = SecondPassAcoPriorities2;
 
   // Force the input to the balanced scheduler to be the sequential order of the
   // (hopefully) good register pressure schedule. We don’t want the list

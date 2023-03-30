@@ -270,6 +270,20 @@ protected:
   // scheduling approach.
   SchedPriorities SecondPassEnumPriorities;
 
+  // The heuristic used for the first portion of blocks in ACO.
+  SchedPriorities AcoPriorities1;
+
+  // The heuristic used for the second portion of blocks in ACO.
+  SchedPriorities AcoPriorities2;
+
+  // The heuristic used for the first portion of blocks in ACO
+  // in the two-pass scheduling approach.
+  SchedPriorities SecondPassAcoPriorities1;
+
+  // The heuristic used for the second portion of blocks in ACO
+  // in the two-pass scheduling approach.
+  SchedPriorities SecondPassAcoPriorities2;
+
   // Static node superiority RP only graph transformation.
   bool StaticNodeSup;
 

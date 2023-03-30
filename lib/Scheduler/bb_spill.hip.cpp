@@ -36,10 +36,11 @@ BBWithSpill::BBWithSpill(const OptSchedTarget *OST_, DataDepGraph *dataDepGraph,
                          Pruning PruningStrategy, bool SchedForRPOnly,
                          bool enblStallEnum, int SCW,
                          SPILL_COST_FUNCTION spillCostFunc,
-                         SchedulerType HeurSchedType, MachineModel *dev_machMdl)
+                         SchedulerType HeurSchedType, MachineModel *dev_machMdl,
+                         SchedPriorities acoPrirts1, SchedPriorities acoPrirts2)
     : SchedRegion(OST_->MM, dev_machMdl, dataDepGraph, rgnNum, sigHashSize, lbAlg,
                   hurstcPrirts, enumPrirts, vrfySched, PruningStrategy,
-                  HeurSchedType, spillCostFunc),
+                  HeurSchedType, acoPrirts1, acoPrirts2, spillCostFunc),
       OST(OST_) {
   enumrtr_ = NULL;
   optmlSpillCost_ = INVALID_VALUE;

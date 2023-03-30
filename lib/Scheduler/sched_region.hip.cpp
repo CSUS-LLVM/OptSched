@@ -77,12 +77,13 @@ static std::string GetDDGDumpPath() {
   return DDGDumpPath;
 }
 
-SchedRegion::SchedRegion(MachineModel *machMdl, MachineModel *dev_machMdl, 
-		         DataDepGraph *dataDepGraph, long rgnNum, 
-			 int16_t sigHashSize, LB_ALG lbAlg,
-                         SchedPriorities hurstcPrirts, 
-			 SchedPriorities enumPrirts, bool vrfySched,
+SchedRegion::SchedRegion(MachineModel *machMdl, MachineModel *dev_machMdl,
+		                     DataDepGraph *dataDepGraph, long rgnNum,
+			                   int16_t sigHashSize, LB_ALG lbAlg,
+                         SchedPriorities hurstcPrirts,
+			                   SchedPriorities enumPrirts, bool vrfySched,
                          Pruning PruningStrategy, SchedulerType HeurSchedType,
+                         SchedPriorities acoPrirts1, SchedPriorities acoPrirts2,
                          SPILL_COST_FUNCTION spillCostFunc) {
   machMdl_ = machMdl;
   dev_machMdl_ = dev_machMdl;
@@ -92,6 +93,8 @@ SchedRegion::SchedRegion(MachineModel *machMdl, MachineModel *dev_machMdl,
   lbAlg_ = lbAlg;
   hurstcPrirts_ = hurstcPrirts;
   enumPrirts_ = enumPrirts;
+  acoPrirts1_ = acoPrirts1;
+  acoPrirts2_ = acoPrirts2;
   vrfySched_ = vrfySched;
   prune_ = PruningStrategy;
   HeurSchedType_ = HeurSchedType;
@@ -1137,7 +1140,7 @@ FUNC_RESULT SchedRegion::runACO(InstSchedule *ReturnSched,
                                                   randSeed == 0 ? unsigned(time(NULL)) : randSeed,
                                                   dataDepGraph_->GetInstCnt());
     ACOScheduler *AcoSchdulr = new ACOScheduler(
-        dataDepGraph_, machMdl_, abslutSchedUprBound_, enumPrirts_,
+        dataDepGraph_, machMdl_, abslutSchedUprBound_, acoPrirts1_, acoPrirts2_,
         vrfySched_, IsPostBB, numBlocks, (SchedRegion *)dev_rgn, dev_DDG,
         dev_machMdl_, dev_states);
     AcoSchdulr->setInitialSched(InitSched);
@@ -1149,7 +1152,7 @@ FUNC_RESULT SchedRegion::runACO(InstSchedule *ReturnSched,
     gpuErrchk(hipMallocManaged(&dev_AcoSchdulr, memSize));
     gpuErrchk(hipMemcpy(dev_AcoSchdulr, AcoSchdulr, memSize,
                          hipMemcpyHostToDevice));
-    AcoSchdulr->CopyPointersToDevice(dev_AcoSchdulr);
+    AcoSchdulr->CopyPointersToDevice(dev_AcoSchdulr, IsSecondPass());
     // Make sure mallocManaged memory is copied to device before kernel start
     memSize = sizeof(DataDepGraph);
     gpuErrchk(hipMemPrefetchAsync(dev_DDG, memSize, 0));
@@ -1159,7 +1162,7 @@ FUNC_RESULT SchedRegion::runACO(InstSchedule *ReturnSched,
     // FindSchedule
     Rslt = AcoSchdulr->FindSchedule(ReturnSched, this, dev_AcoSchdulr);
 
-    dev_AcoSchdulr->FreeDevicePointers();
+    dev_AcoSchdulr->FreeDevicePointers(IsSecondPass());
     hipFree(dev_AcoSchdulr);
     delete AcoSchdulr;
     dev_rgn->FreeDevicePointers(numThreads);
@@ -1178,7 +1181,7 @@ FUNC_RESULT SchedRegion::runACO(InstSchedule *ReturnSched,
   } else {
     ACOScheduler *AcoSchdulr = 
         new ACOScheduler(dataDepGraph_, machMdl_, abslutSchedUprBound_,
-                         enumPrirts_, vrfySched_, IsPostBB, numBlocks);
+                         acoPrirts1_, acoPrirts2_, vrfySched_, IsPostBB, numBlocks);
     AcoSchdulr->setInitialSched(InitSched);
     Rslt = AcoSchdulr->FindSchedule(ReturnSched, this);
     delete AcoSchdulr;

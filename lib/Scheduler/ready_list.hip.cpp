@@ -6,10 +6,11 @@
 #include "opt-sched/Scheduler/dev_defines.h"
 
 using namespace llvm::opt_sched;
-
+//#define DEBUG_KEYSHELPER_CRASH_LOCATIONS
 // pre-compute region info
+
 __host__ __device__
-void KeysHelper::initForRegion(DataDepGraph *DDG) {
+void KeysHelper1::initForRegion(DataDepGraph *DDG) {
 
   uint16_t CurrentOffset = 0, CurrentWidth = 0;
 
@@ -75,7 +76,7 @@ void KeysHelper::initForRegion(DataDepGraph *DDG) {
 
 // compute key
 __host__ __device__
-HeurType KeysHelper::computeKey(SchedInstruction *Inst, bool IncludeDynamic, RegisterFile *RegFiles, DataDepGraph *ddg) const {
+HeurType KeysHelper1::computeKey(SchedInstruction *Inst, bool IncludeDynamic, RegisterFile *RegFiles, DataDepGraph *ddg) const {
   assert(WasInitialized);
 
   HeurType Key= 0;
@@ -125,7 +126,7 @@ HeurType KeysHelper::computeKey(SchedInstruction *Inst, bool IncludeDynamic, Reg
 }
 
 __host__ __device__
-HeurType KeysHelper::computeKey(const uint64_t *Values) const {
+HeurType KeysHelper1::computeKey(const uint64_t *Values) const {
   assert(WasInitialized);
 
   HeurType Key = 0;
@@ -133,6 +134,254 @@ HeurType KeysHelper::computeKey(const uint64_t *Values) const {
   for (int I = 0; I < priorities.cnt; ++I) {
     LISTSCHED_HEURISTIC Heur = priorities.vctr[I];
     Key <<= Entries[Heur].Width;
+    Key |= Values[Heur];
+  }
+
+  return Key;
+}
+
+__host__ __device__
+void KeysHelper2::initForRegion(DataDepGraph *DDG) {
+  uint16_t CurrentOffset1 = 0, CurrentWidth1 = 0;
+
+  uint64_t MaxKVs1[MAX_SCHED_PRIRTS] = { 0 };
+
+  // Calculate the number of bits needed to hold the maximum value of each
+  // priority scheme
+  for (int I = 0; I < priorities1.cnt; ++I) {
+    LISTSCHED_HEURISTIC Heur = priorities1.vctr[I];
+    uint64_t MaxV = 0;
+    switch (Heur) {
+    case LSH_CP:
+    case LSH_CPR:
+      MaxV = DDG->GetRootInst()->GetCrntLwrBound(DIR_BKWRD);
+      break;
+
+    case LSH_LUC:
+    case LSH_UC:
+      MaxV = DDG->GetMaxUseCnt();
+      break;
+
+    case LSH_NID:
+    case LSH_LLVM:
+      MaxV = DDG->GetInstCnt() - 1;
+      break;
+
+    case LSH_ISO:
+      MaxV = DDG->GetMaxFileSchedOrder();
+      break;
+
+    case LSH_SC:
+      MaxV = DDG->GetMaxScsrCnt();
+      break;
+
+    case LSH_LS:
+      MaxV = DDG->GetMaxLtncySum();
+      break;
+    } // end switch
+
+    // Track the size of the key and the width and location of our values
+    CurrentWidth1 = Utilities::clcltBitsNeededToHoldNum(MaxV);
+    Entries1[Heur] = PriorityEntry{CurrentWidth1, CurrentOffset1};
+    MaxKVs1[Heur] = MaxV;
+    CurrentOffset1 += CurrentWidth1;
+  }   // end for
+
+  // check to see if the key can fit in our type
+  assert(CurrentOffset1 <= 8 * sizeof(HeurType));
+
+  // set the key size value to the final offset of the key
+  KeysSz1 = CurrentOffset1;
+
+  //set maximumvalues needed to compute keys
+  MaxNID1 = DDG->GetInstCnt() - 1;
+  MaxISO1 = MaxKVs1[LSH_ISO];
+
+  MaxValue1 = computeKey(MaxKVs1, 1);
+
+  // repeat previous code for the second portion of blocks
+  uint16_t CurrentOffset2 = 0, CurrentWidth2 = 0;
+
+  uint64_t MaxKVs2[MAX_SCHED_PRIRTS] = { 0 };
+
+  // Calculate the number of bits needed to hold the maximum value of each
+  // priority scheme
+  for (int I = 0; I < priorities2.cnt; ++I) {
+    LISTSCHED_HEURISTIC Heur = priorities2.vctr[I];
+    uint64_t MaxV = 0;
+    switch (Heur) {
+    case LSH_CP:
+    case LSH_CPR:
+      MaxV = DDG->GetRootInst()->GetCrntLwrBound(DIR_BKWRD);
+      break;
+
+    case LSH_LUC:
+    case LSH_UC:
+      MaxV = DDG->GetMaxUseCnt();
+      break;
+
+    case LSH_NID:
+    case LSH_LLVM:
+      MaxV = DDG->GetInstCnt() - 1;
+      break;
+
+    case LSH_ISO:
+      MaxV = DDG->GetMaxFileSchedOrder();
+      break;
+
+    case LSH_SC:
+      MaxV = DDG->GetMaxScsrCnt();
+      break;
+
+    case LSH_LS:
+      MaxV = DDG->GetMaxLtncySum();
+      break;
+    } // end switch
+
+    // Track the size of the key and the width and location of our values
+    CurrentWidth2 = Utilities::clcltBitsNeededToHoldNum(MaxV);
+    Entries2[Heur] = PriorityEntry{CurrentWidth2, CurrentOffset2};
+    MaxKVs2[Heur] = MaxV;
+    CurrentOffset2 += CurrentWidth2;
+  }   // end for
+
+  // check to see if the key can fit in our type
+  assert(CurrentOffset2 <= 8 * sizeof(HeurType));
+
+  // set the key size value to the final offset of the key
+  KeysSz2 = CurrentOffset2;
+
+  //set maximumvalues needed to compute keys
+  MaxNID2 = DDG->GetInstCnt() - 1;
+  MaxISO2 = MaxKVs2[LSH_ISO];
+
+  // mark the object as initialized
+  WasInitialized = true;
+
+  // set the max value using the values compute key
+  MaxValue2 = computeKey(MaxKVs2, 2);
+}
+
+// compute key
+__host__ __device__
+HeurType KeysHelper2::computeKey(SchedInstruction *Inst, bool IncludeDynamic, RegisterFile *RegFiles, DataDepGraph *ddg) const {
+  assert(WasInitialized);
+
+  HeurType Key= 0;
+
+  SchedPriorities priorities;
+  uint16_t KeysSz;
+  HeurType MaxValue;
+  HeurType MaxNID;
+  HeurType MaxISO;
+  bool useEntries1;
+  #ifdef __HIP_DEVICE_COMPILE__
+    // even blocks use priorities 1, odd blocks use priority 2
+    if (hipBlockIdx_x % 2 == 0) {
+      priorities = priorities1;
+      KeysSz = KeysSz1;
+      MaxValue = MaxValue1;
+      MaxNID = MaxNID1;
+      MaxISO = MaxISO1;
+      useEntries1 = true;
+    }
+    else {
+      priorities = priorities2;
+      KeysSz = KeysSz2;
+      MaxValue = MaxValue2;
+      MaxNID = MaxNID2;
+      MaxISO = MaxISO2;
+      useEntries1 = false;
+    }
+  #else
+    priorities = priorities1;
+    KeysSz = KeysSz1;
+    MaxValue = MaxValue1;
+    MaxNID = MaxNID1;
+    MaxISO = MaxISO1;
+    useEntries1 = true;
+  #endif
+
+  #ifdef __HIP_DEVICE_COMPILE__
+  #ifdef DEBUG_KEYSHELPER_CRASH_LOCATIONS
+    if (hipThreadIdx_x == 0) {
+      printf("Crash before the loop in computeKey()\n");
+    }
+  #endif
+  #endif
+  #ifdef DEBUG_KEYSHELPER_CRASH_LOCATIONS
+    if (hipThreadIdx_x == 0) {
+      printf("block id: %d, priorities.cnt: %d, keysSz: %d, MaxValue: %d, MaxNID: %d, MaxISO: %d\n", hipBlockIdx_x, priorities.cnt, KeysSz, MaxValue, MaxNID, MaxISO);
+    }
+  #endif
+  for (int I = 0; I < priorities.cnt; ++I) {
+    LISTSCHED_HEURISTIC Heur = priorities.vctr[I];
+    HeurType PriorityValue = 0;
+    switch (Heur) {
+    case LSH_CP:
+    case LSH_CPR:
+      PriorityValue = Inst->GetCrtclPath(DIR_BKWRD);
+      break;
+
+    case LSH_LUC:
+      PriorityValue = IncludeDynamic ? Inst->CmputLastUseCnt(RegFiles, ddg) : 0;
+      break;
+
+    case LSH_UC:
+      PriorityValue = Inst->GetUseCnt();
+      break;
+
+    case LSH_NID:
+    case LSH_LLVM:
+      PriorityValue = MaxNID - Inst->GetNodeID();
+      break;
+
+    case LSH_ISO:
+      PriorityValue = MaxISO - Inst->GetFileSchedOrder();
+      break;
+
+    case LSH_SC:
+      #ifdef __HIP_DEVICE_COMPILE__
+      PriorityValue = Inst->GetScsrCnt_();
+      #else
+      PriorityValue = Inst->GetScsrCnt();
+      #endif
+      break;
+
+    case LSH_LS:
+      PriorityValue = Inst->GetLtncySum();
+      break;
+    }
+    if (useEntries1)
+      Key <<= Entries1[Heur].Width;
+    else
+      Key <<= Entries2[Heur].Width;
+    Key |= PriorityValue;
+  }
+  return Key;
+}
+
+__host__ __device__
+HeurType KeysHelper2::computeKey(const uint64_t *Values, int whichPrirts) const {
+  assert(WasInitialized);
+
+  HeurType Key = 0;
+  SchedPriorities priorities;
+  if (whichPrirts == 1)
+    priorities = priorities1;
+  else
+    priorities = priorities2;
+  for (int I = 0; I < priorities.cnt; ++I) {
+    LISTSCHED_HEURISTIC Heur = priorities.vctr[I];
+    #ifdef __HIP_DEVICE_COMPILE__
+    #ifdef DEBUG_KEYSHELPER_CRASH_LOCATIONS
+    printf("WhichPrirts: %d, Heur: %d, Value: %d\n",whichPrirts,Heur,Values[Heur]);
+    #endif
+    #endif
+    if (whichPrirts == 1)
+      Key <<= Entries1[Heur].Width;
+    else
+      Key <<= Entries2[Heur].Width;
     Key |= Values[Heur];
   }
 
@@ -156,7 +405,7 @@ ReadyList::ReadyList(DataDepGraph *dataDepGraph, SchedPriorities prirts) {
     keyedEntries_ = nullptr;
 
   // Initialize the KeyHelper
-  KHelper = KeysHelper(prirts);
+  KHelper = KeysHelper1(prirts);
   KHelper.initForRegion(dataDepGraph);
 
   // if we have an luc in the Priorities then lets store some info about it

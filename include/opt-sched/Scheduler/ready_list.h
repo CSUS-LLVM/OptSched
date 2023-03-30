@@ -26,12 +26,12 @@ struct PriorityEntry {
   uint16_t Offset;
 };
 
-class KeysHelper {
+class KeysHelper1 {
   public:
   __host__ __device__
-  KeysHelper(SchedPriorities prirts) : priorities(prirts), Entries{} {};
+  KeysHelper1(SchedPriorities prirts) : priorities(prirts), Entries{} {};
   __host__ __device__
-  KeysHelper() : KeysHelper(SchedPriorities{}) {};
+  KeysHelper1() : KeysHelper1(SchedPriorities{}) {};
 
   // pre-compute region info
   __host__ __device__
@@ -74,6 +74,80 @@ class KeysHelper {
   HeurType MaxValue = 0;
   HeurType MaxNID = 0;
   HeurType MaxISO = 0;
+
+  // Field to store if this KeyHelper was initialized
+  bool WasInitialized = false;
+};
+
+class KeysHelper2 {
+  public:
+  __host__ __device__
+  KeysHelper2(SchedPriorities prirts1, SchedPriorities prirts2) : priorities1(prirts1), priorities2(prirts2), Entries1{}, Entries2{} {};
+  __host__ __device__
+  KeysHelper2() : KeysHelper2(SchedPriorities{}, SchedPriorities{}) {};
+
+  // pre-compute region info
+  __host__ __device__
+  void initForRegion(DataDepGraph *DDG);
+
+  // compute key
+  __host__ __device__
+  HeurType computeKey(SchedInstruction *Inst, bool IncludeDynamic, RegisterFile *RegFiles = NULL, DataDepGraph *ddg = NULL) const;
+  __host__ __device__
+  HeurType computeKey(const uint64_t *Values, int whichPrirts = 1) const;
+
+  // get information about a keys layout
+  __host__ __device__
+  PriorityEntry getPriorityEntry(int16_t Indx, int whichPrirts = 1) const {
+    if (whichPrirts == 1)
+      return Entries1[Indx];
+    else
+      return Entries2[Indx];
+  }
+
+  //get the max key size and value
+  __host__ __device__
+  HeurType getKeySizeInBits(int whichPrirts = 1) const {
+    if (whichPrirts == 1)
+      return KeysSz1;
+    else
+      return KeysSz2;
+    }
+  __host__ __device__
+  HeurType getMaxValue(int whichPrirts = 1) const {
+    if (whichPrirts == 1)
+      return MaxValue1;
+    else
+      return MaxValue2;
+    }
+
+  // Allocates arrays to hold independent values for each device thread during
+  // parallel ACO
+  // void AllocDevArraysForParallelACO(int numThreads);
+  // Calls hipFree on all arrays/objects that were allocated with hipMalloc
+  // void FreeDevicePointers(int numThreads);
+
+  private:
+  // private member variables
+  // scheduling priorities used for this KeysHelper
+  SchedPriorities priorities1;
+  SchedPriorities priorities2;
+
+  // width and offset info for each priority
+  PriorityEntry Entries1[MAX_SCHED_PRIRTS];
+  PriorityEntry Entries2[MAX_SCHED_PRIRTS];
+
+  // pre-computed size of all keys for this region
+  uint16_t KeysSz1 = 0;
+  uint16_t KeysSz2 = 0;
+
+  // pre-computed max key value;
+  HeurType MaxValue1 = 0;
+  HeurType MaxValue2 = 0;
+  HeurType MaxNID1 = 0;
+  HeurType MaxNID2 = 0;
+  HeurType MaxISO1 = 0;
+  HeurType MaxISO2 = 0;
 
   // Field to store if this KeyHelper was initialized
   bool WasInitialized = false;
@@ -179,7 +253,7 @@ private:
   SchedPriorities prirts_;
 
   // The KeysHelper for the key computations
-  KeysHelper KHelper;
+  KeysHelper1 KHelper;
 
   // The priority list containing the actual instructions.
   PriorityArrayList<InstCount> *prirtyLst_;

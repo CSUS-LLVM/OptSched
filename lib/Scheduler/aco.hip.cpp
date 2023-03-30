@@ -50,14 +50,15 @@ double RandDouble(double min, double max) {
 
 ACOScheduler::ACOScheduler(DataDepGraph *dataDepGraph,
                            MachineModel *machineModel, InstCount upperBound,
-                           SchedPriorities priorities, bool vrfySched, 
+                           SchedPriorities priorities1, SchedPriorities priorities2, bool vrfySched,
                            bool IsPostBB, int numBlocks,
                            SchedRegion *dev_rgn, DataDepGraph *dev_DDG,
 			                     MachineModel *dev_MM, void *dev_states)
     : ConstrainedScheduler(dataDepGraph, machineModel, upperBound, true) {
   VrfySched_ = vrfySched;
   this->IsPostBB = IsPostBB;
-  prirts_ = priorities;
+  priorities1_ = priorities1;
+  priorities2_ = priorities2;
   count_ = dataDepGraph->GetInstCnt();
   Config &schedIni = SchedulerOptions::getInstance();
   dev_rgn_ = dev_rgn;
@@ -99,8 +100,15 @@ ACOScheduler::ACOScheduler(DataDepGraph *dataDepGraph,
 
   //construct the ACOReadyList member and a key helper
   readyLs = new ACOReadyList(dataDepGraph->GetMaxIndependentInstructions());
-  kHelper = new KeysHelper(priorities);
-  kHelper->initForRegion(dataDepGraph);
+  kHelper1 = new KeysHelper1(priorities1_);
+  kHelper1->initForRegion(dataDepGraph);
+  if (use_dev_ACO && count_ >= REGION_MIN_SIZE && dev_rgn_->IsSecondPass()) {
+    kHelper2 = new KeysHelper2(priorities1_, priorities2_);
+    kHelper2->initForRegion(dataDepGraph);
+  }
+  else {
+    kHelper2 = NULL;
+  }
 
   InitialSchedule = nullptr;
 }
@@ -108,8 +116,10 @@ ACOScheduler::ACOScheduler(DataDepGraph *dataDepGraph,
 ACOScheduler::~ACOScheduler() {
   if (readyLs)
     delete readyLs;
-  if (kHelper)
-    delete kHelper;
+  if (kHelper1)
+    delete kHelper1;
+  if (kHelper2)
+    delete kHelper2;
 }
 
 __device__
@@ -139,10 +149,18 @@ pheromone_t &ACOScheduler::Pheromone(InstCount from, InstCount to) {
 }
 
 __host__ __device__
-pheromone_t ACOScheduler::Score(InstCount FromId, InstCount ToId, HeurType ToHeuristic) {
+pheromone_t ACOScheduler::Score(InstCount FromId, InstCount ToId, HeurType ToHeuristic, bool IsFirstPass) {
   // tuneable heuristic importance is temporarily disabled
   // double Hf = pow(ToHeuristic, heuristicImportance_);
-  pheromone_t HeurScore = ToHeuristic * MaxPriorityInv + 1;
+  pheromone_t HeurScore;
+  #ifdef __HIP_DEVICE_COMPILE__
+    if (hipBlockIdx_x % 2 == 0 || IsFirstPass)
+      HeurScore = ToHeuristic * MaxPriorityInv + 1;
+    else
+      HeurScore = ToHeuristic * MaxPriorityInv2 + 1;
+  #else
+    HeurScore = ToHeuristic * MaxPriorityInv + 1;
+  #endif
   pheromone_t Hf = heuristicImportance_ ? HeurScore : 1.0;
   return Pheromone(FromId, ToId) * Hf;
 }
@@ -266,7 +284,7 @@ InstCount ACOScheduler::SelectInstruction(SchedInstruction *lastInst, InstCount 
 
     // compute the score
     HeurType Heur = *dev_readyLs->getInstHeuristicAtIndex(I);
-    pheromone_t IScore = Score(lastInstId, *dev_readyLs->getInstIdAtIndex(I), Heur);
+    pheromone_t IScore = Score(lastInstId, *dev_readyLs->getInstIdAtIndex(I), Heur, !rgn->IsSecondPass());
     if (dev_RP0OrPositiveCount[GLOBALTID] != 0 && candidateDefs > candidateLUC)
       IScore = IScore * 9/10;
 
@@ -379,7 +397,7 @@ InstCount ACOScheduler::SelectInstruction(SchedInstruction *lastInst, InstCount 
 
     // compute the score
     HeurType Heur = *readyLs->getInstHeuristicAtIndex(I);
-    pheromone_t IScore = Score(lastInstId, *readyLs->getInstIdAtIndex(I), Heur);
+    pheromone_t IScore = Score(lastInstId, *readyLs->getInstIdAtIndex(I), Heur, !rgn->IsSecondPass());
     if (RP0OrPositiveCount != 0 && candidateDefs > candidateLUC)
       IScore = IScore * 9/10;
 
@@ -572,20 +590,47 @@ InstSchedule *ACOScheduler::FindOneSchedule(InstCount RPTarget,
 
   // The MaxPriority that we are getting from the ready list represents
   // the maximum possible heuristic/key value that we can have
-  HeurType MaxPriority = dev_kHelper->getMaxValue();
-  if (MaxPriority == 0)
-    MaxPriority = 1; // divide by 0 is bad
+  HeurType MaxPriority = 1;
+  HeurType MaxPriority2 = 1;
+  if (IsSecondPass) {
+    MaxPriority = dev_kHelper2->getMaxValue(1);
+    if (MaxPriority == 0)
+      MaxPriority = 1; // divide by 0 is bad
+    MaxPriority2 = dev_kHelper2->getMaxValue(2);
+    if (MaxPriority2 == 0)
+      MaxPriority2 = 1; // divide by 0 is bad
+  }
+  else {
+    MaxPriority = dev_kHelper1->getMaxValue();
+    if (MaxPriority == 0)
+      MaxPriority = 1; // divide by 0 is bad
+  }
   Initialize_();
 
   SchedInstruction *waitFor = NULL;
   InstCount waitUntil = 0;
   MaxPriorityInv = 1 / (pheromone_t)MaxPriority;
+  MaxPriorityInv2 = 1 / (pheromone_t)MaxPriority2;
 
   // initialize the aco ready list so that the start instruction is ready
   // The luc component is 0 since the root inst uses no instructions
   InstCount RootId = rootInst_->GetNum();
-  HeurType RootHeuristic = dev_kHelper->computeKey(rootInst_, true, dev_DDG_->RegFiles, dev_DDG_);
-  pheromone_t RootScore = Score(-1, RootId, RootHeuristic);
+  #ifdef DEBUG_ACO_CRASH_LOCATIONS
+    if (hipThreadIdx_x == 0) {
+      printf("Crash before computeKey() in FindOneSchedule()\n");
+    }
+  #endif
+  HeurType RootHeuristic;
+  if (IsSecondPass)
+    RootHeuristic = dev_kHelper2->computeKey(rootInst_, true, dev_DDG_->RegFiles, dev_DDG_);
+  else
+    RootHeuristic = dev_kHelper1->computeKey(rootInst_, true, dev_DDG_->RegFiles, dev_DDG_);
+  #ifdef DEBUG_ACO_CRASH_LOCATIONS
+    if (hipThreadIdx_x == 0) {
+      printf("Crash after computeKey() in FindOneSchedule()\n");
+    }
+  #endif
+  pheromone_t RootScore = Score(-1, RootId, RootHeuristic, !IsSecondPass);
   ACOReadyListEntry InitialRoot{RootId, 0, RootHeuristic, RootScore};
   dev_readyLs->addInstructionToReadyList(InitialRoot);
   dev_readyLs->dev_ScoreSum[GLOBALTID] = RootScore;
@@ -725,7 +770,7 @@ InstSchedule *ACOScheduler::FindOneSchedule(InstCount RPTarget,
         }
       #endif
       // new readylist update
-      UpdateACOReadyList(inst);
+      UpdateACOReadyList(inst , IsSecondPass);
       #ifdef DEBUG_ACO_CRASH_LOCATIONS
         if (hipThreadIdx_x == 0) {
           printf("After UpdateACOReadyList()\n");
@@ -769,7 +814,7 @@ InstSchedule *ACOScheduler::FindOneSchedule(InstCount RPTarget,
   bool unnecessarilyStalling = false;
   // The MaxPriority that we are getting from the ready list represents the maximum possible heuristic/key value that we can have
   // I want to move all the heuristic computation stuff to another class for code tidiness reasons.
-  HeurType MaxPriority = kHelper->getMaxValue();
+  HeurType MaxPriority = kHelper1->getMaxValue();
   if (MaxPriority == 0)
     MaxPriority = 1; // divide by 0 is bad
   Initialize_();
@@ -781,8 +826,8 @@ InstSchedule *ACOScheduler::FindOneSchedule(InstCount RPTarget,
   // initialize the aco ready list so that the start instruction is ready
   // The luc component is 0 since the root inst uses no instructions
   InstCount RootId = rootInst_->GetNum();
-  HeurType RootHeuristic = kHelper->computeKey(rootInst_, true, dataDepGraph_->RegFiles);
-  pheromone_t RootScore = Score(-1, RootId, RootHeuristic);
+  HeurType RootHeuristic = kHelper1->computeKey(rootInst_, true, dataDepGraph_->RegFiles);
+  pheromone_t RootScore = Score(-1, RootId, RootHeuristic, !IsSecondPass);
   ACOReadyListEntry InitialRoot{RootId, 0, RootHeuristic, RootScore};
   readyLs->addInstructionToReadyList(InitialRoot);
   readyLs->ScoreSum = RootScore;
@@ -883,7 +928,7 @@ InstSchedule *ACOScheduler::FindOneSchedule(InstCount RPTarget,
       UpdtSlotAvlblty_(inst);
 
       // new readylist update
-      UpdateACOReadyList(inst);
+      UpdateACOReadyList(inst, IsSecondPass);
     }
     /* Logger::Info("Chose instruction %d (for some reason)", instNum); */
     schedule->AppendInst(instNum);
@@ -1260,7 +1305,6 @@ FUNC_RESULT ACOScheduler::FindSchedule(InstSchedule *schedule_out,
   InstCount InitialCost = InitialSchedule ? InitialSchedule->GetCost() : 0;
   InstCount TargetSC = InitialSchedule ? InitialSchedule->GetSpillCost()
                                         : heuristicSched->GetSpillCost();  
-
 #if USE_ACS
   initialValue_ = 2.0 / ((double)count_ * heuristicCost);
 #else
@@ -1699,7 +1743,7 @@ void ACOScheduler::CopyPheromonesToSharedMem(double *s_pheromone) {
 }
 
 __host__ __device__
-inline void ACOScheduler::UpdateACOReadyList(SchedInstruction *inst) {
+inline void ACOScheduler::UpdateACOReadyList(SchedInstruction *inst, bool IsSecondPass) {
   InstCount prdcsrNum, scsrRdyCycle;
   
   #ifdef __HIP_DEVICE_COMPILE__ // device version of function
@@ -1728,7 +1772,11 @@ inline void ACOScheduler::UpdateACOReadyList(SchedInstruction *inst) {
         if (wasLastPrdcsr) {
           // If all other predecessors of this successor have been scheduled then
           // we now know in which cycle this successor will become ready.
-          HeurType HeurWOLuc = dev_kHelper->computeKey(crntScsr, false, dev_DDG_->RegFiles, dev_DDG_);
+          HeurType HeurWOLuc;
+          if (!IsSecondPass)
+            HeurWOLuc = dev_kHelper1->computeKey(crntScsr, false, dev_DDG_->RegFiles, dev_DDG_);
+          else
+            HeurWOLuc = dev_kHelper2->computeKey(crntScsr, false, dev_DDG_->RegFiles, dev_DDG_);
           dev_readyLs->addInstructionToReadyList(ACOReadyListEntry{crntScsr->GetNum(), scsrRdyCycle, HeurWOLuc, 0});
         }
     }
@@ -1739,7 +1787,11 @@ inline void ACOScheduler::UpdateACOReadyList(SchedInstruction *inst) {
     #endif
     // Make sure the scores are valid.  The scheduling of an instruction may
     // have increased another instruction's LUC Score
-    PriorityEntry LUCEntry = dev_kHelper->getPriorityEntry(LSH_LUC);
+    PriorityEntry LUCEntry;
+    if (!IsSecondPass)
+      LUCEntry = dev_kHelper1->getPriorityEntry(LSH_LUC);
+    else
+      LUCEntry = dev_kHelper2->getPriorityEntry(LSH_LUC, hipBlockIdx_x % 2 == 0 ? 1 : 2);
     dev_RP0OrPositiveCount[GLOBALTID] = 0;
     for (InstCount I = 0; I < dev_readyLs->getReadyListSize(); ++I) {
       //we first get the heuristic without the LUC component, add the LUC
@@ -1774,14 +1826,14 @@ inline void ACOScheduler::UpdateACOReadyList(SchedInstruction *inst) {
         if (wasLastPrdcsr) {
           // If all other predecessors of this successor have been scheduled then
           // we now know in which cycle this successor will become ready.
-          HeurType HeurWOLuc = kHelper->computeKey(crntScsr, false, dataDepGraph_->RegFiles);
+          HeurType HeurWOLuc = kHelper1->computeKey(crntScsr, false, dataDepGraph_->RegFiles);
           readyLs->addInstructionToReadyList(ACOReadyListEntry{crntScsr->GetNum(), scsrRdyCycle, HeurWOLuc, 0});
         }
     }
 
     // Make sure the scores are valid.  The scheduling of an instruction may
     // have increased another instruction's LUC Score
-    PriorityEntry LUCEntry = kHelper->getPriorityEntry(LSH_LUC);
+    PriorityEntry LUCEntry = kHelper1->getPriorityEntry(LSH_LUC);
     RP0OrPositiveCount = 0;
     for (InstCount I = 0; I < readyLs->getReadyListSize(); ++I) {
       //we first get the heuristic without the LUC component, add the LUC
@@ -1927,7 +1979,7 @@ void ACOScheduler::CopyPheromonesToDevice(ACOScheduler *dev_AcoSchdulr) {
   dev_AcoSchdulr->dev_pheromone_elmnts_alloced_ = true;
 }
 
-void ACOScheduler::CopyPointersToDevice(ACOScheduler *dev_ACOSchedulr) {
+void ACOScheduler::CopyPointersToDevice(ACOScheduler *dev_ACOSchedulr, bool IsSecondPass) {
   size_t memSize;
   dev_ACOSchedulr->machMdl_ = dev_MM_;
   dev_ACOSchedulr->dataDepGraph_ = dev_DDG_;
@@ -1954,13 +2006,21 @@ void ACOScheduler::CopyPointersToDevice(ACOScheduler *dev_ACOSchedulr) {
   gpuErrchk(hipMemcpy(dev_ACOSchedulr->dev_readyLs, readyLs, memSize,
 		       hipMemcpyHostToDevice));
   // copy khelper
-  memSize = sizeof(KeysHelper);
-  gpuErrchk(hipMalloc(&dev_ACOSchedulr->dev_kHelper, memSize));
-  gpuErrchk(hipMemcpy(dev_ACOSchedulr->dev_kHelper, kHelper, memSize,
-		       hipMemcpyHostToDevice));
+  if (!IsSecondPass) {
+    memSize = sizeof(KeysHelper1);
+    gpuErrchk(hipMalloc(&dev_ACOSchedulr->dev_kHelper1, memSize));
+    gpuErrchk(hipMemcpy(dev_ACOSchedulr->dev_kHelper1, kHelper1, memSize,
+            hipMemcpyHostToDevice));
+  }
+  else {
+    memSize = sizeof(KeysHelper2);
+    gpuErrchk(hipMalloc(&dev_ACOSchedulr->dev_kHelper2, memSize));
+    gpuErrchk(hipMemcpy(dev_ACOSchedulr->dev_kHelper2, kHelper2, memSize,
+            hipMemcpyHostToDevice));
+  }
 }
 
-void ACOScheduler::FreeDevicePointers() {
+void ACOScheduler::FreeDevicePointers(bool IsSecondPass) {
   hipFree(dev_schduldInstCnt_);
   hipFree(dev_crntCycleNum_);
   hipFree(dev_crntSlotNum_);
@@ -1973,6 +2033,9 @@ void ACOScheduler::FreeDevicePointers() {
   hipFree(dev_rsrvSlots_);
   hipFree(dev_rsrvSlotCnt_);
   hipFree(dev_readyLs);
-  hipFree(dev_kHelper);
+  if (!IsSecondPass)
+    hipFree(dev_kHelper1);
+  else
+    hipFree(dev_kHelper2);
   hipFree(pheromone_.elmnts_);
 }
