@@ -30,6 +30,7 @@ namespace opt_sched {
 #define REGION_MAX_EDGE_CNT 800000
 #define NUMBLOCKSMANYANTS 80
 #define NUMTHREADSPERBLOCK 64
+#define BLOCKOPTSTALLTHRESHOLD 30
 
 enum class DCF_OPT {
   OFF,

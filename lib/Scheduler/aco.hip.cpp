@@ -270,6 +270,9 @@ InstCount ACOScheduler::SelectInstruction(SchedInstruction *lastInst, InstCount 
     if (dev_RP0OrPositiveCount[GLOBALTID] != 0 && candidateDefs > candidateLUC)
       IScore = IScore * 9/10;
 
+    *dev_readyLs->getInstScoreAtIndex(I) = IScore;
+    dev_readyLs->dev_ScoreSum[GLOBALTID] += IScore;
+
     #ifdef DEBUG_INSTR_SELECTION
     if (GLOBALTID==0)
       printf("Before Inst: %d, score: %f\n", *dev_readyLs->getInstIdAtIndex(I), IScore);
@@ -288,7 +291,9 @@ InstCount ACOScheduler::SelectInstruction(SchedInstruction *lastInst, InstCount 
     // add a score penalty for instructions that are not ready yet
     // unnecessary stalls should not be considered if current RP is low, or if we already have too many stalls
     if (*dev_readyLs->getInstReadyOnAtIndex(I) > dev_crntCycleNum_[GLOBALTID]) {
-      if (dev_RP0OrPositiveCount[GLOBALTID] != 0) {
+      // if we have any instruction available that doesn't have a negative effect on RP
+      // or block ID is under 30, do not add an optional stall
+      if (dev_RP0OrPositiveCount[GLOBALTID] != 0 || hipBlockIdx_x < BLOCKOPTSTALLTHRESHOLD) {
         #ifdef DEBUG_INSTR_SELECTION
         if (GLOBALTID==0)
           printf("Zeroing out Inst: %d, score: %f, only rp negative: %s, close to RP Target: %s\n", *dev_readyLs->getInstIdAtIndex(I), IScore, dev_RP0OrPositiveCount[GLOBALTID] ? "true" : "false", closeToRPTarget ? "true" : "false");
@@ -377,6 +382,9 @@ InstCount ACOScheduler::SelectInstruction(SchedInstruction *lastInst, InstCount 
     pheromone_t IScore = Score(lastInstId, *readyLs->getInstIdAtIndex(I), Heur);
     if (RP0OrPositiveCount != 0 && candidateDefs > candidateLUC)
       IScore = IScore * 9/10;
+
+    *readyLs->getInstScoreAtIndex(I) = IScore;
+    readyLs->ScoreSum += IScore;
 
     if (currentlyWaiting) {
       // if currently waiting on an instruction, do not consider semi-ready instructions 
@@ -472,7 +480,9 @@ InstCount ACOScheduler::SelectInstruction(SchedInstruction *lastInst, InstCount 
   // select the instruction index for fp choice
   size_t fpIndx=0;
   #ifdef __HIP_DEVICE_COMPILE__
-    __shared__ bool dev_useMax;
+  __shared__ bool dev_useMax;
+  // only explore and exploit at block level for first pass
+  if (!dev_rgn_->IsSecondPass()) {
     // select useMax for each block
     if (hipThreadIdx_x == 0)
       dev_useMax = (rand < choose_best_chance) || currentlyWaiting;
@@ -490,6 +500,16 @@ InstCount ACOScheduler::SelectInstruction(SchedInstruction *lastInst, InstCount 
         }
       }
     }
+  }
+  else {
+    for (size_t i = 0; i < dev_readyLs->getReadyListSize(); ++i) {
+      point -= *dev_readyLs->getInstScoreAtIndex(i);
+      if (point <= 0) {
+        fpIndx = i;
+        break;
+      }
+    }
+  }
   #else
     for (size_t i = 0; i < readyLs->getReadyListSize(); ++i) {
       point -= *readyLs->getInstScoreAtIndex(i);
@@ -500,11 +520,17 @@ InstCount ACOScheduler::SelectInstruction(SchedInstruction *lastInst, InstCount 
     }
   #endif
   //finally we pick whether we will return the fp choice or max score inst w/o using a branch
+  size_t indx;
   #ifdef __HIP_DEVICE_COMPILE__
-    size_t indx = dev_useMax ? MaxScoreIndx : fpIndx;
+    if (!dev_rgn_->IsSecondPass())
+      indx = dev_useMax ? MaxScoreIndx : fpIndx;
+    else {
+      bool UseMax = (rand < choose_best_chance) || currentlyWaiting;
+      indx = UseMax ? MaxScoreIndx : fpIndx;
+    }
   #else
     bool UseMax = (rand < choose_best_chance) || currentlyWaiting;
-    size_t indx = UseMax ? MaxScoreIndx : fpIndx;
+    indx = UseMax ? MaxScoreIndx : fpIndx;
   #endif
   #ifdef __HIP_DEVICE_COMPILE__
     #ifdef DEBUG_INSTR_SELECTION
@@ -572,7 +598,9 @@ InstSchedule *ACOScheduler::FindOneSchedule(InstCount RPTarget,
       printf("Crash before while loop inside FindOneSchedule()\n");
     }
   #endif
-  while (!IsSchedComplete_()) {
+  __shared__ bool noSchedsInBlockCompleted;
+  noSchedsInBlockCompleted = true;
+  while (noSchedsInBlockCompleted) {
     // incrementally calculate if there are any instructions with a neutral
     // or positive effect on RP
     for (InstCount I = 0; I < dev_readyLs->getReadyListSize(); ++I) {
@@ -707,12 +735,27 @@ InstSchedule *ACOScheduler::FindOneSchedule(InstCount RPTarget,
     schedule->AppendInst(instNum);
     if (MovToNxtSlot_(inst))
       InitNewCycle_();
+    // at end of loop, check if any ants have completed their schedule, so that
+    // the other ants can terminated
+    if (IsSchedComplete_())
+      noSchedsInBlockCompleted = false;
   }
   #ifdef DEBUG_ACO_CRASH_LOCATIONS
     if (hipThreadIdx_x == 0) {
       printf("After while loop inside FindOneSchedule()\n");
     }
   #endif
+  // for any incomplete schedules, return a null value
+  if (!IsSchedComplete_()) {
+    // set schedule cost to INVALID_VALUE so it is not considered for
+    // iteration best or global best
+    schedule->SetCost(INVALID_VALUE);
+    // keep track of ants terminated
+    atomicAdd(&numAntsTerminated_, 1);
+    dev_readyLs->clearReadyList();
+    // end schedule construction
+    return NULL;
+  }
   dev_rgn_->UpdateScheduleCost(schedule);
   schedule->setIsZeroPerp( ((BBWithSpill *)dev_rgn_)->ReturnPeakSpillCost() == 0 );
   return schedule;
