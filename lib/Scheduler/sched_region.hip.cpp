@@ -180,7 +180,8 @@ FUNC_RESULT SchedRegion::FindOptimalSchedule(
     Milliseconds rgnTimeout, Milliseconds lngthTimeout, bool &isLstOptml,
     InstCount &bestCost, InstCount &bestSchedLngth, InstCount &hurstcCost,
     InstCount &hurstcSchedLngth, InstSchedule *&bestSched, bool filterByPerp,
-    const BLOCKS_TO_KEEP blocksToKeep) {
+    const BLOCKS_TO_KEEP blocksToKeep, unsigned loopDepth) {
+
   ListScheduler *lstSchdulr = NULL;
   SequentialListScheduler *seqSchdulr = NULL;
   InstSchedule *InitialSchedule = nullptr;
@@ -475,6 +476,14 @@ FUNC_RESULT SchedRegion::FindOptimalSchedule(
   // check if region is of appropriate size to execute Dev_ACO on 
   // Defined in aco.h
   // TODO: move to sched.ini
+
+  int aco_skip_cycles = schedIni.GetInt("CYCLES_FROM_OPTIMAL");
+  int optimalScheduleThreshhold = (schedLwrBound_ + aco_skip_cycles);
+  int aco_skip_depth = schedIni.GetInt("LOOP_DEPTH");
+
+  Logger::Info("Sched Lwr Bound: %d", schedLwrBound_);
+  Logger::Info("Loop Depth: %d", loopDepth);
+
   if (AcoBeforeEnum && 
       (REGION_MAX_EDGE_CNT > 0 &&
        dataDepGraph_->GetEdgeCnt() > REGION_MAX_EDGE_CNT /*||
@@ -488,6 +497,27 @@ FUNC_RESULT SchedRegion::FindOptimalSchedule(
   }
   else if (!isLstOptml && AcoBeforeEnum && memOps == 0) {
     Logger::Info("Skipping ACO (No Mem ops)");
+    AcoBeforeEnum = false;
+    bestSched = bestSched_ = lstSched;
+    bestSchedLngth_ = heuristicScheduleLength;
+    bestCost_ = hurstcCost_;
+  }
+  else if (aco_skip_cycles > 0 && aco_skip_depth > -1 && !isLstOptml && IsSecondPass() && (lstSched->GetCrntLngth() <= optimalScheduleThreshhold) && loopDepth == aco_skip_depth) {
+	Logger::Info("Skipping ACO (list sched within %d cycles from optimal & loop depth %d)", aco_skip_cycles, loopDepth);
+    AcoBeforeEnum = false;
+    bestSched = bestSched_ = lstSched;
+    bestSchedLngth_ = heuristicScheduleLength;
+    bestCost_ = hurstcCost_;
+  }
+  else if (aco_skip_cycles > 0 && !isLstOptml && IsSecondPass() && (lstSched->GetCrntLngth() <= optimalScheduleThreshhold)) {
+	Logger::Info("Skipping ACO (list sched within %d cycles from optimal)", aco_skip_cycles);
+    AcoBeforeEnum = false;
+    bestSched = bestSched_ = lstSched;
+    bestSchedLngth_ = heuristicScheduleLength;
+    bestCost_ = hurstcCost_;
+  }
+  else if (aco_skip_depth > -1 && !isLstOptml && IsSecondPass() && (loopDepth == aco_skip_depth)) {
+	Logger::Info("Skipping ACO (list sched with loop depth %d)", loopDepth);
     AcoBeforeEnum = false;
     bestSched = bestSched_ = lstSched;
     bestSchedLngth_ = heuristicScheduleLength;

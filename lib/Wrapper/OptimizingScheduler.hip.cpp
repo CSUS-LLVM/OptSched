@@ -20,6 +20,9 @@
 #include "llvm/CodeGen/LiveIntervals.h"
 #include "llvm/CodeGen/MachineRegisterInfo.h"
 #include "llvm/CodeGen/MachineScheduler.h"
+#include "llvm/Analysis/LoopInfo.h"
+#include "llvm/CodeGen/MachineFunctionPass.h"
+#include "llvm/CodeGen/MachineLoopInfo.h"
 #include "llvm/CodeGen/RegisterClassInfo.h"
 #include "llvm/CodeGen/RegisterPressure.h"
 #include "llvm/CodeGen/ScheduleDAG.h"
@@ -466,11 +469,21 @@ void ScheduleDAGOptSched::schedule() {
 
   // Setup time before scheduling
   Utilities::startTime = std::chrono::high_resolution_clock::now();
+
+  //Calculate Loop Depth
+  unsigned depth;
+  if (C->MLI != nullptr) {
+    depth = MLI->getLoopDepth(BB);
+  } 
+  else {
+	depth = -1;
+  }
+
   // Schedule region.
   Rslt = region->FindOptimalSchedule(CurrentRegionTimeout, CurrentLengthTimeout,
                                      IsEasy, NormBestCost, BestSchedLngth,
                                      NormHurstcCost, HurstcSchedLngth, Sched,
-                                     FilterByPerp, blocksToKeep(schedIni));
+                                     FilterByPerp, blocksToKeep(schedIni), depth);
 
   if ((!(Rslt == RES_SUCCESS || Rslt == RES_TIMEOUT) || Sched == NULL)) {
     LLVM_DEBUG(
