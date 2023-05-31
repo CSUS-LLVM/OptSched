@@ -58,7 +58,7 @@ static unsigned getAdjustedOccupancy(const GCNSubtarget *ST, unsigned VGPRCount,
   return std::min(MaxOccLDS, std::min(MaxOccVGPR, MaxOccSGPR));
 }
 
-#if !defined(NDEBUG) || defined(LLVM_ENABLE_DUMP)
+#if !defined(NDEBUG)
 void OptSchedGCNTarget::dumpOccupancyInfo(const InstSchedule *Schedule) const {
   const InstCount *PRP;
   Schedule->GetPeakRegPressures(PRP);

@@ -10,6 +10,7 @@
 
 #pragma once
 
+#include "GCNSubtarget.h"
 #include "OptSchedMachineWrapper.h"
 #include "opt-sched/Scheduler/OptSchedTarget.h"
 #include "opt-sched/Scheduler/config.h"
@@ -19,6 +20,7 @@
 #include "llvm/ADT/SmallString.h"
 #include "llvm/CodeGen/MachineScheduler.h"
 #include "llvm/Support/Debug.h"
+#include "GCNRegPressure.h"
 #include <chrono>
 #include <memory>
 #include <vector>
@@ -30,7 +32,83 @@ namespace opt_sched {
 
 class OptSchedDDGWrapperBasic;
 
+class ILPMetrics {
+  unsigned ScheduleLength;
+  unsigned BubbleCycles;
+
+public:
+  ILPMetrics() = default;
+  ILPMetrics(unsigned L, unsigned BC)
+      : ScheduleLength(L), BubbleCycles(BC) {}
+  unsigned getLength() const { return ScheduleLength; }
+  unsigned getBubbles() const { return BubbleCycles; }
+  unsigned getMetric() const {
+    unsigned Metric = (BubbleCycles * ScaleFactor) / ScheduleLength;
+    // Metric is zero if the amount of bubbles is less than 1% which is too
+    // small. So, return 1.
+    return Metric ? Metric : 1;
+  }
+  static const unsigned ScaleFactor;
+};
+
+inline raw_ostream &operator<<(raw_ostream &OS, const ILPMetrics &Sm) {
+  dbgs() << "\n Schedule Metric (scaled by "
+         << ILPMetrics::ScaleFactor
+         << " ) is: " << Sm.getMetric() << " [ " << Sm.getBubbles() << "/"
+         << Sm.getLength() << " ]\n";
+  return OS;
+}
+
+// Evaluate schedules with AMDGPU target.
+class ScheduleEvaluator {
+private:
+  ScheduleDAGOptSched &DAG;
+
+  // RP before scheduling.
+  GCNRegPressure RPBefore;
+
+  // RP after scheduling.
+  GCNRegPressure RPAfter;
+
+  // ILP before scheduling.
+  int64_t ILPBefore;
+
+  // ILP after scheduling.
+  int64_t ILPAfter;
+
+  // Record the original instruction order.
+  std::vector<MachineInstr *> Unsched;
+
+  ILPMetrics calculateILP() const;
+
+public:
+  ScheduleEvaluator(ScheduleDAGOptSched &DAG) : DAG(DAG) {}
+
+  virtual ~ScheduleEvaluator() = default;
+
+  void calculateRPBefore();
+
+  void calculateRPAfter();
+
+  void calcualteILPBefore();
+
+  void claculateILPAfter();
+
+  // Returns RPAfter - RPBefore.
+  unsigned getOccDifference() const;
+
+  // Returns ILPAfter - ILPBefore.
+  int64_t getILPDifference() const;
+
+  unsigned getOccupancyBefore() const;
+
+  void recordSchedule();
+
+  void revertScheduling();
+};
+
 class ScheduleDAGOptSched : public ScheduleDAGMILive {
+friend class ScheduleEvaluator;
 
 private:
   enum SchedPassStrategy { OptSchedMinRP, OptSchedBalanced };
@@ -166,6 +244,10 @@ protected:
   // the primary objective).
   int SCW;
 
+  // Evaluate scheduling regions and decide whether to revert to a previous
+  // schedule or keep a new one.
+  std::vector<ScheduleEvaluator> SchedEvals;
+
   // In ISO mode this is the original DAG before ISO conversion.
   std::vector<SUnit> OriginalDAG;
 
@@ -203,6 +285,10 @@ protected:
 
   // What list scheduler should be used to find an initial feasible schedule.
   SchedulerType HeurSchedType;
+
+  // Return the real register pressure for the current region. Only work for
+  // AMDGPU target.
+  GCNRegPressure getRealRegPressure() const;
 
   // Load config files for the OptScheduler and set flags
   void loadOptSchedConfig();
