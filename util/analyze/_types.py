@@ -41,12 +41,25 @@ class Logs:
         for bench in self.benchmarks:
             yield from bench.blocks
 
+    def __len__(self):
+        return sum(len(bench) for bench in self.benchmarks)
+
     def __repr__(self):
         benchmarks = ','.join(b.name for b in self.benchmarks)
         return f'<Logs({benchmarks})>'
 
     def keep_blocks_if(self, p):
         return Logs([bench.keep_blocks_if(p) for bench in self.benchmarks])
+
+    def find_equiv(self, blk):
+        uid = blk.uniqueid()
+        return [b for b in self.benchmark(blk.info['benchmark']) if b.uniqueid() == uid]
+
+    def find_block(self, name, benchmark=None):
+        search = self
+        if benchmark is not None:
+            search = self.benchmark(benchmark)
+        return [b for b in search if b.name == name]
 
 
 class Benchmark:
@@ -67,6 +80,9 @@ class Benchmark:
     def __iter__(self):
         return iter(self.blocks)
 
+    def __len__(self):
+        return len(self.blocks)
+
     @property
     def benchmarks(self):
         return (self,)
@@ -76,6 +92,16 @@ class Benchmark:
 
     def keep_blocks_if(self, p):
         return Benchmark(self.info, [blk for blk in self.blocks if p(blk)])
+
+    def find_equiv(self, blk):
+        uid = blk.uniqueid()
+        return [b for b in self if b.uniqueid() == uid]
+
+    def find_block(self, name, benchmark=None):
+        if benchmark is not None:
+            if benchmark != self.name:
+                return []
+        return [b for b in self if b.name == name]
 
 
 class Block:
@@ -93,9 +119,13 @@ class Block:
 
     def __init__(self, info, raw_log, events):
         self.name = info['name']
+        self.benchmark = info['benchmark']
         self.info = info
         self.raw_log = raw_log
         self.events = events
+
+        if 'PassFinished' in self:
+            self.info['pass'] = self.single('PassFinished')['num']
 
     def single(self, event_name):
         '''
@@ -132,3 +162,6 @@ class Block:
 
     def uniqueid(self):
         return frozenset(self.info.items())
+
+    def dump(self):
+        print(self.raw_log)

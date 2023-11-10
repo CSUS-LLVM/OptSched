@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 
 import os
-import re
 
 from . import import_utils
 
@@ -13,8 +12,8 @@ def parse(file):
     with open(file, 'r') as f:
         return import_utils.parse_multi_bench_file(
             f.read(),
-            benchstart=re.compile(r'Building (?P<name>\S*)'),
-            filename=re.compile(r'/[fc]lang\b.*\s(\S+\.\S+)\n'))
+            benchstart=r'Building (?P<name>\S*)',
+            filename=r'/[fc]lang\b.*\s(\S+\.\S+)\n')
 
 
 if __name__ == '__main__':
