@@ -1,0 +1,149 @@
+#!/usr/bin/env python3
+import argparse
+import os
+import shlex
+import subprocess
+import sys
+from pathlib import Path
+from typing import Dict, List, Optional, Tuple
+import json
+import itertools
+import functools
+
+from runners import runwith
+
+# %% Setup
+
+
+def expand_matrix(matrix: List[Dict[str, Dict[str, str]]]) -> Tuple[List[Dict[str, str]], List[str]]:
+    withs = []
+    labels = []
+    from pprint import pprint
+
+    def merge_dict(a: dict, b: dict) -> dict:
+        assert not (a.keys() & b.keys())
+        a = a.copy()
+        a.update(b)
+        return a
+
+    for setting in itertools.product(*matrix):
+        withs_setting = functools.reduce(merge_dict, (obj[opt] for opt, obj in zip(setting, matrix)))
+        label = '-'.join(setting)
+
+        withs.append(withs_setting)
+        labels.append(label)
+
+    return withs, labels
+
+
+def main(outdir: Path, optsched_cfg: Path, labels: List[str], withs: List[str], cmd: List[str], append_logs: bool = False, git_state: Optional[str] = None, validate_cmd: Optional[str] = None, analyze_cmds: List[str] = [], analyze_files: List[str] = [], matrix: List[Path] = []):
+    if withs is not None:
+        withs: List[Dict[str, str]] = [runwith.parse_withs(with_) for with_ in withs]
+    else:
+        assert matrix
+        assert not labels
+
+        withs = []
+        labels = []
+
+        for matrix_path in matrix:
+            matrix_json = json.loads(matrix_path.read_text())
+            new_withs, new_labels = expand_matrix(matrix_json)
+            withs += new_withs
+            labels += new_labels
+
+    assert len(labels) == len(withs)
+    assert not analyze_files or len(analyze_files) == len(analyze_cmds)
+
+    outdir = outdir.resolve()
+    logfiles = []
+
+    for label, with_ in zip(labels, withs):
+        print(f'Running {label} with settings:', ' '.join(f'{k}={v}' for k, v in with_.items()))
+        logfile = runwith.main(
+            outdir=outdir,
+            optsched_cfg=optsched_cfg,
+            label=label,
+            with_=with_,
+            cmd=[arg.replace('{{label}}', label) for arg in cmd],
+            append_logs=append_logs,
+            git_state=git_state,
+        )
+        logfiles.append(logfile)
+
+    if validate_cmd:
+        val_cmd = shlex.split(validate_cmd, comments=True)
+        if not validate_cmd.endswith('#'):
+            val_cmd += map(str, logfiles)
+        subprocess.run(subprocess.list2cmdline(val_cmd), cwd=outdir, check=True, shell=True)
+
+    if not analyze_files:
+        analyze_files = [None] * len(analyze_cmds)
+
+    for analyze_cmd, outfile in zip(analyze_cmds, analyze_files):
+        analyze_run = shlex.split(analyze_cmd, comments=True)
+        if not analyze_cmd.endswith('#'):
+            analyze_run += map(str, logfiles)
+        result = subprocess.run(subprocess.list2cmdline(analyze_run), cwd=outdir,
+                                capture_output=True, encoding='utf-8', shell=True)
+        if result.returncode != 0:
+            print(
+                f'Analysis command {subprocess.list2cmdline(analyze_run)} failed with error code: {result.returncode}', file=sys.stderr)
+
+        print(result.stdout)
+        print(result.stderr, file=sys.stderr)
+        if outfile:
+            with open(outdir / outfile, 'w') as f:
+                f.write(result.stdout)
+
+
+# %% Main
+if __name__ == '__main__':
+    OPTSCHEDCFG = os.getenv('OPTSCHEDCFG')
+    RUN_CMD = os.getenv('RUN_CMD')
+    RUN_CMD = shlex.split(RUN_CMD) if RUN_CMD else RUN_CMD
+    VALIDATE_CMD = os.getenv('VALIDATE_CMD')
+    ANALYZE_CMD = os.getenv('ANALYZE_CMD')
+    RUNNER_GIT_REPO = os.getenv('RUNNER_GIT_REPO')
+
+    parser = argparse.ArgumentParser(description='Run the commands with the sched.ini settings')
+    parser.add_argument('-c', '--optsched-cfg',
+                        required=OPTSCHEDCFG is None,
+                        default=OPTSCHEDCFG,
+                        help='The path to the optsched config to use. Defaults to the env variable OPTSCHEDCFG if it exists, else is required. The sched.ini is expected to be there')
+    parser.add_argument('-o', '--outdir', required=True, help='The path to place the output files at')
+    parser.add_argument('-L', '--labels', default='',
+                        help='Comma separated labels to use for these runs. Must be equal to the number of --with flags. Any parts of the run command <cmd> will have the string {{label}} replaced with the label for the run.')
+    parser.add_argument('--with', nargs='*', action='append', metavar='KEY=VALUE',
+                        help="The sched.ini settings to set for each run. Each run's settings should have a new --with flag.")
+    parser.add_argument('--matrix', type=Path, action='append', metavar='MATRIX.json',
+                        help='A json file containing a matrix of configuration values to act as-if their product was specified via --with and --labels')
+    parser.add_argument(
+        'cmd', nargs='+', help='The command (with args) to run. Use - to default to the environment variable RUN_CMD.')
+    parser.add_argument('--append', action='store_true',
+                        help='Allow a <label>.log file to exist, appending to it if so')
+    parser.add_argument('--git-state', default=RUNNER_GIT_REPO,
+                        help='The path to a git repository to snapshot its state in our <outdir>. Defaults to the environment variable RUNNER_GIT_REPO if set. If not present, no git status will be generated.')
+
+    parser.add_argument('--validate', default=VALIDATE_CMD,
+                        help='The command (single string) to run after all runs to validate that the runs were correct. Defaults to the env variable VALIDATE_CMD. The output log files will be passed to the command, one additional arg for each run. To skip this, end the command with a bash comment #')
+    parser.add_argument('--analyze', nargs='*', default=[ANALYZE_CMD] if ANALYZE_CMD else [],
+                        help='The commands (each a single string) to run after all runs to analyze the runs and produce output. Defaults to the single command from the env variable ANALYZE_CMD. The output log files will be passed to each command, one additional arg for each run. To skip this, end the command with a bash comment #')
+    parser.add_argument('--analyze-files',
+                        help='The filenames to place the stdout of each analyze command, comma separated.')
+
+    args = parser.parse_args()
+
+    main(
+        outdir=Path(args.outdir),
+        optsched_cfg=Path(args.optsched_cfg),
+        labels=list(filter(bool, args.labels.split(','))),
+        withs=getattr(args, 'with'),
+        matrix=args.matrix,
+        cmd=args.cmd if args.cmd != '-' else RUN_CMD,
+        append_logs=args.append,
+        git_state=args.git_state,
+        validate_cmd=args.validate,
+        analyze_cmds=args.analyze,
+        analyze_files=args.analyze_files.split(',') if args.analyze_files else [],
+    )
