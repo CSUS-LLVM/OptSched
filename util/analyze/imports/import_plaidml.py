@@ -3,7 +3,7 @@
 import os
 import pathlib
 
-from .._types import Logs
+from .._types import Logs, merge_logs
 from . import import_utils
 
 
@@ -22,7 +22,8 @@ def parse(path):
 
         with logfiles[0].open('r') as f:
             benchname = benchmark_dir.stem
-            result.merge(
+            merge_logs(
+                result,
                 import_utils.parse_single_bench_file(
                     f.read(), benchname=benchname)
             )

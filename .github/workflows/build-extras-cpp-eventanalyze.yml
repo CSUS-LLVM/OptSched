@@ -1,0 +1,88 @@
+name: Build extras/analyze
+
+on:
+  workflow_dispatch:
+    inputs:
+      python-version:
+        description: 'Python version to use'
+        required: true
+        default: '3.8-dev'
+      ref:
+        description: 'The OptSched git ref to checkout to build'
+        required: true
+        default: 'master'
+      build_type:
+        description: 'CMAKE_BUILD_TYPE'
+        required: true
+        default: 'Release'
+
+jobs:
+  build:
+    runs-on: ubuntu-20.04
+
+    steps:
+      - name: Install APT dependencies
+        run: |
+          # For parallel STL
+          sudo apt-get install libtbb-dev
+
+          # For latest C++ features
+          sudo add-apt-repository ppa:ubuntu-toolchain-r/test
+          sudo apt-get update
+
+          sudo apt-get install g++-11
+
+          # For pyenv python
+          sudo apt-get install make build-essential libssl-dev zlib1g-dev \
+            libbz2-dev libreadline-dev libsqlite3-dev wget curl llvm \
+            libncursesw5-dev xz-utils tk-dev libxml2-dev libxmlsec1-dev libffi-dev liblzma-dev
+
+      - name: Install Python version
+        run: |
+          curl https://pyenv.run | bash
+          eval "$(pyenv init --path)"
+          echo "PYENV_ROOT=$HOME/.pyenv" >> $GITHUB_ENV
+          echo "$HOME/.pyenv/bin" >> $GITHUB_PATH
+
+          export PYENV_ROOT="$HOME/.pyenv"
+          export PATH="$PYENV_ROOT/bin:$PATH"
+
+          pyenv install ${{ github.event.inputs.python-version }}
+          pyenv global ${{ github.event.inputs.python-version }}
+
+          python3 --version
+
+      - uses: actions/checkout@v2
+        with:
+          ref: ${{ github.event.inputs.ref }}
+
+      - name: Configure
+        run: |
+          eval "$(pyenv init --path)"
+
+          cmake -S extras/analyze -B build \
+            -DCMAKE_BUILD_TYPE=${{ github.event.inputs.build_type }} \
+            -DPython_FIND_UNVERSIONED_NAMES=FIRST \
+            -DPYBIND11_FINDPYTHON=ON \
+            -DCMAKE_CXX_COMPILER=g++-11
+
+      - name: Build
+        run: |
+          eval "$(pyenv init --path)"
+
+          cmake --build build -j 2
+
+      - name: Bundle Shared Objects
+        run: |
+          cd build
+
+          # Copy the shared object dependencies of this Python module to the current directory
+          ldd eventanalyze.*.so | sed -E 's/^.*=> (\S+).*$|(\S+) .*$/\1/g' | xargs -I {} cp {} .
+          chmod +x lib*.so*
+
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v2
+        with:
+          name: Python-${{ github.event.inputs.python-version }} ${{ github.event.inputs.build_type }} Module
+          path: build/*.so*
+          if-no-files-found: error

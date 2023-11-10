@@ -4,7 +4,7 @@ import os
 import re
 import pathlib
 
-from .._types import Logs
+from .._types import Logs, merge_logs
 from . import import_utils
 
 
@@ -25,7 +25,8 @@ def parse(path):
     for benchmark in benchmarks:
         with benchmark.open('r') as f:
             benchname = benchname_re.search(benchmark.stem).group(1)
-            result.merge(
+            merge_logs(
+                result,
                 import_utils.parse_single_bench_file(
                     f.read(), benchname=benchname)
             )
