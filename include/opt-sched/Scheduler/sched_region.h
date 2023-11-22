@@ -50,8 +50,7 @@ public:
 	      DataDepGraph *dataDepGraph, long rgnNum, int16_t sigHashSize, 
 	      LB_ALG lbAlg, SchedPriorities hurstcPrirts, 
 	      SchedPriorities enumPrirts, bool vrfySched, 
-	      Pruning PruningStrategy, SchedulerType HeurSchedType,
-        SchedPriorities acoPrirts1, SchedPriorities acoPrirts2,
+	      Pruning PruningStrategy, SchedulerType HeurSchedType, 
 	      SPILL_COST_FUNCTION spillCostFunc = SCF_PERP);
   // Destroys the region. Must be overriden by child classes.
   virtual ~SchedRegion() {}
@@ -175,9 +174,6 @@ private:
   SchedPriorities hurstcPrirts_;
   // Scheduling heuristics to use when enumerating
   SchedPriorities enumPrirts_;
-  // Scheduling heuristics to use during ACO
-  SchedPriorities acoPrirts1_;
-  SchedPriorities acoPrirts2_;
 
   // TODO(max): Document.
   int16_t sigHashSize_;

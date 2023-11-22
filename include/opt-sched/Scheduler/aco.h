@@ -29,8 +29,8 @@ namespace opt_sched {
 // memory usage as well. Smaller node count DAGs can use more memory.
 #define REGION_MAX_EDGE_CNT 800000
 #define NUMBLOCKSMANYANTS 80
-#define NUMTHREADSPERBLOCK 64
-#define BLOCKOPTSTALLTHRESHOLD 30
+#define NUMTHREADSPERBLOCK 64	
+#define BLOCKOPTSTALLTHRESHOLD 135
 
 enum class DCF_OPT {
   OFF,
@@ -49,8 +49,8 @@ struct Choice {
 class ACOScheduler : public ConstrainedScheduler {
 public:
   ACOScheduler(DataDepGraph *dataDepGraph, MachineModel *machineModel,
-               InstCount upperBound, SchedPriorities priorities1,
-               SchedPriorities priorities2, bool vrfySched, bool IsPostBB, int numBlocks,
+               InstCount upperBound, SchedPriorities priorities,
+               bool vrfySched, bool IsPostBB,  int numBlocks,
                SchedRegion *dev_rgn = NULL, DataDepGraph *dev_DDG = NULL,
 	             MachineModel *dev_MM = NULL, void *dev_states = NULL);
   __host__
@@ -63,11 +63,11 @@ public:
   // Default is NULL if none are set.
   void setInitialSched(InstSchedule *Sched);
   // Copies the objects pointed to by ACOSched to device
-  void CopyPointersToDevice(ACOScheduler *dev_ACOSchedur, bool IsSecondPass);
+  void CopyPointersToDevice(ACOScheduler *dev_ACOSchedur);
   // Copies the current pheromone values to device pheromone array
   void CopyPheromonesToDevice(ACOScheduler *dev_AcoSchdulr);
   // Calls hipFree on all arrays/objects that were allocated with hipMalloc
-  void FreeDevicePointers(bool IsSecondPass);
+  void FreeDevicePointers();
   // Allocates device arrays of size numThreads_ of dynamic variables to allow
   // each thread to have its own value
   void AllocDevArraysForParallelACO();
@@ -108,28 +108,25 @@ private:
   __host__ __device__
   pheromone_t &Pheromone(InstCount from, InstCount to);
   __host__ __device__
-  pheromone_t Score(InstCount FromId, InstCount ToId, HeurType ToHeuristic, bool IsFirstPass);
+  pheromone_t Score(InstCount FromId, InstCount ToId, HeurType ToHeuristic);
   DCF_OPT ParseDCFOpt(const std::string &opt);
   __host__ __device__
   InstCount SelectInstruction(SchedInstruction *lastInst, InstCount totalStalls, 
                               SchedRegion *rgn, bool &unnecessarilyStalling, 
                               bool closeToRPTarget, bool currentlyWaiting);
   __host__ __device__
-  void UpdateACOReadyList(SchedInstruction *Inst, bool IsSecondPass);
+  void UpdateACOReadyList(SchedInstruction *Inst);
 
   DeviceVector<pheromone_t> pheromone_;
   // new ds representations
   ACOReadyList *readyLs;
-  KeysHelper1 *kHelper1;
-  KeysHelper2 *kHelper2;
+  KeysHelper *kHelper;
   pheromone_t MaxPriorityInv;
-  pheromone_t MaxPriorityInv2;
   InstCount MaxScoringInst;
 
   // new ds representations for device
   ACOReadyList *dev_readyLs;
-  KeysHelper1 *dev_kHelper1;
-  KeysHelper2 *dev_kHelper2;
+  KeysHelper *dev_kHelper;
   InstCount *dev_MaxScoringInst;
   
   // True if pheromone_.elmnts_ alloced on device
@@ -165,9 +162,6 @@ private:
   int numBlocks_, numThreads_;
   int *dev_RP0OrPositiveCount;
   int RP0OrPositiveCount;
-
-  SchedPriorities priorities1_;
-  SchedPriorities priorities2_;
 
 };
 
