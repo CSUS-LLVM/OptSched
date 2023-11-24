@@ -1,0 +1,223 @@
+#!/usr/bin/python3
+
+import os
+import sys
+import re
+import csv
+import pandas as pd
+from decimal import Decimal
+
+benchName = re.compile("build    ([0-9]+).([a-zA-Z_]+)")
+benchTime = re.compile("([0-9]+) total seconds elapsed")
+functionName = re.compile("Function: ([a-zA-Z_:0-9]+)")
+spilledLiveRangesRE = re.compile("Number of spilled live ranges: (\d+)")
+weightedSpillsRE = re.compile(" SC in Function [a-zA-Z_:0-9]+ (\d+)")
+fnOccRE      = re.compile("Final occupancy for function ([a-zA-Z_0-9]+):([0-9]+)")
+
+def parseLog(log):
+    # get name and total time before we cut off top and bottom
+    name = "prim"
+    time = "0"
+    
+    res = {}
+
+    timeInfo = {}
+    timeStuff = {}
+    timeStuff["bench_name"] = str(name)
+    timeStuff["compile_time"] = int(time)
+    timeInfo[0] = timeStuff
+    functionNum = 0
+    
+    occupancyList = re.findall("Final occupancy for function (.*):([0-9]+)", log)
+    print("Function count: ", len(occupancyList))
+    for x in occupancyList:
+        functionInfo = {}
+        functionInfo["function_name"] = x[0]
+        functionInfo["Occupancy"] = int(x[1])
+
+        res[functionNum] = functionInfo
+        functionNum += 1
+
+    return [res, timeInfo]
+
+
+def parseLogCompileTime(log):
+    # get name and total time before we cut off top and bottom
+    #name = benchName.search(log).group(2)
+    #time = benchTime.search(log).group(1)
+    name = "prim"
+    time = "0"
+    timeInfo = {}
+    timeInfo["bench_name"] = str(name)
+    timeInfo["compile_time"] = int(time)
+
+    return timeInfo
+
+
+globalStats = {
+    'bench': "Global",
+    'ACOTime': 0,
+    'ACOTime1': 0,
+    'ACOTime2': 0,
+    'numberOfAcoCalls': 0,
+    'numberOfAcoCalls1': 0,
+    'numberOfAcoCalls2': 0,
+    'avgRP': 0,
+    'RPSum': 0,
+    'avgLen': 0,
+    'lenSum': 0,
+    'rgnCnt': 0,
+    'copyTimeSum': 0,
+    'avgCopyTime': 0
+}
+
+# calculates geomean of second pass costs where ACO is invoked
+
+
+def getRgnRPandLen(regions):
+    stats = {
+        'bench': "tbd",
+        'ACOTime': 0,
+        'ACOTime1': 0,
+        'ACOTime2': 0,
+        'numberOfAcoCalls': 0,
+        'numberOfAcoCalls1': 0,
+        'numberOfAcoCalls2': 0,
+        'avgRP': 0,
+        'RPSum': 0,
+        'avgLen': 0,
+        'lenSum': 0,
+        'rgnCnt': 0,
+        'copyTimeSum': 0,
+        'avgCopyTime': 0
+    }
+    listOfRegionDicts = []
+    for _, rgn in regions.items():
+        regionDict = {
+            'bench': "tbd",
+            'region_name': 0,
+            'pass_no': 0,
+            'total_iterations': 0,
+            'ACOTime': 0,
+            'RP': 0,
+            'len': 0,
+            'copyTime': 0,
+        }
+        if rgn["pass_no"] == 1 and rgn["instruction_count"] >= 50:
+            regionDict["region_name"] = rgn["region_name"]
+            regionDict["bench"] = rgn["bench"]
+            regionDict["pass_no"] = rgn["pass_no"]
+            regionDict["ACOTime"] = rgn["ACOTime"]
+            regionDict["total_iterations"] = rgn["total_iterations"]
+            if rgn["ACOTime"] > 0:
+                regionDict["copyTime"] = rgn["copyTime"]
+            listOfRegionDicts.append(regionDict)
+        elif rgn["pass_no"] == 2 and rgn["instruction_count"] >= 50:
+            regionDict["region_name"] = rgn["region_name"]
+            regionDict["bench"] = rgn["bench"]
+            regionDict["pass_no"] = rgn["pass_no"]
+            regionDict["ACOTime"] = rgn["ACOTime"]
+            regionDict["total_iterations"] = rgn["total_iterations"]
+            if rgn["ACOTime"] > 0:
+                regionDict["copyTime"] = rgn["copyTime"]
+            regionDict["RP"] = rgn["initial_spill_cost"]
+            regionDict["len"] = rgn["aco_length"]
+            listOfRegionDicts.append(regionDict)
+
+    # save global stats for benchmark and calculate averages
+    if stats["rgnCnt"] > 0:
+        globalStats["ACOTime"] += stats["ACOTime"]
+        globalStats["ACOTime1"] += stats["ACOTime1"]
+        globalStats["ACOTime2"] += stats["ACOTime2"]
+        globalStats["numberOfAcoCalls"] += stats["numberOfAcoCalls"]
+        globalStats["numberOfAcoCalls1"] += stats["numberOfAcoCalls1"]
+        globalStats["numberOfAcoCalls2"] += stats["numberOfAcoCalls2"]
+        globalStats["copyTimeSum"] += stats["copyTimeSum"]
+        globalStats["RPSum"] += stats["RPSum"]
+        globalStats["lenSum"] += stats["lenSum"]
+        globalStats["rgnCnt"] += stats["rgnCnt"]
+        stats["avgRP"] = stats["RPSum"]/stats["rgnCnt"]
+        stats["avgLen"] = stats["lenSum"]/stats["rgnCnt"]
+        stats["avgCopyTime"] = stats["copyTimeSum"]/stats["numberOfAcoCalls"]
+    return listOfRegionDicts
+
+
+def getLogData(f):
+    rgns = parseLog(f.read())
+    dataFrame = pd.DataFrame(rgns[0])
+    dataFrameTime = pd.DataFrame(rgns[1])
+    return [dataFrame, dataFrameTime]
+
+
+def getLogDataCompileTime(f):
+    rgns = parseLogCompileTime(f.read())
+    dataFrame = pd.DataFrame(rgns)
+    return dataFrame
+
+# prints results of log file
+
+
+def printLogStats(logData):
+    print(logData["bench"].ljust(13), '{:.2f}'.format(logData["avgRP"]).ljust(17), '{:.2f}'.format(logData["avgLen"]).ljust(12), str(logData["ACOTime"]).ljust(12), str(logData["ACOTime1"]).ljust(11), str(logData["ACOTime2"]).ljust(
+        11), str(logData["copyTimeSum"]).ljust(12), str(logData["rgnCnt"]).ljust(16), str(logData["numberOfAcoCalls"]).ljust(15), str(logData["numberOfAcoCalls1"]).ljust(14), str(logData["numberOfAcoCalls2"]).ljust(14))
+
+
+def writeCSV(logData):
+    try:
+        with open('test.csv', 'w') as file:
+            #csv_columns = ["Benchmark name", "Average RP", "Average Length", "ACO TIME", "ACO Time in pass 1", "ACO Time in pass 2", "Sum of time spent copying", "Region count", "Calls to ACO", "Calls to ACO in pass 1", "Calls to ACO in pass 2"]
+            #csv_columns = ['bench', 'ACOTime', 'ACOTime1', 'ACOTime2', 'numberOfAcoCalls', 'numberOfAcoCalls1', 'numberOfAcoCalls2', 'avgRP', 'RPSum', 'avgLen', 'lenSum', 'rgnCnt', 'copyTimeSum', 'avgCopyTime']
+            csv_columns = ['bench', 'region_name', 'pass_no',
+                           "total_iterations", 'ACOTime', 'RP', 'len', 'copyTime']
+            writer = csv.DictWriter(file, fieldnames=csv_columns)
+            writer.writeheader()
+            for data in logData:
+                writer.writerow(data)
+    except IOError:
+        print("I/O Error")
+
+
+def iterationsSaved(series):
+    return
+
+
+# main
+hotfuncs = []
+if len(sys.argv) == 4:
+    with open(sys.argv[3]) as f:
+        for line in f:
+            hotfuncs.append(line.strip())
+if len(sys.argv) >= 3:
+  dataFrame = None
+  dataFrameCompileTime = None
+  fpath = sys.argv[1]
+  if os.path.isfile(fpath):
+    print("Checking log: " + fpath)
+    with open(fpath) as f:
+        theData = getLogData(f)
+        logData = theData[0]
+        logDataCompileTime = theData[1]
+        # data is transposed from what I want
+        logDataTransposed = logData.T
+        logDataCompileTimeTransposed = logDataCompileTime.T
+        # add benchmark to the dataFrame
+        dataFrame = pd.concat([dataFrame, logDataTransposed])
+        dataFrameCompileTime = pd.concat(
+            [dataFrameCompileTime, logDataCompileTimeTransposed])
+  #dataFrame = dataFrame.loc[dataFrame['pass_no'] == 2]
+  #print(dataFrame[dataFrame[1].isin(hotfuncs)])
+  if hotfuncs:
+      dataFrame = dataFrame[dataFrame["function_name"].isin(hotfuncs)]
+  print(dataFrame)
+
+  with pd.ExcelWriter(sys.argv[2] + ".xlsx", engine='xlsxwriter') as writer:
+    dataFrame.to_excel(writer, sheet_name='AllRegions')
+
+  if globalStats["rgnCnt"] > 0:
+    globalStats["avgRP"] = globalStats["RPSum"]/globalStats["rgnCnt"]
+    globalStats["avgLen"] = globalStats["lenSum"]/globalStats["rgnCnt"]
+    globalStats["avgCopyTime"] = globalStats["copyTimeSum"]/globalStats["numberOfAcoCalls"]
+  #printLogStats(globalStats)
+
+else:
+  print ("USAGE: simpleExtractDataPandas.py <name of log> <name of output file>")

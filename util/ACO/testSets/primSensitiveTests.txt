@@ -1,0 +1,318 @@
+benchmark_device_segmented_reduce	segmented_reduce<rocprim::half>(~10 segments)/manual_time
+benchmark_device_segmented_reduce	segmented_reduce<rocprim::half>(~1 segments)/manual_time
+benchmark_device_segmented_reduce	segmented_reduce<float>(~10 segments)/manual_time
+benchmark_device_segmented_reduce	segmented_reduce<float>(~1 segments)/manual_time
+benchmark_device_segmented_reduce	segmented_reduce<uint8_t>(~1 segments)/manual_time
+benchmark_device_segmented_reduce	segmented_reduce<int8_t>(~1 segments)/manual_time
+benchmark_device_segmented_reduce	segmented_reduce<rocprim::half>(~100 segments)/manual_time
+benchmark_device_segmented_reduce	segmented_reduce<uint8_t>(~10 segments)/manual_time
+benchmark_device_segmented_reduce	segmented_reduce<int8_t>(~10 segments)/manual_time
+benchmark_device_segmented_reduce	segmented_reduce<custom_float2>(~1 segments)/manual_time
+benchmark_device_segmented_reduce	segmented_reduce<double>(~1 segments)/manual_time
+benchmark_device_segmented_reduce	segmented_reduce<int8_t>(~100 segments)/manual_time
+benchmark_device_segmented_reduce	segmented_reduce<uint8_t>(~100 segments)/manual_time
+benchmark_device_segmented_reduce	segmented_reduce<double>(~10 segments)/manual_time
+benchmark_device_segmented_reduce	segmented_reduce<custom_float2>(~10 segments)/manual_time
+benchmark_device_segmented_reduce	segmented_reduce<custom_double2>(~1 segments)/manual_time
+benchmark_device_segmented_reduce	segmented_reduce<custom_double2>(~10 segments)/manual_time
+benchmark_device_segmented_reduce	segmented_reduce<int>(~1 segments)/manual_time
+benchmark_device_segmented_reduce	segmented_reduce<int>(~10 segments)/manual_time
+benchmark_device_segmented_reduce	segmented_reduce<float>(~100 segments)/manual_time
+benchmark_device_adjacent_difference	device_adjacent_difference<float, adjacent_difference_config<256, 16>>/manual_time
+benchmark_device_adjacent_difference	device_adjacent_difference_right<float, adjacent_difference_config<256, 16>>/manual_time
+benchmark_device_adjacent_difference	device_adjacent_difference_right<int, adjacent_difference_config<256, 16>>/manual_time
+benchmark_device_adjacent_difference	device_adjacent_difference<int, adjacent_difference_config<256, 16>>/manual_time
+benchmark_device_segmented_radix_sort	sort_pairs<int, float>(5000 segments with length ~30)/manual_time
+benchmark_device_reduce	device_reduce<int8_t, default_config>/manual_time
+benchmark_device_reduce	device_reduce<uint8_t, default_config>/manual_time
+benchmark_device_adjacent_difference	device_adjacent_difference<uint8_t, adjacent_difference_config<256, 16>>/manual_time
+benchmark_device_adjacent_difference	device_adjacent_difference_right<uint8_t, adjacent_difference_config<256, 16>>/manual_time
+benchmark_device_adjacent_difference	device_adjacent_difference_right<rocprim::half, adjacent_difference_config<256, 16>>/manual_time
+benchmark_device_adjacent_difference	device_adjacent_difference_inplace<uint8_t, adjacent_difference_config<256, 16>>/manual_time
+benchmark_device_adjacent_difference	device_adjacent_difference_inplace<float, adjacent_difference_config<256, 16>>/manual_time
+benchmark_device_adjacent_difference	device_adjacent_difference_right_inplace<uint8_t, adjacent_difference_config<256, 16>>/manual_time
+benchmark_device_adjacent_difference	device_adjacent_difference_right_inplace<float, adjacent_difference_config<256, 16>>/manual_time
+benchmark_device_adjacent_difference	device_adjacent_difference_right_inplace<int, adjacent_difference_config<256, 16>>/manual_time
+benchmark_device_adjacent_difference	device_adjacent_difference_right_inplace<rocprim::half, adjacent_difference_config<256, 16>>/manual_time
+benchmark_device_adjacent_difference	device_adjacent_difference_inplace<int, adjacent_difference_config<256, 16>>/manual_time
+benchmark_block_sort	block_sort<double,  512,  4, merge_sort, false>/manual_time
+benchmark_device_scan	device_scan_by_key<int8_t, int8_t, exclusive,     1, scan_config<256, 16, block_scan_algorithm::using_warp_scan>>/manual_time
+benchmark_device_scan	device_scan_by_key<int8_t, int8_t, exclusive,    16, scan_config<256, 16, block_scan_algorithm::using_warp_scan>>/manual_time
+benchmark_device_scan	device_scan_by_key<int8_t, int8_t, exclusive,   256, scan_config<256, 16, block_scan_algorithm::using_warp_scan>>/manual_time
+benchmark_device_scan	device_scan_by_key<int8_t, int8_t, exclusive,  4096, scan_config<256, 16, block_scan_algorithm::using_warp_scan>>/manual_time
+benchmark_device_scan	device_scan_by_key<int8_t, int8_t, exclusive, 65536, scan_config<256, 16, block_scan_algorithm::using_warp_scan>>/manual_time
+benchmark_device_scan	device_scan_by_key<uint8_t, uint8_t, exclusive,   256, scan_config<256, 16, block_scan_algorithm::using_warp_scan>>/manual_time
+benchmark_device_scan	device_scan_by_key<uint8_t, uint8_t, exclusive,  4096, scan_config<256, 16, block_scan_algorithm::using_warp_scan>>/manual_time
+benchmark_device_scan	device_scan_by_key<uint8_t, uint8_t, exclusive,    16, scan_config<256, 16, block_scan_algorithm::using_warp_scan>>/manual_time
+benchmark_device_scan	device_scan_by_key<uint8_t, uint8_t, exclusive,     1, scan_config<256, 16, block_scan_algorithm::using_warp_scan>>/manual_time
+benchmark_device_scan	device_scan_by_key<uint8_t, uint8_t, exclusive, 65536, scan_config<256, 16, block_scan_algorithm::using_warp_scan>>/manual_time
+benchmark_block_adjacent_difference	block_adjacent_difference<int8_t, 256>.subtract_left<8, true>/manual_time
+benchmark_device_segmented_reduce	segmented_reduce<uint8_t>(~10000 segments)/manual_time
+benchmark_device_segmented_reduce	segmented_reduce<int8_t>(~10000 segments)/manual_time
+benchmark_device_scan	device_scan_by_key<int8_t, int8_t, inclusive,    16, scan_config<256, 16, block_scan_algorithm::using_warp_scan>>/manual_time
+benchmark_device_scan	device_scan_by_key<int8_t, int8_t, inclusive,   256, scan_config<256, 16, block_scan_algorithm::using_warp_scan>>/manual_time
+benchmark_device_scan	device_scan_by_key<int8_t, int8_t, inclusive,     1, scan_config<256, 16, block_scan_algorithm::using_warp_scan>>/manual_time
+benchmark_device_scan	device_scan_by_key<int8_t, int8_t, inclusive,  4096, scan_config<256, 16, block_scan_algorithm::using_warp_scan>>/manual_time
+benchmark_device_scan	device_scan_by_key<int8_t, int8_t, inclusive, 65536, scan_config<256, 16, block_scan_algorithm::using_warp_scan>>/manual_time
+benchmark_device_scan	device_scan_by_key<uint8_t, uint8_t, inclusive,     1, scan_config<256, 16, block_scan_algorithm::using_warp_scan>>/manual_time
+benchmark_device_scan	device_scan_by_key<uint8_t, uint8_t, inclusive,   256, scan_config<256, 16, block_scan_algorithm::using_warp_scan>>/manual_time
+benchmark_device_scan	device_scan_by_key<uint8_t, uint8_t, inclusive,  4096, scan_config<256, 16, block_scan_algorithm::using_warp_scan>>/manual_time
+benchmark_device_scan	device_scan_by_key<uint8_t, uint8_t, inclusive,    16, scan_config<256, 16, block_scan_algorithm::using_warp_scan>>/manual_time
+benchmark_device_scan	device_scan_by_key<uint8_t, uint8_t, inclusive, 65536, scan_config<256, 16, block_scan_algorithm::using_warp_scan>>/manual_time
+benchmark_device_memory	block_primitives_transpose_block_scan<double,megabytes<uint64_t>(128),BS:256,IPT:16>/manual_time
+benchmark_device_adjacent_difference	device_adjacent_difference<double, adjacent_difference_config<256,  8>>/manual_time
+benchmark_device_adjacent_difference	device_adjacent_difference_right<double, adjacent_difference_config<256,  8>>/manual_time
+benchmark_device_reduce_by_key	reduce_by_key<int8_t, int8_t>([1, 10])/manual_time
+benchmark_device_adjacent_difference	device_adjacent_difference<custom_type<float,float>, adjacent_difference_config<256,  8>>/manual_time
+benchmark_device_reduce_by_key	reduce_by_key<uint8_t, uint8_t>([1, 10])/manual_time
+benchmark_device_adjacent_difference	device_adjacent_difference_right<int64_t, adjacent_difference_config<256,  8>>/manual_time
+benchmark_device_memory	block_primitives_transpose_block_scan<uint64_t,megabytes<uint64_t>(128),BS:256,IPT:16>/manual_time
+benchmark_device_adjacent_difference	device_adjacent_difference_right<custom_type<float,float>, adjacent_difference_config<256,  8>>/manual_time
+benchmark_device_segmented_reduce	segmented_reduce<custom_float2>(~100 segments)/manual_time
+benchmark_device_reduce_by_key	reduce_by_key<int8_t, int8_t>([1, 1000])/manual_time
+benchmark_device_reduce_by_key	reduce_by_key<uint8_t, uint8_t>([1, 1000])/manual_time
+benchmark_device_adjacent_difference	device_adjacent_difference<int64_t, adjacent_difference_config<256,  8>>/manual_time
+benchmark_device_segmented_reduce	segmented_reduce<double>(~100 segments)/manual_time
+benchmark_device_memory	block_primitives_transpose_no_operation<uint64_t,megabytes<uint64_t>(128),BS:256,IPT:16>/manual_time
+benchmark_device_adjacent_difference	device_adjacent_difference_right<custom_type<double,double>, adjacent_difference_config<256,  4>>/manual_time
+benchmark_device_adjacent_difference	device_adjacent_difference<custom_type<double,double>, adjacent_difference_config<256,  4>>/manual_time
+benchmark_device_scan	device_scan<int8_t, inclusive, scan_config<256, 16, block_scan_algorithm::using_warp_scan>>/manual_time
+benchmark_device_scan	device_scan<rocprim::half, inclusive, scan_config<256, 16, block_scan_algorithm::using_warp_scan>>/manual_time
+benchmark_device_segmented_reduce	segmented_reduce<uint8_t>(~1000 segments)/manual_time
+benchmark_device_segmented_reduce	segmented_reduce<int8_t>(~1000 segments)/manual_time
+benchmark_device_scan	device_scan<rocprim::half, exclusive, scan_config<256, 16, block_scan_algorithm::using_warp_scan>>/manual_time
+benchmark_device_memory	vectorized_block_scan<float,megabytes<float>(128),BS:1024,IPT:8>/manual_time
+benchmark_device_scan	device_scan_by_key<int, int, exclusive,    16, scan_config<256, 16, block_scan_algorithm::using_warp_scan>>/manual_time
+benchmark_device_scan	device_scan_by_key<int, int, exclusive,  4096, scan_config<256, 16, block_scan_algorithm::using_warp_scan>>/manual_time
+benchmark_device_scan	device_scan_by_key<int, int, exclusive, 65536, scan_config<256, 16, block_scan_algorithm::using_warp_scan>>/manual_time
+benchmark_device_scan	device_scan_by_key<int, int, exclusive,   256, scan_config<256, 16, block_scan_algorithm::using_warp_scan>>/manual_time
+benchmark_device_scan	device_scan_by_key<int, int, exclusive,     1, scan_config<256, 16, block_scan_algorithm::using_warp_scan>>/manual_time
+benchmark_device_scan	device_scan_by_key<rocprim::half, rocprim::half, inclusive, 65536, scan_config<256, 16, block_scan_algorithm::using_warp_scan>>/manual_time
+benchmark_device_scan	device_scan_by_key<rocprim::half, rocprim::half, inclusive,  4096, scan_config<256, 16, block_scan_algorithm::using_warp_scan>>/manual_time
+benchmark_device_scan	device_scan_by_key<rocprim::half, rocprim::half, inclusive,   256, scan_config<256, 16, block_scan_algorithm::using_warp_scan>>/manual_time
+benchmark_device_scan	device_scan_by_key<rocprim::half, rocprim::half, inclusive,     1, scan_config<256, 16, block_scan_algorithm::using_warp_scan>>/manual_time
+benchmark_device_scan	device_scan_by_key<rocprim::half, rocprim::half, inclusive,    16, scan_config<256, 16, block_scan_algorithm::using_warp_scan>>/manual_time
+benchmark_device_adjacent_difference	device_adjacent_difference<rocprim::half, adjacent_difference_config<256, 16>>/manual_time
+benchmark_device_scan	device_scan_by_key<float, float, exclusive,   256, scan_config<256, 16, block_scan_algorithm::using_warp_scan>>/manual_time
+benchmark_device_scan	device_scan_by_key<float, float, exclusive, 65536, scan_config<256, 16, block_scan_algorithm::using_warp_scan>>/manual_time
+benchmark_device_scan	device_scan_by_key<float, float, exclusive,    16, scan_config<256, 16, block_scan_algorithm::using_warp_scan>>/manual_time
+benchmark_device_scan	device_scan_by_key<float, float, exclusive,     1, scan_config<256, 16, block_scan_algorithm::using_warp_scan>>/manual_time
+benchmark_device_scan	device_scan_by_key<float, float, exclusive,  4096, scan_config<256, 16, block_scan_algorithm::using_warp_scan>>/manual_time
+benchmark_device_adjacent_difference	device_adjacent_difference_inplace<double, adjacent_difference_config<256,  8>>/manual_time
+benchmark_device_scan	device_scan<int8_t, exclusive, scan_config<256, 16, block_scan_algorithm::using_warp_scan>>/manual_time
+benchmark_device_scan	device_scan<uint8_t, inclusive, scan_config<256, 16, block_scan_algorithm::using_warp_scan>>/manual_time
+benchmark_device_adjacent_difference	device_adjacent_difference_inplace<rocprim::half, adjacent_difference_config<256, 16>>/manual_time
+benchmark_device_adjacent_difference	device_adjacent_difference_right_inplace<double, adjacent_difference_config<256,  8>>/manual_time
+benchmark_device_adjacent_difference	device_adjacent_difference_right_inplace<custom_type<float,float>, adjacent_difference_config<256,  8>>/manual_time
+benchmark_block_adjacent_difference	block_adjacent_difference<int8_t, 256>.subtract_left<4, true>/manual_time
+benchmark_device_adjacent_difference	device_adjacent_difference_right_inplace<int64_t, adjacent_difference_config<256,  8>>/manual_time
+benchmark_device_adjacent_difference	device_adjacent_difference_inplace<custom_type<float,float>, adjacent_difference_config<256,  8>>/manual_time
+benchmark_device_scan	device_scan<uint8_t, exclusive, scan_config<256, 16, block_scan_algorithm::using_warp_scan>>/manual_time
+benchmark_device_adjacent_difference	device_adjacent_difference_inplace<int64_t, adjacent_difference_config<256,  8>>/manual_time
+benchmark_device_memory	vectorized_block_scan<float,megabytes<float>(128),BS:256,IPT:8>/manual_time
+benchmark_block_adjacent_difference	block_adjacent_difference<int8_t, 256>.subtract_left_partial<1, true>/manual_time
+benchmark_block_adjacent_difference	block_adjacent_difference<int8_t, 256>.subtract_left<3, true>/manual_time
+benchmark_device_segmented_radix_sort	sort_pairs<int64_t, double>(2500 segments with length ~30)/manual_time
+benchmark_device_memory	block_primitives_transpose_custom_operation<double,megabytes<double>(128),BS:128,IPT:16>/manual_time
+benchmark_device_segmented_radix_sort	sort_pairs<int64_t, double>(1000 segments with length ~30)/manual_time
+benchmark_device_memory	block_primitives_transpose_custom_operation<double,megabytes<double>(128),BS:256,IPT:16>/manual_time
+benchmark_device_memory	vectorized_block_scan<float,megabytes<float>(128),BS:512,IPT:8>/manual_time
+benchmark_device_scan	device_scan_by_key<int, int, inclusive,  4096, scan_config<256, 16, block_scan_algorithm::using_warp_scan>>/manual_time
+benchmark_device_scan	device_scan_by_key<int, int, inclusive, 65536, scan_config<256, 16, block_scan_algorithm::using_warp_scan>>/manual_time
+benchmark_device_scan	device_scan_by_key<int, int, inclusive,   256, scan_config<256, 16, block_scan_algorithm::using_warp_scan>>/manual_time
+benchmark_device_segmented_reduce	segmented_reduce<custom_double2>(~100 segments)/manual_time
+benchmark_block_reduce	block_reduce<int, 256, 11, raking_reduce>.reduce/manual_time
+benchmark_device_scan	device_scan_by_key<int, int, inclusive,    16, scan_config<256, 16, block_scan_algorithm::using_warp_scan>>/manual_time
+benchmark_device_scan	device_scan_by_key<int, int, inclusive,     1, scan_config<256, 16, block_scan_algorithm::using_warp_scan>>/manual_time
+benchmark_block_histogram	block_histogram<unsigned long long, 320, 8, using_sort>.histogram/manual_time
+benchmark_device_scan	device_scan_by_key<custom_type<float,float>, custom_type<float,float>, inclusive,     1, scan_config<256,  8, block_scan_algorithm::using_warp_scan>>/manual_time
+benchmark_device_scan	device_scan_by_key<custom_type<float,float>, custom_type<float,float>, inclusive,   256, scan_config<256,  8, block_scan_algorithm::using_warp_scan>>/manual_time
+benchmark_device_scan	device_scan_by_key<custom_type<float,float>, custom_type<float,float>, inclusive,    16, scan_config<256,  8, block_scan_algorithm::using_warp_scan>>/manual_time
+benchmark_device_scan	device_scan_by_key<custom_type<float,float>, custom_type<float,float>, inclusive,  4096, scan_config<256,  8, block_scan_algorithm::using_warp_scan>>/manual_time
+benchmark_device_scan	device_scan_by_key<custom_type<float,float>, custom_type<float,float>, inclusive, 65536, scan_config<256,  8, block_scan_algorithm::using_warp_scan>>/manual_time
+benchmark_device_scan	device_scan_by_key<float, float, inclusive,    16, scan_config<256, 16, block_scan_algorithm::using_warp_scan>>/manual_time
+benchmark_device_scan	device_scan_by_key<custom_type<float,float>, custom_type<float,float>, exclusive,   256, scan_config<256,  8, block_scan_algorithm::using_warp_scan>>/manual_time
+benchmark_device_scan	device_scan_by_key<custom_type<float,float>, custom_type<float,float>, exclusive,  4096, scan_config<256,  8, block_scan_algorithm::using_warp_scan>>/manual_time
+benchmark_device_scan	device_scan_by_key<custom_type<float,float>, custom_type<float,float>, exclusive, 65536, scan_config<256,  8, block_scan_algorithm::using_warp_scan>>/manual_time
+benchmark_device_scan	device_scan_by_key<custom_type<float,float>, custom_type<float,float>, exclusive,    16, scan_config<256,  8, block_scan_algorithm::using_warp_scan>>/manual_time
+benchmark_device_scan	device_scan_by_key<custom_type<float,float>, custom_type<float,float>, exclusive,     1, scan_config<256,  8, block_scan_algorithm::using_warp_scan>>/manual_time
+benchmark_device_reduce	device_reduce<rocprim::half, default_config>/manual_time
+benchmark_device_scan	device_scan_by_key<float, float, inclusive,  4096, scan_config<256, 16, block_scan_algorithm::using_warp_scan>>/manual_time
+benchmark_device_scan	device_scan_by_key<float, float, inclusive,   256, scan_config<256, 16, block_scan_algorithm::using_warp_scan>>/manual_time
+benchmark_device_scan	device_scan_by_key<float, float, inclusive, 65536, scan_config<256, 16, block_scan_algorithm::using_warp_scan>>/manual_time
+benchmark_device_scan	device_scan_by_key<float, float, inclusive,     1, scan_config<256, 16, block_scan_algorithm::using_warp_scan>>/manual_time
+benchmark_device_segmented_radix_sort	sort_pairs<int64_t, custom_type<double,double>>(2500 segments with length ~30)/manual_time
+benchmark_device_scan	device_scan_by_key<float2, float2, exclusive,  4096, scan_config<256,  8, block_scan_algorithm::using_warp_scan>>/manual_time
+benchmark_device_scan	device_scan_by_key<float2, float2, exclusive,   256, scan_config<256,  8, block_scan_algorithm::using_warp_scan>>/manual_time
+benchmark_device_scan	device_scan_by_key<float2, float2, exclusive, 65536, scan_config<256,  8, block_scan_algorithm::using_warp_scan>>/manual_time
+benchmark_device_scan	device_scan_by_key<float2, float2, exclusive,    16, scan_config<256,  8, block_scan_algorithm::using_warp_scan>>/manual_time
+benchmark_device_scan	device_scan_by_key<float2, float2, exclusive,     1, scan_config<256,  8, block_scan_algorithm::using_warp_scan>>/manual_time
+benchmark_device_memory	vectorized_block_scan<int,megabytes<int>(128),BS:128,IPT:16>/manual_time
+benchmark_device_memory	block_primitives_transpose_block_scan<int,megabytes<int>(128),BS:128,IPT:32>/manual_time
+benchmark_block_scan	block_scan<int, 256, 11, using_warp_scan>.inclusive_scan/manual_time
+benchmark_device_scan	device_scan_by_key<int64_t, int64_t, inclusive,    16, scan_config<256,  8, block_scan_algorithm::using_warp_scan>>/manual_time
+benchmark_device_scan	device_scan_by_key<int64_t, int64_t, inclusive, 65536, scan_config<256,  8, block_scan_algorithm::using_warp_scan>>/manual_time
+benchmark_device_scan	device_scan_by_key<int64_t, int64_t, inclusive,  4096, scan_config<256,  8, block_scan_algorithm::using_warp_scan>>/manual_time
+benchmark_device_scan	device_scan_by_key<int64_t, int64_t, inclusive,   256, scan_config<256,  8, block_scan_algorithm::using_warp_scan>>/manual_time
+benchmark_device_scan	device_scan_by_key<int64_t, int64_t, inclusive,     1, scan_config<256,  8, block_scan_algorithm::using_warp_scan>>/manual_time
+benchmark_device_scan	device_scan_by_key<float2, float2, inclusive,  4096, scan_config<256,  8, block_scan_algorithm::using_warp_scan>>/manual_time
+benchmark_device_scan	device_scan_by_key<float2, float2, inclusive, 65536, scan_config<256,  8, block_scan_algorithm::using_warp_scan>>/manual_time
+benchmark_device_memory	vectorized_block_scan<float,megabytes<float>(128),BS:128,IPT:16>/manual_time
+benchmark_device_scan	device_scan_by_key<float2, float2, inclusive,    16, scan_config<256,  8, block_scan_algorithm::using_warp_scan>>/manual_time
+benchmark_device_scan	device_scan_by_key<float2, float2, inclusive,   256, scan_config<256,  8, block_scan_algorithm::using_warp_scan>>/manual_time
+benchmark_device_scan	device_scan_by_key<float2, float2, inclusive,     1, scan_config<256,  8, block_scan_algorithm::using_warp_scan>>/manual_time
+benchmark_device_memory	block_primitives_transpose_custom_operation<double,megabytes<double>(128),BS:128,IPT:8>/manual_time
+benchmark_block_histogram	block_histogram<int, 512, 8, using_sort>.histogram/manual_time
+benchmark_device_merge	merge<int8_t, int8_t>/manual_time
+benchmark_device_segmented_radix_sort	sort_pairs<int64_t, custom_type<double,double>>(1000 segments with length ~30)/manual_time
+benchmark_device_scan	device_scan_by_key<double, double, inclusive, 65536, scan_config<256,  8, block_scan_algorithm::using_warp_scan>>/manual_time
+benchmark_device_scan	device_scan_by_key<double, double, inclusive,    16, scan_config<256,  8, block_scan_algorithm::using_warp_scan>>/manual_time
+benchmark_device_scan	device_scan_by_key<double, double, inclusive,   256, scan_config<256,  8, block_scan_algorithm::using_warp_scan>>/manual_time
+benchmark_device_scan	device_scan<float, inclusive, scan_config<256, 16, block_scan_algorithm::using_warp_scan>>/manual_time
+benchmark_device_scan	device_scan_by_key<double, double, inclusive,  4096, scan_config<256,  8, block_scan_algorithm::using_warp_scan>>/manual_time
+benchmark_device_scan	device_scan_by_key<double, double, inclusive,     1, scan_config<256,  8, block_scan_algorithm::using_warp_scan>>/manual_time
+benchmark_device_memory	vectorized_block_scan<int,megabytes<int>(128),BS:256,IPT:16>/manual_time
+benchmark_device_memory	block_primitives_transpose_custom_operation<float,megabytes<float>(128),BS:256,IPT:16>/manual_time
+benchmark_device_segmented_radix_sort	sort_pairs<int64_t, double>(100000 segments with length ~30)/manual_time
+benchmark_device_memory	vectorized_block_scan<float,megabytes<float>(128),BS:256,IPT:16>/manual_time
+benchmark_device_memory	vectorized_block_scan<float,megabytes<float>(128),BS:128,IPT:8>/manual_time
+benchmark_device_scan	device_scan_by_key<int64_t, int64_t, exclusive,   256, scan_config<256,  8, block_scan_algorithm::using_warp_scan>>/manual_time
+benchmark_device_scan	device_scan_by_key<int64_t, int64_t, exclusive,     1, scan_config<256,  8, block_scan_algorithm::using_warp_scan>>/manual_time
+benchmark_device_scan	device_scan_by_key<int64_t, int64_t, exclusive,  4096, scan_config<256,  8, block_scan_algorithm::using_warp_scan>>/manual_time
+benchmark_device_scan	device_scan_by_key<int64_t, int64_t, exclusive, 65536, scan_config<256,  8, block_scan_algorithm::using_warp_scan>>/manual_time
+benchmark_device_scan	device_scan_by_key<int64_t, int64_t, exclusive,    16, scan_config<256,  8, block_scan_algorithm::using_warp_scan>>/manual_time
+benchmark_device_scan	device_scan<float, exclusive, scan_config<256, 16, block_scan_algorithm::using_warp_scan>>/manual_time
+benchmark_device_merge	merge<uint8_t, uint8_t>/manual_time
+benchmark_device_adjacent_difference	device_adjacent_difference_right_inplace<custom_type<double,double>, adjacent_difference_config<256,  4>>/manual_time
+benchmark_device_scan	device_scan<int, inclusive, scan_config<256, 16, block_scan_algorithm::using_warp_scan>>/manual_time
+benchmark_block_scan	block_scan<float, 256, 11, reduce_then_scan>.inclusive_scan/manual_time
+benchmark_block_scan	block_scan<float4, 256, 8, reduce_then_scan>.exclusive_scan/manual_time
+benchmark_device_memory	block_primitives_transpose_block_scan<double,megabytes<uint64_t>(128),BS:128,IPT:16>/manual_time
+benchmark_device_adjacent_difference	device_adjacent_difference_inplace<custom_type<double,double>, adjacent_difference_config<256,  4>>/manual_time
+benchmark_device_scan	device_scan_by_key<rocprim::half, rocprim::half, exclusive,  4096, scan_config<256, 16, block_scan_algorithm::using_warp_scan>>/manual_time
+benchmark_device_scan	device_scan_by_key<rocprim::half, rocprim::half, exclusive,   256, scan_config<256, 16, block_scan_algorithm::using_warp_scan>>/manual_time
+benchmark_device_scan	device_scan_by_key<rocprim::half, rocprim::half, exclusive, 65536, scan_config<256, 16, block_scan_algorithm::using_warp_scan>>/manual_time
+benchmark_device_scan	device_scan_by_key<rocprim::half, rocprim::half, exclusive,     1, scan_config<256, 16, block_scan_algorithm::using_warp_scan>>/manual_time
+benchmark_device_scan	device_scan_by_key<rocprim::half, rocprim::half, exclusive,    16, scan_config<256, 16, block_scan_algorithm::using_warp_scan>>/manual_time
+benchmark_device_scan	device_scan_by_key<double, double, exclusive, 65536, scan_config<256,  8, block_scan_algorithm::using_warp_scan>>/manual_time
+benchmark_device_scan	device_scan_by_key<double, double, exclusive,  4096, scan_config<256,  8, block_scan_algorithm::using_warp_scan>>/manual_time
+benchmark_device_scan	device_scan_by_key<double, double, exclusive,     1, scan_config<256,  8, block_scan_algorithm::using_warp_scan>>/manual_time
+benchmark_device_scan	device_scan_by_key<double, double, exclusive,    16, scan_config<256,  8, block_scan_algorithm::using_warp_scan>>/manual_time
+benchmark_device_scan	device_scan_by_key<double, double, exclusive,   256, scan_config<256,  8, block_scan_algorithm::using_warp_scan>>/manual_time
+benchmark_device_merge	merge<int8_t>/manual_time
+benchmark_block_scan	block_scan<rocprim::half, 256, 11, reduce_then_scan>.exclusive_scan/manual_time
+benchmark_device_scan	device_scan<int, exclusive, scan_config<256, 16, block_scan_algorithm::using_warp_scan>>/manual_time
+benchmark_device_merge	merge<uint8_t>/manual_time
+benchmark_device_segmented_radix_sort	sort_keys<int>(2500 segments with length ~30)/manual_time
+benchmark_device_segmented_radix_sort	sort_keys<float>(2500 segments with length ~30)/manual_time
+benchmark_device_memory	block_primitives_transpose_custom_operation<uint64_t,megabytes<uint64_t>(128),BS:128,IPT:8>/manual_time
+benchmark_device_segmented_radix_sort	sort_pairs<int64_t, custom_type<double,double>>(100000 segments with length ~30)/manual_time
+benchmark_block_reduce	block_reduce<float, 256, 4, raking_reduce_commutative_only>.reduce/manual_time
+benchmark_device_memory	block_primitives_transpose_custom_operation<int,megabytes<int>(128),BS:256,IPT:2>/manual_time
+benchmark_device_segmented_reduce	segmented_reduce<rocprim::half>(~1000 segments)/manual_time
+benchmark_device_segmented_radix_sort	sort_keys<int>(1000 segments with length ~30)/manual_time
+benchmark_block_scan	block_scan<float, 256, 11, using_warp_scan>.inclusive_scan/manual_time
+benchmark_block_reduce	block_reduce<float, 256, 1, raking_reduce_commutative_only>.reduce/manual_time
+benchmark_block_reduce	block_reduce<int, 256, 11, raking_reduce_commutative_only>.reduce/manual_time
+benchmark_device_memory	block_primitives_transpose_custom_operation<int,megabytes<int>(128),BS:512,IPT:2>/manual_time
+benchmark_device_memory	block_primitives_transpose_custom_operation<int,megabytes<int>(128),BS:256,IPT:16>/manual_time
+benchmark_device_scan	device_scan<float2, inclusive, scan_config<256,  8, block_scan_algorithm::using_warp_scan>>/manual_time
+benchmark_device_segmented_radix_sort	sort_keys<float>(1000 segments with length ~30)/manual_time
+benchmark_device_scan	device_scan<float2, exclusive, scan_config<256,  8, block_scan_algorithm::using_warp_scan>>/manual_time
+benchmark_device_memory	block_primitives_transpose_block_scan<uint64_t,megabytes<uint64_t>(128),BS:128,IPT:16>/manual_time
+benchmark_device_scan	device_scan<double, exclusive, scan_config<256,  8, block_scan_algorithm::using_warp_scan>>/manual_time
+benchmark_device_memory	block_primitives_transpose_no_operation<uint64_t,megabytes<uint64_t>(128),BS:128,IPT:16>/manual_time
+benchmark_device_scan	device_scan<double, inclusive, scan_config<256,  8, block_scan_algorithm::using_warp_scan>>/manual_time
+benchmark_device_scan	device_scan<int64_t, exclusive, scan_config<256,  8, block_scan_algorithm::using_warp_scan>>/manual_time
+benchmark_device_memory	block_primitives_transpose_no_operation<int,megabytes<int>(128),BS:1024,IPT:8>/manual_time
+benchmark_device_scan	device_scan<int64_t, inclusive, scan_config<256,  8, block_scan_algorithm::using_warp_scan>>/manual_time
+benchmark_block_scan	block_scan<float, 256, 11, reduce_then_scan>.exclusive_scan/manual_time
+benchmark_device_scan	device_scan<custom_type<float,float>, inclusive, scan_config<256,  8, block_scan_algorithm::using_warp_scan>>/manual_time
+benchmark_device_memory	block_primitives_transpose_custom_operation<int,megabytes<int>(128),BS:256,IPT:8>/manual_time
+benchmark_device_scan	device_scan<custom_type<float,float>, exclusive, scan_config<256,  8, block_scan_algorithm::using_warp_scan>>/manual_time
+benchmark_device_memory	block_primitives_transpose_no_operation<uint64_t,megabytes<uint64_t>(128),BS:512,IPT:8>/manual_time
+benchmark_block_histogram	block_histogram<int, 320, 8, using_sort>.histogram/manual_time
+benchmark_device_merge	merge<rocprim::half>/manual_time
+benchmark_block_scan	block_scan<double, 256, 11, reduce_then_scan>.inclusive_scan/manual_time
+benchmark_device_segmented_radix_sort	sort_pairs<int64_t, double>(10000 segments with length ~30)/manual_time
+benchmark_block_reduce	block_reduce<float, 256, 2, raking_reduce_commutative_only>.reduce/manual_time
+benchmark_device_reduce_by_key	reduce_by_key<int, custom_double2>([1, 10])/manual_time
+benchmark_device_memory	block_primitives_transpose_block_scan<double,megabytes<uint64_t>(128),BS:512,IPT:8>/manual_time
+benchmark_device_memory	block_primitives_transpose_block_scan<uint64_t,megabytes<uint64_t>(128),BS:512,IPT:8>/manual_time
+benchmark_device_select	select_if<int, int, unsigned int>(p = 0.25f)/manual_time
+benchmark_device_memory	block_primitives_transpose_custom_operation<uint64_t,megabytes<uint64_t>(128),BS:256,IPT:8>/manual_time
+benchmark_block_scan	block_scan<custom_double2, 256, 8, reduce_then_scan>.exclusive_scan/manual_time
+benchmark_block_sort	block_sort<int,  512,  1, bitonic_sort, false>/manual_time
+benchmark_device_select	select_if<float, float, unsigned int>(p = 0.25f)/manual_time
+benchmark_block_scan	block_scan<double2, 256, 8, reduce_then_scan>.exclusive_scan/manual_time
+benchmark_device_segmented_reduce	segmented_reduce<int>(~100 segments)/manual_time
+benchmark_device_select	unique_by_key<float, double, unsigned int>(p = 0.5f)/manual_time
+benchmark_device_scan	device_scan_by_key<custom_type<double,double>, custom_type<double,double>, inclusive,    16, scan_config<256,  4, block_scan_algorithm::using_warp_scan>>/manual_time
+benchmark_device_scan	device_scan_by_key<custom_type<double,double>, custom_type<double,double>, inclusive,  4096, scan_config<256,  4, block_scan_algorithm::using_warp_scan>>/manual_time
+benchmark_device_scan	device_scan_by_key<custom_type<double,double>, custom_type<double,double>, inclusive,   256, scan_config<256,  4, block_scan_algorithm::using_warp_scan>>/manual_time
+benchmark_device_scan	device_scan_by_key<custom_type<double,double>, custom_type<double,double>, inclusive,     1, scan_config<256,  4, block_scan_algorithm::using_warp_scan>>/manual_time
+benchmark_device_scan	device_scan_by_key<custom_type<double,double>, custom_type<double,double>, inclusive, 65536, scan_config<256,  4, block_scan_algorithm::using_warp_scan>>/manual_time
+benchmark_block_scan	block_scan<double, 256, 11, reduce_then_scan>.exclusive_scan/manual_time
+benchmark_block_reduce	block_reduce<float2, 256, 1, raking_reduce_commutative_only>.reduce/manual_time
+benchmark_device_memory	block_primitives_transpose_custom_operation<uint64_t,megabytes<uint64_t>(128),BS:512,IPT:8>/manual_time
+benchmark_device_segmented_radix_sort	sort_pairs<int64_t, double>(10000 segments with length ~3000)/manual_time
+benchmark_block_reduce	block_reduce<float, 256, 3, raking_reduce_commutative_only>.reduce/manual_time
+benchmark_device_segmented_radix_sort	sort_pairs<int64_t, double>(5000 segments with length ~3000)/manual_time
+benchmark_device_scan	device_scan_by_key<custom_type<double,double>, custom_type<double,double>, exclusive, 65536, scan_config<256,  4, block_scan_algorithm::using_warp_scan>>/manual_time
+benchmark_device_scan	device_scan_by_key<custom_type<double,double>, custom_type<double,double>, exclusive,    16, scan_config<256,  4, block_scan_algorithm::using_warp_scan>>/manual_time
+benchmark_device_scan	device_scan_by_key<custom_type<double,double>, custom_type<double,double>, exclusive,     1, scan_config<256,  4, block_scan_algorithm::using_warp_scan>>/manual_time
+benchmark_block_scan	block_scan<rocprim::half, 256, 16, reduce_then_scan>.exclusive_scan/manual_time
+benchmark_device_scan	device_scan_by_key<custom_type<double,double>, custom_type<double,double>, exclusive,  4096, scan_config<256,  4, block_scan_algorithm::using_warp_scan>>/manual_time
+benchmark_device_scan	device_scan_by_key<custom_type<double,double>, custom_type<double,double>, exclusive,   256, scan_config<256,  4, block_scan_algorithm::using_warp_scan>>/manual_time
+benchmark_block_reduce	block_reduce<rocprim::half, 64, 1, raking_reduce_commutative_only>.reduce/manual_time
+benchmark_device_memory	block_primitives_transpose_custom_operation<int,megabytes<int>(128),BS:128,IPT:2>/manual_time
+benchmark_device_merge	merge<short>/manual_time
+benchmark_device_segmented_radix_sort	sort_pairs<int64_t, double>(7500 segments with length ~3000)/manual_time
+benchmark_device_select	select_if<float, float, unsigned int>(p = 0.5f)/manual_time
+benchmark_device_segmented_radix_sort	sort_pairs<int64_t, custom_type<double,double>>(10000 segments with length ~30)/manual_time
+benchmark_block_radix_sort	block_radix_sort<long long, 320, 8>.sort(keys)/manual_time
+benchmark_device_select	unique_by_key<float, double, unsigned int>(p = 0.75f)/manual_time
+benchmark_block_adjacent_difference	block_adjacent_difference<rocprim::half, 256>.subtract_right<1, false>/manual_time
+benchmark_device_select	select_if<int, int, unsigned int>(p = 0.5f)/manual_time
+benchmark_device_select	unique_by_key<float, double, unsigned int>(p = 0.25f)/manual_time
+benchmark_device_segmented_radix_sort	sort_pairs<int64_t, custom_type<double,double>>(7500 segments with length ~30)/manual_time
+benchmark_block_reduce	block_reduce<rocprim::half, 64, 1, raking_reduce>.reduce/manual_time
+benchmark_device_segmented_reduce	segmented_reduce<rocprim::half>(~10000 segments)/manual_time
+benchmark_block_sort	block_sort<float,  512,  4, double, bitonic_sort, false>/manual_time
+benchmark_device_scan	device_scan<custom_type<double,double>, inclusive, scan_config<256,  4, block_scan_algorithm::using_warp_scan>>/manual_time
+benchmark_device_memory	block_primitives_transpose_block_scan<int,megabytes<int>(128),BS:1024,IPT:8>/manual_time
+benchmark_block_sort	block_sort<float,  512,  4, double, merge_sort, false>/manual_time
+benchmark_device_scan	device_scan<custom_type<double,double>, exclusive, scan_config<256,  4, block_scan_algorithm::using_warp_scan>>/manual_time
+benchmark_device_memory	block_primitives_transpose_block_scan<float,megabytes<int>(128),BS:1024,IPT:8>/manual_time
+benchmark_device_memory	block_primitives_transpose_custom_operation<int,megabytes<int>(128),BS:128,IPT:16>/manual_time
+benchmark_device_select	select_if<float, float, unsigned int>(p = 0.75f)/manual_time
+benchmark_block_reduce	block_reduce<double, 256, 11, raking_reduce>.reduce/manual_time
+benchmark_block_reduce	block_reduce<int, 64, 2, raking_reduce_commutative_only>.reduce/manual_time
+benchmark_block_scan	block_scan<rocprim::half, 256, 11, using_warp_scan>.exclusive_scan/manual_time
+benchmark_device_memory	block_primitives_transpose_custom_operation<double,megabytes<double>(128),BS:512,IPT:2>/manual_time
+benchmark_block_adjacent_difference	block_adjacent_difference<float, 256>.subtract_right<1, false>/manual_time
+benchmark_block_reduce	block_reduce<float4, 256, 1, raking_reduce_commutative_only>.reduce/manual_time
+benchmark_block_reduce	block_reduce<float, 64, 2, raking_reduce_commutative_only>.reduce/manual_time
+benchmark_device_segmented_radix_sort	sort_pairs<int64_t, custom_type<double,double>>(5000 segments with length ~30)/manual_time
+benchmark_device_run_length_encode	run_length_encode<long long>([1, 10])/manual_time
+benchmark_device_memory	block_primitives_transpose_custom_operation<float,megabytes<float>(128),BS:128,IPT:16>/manual_time
+benchmark_device_select	select_if<int, int, unsigned int>(p = 0.75f)/manual_time
+benchmark_block_adjacent_difference	block_adjacent_difference<int, 256>.subtract_right<1, false>/manual_time
+benchmark_device_segmented_radix_sort	sort_pairs<int64_t, double>(10 segments with length ~3000)/manual_time
+benchmark_device_segmented_radix_sort	sort_pairs<int64_t, double>(1000 segments with length ~3000)/manual_time
+benchmark_block_reduce	block_reduce<float, 64, 2, raking_reduce>.reduce/manual_time
+benchmark_block_scan	block_scan<float, 256, 11, using_warp_scan>.exclusive_scan/manual_time
+benchmark_block_reduce	block_reduce<float, 256, 8, raking_reduce_commutative_only>.reduce/manual_time
+benchmark_device_segmented_radix_sort	sort_pairs<int64_t, double>(2500 segments with length ~3000)/manual_time
+benchmark_block_reduce	block_reduce<int, 256, 3, raking_reduce_commutative_only>.reduce/manual_time
+benchmark_block_reduce	block_reduce<int, 64, 2, raking_reduce>.reduce/manual_time
+benchmark_device_memory	block_primitives_transpose_custom_operation<uint64_t,megabytes<uint64_t>(128),BS:512,IPT:4>/manual_time
+benchmark_device_memory	block_primitives_transpose_custom_operation<double,megabytes<double>(128),BS:256,IPT:8>/manual_time
+benchmark_device_segmented_radix_sort	sort_pairs<int64_t, double>(100 segments with length ~3000)/manual_time
+benchmark_block_histogram	block_histogram<int, 320, 3, using_sort>.histogram/manual_time
+benchmark_warp_sort	warp_sort<int, 256, 64, 4, custom_double2>.sort/manual_time
+benchmark_block_radix_sort	block_radix_sort<rocprim::half, 320, 8>.sort(keys)/manual_time
+benchmark_device_memory	block_primitives_transpose_custom_operation<double,megabytes<double>(128),BS:512,IPT:8>/manual_time
+benchmark_block_reduce	block_reduce<double2, 256, 4, raking_reduce>.reduce/manual_time
+benchmark_device_memory	block_primitives_transpose_block_scan<float,megabytes<int>(128),BS:1024,IPT:4>/manual_time
+benchmark_device_run_length_encode	run_length_encode<long long>([1, 1000])/manual_time
