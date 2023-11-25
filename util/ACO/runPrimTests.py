@@ -4,6 +4,7 @@ import re
 import argparse
 import json
 import csv
+import random
 from tqdm import tqdm
 from collections import namedtuple
 from statistics import median
@@ -18,6 +19,8 @@ def load_tests(test_list : [],
     for test in test_list:
         for i in range(repetitions):
             runs.append(Run(test[0], test[1]))
+    if (shuffle): random.shuffle(runs)
+    return runs
 
 def parse_tests_to_run(test_path : str):
     test_list = []
@@ -29,12 +32,13 @@ def parse_tests_to_run(test_path : str):
             test_list.append((bench_set, bench_name))
     return test_list
 
-def run_test_sets(bench_path : str,
+def run_tests(bench_path : str,
                   benchmarks : [] 
 ):
     results = {}
-    bench_runs = iter(tqdm(benchmarks, leave=False, ascii=True))
-    for run in bench_runs:
+    runs = iter(tqdm(benchmarks, leave=False, ascii=True))
+    incomplete_runs = set()
+    for run in runs:
         try:
             tqdm.write(f"Running {run.bench}...")
             regex = re.escape(run.bench)
@@ -49,36 +53,32 @@ def run_test_sets(bench_path : str,
             if "benchmarks" in res:
                 if not run.bench in results:
                     results[run.bench] = []
-                results[run.bench].append(res["benchmarks"])
+                results[run.bench].append(res["benchmarks"][0]["bytes_per_second"])
         except KeyboardInterrupt:
             tqdm.write("Benchmarking run aborted by user.")
             tqdm.write("The following benchmarks were not completed:")
-            incomplete_runs = list(set(bench_runs))
+            incomplete_runs = list(set(runs))
             for run in incomplete_runs:
                 tqdm.write(f"{run.set}\t{run.bench}")
             break
-    return results
+    return [bench for bench in benchmarks 
+            if not bench in incomplete_runs], results
 
-def write_csv(out_path : str, results : dict):
+def write_csv(out_path : str, benchmarks : [], results : dict):
     with open(out_path, "w", newline='') as file:
         writer = csv.writer(file, dialect='excel')
-        writer.writerow(["bench_set","name","throughput"])
-        for bench_set in results.keys():   
-            throughputs = [float(bench["bytes_per_second"]) * float("1e-9")
-                           for bench in results[bench_set]
-            for bench in results[bench_set]:
-                name = bench["name"]
-                if median_only:
-                    if not "manual_time_median" in name: continue
-                if "manual_time" in name:
-                    throughput = float(bench["bytes_per_second"]) * float("1e-9")
-                    writer.writerow([bench_set, name, throughput])
+        writer.writerow(["bench_set", "name", "throughput"])
+        benchmarks = set(benchmarks)
+        for run in benchmarks:
+            mid = median(results[run.bench])
+            writer.writerow([run.set, run.bench, float(mid) * float("1e-9")]) 
+    return
 
 def main(args):
     test_list = parse_tests_to_run(args.test_path)
-    benchmarks = load_tests(test_list)
-    results = run_test_indiv(args.bench_path, benchmarks, args.repetitions)
-    write_csv(args.out_path, results, args.repetitions > 1)
+    benchmarks = load_tests(test_list, args.repetitions, args.shuffle)
+    completed_runs, results = run_tests(args.bench_path, benchmarks)
+    write_csv(args.out_path, completed_runs, results)
 
 if __name__ == '__main__':
         parser = argparse.ArgumentParser(
@@ -111,10 +111,9 @@ if __name__ == '__main__':
                             help='Number of repeated trials per benchmark'
         )
 
-        parser.add_argument('--shuffle', '-i',
+        parser.add_argument('--shuffle', 
                             dest='shuffle',
-                            type=bool,
-                            default=False,
+                            action='store_true',
                             help='Enable random interleaving ' 
                                  'of benchmark repetitions'
         )
