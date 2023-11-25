@@ -2,7 +2,7 @@ FROM rocm/dev-ubuntu-20.04:5.4.2
 ARG amdgpu_arch
 
 ENV AMDGPU_ARCH=$amdgpu_arch
-ENV PATH=$PATH:/aco/util/:/opt/rocm/bin:/opt/rocm/llvm/bin
+ENV PATH=$PATH:/root/aco/util/:/opt/rocm/bin:/opt/rocm/llvm/bin
 ENV LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/opt/rocm/lib
 
 WORKDIR /root/aco
