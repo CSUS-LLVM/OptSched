@@ -11,9 +11,9 @@ RUN mkdir util
 
 RUN apt-get update
 RUN DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends git cmake ninja-build clang ccache rocrand rocrand-dev rocm-hip-libraries
-RUN pip3 install pandas tqdm
-RUN git clone -b CGO24 https://github.com/balinck/llvm-project.git
-RUN git clone -b CGO24 https://github.com/balinck/OptSched.git llvm-project/llvm/lib/Target/AMDGPU/OptSched
+RUN pip3 install pandas tqdm xlsxwriter
+RUN git clone -b CGO24 https://github.com/CSUS-LLVM/llvm-project.git
+RUN git clone -b CGO24 https://github.com/CSUS-LLVM/OptSched.git llvm-project/llvm/lib/Target/AMDGPU/OptSched
 RUN cp -r llvm-project/llvm/lib/Target/AMDGPU/OptSched/example/optsched-cfg /root/.optsched-cfg
 RUN cp -r llvm-project/llvm/lib/Target/AMDGPU/OptSched/util/ACO/* /root/aco/util/
 
