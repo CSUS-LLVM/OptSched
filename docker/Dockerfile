@@ -11,7 +11,7 @@ RUN mkdir util
 
 RUN apt-get update
 RUN DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends git cmake ninja-build clang ccache rocrand rocrand-dev rocm-hip-libraries
-RUN pip3 install pandas tqdm xlsxwriter
+RUN pip3 install pandas tqdm xlsxwriter openpyxl
 RUN git clone -b CGO24 https://github.com/CSUS-LLVM/llvm-project.git
 RUN git clone -b CGO24 https://github.com/CSUS-LLVM/OptSched.git llvm-project/llvm/lib/Target/AMDGPU/OptSched
 RUN cp -r llvm-project/llvm/lib/Target/AMDGPU/OptSched/example/optsched-cfg /root/.optsched-cfg
