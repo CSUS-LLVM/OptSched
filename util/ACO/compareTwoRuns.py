@@ -90,12 +90,12 @@ if len(sys.argv) == 4:
   dfGlobalTime['bench'] = 'Global'
   dfGlobalTime['pass_no'] = dfGlobalTime.index
   dfGlobalTime.set_index(['bench', 'pass_no'],inplace=True)
-  dfCompareTime = dfCompareTime.append(dfGlobalTime)
+  dfCompareTime = pd.concat([dfCompareTime, dfGlobalTime])
   
   dfGlobalQuality['bench'] = 'Global'
   dfGlobalQuality['pass_no'] = dfGlobalQuality.index
   dfGlobalQuality.set_index(['bench', 'pass_no'],inplace=True)
-  dfCompareQuality = dfCompareQuality.append(dfGlobalQuality)
+  dfCompareQuality = pd.concat([dfCompareQuality, dfGlobalQuality])
   
   compareSameProcessor = True
   if compareSameProcessor:
