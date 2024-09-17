@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-import subprocess
 import argparse
 import os
+import subprocess
 
 #**************************************************************************************
 #Description:	Run all plaidbench benchmarks and redirect output to a directory

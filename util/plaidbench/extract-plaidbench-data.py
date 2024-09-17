@@ -39,9 +39,9 @@ Example:
         ...
 '''
 
+import argparse # Used to parse commandline arguments
 import os       # Used for scanning directories, getting paths, and checking files.
 import xlwt     # Used to create excel spreadsheets.
-import argparse # Used to parse commandline arguments
 
 # Contains all of the stats
 benchStats = {}
@@ -388,7 +388,7 @@ def main(args):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Script to extract plaidbench data.',
-                                      formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+                                    formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 
     parser.add_argument('--verbose', '-v',
                         action='store_true', default=False,
