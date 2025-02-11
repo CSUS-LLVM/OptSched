@@ -1021,7 +1021,7 @@ void ScheduleDAGOptSched::loadOptSchedConfig() {
   if (ShouldLimitOccupancy)
     OccupancyLimitSource = parseOccLimit(schedIni.GetString("OCCUPANCY_LIMIT_SOURCE"));
 
-  DeviceACOEnabled = schedIni.GetInt("DEV_ACO");
+  DeviceACOEnabled = schedIni.GetBool("DEV_ACO");
 }
 
 bool ScheduleDAGOptSched::isOptSchedEnabled() const {

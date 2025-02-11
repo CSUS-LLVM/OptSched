@@ -39,7 +39,7 @@ double RandDouble(double min, double max) {
 #define MULTIPLE_PHEROMONE_TABLES 1
 // #define CHECK_DIFFERENT_SCHEDULES 1
 // #define DEBUG_DIFFERENT_OCCUPANCIES 1
-
+// #define DEBUG_INSTR_SELECTION 1
 //#define BIASED_CHOICES 10000000
 //#define LOCAL_DECAY 0.1
 
@@ -1375,10 +1375,10 @@ FUNC_RESULT ACOScheduler::FindSchedule(InstSchedule *schedule_out,
   
   #ifdef MULTIPLE_PHEROMONE_TABLES
   for (int i = 0; i < pheromone_size * numDiffOccupancies_; i++)
-    pheromone_[i] = 1;
+    pheromone_[i] = 1.0;
   #else
   for (int i = 0; i < pheromone_size; i++)
-    pheromone_[i] = 1;
+    pheromone_[i] = 1.0;
   #endif
   initialValue_ = 1;
   InstCount MaxRPTarget = std::numeric_limits<InstCount>::max();
@@ -1899,7 +1899,7 @@ void ACOScheduler::UpdatePheromone(InstSchedule *schedule, bool isIterationBest,
   InstCount lastInstNum = -1;
   pheromone_t portion = schedule->GetCost() / (ScRelMax * 1.5);
   pheromone_t deposition;
-    if (isIterationBest)
+  if (isIterationBest)
     deposition = 100000;
   else {
     if (portion < 1)
