@@ -161,7 +161,7 @@ private:
   int fixed_bias;
   double bias_ratio;
   double local_decay;
-  double decay_factor;
+  float decay_factor;
   int noImprovementMax;
   bool print_aco_trace;
   InstSchedule *InitialSchedule;

@@ -1348,9 +1348,11 @@ FUNC_RESULT ACOScheduler::FindSchedule(InstSchedule *schedule_out,
   if (dev_AcoSchdulr)
     dev_AcoSchdulr->heuristicImportance_ = heuristicImportance_;
   fixed_bias = schedIni.GetInt(IsFirst ? "ACO_FIXED_BIAS" : "ACO2P_FIXED_BIAS");
-  decay_factor = schedIni.GetInt(IsFirst ? "ACO_DECAY_FACTOR" : "ACO2P_DECAY_FACTOR");
-  if (dev_AcoSchdulr)
+  decay_factor = schedIni.GetFloat(IsFirst ? "ACO_DECAY_FACTOR" : "ACO2P_DECAY_FACTOR");
+  if (dev_AcoSchdulr) {
+    dev_AcoSchdulr->decay_factor = decay_factor;
     dev_AcoSchdulr->fixed_bias = fixed_bias;
+  }
   if (count_ < 50)
     noImprovementMax = schedIni.GetInt(IsFirst ? "ACO_STOP_ITERATIONS_RANGE1"
                                              : "ACO2P_STOP_ITERATIONS_RANGE1");
@@ -1981,8 +1983,12 @@ void ACOScheduler::UpdatePheromone(InstSchedule *schedule, bool isIterationBest,
 __host__ __device__
 void ACOScheduler::ScalePheromoneTable(int blockOccupancyNum) {
 #ifdef __HIP_DEVICE_COMPILE__ // device version of function
+  auto gridGroup = cg::this_grid();
   int instNum = GLOBALTID;
-  dev_totalPherInTable[blockOccupancyNum] = 0;
+  if (GLOBALTID == 0) {
+    dev_totalPherInTable[blockOccupancyNum] = 0;
+  }
+  gridGroup.sync();
   // Each thread updates pheromone table for 1 instruction
   // For the case numThreads < count_, increase instNum by
   // numThreads at the end of the loop.
@@ -2000,6 +2006,7 @@ void ACOScheduler::ScalePheromoneTable(int blockOccupancyNum) {
     // Increase instNum by numThreads_ until over count_
     instNum += numThreads_;
   }
+  gridGroup.sync();
   // adjust pheromone table by scaling factor
   // pheromone_t scalingFactor = (double) (count_ * count_ * 4.5)/dev_totalPherInTable[blockOccupancyNum];
   pheromone_t scalingAdjustment = 4.5 - dev_totalPherInTable[blockOccupancyNum] / (count_ * count_);
