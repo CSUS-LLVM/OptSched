@@ -1266,6 +1266,18 @@ InstCount BBWithSpill::getOccupancy() {
 }
 
 __host__ __device__
+unsigned BBWithSpill::getVGPRPressure() {
+  #ifdef __HIP_DEVICE_COMPILE__
+  unsigned *PRP = (unsigned *) dev_peakRegPressures_;
+  auto VGPRPressure = PRP[OptSchedDDGWrapperGCN::VGPR32 * numThreads_ + GLOBALTID];
+  #else
+  unsigned *PRP = (unsigned *) peakRegPressures_;
+  auto VGPRPressure = PRP[OptSchedDDGWrapperGCN::VGPR32];
+  #endif
+  return VGPRPressure;
+}
+
+__host__ __device__
 unsigned BBWithSpill::closeOccupancyWithNumVGPRs(unsigned VGPRs) {
   // approximation from llvm/lib/Target/AMDGPUSubtarget.cpp
   // from this llvm commit fd08dcb9db0df6dc1aaf329f790cc4a7af9e0a91

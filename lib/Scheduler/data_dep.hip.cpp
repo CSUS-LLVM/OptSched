@@ -3533,6 +3533,7 @@ UDT_GLABEL DataDepGraph::GetMaxLtncy() { return maxLtncy_; }
 __host__ __device__
 UDT_GLABEL DataDepGraph::GetMaxLtncySum() { return maxLtncySum_; }
 
+__host__ __device__
 InstCount DataDepGraph::GetSchedLwrBound() { return schedLwrBound_; }
 
 const char *DataDepGraph::GetDagID() const { return dagID_; }

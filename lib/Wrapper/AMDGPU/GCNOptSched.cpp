@@ -235,7 +235,8 @@ void ScheduleDAGOptSchedGCN::finalizeSchedule() {
       for (int i = 1; i < numOccupancies; i++) {
         occCost = calcOccCost(OccTracker[i], RegisterMarginTracker[i]);
         ilpCost = ILP_WEIGHT * ILPSum[i];
-        weightedCost[i] = ilpCost + occCost + COST_THRESHOLD;
+        weightedCost[i] = ilpCost + occCost;
+        weightedCost[i] += (int) ((COST_THRESHOLD / 100.0) * weightedCost[i]);
         if (weightedCost[i] < minCost) {
           minIndex = i;
           minCost = weightedCost[i];

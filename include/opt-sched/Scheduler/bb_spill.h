@@ -262,6 +262,8 @@ public:
   }
   __host__ __device__
   InstCount getOccupancy();
+  __host__ __device__
+  unsigned getVGPRPressure();
   // size_t calculateMemoryNeeded() {
   //   return regTypeCnt_ * sizeof(WeightedBitVector) * numThreads * 2;
   // }

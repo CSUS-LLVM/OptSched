@@ -263,6 +263,7 @@ public:
   bool DoesFeedUser(SchedInstruction *inst);
 
   // Get a lower bound on the schedule length
+  __host__ __device__
   InstCount GetSchedLwrBound();
 
   // Get the lower and upper bounds read from the input file
