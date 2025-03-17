@@ -178,8 +178,13 @@ static void dumpDDG(DataDepGraph *DDG, llvm::StringRef DDGDumpPath,
   DDG->WriteToFile(f, RES_SUCCESS, 1, 0);
   std::fclose(f);
 }
-int occLevelChoice(int lengthFromOptimal)
+bool SchedRegion::multipleOccupancies = false;
+int SchedRegion::occLevelChoice(int lengthFromOptimal)
 {
+  if(multipleOccupancies == false)
+  {
+    return 1;
+  }
   if (lengthFromOptimal > 30)
   {
     printf("OccLevel choosen: 3\n");
@@ -191,7 +196,6 @@ int occLevelChoice(int lengthFromOptimal)
     return 2;
   }
   {
-    // Enable Early Stopping Heuristics
     printf("OccLevel choosen: 1\n");
     return 1;
   }
@@ -250,6 +254,8 @@ FUNC_RESULT SchedRegion::FindOptimalSchedule(
   Config &schedIni = SchedulerOptions::getInstance();
   bool HeuristicSchedulerEnabled = schedIni.GetBool("HEUR_ENABLED");
   bool AcoSchedulerEnabled = schedIni.GetBool("ACO_ENABLED");
+  multipleOccupancies = schedIni.GetBool("MO_ENABLED");
+  printf("multipleOccupancies is %d",multipleOccupancies);
   bool BbSchedulerEnabled = isBbEnabled(schedIni, rgnTimeout);
   unsigned long randSeed = (unsigned long) schedIni.GetInt("RANDOM_SEED");
   bool devACOEnabled = schedIni.GetBool("DEV_ACO");

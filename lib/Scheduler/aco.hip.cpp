@@ -1610,8 +1610,8 @@ FUNC_RESULT ACOScheduler::FindSchedule(InstSchedule *schedule_out,
     memSize = sizeof(ACOScheduler);
     gpuErrchk(hipMemPrefetchAsync(dev_AcoSchdulr, memSize, 0));
     Logger::Info("Launching Dev_ACO with %d blocks of %d threads", numBlocks_,
-                                                           NUMTHREADSPERBLOCK);
-
+                                                           NUMTHREADSPERBLOCK);                                                   
+    // PrintSchedule(InitialSchedule);
     int hostTermOcc = numDiffOccupancies_;
     hipMemcpyToSymbol(HIP_SYMBOL(termOcc), &hostTermOcc, sizeof(int));
 
@@ -1748,7 +1748,7 @@ FUNC_RESULT ACOScheduler::FindSchedule(InstSchedule *schedule_out,
       //     SchedsAtDiffOccupancies.push_back(bestSchedule5);
       //   }
     }
-    for(int i = 1; i < numDiffOccupancies_; i++){
+    for(int i = 0; i < numDiffOccupancies_; i++){
       hipFree(dev_bestScheduleArray[i]);
     }
     // hipFree(dev_bestSched0);
