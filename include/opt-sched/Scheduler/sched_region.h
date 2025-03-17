@@ -121,6 +121,9 @@ public:
   // TODO(max): Document.
   InstSchedule *AllocNewSched_();
 
+  //Function ot determine how many occupancy level to use based on the lower bound and if it is enabled
+  static int occLevelChoice(int lengthFromOptimal);
+
   __host__ __device__
   void UpdateScheduleCost(InstSchedule *sched);
   __host__ __device__
@@ -182,7 +185,8 @@ private:
 
   // TODO(max): Document.
   int16_t sigHashSize_;
-
+  // Decide if schedule should store multiple schedules at difference occupancies for comparision
+  static bool multipleOccupancies;
   // The pruning technique to use for this region.
   Pruning prune_;
 

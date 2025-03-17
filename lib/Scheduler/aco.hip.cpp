@@ -1726,7 +1726,7 @@ FUNC_RESULT ACOScheduler::FindSchedule(InstSchedule *schedule_out,
       //     SchedsAtDiffOccupancies.push_back(bestSchedule5);
       //   }
     }
-    for(int i = 1; i < numDiffOccupancies_; i++){
+    for(int i = 0; i < numDiffOccupancies_; i++){
       hipFree(dev_bestScheduleArray[i]);
     }
     // hipFree(dev_bestSched0);
