@@ -1375,6 +1375,8 @@ FUNC_RESULT ACOScheduler::FindSchedule(InstSchedule *schedule_out,
     dev_AcoSchdulr->decay_factor = decay_factor;
     dev_AcoSchdulr->fixed_bias = fixed_bias;
   }
+  targetOccupancy_ = ((BBWithSpill *)rgn_)->getOccupancy();
+  printf("target: %d\n",targetOccupancy_);
   if (count_ < 50)
     noImprovementMax = schedIni.GetInt(IsFirst ? "ACO_STOP_ITERATIONS_RANGE1"
                                              : "ACO2P_STOP_ITERATIONS_RANGE1");
