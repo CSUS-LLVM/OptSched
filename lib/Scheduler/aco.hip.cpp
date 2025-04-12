@@ -509,6 +509,8 @@ InstCount ACOScheduler::SelectInstruction(SchedInstruction *lastInst, InstCount 
   auto dev_states = getDevRandStates(this);
   rand = hiprand_uniform(&dev_states[GLOBALTID]);
   point = dev_readyLs->dev_ScoreSum[GLOBALTID] * hiprand_uniform(&dev_states[GLOBALTID]);
+  if(GLOBALTID == 0)
+    printf("rand : %f\npoint : %d\n",rand, point);
 #else
   rand = RandDouble(0, 1);
   point = RandDouble(0, readyLs->ScoreSum);
@@ -786,7 +788,7 @@ InstSchedule *ACOScheduler::FindOneSchedule(InstCount RPTarget, InstSchedule *de
       //   printf("RPTarget %d blockOccupancyNum %d Spill Cost %d TID\n",RPTarget, blockOccupancyNum,((BBWithSpill *)dev_rgn_)->GetCrntSpillCost());
       // }
       if (((BBWithSpill *)dev_rgn_)->GetCrntSpillCost() > RPTarget) {
-        // printf("terminating ant for under RPTarget of %d with spill cost %d in blockOccupancy %d \n", RPTarget, ((BBWithSpill *)dev_rgn_)->GetCrntSpillCost() ,blockOccupancyNum);
+        // printf("terminating ant at thread %d for under RPTarget of %d with spill cost %d in blockOccupancy %d \n",GLOBALTID, RPTarget, ((BBWithSpill *)dev_rgn_)->GetCrntSpillCost() ,blockOccupancyNum);
         // set schedule cost to INVALID_VALUE so it is not considered for
         // iteration best or global best
         schedule->SetCost(INVALID_VALUE);
@@ -1109,7 +1111,7 @@ Dev_ACO(SchedRegion *dev_rgn, DataDepGraph *dev_DDG,
   InstCount RPTarget;
   dev_schedsUsed = 0;
   dev_schedsFound = 0;
-
+  auto dev_states = getDevRandStates(dev_AcoSchdulr);
   // If in second pass and not using SLIL, set RPTarget
   if (!needsSLIL)
   {
@@ -1135,6 +1137,8 @@ Dev_ACO(SchedRegion *dev_rgn, DataDepGraph *dev_DDG,
     }
     threadGroup.sync();
     #endif
+    // Get a new seed for construction of a new schedule for each iteration
+    hiprand_init(3 * GLOBALTID, dev_iterations, 0, &dev_states[GLOBALTID]);
     dev_AcoSchdulr->FindOneSchedule(RPTarget,
                                     dev_schedules[GLOBALTID], dev_AcoSchdulr->blockDecisions_[hipBlockIdx_x].blockOccupancyNum);
     for (int i = 0; i < 5; i++) {
