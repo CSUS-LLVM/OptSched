@@ -56,7 +56,7 @@ ACOScheduler::ACOScheduler(DataDepGraph *dataDepGraph,
                            SchedPriorities priorities1, SchedPriorities priorities2, bool vrfySched,
                            bool IsPostBB, int numBlocks,
                            SchedRegion *dev_rgn, DataDepGraph *dev_DDG,
-			                     MachineModel *dev_MM, void *dev_states, int numDiffOccupancies, int targetOccupancy)
+			                     MachineModel *dev_MM, void *dev_states, unsigned long randSeed, int numDiffOccupancies, int targetOccupancy)
     : ConstrainedScheduler(dataDepGraph, machineModel, upperBound, true) {
   VrfySched_ = vrfySched;
   this->IsPostBB = IsPostBB;
@@ -68,6 +68,7 @@ ACOScheduler::ACOScheduler(DataDepGraph *dataDepGraph,
   dev_DDG_ = dev_DDG;
   dev_MM_ = dev_MM;
   dev_states_ = dev_states;
+  random_seed_ = randSeed;
   dev_pheromone_elmnts_alloced_ = false;
   numAntsTerminated_ = 0;
   numBlocks_ = numBlocks;
@@ -1138,7 +1139,7 @@ Dev_ACO(SchedRegion *dev_rgn, DataDepGraph *dev_DDG,
     threadGroup.sync();
     #endif
     // Get a new seed for construction of a new schedule for each iteration
-    hiprand_init(3 * GLOBALTID, dev_iterations, 0, &dev_states[GLOBALTID]);
+    hiprand_init(dev_AcoSchdulr->random_seed_ * GLOBALTID, dev_iterations, 0, &dev_states[GLOBALTID]);
     dev_AcoSchdulr->FindOneSchedule(RPTarget,
                                     dev_schedules[GLOBALTID], dev_AcoSchdulr->blockDecisions_[hipBlockIdx_x].blockOccupancyNum);
     for (int i = 0; i < 5; i++) {
@@ -1182,10 +1183,9 @@ Dev_ACO(SchedRegion *dev_rgn, DataDepGraph *dev_DDG,
       if (dev_schedules[blockBestIndex[GLOBALTID * (NUMBLOCKSMANYANTS/2)]]->GetCost() != INVALID_VALUE)
         dev_AcoSchdulr->globalBestIndex[GLOBALTID] = blockBestIndex[GLOBALTID * (NUMBLOCKSMANYANTS/2)];
     }
-
+    dev_iterations++;
     // 1 thread compares iteration best to overall bestsched
     if (GLOBALTID < numDiffOccupancies) {
-      dev_iterations++;
       #ifdef DEBUG_INSTR_SELECTION
       printf("Iterations: %d\n", dev_iterations);
       #endif
