@@ -839,6 +839,10 @@ InstSchedule *ACOScheduler::FindOneSchedule(InstCount RPTarget, InstSchedule *de
     // end schedule construction
     return NULL;
   }
+  if (((BBWithSpill *)dev_rgn_)->GetCrntSpillCost() > RPTarget) {
+    schedule->SetCost(INVALID_VALUE);
+    return NULL;
+  }
   dev_rgn_->UpdateScheduleCost(schedule);
   schedule->setIsZeroPerp( ((BBWithSpill *)dev_rgn_)->ReturnPeakSpillCost() == 0 );
   // if (GLOBALTID < 10)
