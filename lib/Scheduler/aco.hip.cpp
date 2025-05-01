@@ -1322,9 +1322,15 @@ Dev_ACO(SchedRegion *dev_rgn, DataDepGraph *dev_DDG,
     
     #ifdef MULTIPLE_PHEROMONE_TABLES
     for (int i = 0; i < numDiffOccupancies; i++)
+    {
       dev_AcoSchdulr->ScalePheromoneTable(i);
+      if(GLOBALTID == 0)
+        isGlobalBest[i] = false;
+    }
     #else
     dev_AcoSchdulr->ScalePheromoneTable(0);
+    if(GLOBALTID == 0)
+        isGlobalBest[0] = false;
     #endif
     // wait for other blocks to finish before starting next iteration
     threadGroup.sync();
