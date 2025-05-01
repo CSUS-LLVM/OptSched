@@ -1400,6 +1400,7 @@ FUNC_RESULT ACOScheduler::FindSchedule(InstSchedule *schedule_out,
   #endif
   initialValue_ = 1;
   InstCount MaxRPTarget = std::numeric_limits<InstCount>::max();
+  InitialSchedule->setOccupancy(((BBWithSpill *)rgn_)->getOccupancy());
   InstSchedule *heuristicSched = FindOneSchedule(MaxRPTarget);
   InstCount heuristicCost =
       heuristicSched->GetCost() + 1; // prevent divide by zero
