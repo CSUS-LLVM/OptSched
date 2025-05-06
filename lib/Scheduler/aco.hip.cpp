@@ -30,8 +30,6 @@ double RandDouble(double min, double max) {
   return (rand * (max - min)) + min;
 }
 
-__device__ int termOcc;
-
 #define USE_ACS 0
 #define TWO_STEP 1
 #define MIN_DEPOSITION 1
@@ -512,8 +510,8 @@ InstCount ACOScheduler::SelectInstruction(SchedInstruction *lastInst, InstCount 
   auto dev_states = getDevRandStates(this);
   rand = hiprand_uniform(&dev_states[GLOBALTID]);
   point = dev_readyLs->dev_ScoreSum[GLOBALTID] * hiprand_uniform(&dev_states[GLOBALTID]);
-  if(GLOBALTID == 0)
-    printf("rand : %f\npoint : %d\n",rand, point);
+  // if(GLOBALTID == 0)
+  //   printf("rand : %f\npoint : %d\n",rand, point);
 #else
   rand = RandDouble(0, 1);
   point = RandDouble(0, readyLs->ScoreSum);
@@ -784,18 +782,6 @@ InstSchedule *ACOScheduler::FindOneSchedule(InstCount RPTarget, InstSchedule *de
                                             dev_crntCycleNum_[GLOBALTID],
                                             dev_crntSlotNum_[GLOBALTID],
                                             false, blockDecisions_[hipBlockIdx_x].blockOccupancyNum);
-
-      if (blockOccupancyNum >= termOcc) {
-        //printf("terminating ant lower bound schedule with occupancy greater than or equal to this ant already found\n");
-        // set schedule cost to INVALID_VALUE so it is not considered for
-        // iteration best or global best
-        schedule->SetCost(INVALID_VALUE);
-        // keep track of ants terminated
-        atomicAdd(&numAntsTerminated_, 1);
-        dev_readyLs->clearReadyList();
-        // end schedule construction
-        return NULL;
-      }
 
       // If an ant violates the RP cost constraint, terminate further
       // schedule construction
@@ -1163,12 +1149,6 @@ Dev_ACO(SchedRegion *dev_rgn, DataDepGraph *dev_DDG,
                                     dev_schedules[GLOBALTID], dev_AcoSchdulr->blockDecisions_[hipBlockIdx_x].blockOccupancyNum);
     for (int i = 0; i < 5; i++) {
       dev_AcoSchdulr->globalBestIndex[i] = INVALID_VALUE;
-    }
-
-    int blockOccupancyNum = dev_AcoSchdulr->blockDecisions_[hipBlockIdx_x].blockOccupancyNum;
-    //if schedule is at lower bound and rp is at min rp for occupancy level set termination flag
-    if (blockOccupancyNum < termOcc && dev_schedules[GLOBALTID]->GetCrntLngth() <= dev_DDG->GetSchedLwrBound() && dev_AcoSchdulr->IsMinRp(targetOccupancy - blockOccupancyNum, ((BBWithSpill *)dev_rgn)->getVGPRPressure())) {
-      atomicMin(&termOcc, blockOccupancyNum);
     }
 
     // Sync threads after schedule creation
@@ -1628,9 +1608,6 @@ FUNC_RESULT ACOScheduler::FindSchedule(InstSchedule *schedule_out,
     gpuErrchk(hipMemPrefetchAsync(dev_AcoSchdulr, memSize, 0));
     Logger::Info("Launching Dev_ACO with %d blocks of %d threads", numBlocks_,
                                                            NUMTHREADSPERBLOCK);                                                   
-    // PrintSchedule(InitialSchedule);
-    int hostTermOcc = numDiffOccupancies_;
-    hipMemcpyToSymbol(HIP_SYMBOL(termOcc), &hostTermOcc, sizeof(int));
 
     // Using Cooperative Grid Groups requires launching with
     // hipLaunchCooperativeKernel which requires kernel args to be an array
@@ -2429,23 +2406,4 @@ void ACOScheduler::FreeDevicePointers(bool IsSecondPass) {
   else
     hipFree(dev_kHelper2);
   hipFree(pheromone_.elmnts_);
-}
-
-__host__ __device__
-bool ACOScheduler::IsMinRp(int occupancy, int rp) {
-    int minRp = 0;
-    switch (occupancy) {
-        case 10: minRp = 1; break;
-        case 9:  minRp = 25; break;
-        case 8:  minRp = 29; break;
-        case 7:  minRp = 33; break;
-        case 6:  minRp = 37; break;
-        case 5:  minRp = 41; break;
-        case 4:  minRp = 49; break;
-        case 3:  minRp = 65; break;
-        case 2:  minRp = 85; break;
-        case 1:  minRp = 129; break;
-        default: return false;
-    }
-    return rp <= minRp;
 }

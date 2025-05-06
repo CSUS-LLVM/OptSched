@@ -120,8 +120,6 @@ public:
   int GetNumDiffOccupancies() { return numDiffOccupancies_; }
   __host__ __device__
   int GetTargetOccupancy() { return targetOccupancy_; }
-  __host__ __device__
-  bool IsMinRp(int occupancy, int rp);
   
   int globalBestIndex[5];
 private:
