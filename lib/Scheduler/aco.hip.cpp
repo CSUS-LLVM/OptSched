@@ -58,7 +58,7 @@ ACOScheduler::ACOScheduler(DataDepGraph *dataDepGraph,
                            SchedPriorities priorities1, SchedPriorities priorities2, bool vrfySched,
                            bool IsPostBB, int numBlocks,
                            SchedRegion *dev_rgn, DataDepGraph *dev_DDG,
-			                     MachineModel *dev_MM, void *dev_states, int numDiffOccupancies, int targetOccupancy)
+			                     MachineModel *dev_MM, void *dev_states, unsigned long randSeed, int numDiffOccupancies, int targetOccupancy)
     : ConstrainedScheduler(dataDepGraph, machineModel, upperBound, true) {
   VrfySched_ = vrfySched;
   this->IsPostBB = IsPostBB;
@@ -70,6 +70,7 @@ ACOScheduler::ACOScheduler(DataDepGraph *dataDepGraph,
   dev_DDG_ = dev_DDG;
   dev_MM_ = dev_MM;
   dev_states_ = dev_states;
+  random_seed_ = randSeed;
   dev_pheromone_elmnts_alloced_ = false;
   numAntsTerminated_ = 0;
   numBlocks_ = numBlocks;
@@ -511,6 +512,8 @@ InstCount ACOScheduler::SelectInstruction(SchedInstruction *lastInst, InstCount 
   auto dev_states = getDevRandStates(this);
   rand = hiprand_uniform(&dev_states[GLOBALTID]);
   point = dev_readyLs->dev_ScoreSum[GLOBALTID] * hiprand_uniform(&dev_states[GLOBALTID]);
+  if(GLOBALTID == 0)
+    printf("rand : %f\npoint : %d\n",rand, point);
 #else
   rand = RandDouble(0, 1);
   point = RandDouble(0, readyLs->ScoreSum);
@@ -801,7 +804,7 @@ InstSchedule *ACOScheduler::FindOneSchedule(InstCount RPTarget, InstSchedule *de
       //   printf("RPTarget %d blockOccupancyNum %d Spill Cost %d TID\n",RPTarget, blockOccupancyNum,((BBWithSpill *)dev_rgn_)->GetCrntSpillCost());
       // }
       if (((BBWithSpill *)dev_rgn_)->GetCrntSpillCost() > RPTarget) {
-        // printf("terminating ant for under RPTarget of %d with spill cost %d in blockOccupancy %d \n", RPTarget, ((BBWithSpill *)dev_rgn_)->GetCrntSpillCost() ,blockOccupancyNum);
+        // printf("terminating ant at thread %d for under RPTarget of %d with spill cost %d in blockOccupancy %d \n",GLOBALTID, RPTarget, ((BBWithSpill *)dev_rgn_)->GetCrntSpillCost() ,blockOccupancyNum);
         // set schedule cost to INVALID_VALUE so it is not considered for
         // iteration best or global best
         schedule->SetCost(INVALID_VALUE);
@@ -849,6 +852,10 @@ InstSchedule *ACOScheduler::FindOneSchedule(InstCount RPTarget, InstSchedule *de
     atomicAdd(&numAntsTerminated_, 1);
     dev_readyLs->clearReadyList();
     // end schedule construction
+    return NULL;
+  }
+  if (((BBWithSpill *)dev_rgn_)->GetCrntSpillCost() > RPTarget) {
+    schedule->SetCost(INVALID_VALUE);
     return NULL;
   }
   dev_rgn_->UpdateScheduleCost(schedule);
@@ -1124,7 +1131,7 @@ Dev_ACO(SchedRegion *dev_rgn, DataDepGraph *dev_DDG,
   InstCount RPTarget;
   dev_schedsUsed = 0;
   dev_schedsFound = 0;
-
+  auto dev_states = getDevRandStates(dev_AcoSchdulr);
   // If in second pass and not using SLIL, set RPTarget
   if (!needsSLIL)
   {
@@ -1150,6 +1157,8 @@ Dev_ACO(SchedRegion *dev_rgn, DataDepGraph *dev_DDG,
     }
     threadGroup.sync();
     #endif
+    // Get a new seed for construction of a new schedule for each iteration
+    hiprand_init(dev_AcoSchdulr->random_seed_ * GLOBALTID, dev_iterations, 0, &dev_states[GLOBALTID]);
     dev_AcoSchdulr->FindOneSchedule(RPTarget,
                                     dev_schedules[GLOBALTID], dev_AcoSchdulr->blockDecisions_[hipBlockIdx_x].blockOccupancyNum);
     for (int i = 0; i < 5; i++) {
@@ -1200,10 +1209,9 @@ Dev_ACO(SchedRegion *dev_rgn, DataDepGraph *dev_DDG,
       if (dev_schedules[blockBestIndex[GLOBALTID * (NUMBLOCKSMANYANTS/2)]]->GetCost() != INVALID_VALUE)
         dev_AcoSchdulr->globalBestIndex[GLOBALTID] = blockBestIndex[GLOBALTID * (NUMBLOCKSMANYANTS/2)];
     }
-
+    dev_iterations++;
     // 1 thread compares iteration best to overall bestsched
     if (GLOBALTID < numDiffOccupancies) {
-      dev_iterations++;
       #ifdef DEBUG_INSTR_SELECTION
       printf("Iterations: %d\n", dev_iterations);
       #endif
@@ -1336,9 +1344,15 @@ Dev_ACO(SchedRegion *dev_rgn, DataDepGraph *dev_DDG,
     
     #ifdef MULTIPLE_PHEROMONE_TABLES
     for (int i = 0; i < numDiffOccupancies; i++)
+    {
       dev_AcoSchdulr->ScalePheromoneTable(i);
+      if(GLOBALTID == 0)
+        isGlobalBest[i] = false;
+    }
     #else
     dev_AcoSchdulr->ScalePheromoneTable(0);
+    if(GLOBALTID == 0)
+        isGlobalBest[0] = false;
     #endif
     // wait for other blocks to finish before starting next iteration
     threadGroup.sync();
@@ -1408,6 +1422,7 @@ FUNC_RESULT ACOScheduler::FindSchedule(InstSchedule *schedule_out,
   #endif
   initialValue_ = 1;
   InstCount MaxRPTarget = std::numeric_limits<InstCount>::max();
+  InitialSchedule->setOccupancy(((BBWithSpill *)rgn_)->getOccupancy());
   InstSchedule *heuristicSched = FindOneSchedule(MaxRPTarget);
   InstCount heuristicCost =
       heuristicSched->GetCost() + 1; // prevent divide by zero

@@ -1184,7 +1184,7 @@ FUNC_RESULT SchedRegion::runACO(InstSchedule *ReturnSched,
     ACOScheduler *AcoSchdulr = new ACOScheduler(
         dataDepGraph_, machMdl_, abslutSchedUprBound_, acoPrirts1_, acoPrirts2_,
         vrfySched_, IsPostBB, numBlocks, (SchedRegion *)dev_rgn, dev_DDG,
-        dev_machMdl_, dev_states, numDiffOccupancies, ((BBWithSpill*)this)->getTargetOccupancy());
+        dev_machMdl_, dev_states, randSeed, numDiffOccupancies, ((BBWithSpill*)this)->getTargetOccupancy());
     AcoSchdulr->setInitialSched(InitSched);
     // Alloc dev arrays for parallel ACO
     AcoSchdulr->AllocDevArraysForParallelACO();

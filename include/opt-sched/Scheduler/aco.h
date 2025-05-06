@@ -56,7 +56,7 @@ public:
                InstCount upperBound, SchedPriorities priorities1,
                SchedPriorities priorities2, bool vrfySched, bool IsPostBB, int numBlocks,
                SchedRegion *dev_rgn = NULL, DataDepGraph *dev_DDG = NULL, MachineModel *dev_MM = NULL,
-               void *dev_states = NULL, int numDiffOccupancies = 1, int targetOccupancy = 0);
+               void *dev_states = NULL, unsigned long randSeed = 0, int numDiffOccupancies = 1, int targetOccupancy = 0);
   __host__
   virtual ~ACOScheduler();
   FUNC_RESULT FindSchedule(InstSchedule *schedule, std::vector<InstSchedule *> &SchedsAtDiffOccupancies,
@@ -112,6 +112,8 @@ public:
   void PrintPheromone(int kernelNum = 0);
     // Holds state for each thread for RNG
   void *dev_states_;
+  // Holds seed for reinitializing schedule
+  unsigned long random_seed_;
   BlockDecision blockDecisions_[NUMBLOCKSMANYANTS];
   void setupBlockDecisions();
   __host__ __device__
