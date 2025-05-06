@@ -510,8 +510,8 @@ InstCount ACOScheduler::SelectInstruction(SchedInstruction *lastInst, InstCount 
   auto dev_states = getDevRandStates(this);
   rand = hiprand_uniform(&dev_states[GLOBALTID]);
   point = dev_readyLs->dev_ScoreSum[GLOBALTID] * hiprand_uniform(&dev_states[GLOBALTID]);
-  if(GLOBALTID == 0)
-    printf("rand : %f\npoint : %d\n",rand, point);
+  // if(GLOBALTID == 0)
+  //   printf("rand : %f\npoint : %d\n",rand, point);
 #else
   rand = RandDouble(0, 1);
   point = RandDouble(0, readyLs->ScoreSum);
