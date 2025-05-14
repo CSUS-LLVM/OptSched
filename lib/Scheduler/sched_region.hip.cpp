@@ -1224,8 +1224,8 @@ FUNC_RESULT SchedRegion::runACO(InstSchedule *ReturnSched,
   } else {
     ACOScheduler *AcoSchdulr = 
         new ACOScheduler(dataDepGraph_, machMdl_, abslutSchedUprBound_,
-                         acoPrirts1_, acoPrirts2_, vrfySched_, IsPostBB, numBlocks);
-    AcoSchdulr->setNumDiffOccupancies(numDiffOccupancies);
+                         acoPrirts1_, acoPrirts2_, vrfySched_, IsPostBB, numBlocks, NULL, NULL, NULL, NULL, 0, numDiffOccupancies);
+    // AcoSchdulr->setNumDiffOccupancies(numDiffOccupancies);
     AcoSchdulr->setTargetOccupancy(((BBWithSpill*)this)->getTargetOccupancy());
     AcoSchdulr->setInitialSched(InitSched);
     Rslt = AcoSchdulr->FindSchedule(ReturnSched, SchedsAtDiffOccupancies, this);
