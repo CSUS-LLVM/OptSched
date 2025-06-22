@@ -1888,6 +1888,7 @@ FUNC_RESULT ACOScheduler::FindSchedule(InstSchedule *schedule_out,
       Logger::Info("%d", SchedsAtDiffOccupancies.size());
       if (bestSchedule != InitialSchedule)
         delete bestSchedule;
+      printf("Occupancy Target %d had %d iterations\n",j ,iterations);
     } // End run on CPU
   }
   if (!use_dev_ACO || count_ < REGION_MIN_SIZE)
