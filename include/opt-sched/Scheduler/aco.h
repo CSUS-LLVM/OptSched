@@ -29,7 +29,7 @@ namespace opt_sched {
 // memory usage as well. Smaller node count DAGs can use more memory.
 #define REGION_MAX_EDGE_CNT 800000
 #define NUMBLOCKSMANYANTS 180
-#define BLOCKOPTSTALLTHRESHOLD 135
+#define BLOCKOPTSTALLTHRESHOLD 171 // 5%
 
 enum class DCF_OPT {
   OFF,
