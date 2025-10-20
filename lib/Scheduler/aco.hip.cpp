@@ -535,7 +535,7 @@ InstCount ACOScheduler::SelectInstruction(SchedInstruction *lastInst, InstCount 
   #ifdef __HIP_DEVICE_COMPILE__
   __shared__ bool dev_useMax;
   // only explore and exploit at block level for first pass
-  if (!dev_rgn_->IsSecondPass()) {
+  if (true) { 
     // select useMax for each block
     if (hipThreadIdx_x == 0)
       dev_useMax = (rand < choose_best_chance) || currentlyWaiting;
@@ -575,7 +575,7 @@ InstCount ACOScheduler::SelectInstruction(SchedInstruction *lastInst, InstCount 
   //finally we pick whether we will return the fp choice or max score inst w/o using a branch
   size_t indx;
   #ifdef __HIP_DEVICE_COMPILE__
-    if (!dev_rgn_->IsSecondPass())
+    if (true)
       indx = dev_useMax ? MaxScoreIndx : fpIndx;
     else {
       bool UseMax = (rand < choose_best_chance) || currentlyWaiting;
