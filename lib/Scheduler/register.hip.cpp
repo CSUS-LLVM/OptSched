@@ -117,6 +117,7 @@ Register &Register::operator=(const Register &rhs) {
     type_ = rhs.type_;
     useCnt_ = rhs.useCnt_;
     defCnt_ = rhs.defCnt_;
+    pcpu_crntUseCnt_ = nullptr;
   }
 
   return *this;
@@ -196,6 +197,29 @@ Register::Register(int16_t type, int num, int physicalNumber) {
   isSpillCnddt_ = false;
   liveIn_ = false;
   liveOut_ = false;
+
+  pcpu_crntUseCnt_ = nullptr;
+}
+
+void Register::PCPU_AddCrntUse(int thread){
+  pcpu_crntUseCnt_[thread].value++;
+}
+void Register::PCPU_ResetCrntUseCnt(int thread){
+  pcpu_crntUseCnt_[thread].value = 0;
+}
+bool Register::PCPU_IsLive(int thread) const {
+  assert(pcpu_crntUseCnt_[thread].value <= useCnt_);
+  return pcpu_crntUseCnt_[thread].value < useCnt_;
+}
+void Register::AllocParallelCPURegs(int numThreads){
+  pcpu_crntUseCnt_ = new AlignedInt[numThreads];
+  for (int i = 0; i < numThreads; i++){
+    pcpu_crntUseCnt_[i].value = 0;
+  }
+}
+void Register::FreeParallelCPURegs(){
+  delete[] pcpu_crntUseCnt_;
+  pcpu_crntUseCnt_ = nullptr;
 }
 
 __host__

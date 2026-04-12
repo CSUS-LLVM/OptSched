@@ -25,6 +25,10 @@ namespace opt_sched {
 // Forward Declaration to treat circular dependence
 class SchedInstruction;
 
+struct alignas(64) AlignedInt {
+  int value;
+};
+
 // Represents a a single register of a certain type and tracks the number of
 // times this register is defined and used.
 class Register {
@@ -128,6 +132,13 @@ public:
   // Calls hipFree on all arrays/objects that were allocated with hipMalloc
   void FreeDevicePointers();
 
+  void PCPU_AddCrntUse(int threadIdx);
+  void PCPU_ResetCrntUseCnt(int threadIdx);
+  bool PCPU_IsLive(int threadIdx) const;
+  void AllocParallelCPURegs(int numThreads);
+  void FreeParallelCPURegs();
+
+
 private:
   int16_t type_;
   int num_;
@@ -136,6 +147,9 @@ private:
   int crntUseCnt_;
   // Device array which holds a separate crntUseCnt_ for each thread
   int *dev_crntUseCnt_;
+  //Parallel cpu array to hold separate crntUseCnt_
+  AlignedInt *pcpu_crntUseCnt_;
+
   int crntLngth_;
   int physicalNumber_;
   BitVector conflicts_;

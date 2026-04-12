@@ -50,6 +50,28 @@ struct BlockDecision {
   int blockOccupancyNum; // range 0-(difference in occupancy from AMD's schedule)
 };
 
+struct alignas(64) ParallelCPUVars {
+  InstCount crntCycleNum_;
+  InstCount crntSlotNum_;
+  InstCount crntSpillCost_;
+  InstCount crntStepNum_;
+  InstCount peakSpillCost_;
+  InstCount totSpillCost_;
+  InstCount slilSpillCost_;
+  InstCount dynamicSlilLowerBound_;
+  int schduldInstCnt_;
+  int schduldEntryInstCnt_;
+  int schduldExitInstCnt_;
+
+  // These are per-thread copies of the arrays — you'll need to alloc these
+  WeightedBitVector *liveRegs_;       // array[regTypeCnt_]
+  WeightedBitVector *livePhysRegs_;   // array[regTypeCnt_]
+  InstCount *peakRegPressures_;       // array[regTypeCnt_]
+  InstCount *spillCosts_;             // array[instCnt]
+  int *sumOfLiveIntervalLengths_;     // array[regTypeCnt_]
+  SmallVector<unsigned, 8> regPressures_; // or just unsigned*
+};
+
 class ACOScheduler : public ConstrainedScheduler {
 public:
   ACOScheduler(DataDepGraph *dataDepGraph, MachineModel *machineModel,

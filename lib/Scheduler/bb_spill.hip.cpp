@@ -557,6 +557,30 @@ void BBWithSpill::CmputCrntSpillCost_() {
   }
 #endif
 }
+
+void BBWithSpill::PCPU_CmputCrntSpillCost_(ParallelCPUVars &pcpu) {
+  switch (GetSpillCostFunc()) {
+  case SCF_PERP:
+  case SCF_PRP:
+  case SCF_PEAK_PER_TYPE:
+  case SCF_TARGET:
+    pcpu.crntSpillCost_ = pcpu.peakSpillCost_;
+    break;
+  case SCF_SUM:
+    pcpu.crntSpillCost_ = pcpu.totSpillCost_;
+    break;
+  case SCF_PEAK_PLUS_AVG:
+    pcpu.crntSpillCost_ =
+        pcpu.peakSpillCost_ + pcpu.totSpillCost_ / dataDepGraph_->GetInstCnt();
+    break;
+  case SCF_SLIL:
+    pcpu.crntSpillCost_ = pcpu.slilSpillCost_;
+    break;
+  default:
+    pcpu.crntSpillCost_ = pcpu.peakSpillCost_;
+    break;
+  }
+}
 /******************************i***********************************************/
 
 //#define IS_DEBUG_REG_PRESSURE
@@ -871,6 +895,157 @@ void BBWithSpill::UpdateSpillInfoForSchdul_(SchedInstruction *inst,
     schduldExitInstCnt_++;
 #endif
 }
+
+void BBWithSpill::PCPU_UpdateSpillInfoForSchdul_(SchedInstruction *inst,
+                                                bool trackCnflcts,
+                                                ParallelCPUVars &pcpu, 
+                                                int thread) {
+  int16_t regType;
+  int defCnt, useCnt, regNum, physRegNum;
+  RegIndxTuple *defs, *uses;
+  Register *def, *use;
+  int liveRegs;
+  InstCount newSpillCost;
+  InstCount perpValueForSlil;
+
+#ifdef IS_DEBUG_REG_PRESSURE
+  Logger::Info("Updating reg pressure after scheduling Inst %d",
+               inst->GetNum());
+#endif
+
+  defCnt = inst->GetDefs(defs);
+  useCnt = inst->GetUses(uses);
+
+  // Update Live regs after uses
+  for (int i = 0; i < useCnt; i++) {
+    use = dataDepGraph_->getRegByTuple(&uses[i]);
+    regType = use->GetType();
+    regNum = use->GetNum();
+    physRegNum = use->GetPhysicalNumber();
+
+    if (use->IsLive() == false) {
+      Logger::Fatal("Reg %d of type %d is used without being defined", regNum,
+                    regType);
+    }
+
+#ifdef IS_DEBUG_REG_PRESSURE
+    Logger::Info("Inst %d uses reg %d of type %d and %d uses", inst->GetNum(),
+                 regNum, regType, use->GetUseCnt());
+#endif
+
+    use->PCPU_AddCrntUse(thread);
+
+    if (use->PCPU_IsLive(thread) == false) {
+      if (needsSLIL()) {
+        pcpu.sumOfLiveIntervalLengths_[regType]++;
+      }
+
+      pcpu.liveRegs_[regType].SetBit(regNum, false, use->GetWght());
+
+#ifdef IS_DEBUG_REG_PRESSURE
+      Logger::Info("Reg type %d now has %d live regs", regType,
+                   pcpu.liveRegs_[regType].GetOneCnt());
+#endif
+
+      if (regFiles_[regType].GetPhysRegCnt() > 0 && physRegNum >= 0)
+        pcpu.livePhysRegs_[regType].SetBit(physRegNum, false, use->GetWght());
+    }
+  }
+
+  // Update Live regs after defs
+  for (int i = 0; i < defCnt; i++) {
+    def = dataDepGraph_->getRegByTuple(&defs[i]);
+    regType = def->GetType();
+    regNum = def->GetNum();
+    physRegNum = def->GetPhysicalNumber();
+
+#ifdef IS_DEBUG_REG_PRESSURE
+    Logger::Info("Inst %d defines reg %d of type %d and %d uses",
+                 inst->GetNum(), regNum, regType, def->GetUseCnt());
+#endif
+
+    if (trackCnflcts && pcpu.liveRegs_[regType].GetOneCnt() > 0)
+      regFiles_[regType].AddConflictsWithLiveRegs(
+          regNum, pcpu.liveRegs_[regType].GetOneCnt());
+
+    pcpu.liveRegs_[regType].SetBit(regNum, true, def->GetWght());
+
+#ifdef IS_DEBUG_REG_PRESSURE
+    Logger::Info("Reg type %d now has %d live regs", regType,
+                 pcpu.liveRegs_[regType].GetOneCnt());
+#endif
+
+    if (regFiles_[regType].GetPhysRegCnt() > 0 && physRegNum >= 0)
+      pcpu.livePhysRegs_[regType].SetBit(physRegNum, true, def->GetWght());
+    def->PCPU_ResetCrntUseCnt(thread);
+  }
+
+  newSpillCost = 0;
+
+#ifdef IS_DEBUG_SLIL_CORRECT
+  if (OPTSCHED_gPrintSpills) {
+    Logger::Info(
+        "Printing live range lengths for instruction BEFORE calculation.");
+    for (int j = 0; j < regTypeCnt_; j++) {
+      Logger::Info("SLIL for regType %d %s is currently %d", j,
+                   pcpu.sumOfLiveIntervalLengths_[j]);
+    }
+    Logger::Info("Now computing spill cost for instruction.");
+  }
+#endif
+
+  for (int16_t i = 0; i < regTypeCnt_; i++) {
+    liveRegs = pcpu.liveRegs_[i].GetWghtedCnt();
+    // Set current RP for register type "i"
+    pcpu.regPressures_[i] = liveRegs;
+    // Update peak RP for register type "i"
+    if (liveRegs > pcpu.peakRegPressures_[i])
+      pcpu.peakRegPressures_[i] = liveRegs;
+
+    if (needsSLIL()) {
+      pcpu.sumOfLiveIntervalLengths_[i] += pcpu.liveRegs_[i].GetOneCnt();
+    }
+  }
+
+  if (GetSpillCostFunc() == SCF_SLIL) {
+    pcpu.slilSpillCost_ = PCPU_CmputCostForFunction(GetSpillCostFunc(), pcpu);
+    perpValueForSlil = PCPU_CmputCostForFunction(SCF_PERP, pcpu);
+    if (pcpu.peakSpillCost_ < perpValueForSlil)
+      pcpu.peakSpillCost_ = perpValueForSlil;
+  }
+  else
+    newSpillCost = PCPU_CmputCostForFunction(GetSpillCostFunc(), pcpu);
+
+#ifdef IS_DEBUG_SLIL_CORRECT
+  if (OPTSCHED_gPrintSpills) {
+    Logger::Info(
+        "Printing live range lengths for instruction AFTER calculation.");
+    for (int j = 0; j < regTypeCnt_; j++) {
+      Logger::Info("SLIL for regType %d is currently %d", j,
+                   pcpu.sumOfLiveIntervalLengths_[j]);
+    }
+  }
+#endif
+
+  pcpu.crntStepNum_++;
+  pcpu.spillCosts_[pcpu.crntStepNum_] = newSpillCost;
+
+#ifdef IS_DEBUG_REG_PRESSURE
+  Logger::Info("Spill cost at step  %d = %d", pcpu.crntStepNum_, newSpillCost);
+#endif
+
+  pcpu.totSpillCost_ += newSpillCost;
+  pcpu.peakSpillCost_ = std::max(pcpu.peakSpillCost_, newSpillCost);
+
+  PCPU_CmputCrntSpillCost_(pcpu);
+
+  pcpu.schduldInstCnt_++;
+  if (inst->MustBeInBBEntry())
+    pcpu.schduldEntryInstCnt_++;
+  if (inst->MustBeInBBExit())
+    pcpu.schduldExitInstCnt_++;
+}
+
 /*****************************************************************************/
 
 void BBWithSpill::UpdateSpillInfoForUnSchdul_(SchedInstruction *inst) {
@@ -993,6 +1168,18 @@ void BBWithSpill::SchdulInst(SchedInstruction *inst, InstCount cycleNum,
     return;
   assert(inst != NULL);
   UpdateSpillInfoForSchdul_(inst, trackCnflcts);
+}
+
+void BBWithSpill::PCPU_SchdulInst(SchedInstruction *inst, InstCount cycleNum,
+                                  InstCount slotNum, bool trackCnflcts,
+                                  ParallelCPUVars &pcpu, 
+                                  int thread) {
+  pcpu.crntCycleNum_ = cycleNum;
+  pcpu.crntSlotNum_ = slotNum;
+  if (inst == NULL)
+    return;
+  assert(inst != NULL);
+  PCPU_UpdateSpillInfoForSchdul_(inst, trackCnflcts, pcpu, thread);
 }
 
 __device__
@@ -1170,6 +1357,47 @@ InstCount BBWithSpill::CmputCostForFunction(SPILL_COST_FUNCTION SpillCF) {
     InstCount SC = 0;
     for (int i = 0; i < regTypeCnt_; i ++) {
       inc = regPressures_[i] - machMdl_->GetPhysRegCnt(i);
+      if (inc > 0)
+        SC += inc;
+    }
+    return SC;
+  }
+  }
+}
+
+InstCount BBWithSpill::PCPU_CmputCostForFunction(SPILL_COST_FUNCTION SpillCF, ParallelCPUVars &pcpu) {
+  switch (SpillCF) {
+  case SCF_TARGET: {
+    return OST->getCost(pcpu.regPressures_);
+  }
+  case SCF_SLIL: {
+    InstCount SLILCost = 0;
+    for (int i = 0; i < regTypeCnt_; i++)
+      SLILCost += pcpu.sumOfLiveIntervalLengths_[i];
+    return SLILCost;
+  }
+  case SCF_PRP: {
+    InstCount PRPCost = 0;
+    for (int i = 0; i < regTypeCnt_; i++)
+      PRPCost += pcpu.regPressures_[i];
+    return PRPCost;
+  }
+  case SCF_PEAK_PER_TYPE: {
+    InstCount SC = 0;
+    InstCount inc;
+    for (int i = 0; i < regTypeCnt_; i++) {
+      inc = pcpu.peakRegPressures_[i] - machMdl_->GetPhysRegCnt(i);
+      if (inc > 0)
+        SC += inc;
+    }
+    return SC;
+  }
+  default: {
+    // Default is PERP
+    InstCount inc;
+    InstCount SC = 0;
+    for (int i = 0; i < regTypeCnt_; i++) {
+      inc = pcpu.regPressures_[i] - machMdl_->GetPhysRegCnt(i);
       if (inc > 0)
         SC += inc;
     }
@@ -1749,4 +1977,144 @@ void BBWithSpill::FreeDevicePointers(int numThreads) {
   hipFree(dev_peakRegPressures_);
   hipFree(dev_regPressures_);
   hipFree(dev_spillCosts_);
+}
+
+void BBWithSpill::AllocParallelCPUVars(int numThreads){
+  pcpu_vars_ = new ParallelCPUVars[numThreads];
+  for (int i = 0; i < numThreads; i++) {
+    // Scalar fields
+    pcpu_vars_[i].crntCycleNum_ = 0;
+    pcpu_vars_[i].crntSlotNum_ = 0;
+    pcpu_vars_[i].crntSpillCost_ = 0;
+    pcpu_vars_[i].crntStepNum_ = -1;
+    pcpu_vars_[i].peakSpillCost_ = 0;
+    pcpu_vars_[i].totSpillCost_ = 0;
+    pcpu_vars_[i].slilSpillCost_ = 0;
+    pcpu_vars_[i].dynamicSlilLowerBound_ = staticSlilLowerBound_;
+    pcpu_vars_[i].schduldInstCnt_ = 0;
+    pcpu_vars_[i].schduldEntryInstCnt_ = 0;
+    pcpu_vars_[i].schduldExitInstCnt_ = 0;
+
+    // liveRegs_ — one WeightedBitVector per reg type, constructed from host liveRegs_
+    pcpu_vars_[i].liveRegs_ = new WeightedBitVector[regTypeCnt_];
+    for (int j = 0; j < regTypeCnt_; j++) {
+      pcpu_vars_[i].liveRegs_[j].Construct(regFiles_[j].GetRegCnt());
+    }
+
+    // livePhysRegs_ — only construct if physical regs exist for that type
+    pcpu_vars_[i].livePhysRegs_ = new WeightedBitVector[regTypeCnt_];
+    for (int j = 0; j < regTypeCnt_; j++) {
+      int physRegCnt = regFiles_[j].GetPhysRegCnt();
+      if (physRegCnt > 0)
+        pcpu_vars_[i].livePhysRegs_[j].Construct(physRegCnt);
+    }
+
+    // peakRegPressures_ — one per reg type
+    pcpu_vars_[i].peakRegPressures_ = new InstCount[regTypeCnt_]();
+
+    // regPressures_ — one per reg type
+    pcpu_vars_[i].regPressures_.resize(regTypeCnt_, 0);
+
+    // spillCosts_ — one per instruction
+    pcpu_vars_[i].spillCosts_ = new InstCount[dataDepGraph_->GetInstCnt()]();
+
+    // sumOfLiveIntervalLengths_ — one per reg type
+    pcpu_vars_[i].sumOfLiveIntervalLengths_ = new int[regTypeCnt_]();
+  }    
+  for (int i = 0; i < regTypeCnt_; i++) {
+    for (int j = 0; j < regFiles_[i].GetRegCnt(); j++) {
+      regFiles_[i].GetReg(j)->AllocParallelCPURegs(numThreads);
+    }
+  }
+}
+
+void BBWithSpill::FreeParallelCPUVars(int numThreads){
+  for (int i = 0; i < numThreads; i++) {
+    delete[] pcpu_vars_[i].liveRegs_;
+    delete[] pcpu_vars_[i].livePhysRegs_;
+    delete[] pcpu_vars_[i].peakRegPressures_;
+    delete[] pcpu_vars_[i].spillCosts_;
+    delete[] pcpu_vars_[i].sumOfLiveIntervalLengths_;
+  }
+  delete[] pcpu_vars_;
+  pcpu_vars_ = nullptr;
+  for (int i = 0; i < regTypeCnt_; i++) {
+    for (int j = 0; j < regFiles_[i].GetRegCnt(); j++) {
+      regFiles_[i].GetReg(j)->FreeParallelCPURegs();
+    }
+  }
+}
+
+InstCount BBWithSpill::PCPU_GetCrntSpillCost(ParallelCPUVars &pcpu) {
+  return pcpu.crntSpillCost_;
+}
+
+InstCount BBWithSpill::PCPU_ReturnPeakSpillCost(ParallelCPUVars &pcpu) {
+  return pcpu.peakSpillCost_;
+}
+
+InstCount BBWithSpill::PCPU_getOccupancy(ParallelCPUVars &pcpu) {
+  unsigned *PRP = (unsigned *) pcpu.peakRegPressures_;
+  auto VGPRPressure = PRP[OptSchedDDGWrapperGCN::VGPR32];
+  auto SGPRPressure = PRP[OptSchedDDGWrapperGCN::SGPR32];
+  auto Occ = getAdjustedOccupancy(VGPRPressure, SGPRPressure, MaxOccLDS_, true);
+  return Occ;
+}
+
+bool BBWithSpill::PCPU_closeToRPConstraint(ParallelCPUVars &pcpu, int blockOccupancyNum) {
+  auto Occ = getCloseToOccupancy(
+      pcpu.regPressures_[OptSchedDDGWrapperGCN::VGPR32],
+      pcpu.regPressures_[OptSchedDDGWrapperGCN::SGPR32],
+      MaxOccLDS_);
+  return Occ <= TargetOccupancy_ - blockOccupancyNum;
+}
+
+bool BBWithSpill::PCPU_IsRPHigh(int regType, ParallelCPUVars &pcpu) const {
+  return pcpu.regPressures_[regType] > (unsigned int) machMdl_->GetPhysRegCnt(regType);
+}
+
+void BBWithSpill::PCPU_UpdateScheduleCost(InstSchedule *schedule, ParallelCPUVars &pcpu) {
+  InstCount crntExecCost;
+  PCPU_CmputNormCost_(schedule, CCM_STTC, crntExecCost, false, pcpu);
+}
+
+InstCount BBWithSpill::PCPU_CmputNormCost_(InstSchedule *sched,
+                                      COST_COMP_MODE compMode,
+                                      InstCount &execCost, bool trackCnflcts,
+                                      ParallelCPUVars &pcpu) {
+  InstCount cost = PCPU_CmputCost_(sched, compMode, execCost, trackCnflcts, pcpu);
+
+  cost -= GetCostLwrBound();
+  execCost -= GetExecCostLwrBound();
+
+  sched->SetCost(cost);
+  sched->SetExecCost(execCost);
+  sched->SetNormSpillCost(sched->GetSpillCost() * SCW_ - GetRPCostLwrBound());
+  return cost;
+}
+
+InstCount BBWithSpill::PCPU_CmputCost_(InstSchedule *sched, COST_COMP_MODE compMode,
+                                  InstCount &execCost, bool trackCnflcts,
+                                  ParallelCPUVars &pcpu) {
+  if (compMode == CCM_STTC) {
+    if (GetSpillCostFunc() == SCF_SPILLS) {
+      LocalRegAlloc regAlloc(sched, dataDepGraph_);
+      regAlloc.SetupForRegAlloc();
+      regAlloc.AllocRegs();
+      pcpu.crntSpillCost_ = regAlloc.GetCost();
+    }
+  }
+
+  assert(sched->IsComplete());
+  InstCount cost = sched->GetCrntLngth() * schedCostFactor_;
+  execCost = cost;
+  cost += pcpu.crntSpillCost_ * SCW_;
+  sched->SetSpillCosts(pcpu.spillCosts_);
+  sched->SetPeakRegPressures(pcpu.peakRegPressures_);
+  sched->SetSpillCost(pcpu.crntSpillCost_);
+  return cost;
+}
+
+ParallelCPUVars &BBWithSpill::GetPCPUVars(int thread){
+  return pcpu_vars_[thread];
 }

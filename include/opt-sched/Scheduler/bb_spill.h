@@ -18,6 +18,8 @@ Last Update:  Apr. 2011
 #include <vector>
 #include <hip/hip_runtime.h>
 
+#define RUN_PARALLEL_CPU 1
+
 namespace llvm {
 namespace opt_sched {
 
@@ -29,6 +31,7 @@ class BitVector;
 
 class BBWithSpill : public SchedRegion {
 private:
+  ParallelCPUVars *pcpu_vars_; 
   LengthCostEnumerator *enumrtr_;
 
   InstCount crntSpillCost_;
@@ -267,6 +270,36 @@ public:
   // size_t calculateMemoryNeeded() {
   //   return regTypeCnt_ * sizeof(WeightedBitVector) * numThreads * 2;
   // }
+
+  void AllocParallelCPUVars(int numThreads);
+  void FreeParallelCPUVars(int numThreads);
+
+  void PCPU_CmputCrntSpillCost_(ParallelCPUVars &pcpu);
+  void PCPU_UpdateSpillInfoForSchdul_(SchedInstruction *inst,
+                                      bool trackCnflcts,
+                                      ParallelCPUVars &pcpu, 
+                                      int thread);
+  void PCPU_SchdulInst(SchedInstruction *inst, InstCount cycleNum,
+                                  InstCount slotNum, bool trackCnflcts,
+                                  ParallelCPUVars &pcpu,
+                                  int thread);                                     
+
+  InstCount PCPU_GetCrntSpillCost(ParallelCPUVars &pcpu);
+  InstCount PCPU_ReturnPeakSpillCost(ParallelCPUVars &pcpu);
+  InstCount PCPU_getOccupancy(ParallelCPUVars &pcpu);
+  bool PCPU_closeToRPConstraint(ParallelCPUVars &pcpu, int blockOccupancyNum = 0);
+  bool PCPU_IsRPHigh(int regType, ParallelCPUVars &pcpu) const;
+
+  InstCount PCPU_CmputNormCost_(InstSchedule *sched, COST_COMP_MODE compMode,
+                          InstCount &execCost, bool trackCnflcts,
+                          ParallelCPUVars &pcpu);
+  InstCount PCPU_CmputCost_(InstSchedule *sched, COST_COMP_MODE compMode,
+                      InstCount &execCost, bool trackCnflcts,
+                      ParallelCPUVars &pcpu);
+  void PCPU_UpdateScheduleCost(InstSchedule *sched, ParallelCPUVars &pcpu);    
+  InstCount PCPU_CmputCostForFunction(SPILL_COST_FUNCTION SpillCF, ParallelCPUVars &pcpu);
+  ParallelCPUVars &GetPCPUVars(int thread);
+
 protected:
   // (Chris)
   inline virtual const int *GetSLIL_() const {
