@@ -77,6 +77,11 @@ public:
   void AllocDevArraysForParallelACO();
   // Finds a schedule, if passed a device side schedule, use that instead
   // of creating a new one
+
+
+  InstSchedule *FindManyCPUSchedule(InstCount RPTarget);
+
+
   __host__ __device__
   InstSchedule *FindOneSchedule(InstCount RPTarget,
                                 InstSchedule *dev_schedule = NULL, int kernelNum = -1);

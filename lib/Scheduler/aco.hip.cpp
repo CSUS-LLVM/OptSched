@@ -16,6 +16,9 @@
 #include <sstream>
 #include <hiprand/hiprand_kernel.h>
 
+#include <thread>
+#include <vector>
+
 using namespace llvm::opt_sched;
 namespace cg = cooperative_groups;
 
@@ -50,6 +53,9 @@ double RandDouble(double min, double max) {
 //#define ANTS_PER_ITERATION count_
 //#define DECAY_FACTOR 0.5
 //#endif
+
+#define RUN_PCPU 1
+#define NO_CPU_THREADS 1
 
 ACOScheduler::ACOScheduler(DataDepGraph *dataDepGraph,
                            MachineModel *machineModel, InstCount upperBound,
@@ -1788,12 +1794,19 @@ FUNC_RESULT ACOScheduler::FindSchedule(InstSchedule *schedule_out,
         std::unordered_map<string, int> schedMap;
         int diffSchedCount = 0;
       #endif
-
+      
       while (noImprovement < noImprovementMax) {
         iterations++;
         iterationBest = nullptr;
         for (int i = 0; i < numThreads_; i++) {
-          InstSchedule *schedule = FindOneSchedule(RPTarget, NULL);
+          InstSchedule *schedule;
+          if (!RUN_PCPU) {
+            schedule = FindOneSchedule(RPTarget, NULL);
+          } else {
+            schedule = FindManyCPUSchedule(RPTarget);
+            i+=(NO_CPU_THREADS-1);
+          }
+
 
           #ifdef CHECK_DIFFERENT_SCHEDULES
             // check if schedule is in Map
@@ -1871,6 +1884,7 @@ FUNC_RESULT ACOScheduler::FindSchedule(InstSchedule *schedule_out,
   #if USE_ACS
         UpdatePheromone(bestSchedule, false);
   #endif
+
       }
       Logger::Info("%d ants terminated early", numAntsTerminated_);
       #ifdef CHECK_DIFFERENT_SCHEDULES
@@ -1889,6 +1903,7 @@ FUNC_RESULT ACOScheduler::FindSchedule(InstSchedule *schedule_out,
       if (bestSchedule != InitialSchedule)
         delete bestSchedule;
       printf("Occupancy Target %d had %d iterations\n",j ,iterations);
+
     } // End run on CPU
   }
   if (!use_dev_ACO || count_ < REGION_MIN_SIZE)
@@ -2407,4 +2422,28 @@ void ACOScheduler::FreeDevicePointers(bool IsSecondPass) {
   else
     hipFree(dev_kHelper2);
   hipFree(pheromone_.elmnts_);
+}
+
+InstSchedule *ACOScheduler::FindManyCPUSchedule(InstCount RPTarget) {
+  std::vector<std::thread> PCPUThreads;
+  InstSchedule **cpuScheds = new InstSchedule*[NO_CPU_THREADS]();
+
+  for (int i = 0; i < NO_CPU_THREADS; i++) {
+    PCPUThreads.emplace_back([this, cpuScheds, i, RPTarget]() {
+      cpuScheds[i] = FindOneSchedule(RPTarget, NULL);
+    });
+  }
+
+  for (auto &t : PCPUThreads) {
+    t.join();
+  }
+
+  //logic to find best schedule
+  InstSchedule *result = cpuScheds[0];
+
+  for (int i = 1; i < NO_CPU_THREADS; i++) {
+    delete cpuScheds[i];
+  }
+  delete[] cpuScheds;
+  return result;
 }
