@@ -2427,11 +2427,11 @@ void ACOScheduler::FreeDevicePointers(bool IsSecondPass) {
 InstSchedule *ACOScheduler::FindManyCPUSchedule(InstCount RPTarget) {
   std::vector<std::thread> PCPUThreads;
   InstSchedule **cpuScheds = new InstSchedule*[NO_CPU_THREADS]();
-  ((BBWithSpill*)rgn_)->AllocParallelCPUVars(noCPUThreads);
+  ((BBWithSpill*)rgn_)->AllocParallelCPUVars(NO_CPU_THREADS);
 
   for (int i = 0; i < NO_CPU_THREADS; i++) {
     PCPUThreads.emplace_back([this, cpuScheds, i, RPTarget]() {
-      cpuScheds[i] = PCPU_FindOneSchedule(RPTarget, NULL);
+      cpuScheds[i] = PCPU_FindOneSchedule(RPTarget, NULL, ((BBWithSpill*)rgn_)->GetPCPUVars(i));
     });
   }
 
@@ -2451,7 +2451,7 @@ InstSchedule *ACOScheduler::FindManyCPUSchedule(InstCount RPTarget) {
 
 InstSchedule *ACOScheduler::PCPU_FindOneSchedule(InstCount RPTarget, 
                                                 int thread,
-                                                ParallelCPUVars pcpu,
+                                                ParallelCPUVars &pcpu,
                                                 int kernelNum){             
   SchedInstruction *lastInst = NULL;
   ACOReadyListEntry LastInstInfo;
@@ -2587,6 +2587,7 @@ InstSchedule *ACOScheduler::PCPU_FindOneSchedule(InstCount RPTarget,
   schedule->setOccupancy(((BBWithSpill *)rgn_)->PCPU_getOccupancy(pcpu));
   return schedule;
 }
+
 InstCount ACOScheduler::PCPU_SelectInstruction(SchedInstruction *lastInst, InstCount totalStalls,
                                           SchedRegion *rgn, bool &unnecessarilyStalling,
                                           bool closeToRPTarget, bool currentlyWaiting, 
@@ -2731,7 +2732,6 @@ InstCount ACOScheduler::PCPU_SelectInstruction(SchedInstruction *lastInst, InstC
   return indx;
 }
 
-__host__ __device__
 inline void ACOScheduler::PCPU_UpdateACOReadyList(SchedInstruction *inst, bool IsSecondPass, int heurChoice){                
   InstCount prdcsrNum, scsrRdyCycle;
   // Notify each successor of this instruction that it has been scheduled.

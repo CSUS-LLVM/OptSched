@@ -63,7 +63,6 @@ struct alignas(64) ParallelCPUVars {
   int schduldEntryInstCnt_;
   int schduldExitInstCnt_;
 
-  // These are per-thread copies of the arrays — you'll need to alloc these
   WeightedBitVector *liveRegs_;       // array[regTypeCnt_]
   WeightedBitVector *livePhysRegs_;   // array[regTypeCnt_]
   InstCount *peakRegPressures_;       // array[regTypeCnt_]
@@ -104,6 +103,7 @@ public:
   InstSchedule *FindManyCPUSchedule(InstCount RPTarget);
   InstSchedule *PCPU_FindOneSchedule(InstCount RPTarget,
                                     int thread,
+                                    ParallelCPUVars &pcpu,
                                     int kernelNum = -1);
   InstCount PCPU_SelectInstruction(SchedInstruction *lastInst, InstCount totalStalls,
                                     SchedRegion *rgn, bool &unnecessarilyStalling,
