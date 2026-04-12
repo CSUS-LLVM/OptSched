@@ -105,6 +105,12 @@ public:
   InstSchedule *PCPU_FindOneSchedule(InstCount RPTarget,
                                     int thread,
                                     int kernelNum = -1);
+  InstCount PCPU_SelectInstruction(SchedInstruction *lastInst, InstCount totalStalls,
+                                    SchedRegion *rgn, bool &unnecessarilyStalling,
+                                    bool closeToRPTarget, bool currentlyWaiting, 
+                                    int kernelNum = -1);
+  inline void PCPU_UpdateACOReadyList(SchedInstruction *inst, bool IsSecondPass, int heurChoice = 0);                                      
+                                      
 
 
   __host__ __device__
