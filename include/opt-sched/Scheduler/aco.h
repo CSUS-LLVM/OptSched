@@ -102,6 +102,9 @@ public:
 
 
   InstSchedule *FindManyCPUSchedule(InstCount RPTarget);
+  InstSchedule *PCPU_FindOneSchedule(InstCount RPTarget,
+                                    int thread,
+                                    int kernelNum = -1);
 
 
   __host__ __device__

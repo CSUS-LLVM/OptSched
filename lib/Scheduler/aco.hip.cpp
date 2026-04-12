@@ -2430,7 +2430,7 @@ InstSchedule *ACOScheduler::FindManyCPUSchedule(InstCount RPTarget) {
 
   for (int i = 0; i < NO_CPU_THREADS; i++) {
     PCPUThreads.emplace_back([this, cpuScheds, i, RPTarget]() {
-      cpuScheds[i] = FindOneSchedule(RPTarget, NULL);
+      cpuScheds[i] = PCPU_FindOneSchedule(RPTarget, NULL);
     });
   }
 
@@ -2446,4 +2446,143 @@ InstSchedule *ACOScheduler::FindManyCPUSchedule(InstCount RPTarget) {
   }
   delete[] cpuScheds;
   return result;
+}
+
+InstSchedule *ACOScheduler::PCPU_FindOneSchedule(InstCount RPTarget, 
+                                                int thread,
+                                                int kernelNum){             
+  SchedInstruction *lastInst = NULL;
+  ACOReadyListEntry LastInstInfo;
+  InstSchedule *schedule;
+  schedule = new InstSchedule(machMdl_, dataDepGraph_, true);
+  bool IsSecondPass = rgn_->IsSecondPass();
+  bool unnecessarilyStalling = false;
+  // The MaxPriority that we are getting from the ready list represents the maximum possible heuristic/key value that we can have
+  // I want to move all the heuristic computation stuff to another class for code tidiness reasons.
+  HeurType MaxPriority = kHelper1->getMaxValue();
+  if (MaxPriority == 0)
+    MaxPriority = 1; // divide by 0 is bad
+  Initialize_();
+
+  SchedInstruction *waitFor = NULL;
+  InstCount waitUntil = 0;
+  MaxPriorityInv = 1 / (pheromone_t)MaxPriority;
+
+  // initialize the aco ready list so that the start instruction is ready
+  // The luc component is 0 since the root inst uses no instructions
+  InstCount RootId = rootInst_->GetNum();
+  HeurType RootHeuristic = kHelper1->computeKey(rootInst_, true, dataDepGraph_->RegFiles);
+  pheromone_t RootScore = Score(-1, RootId, RootHeuristic, !IsSecondPass);
+  ACOReadyListEntry InitialRoot{RootId, 0, RootHeuristic, RootScore};
+  readyLs->addInstructionToReadyList(InitialRoot);
+  readyLs->ScoreSum = RootScore;
+  MaxScoringInst = 0;
+  lastInst = dataDepGraph_->GetInstByIndx(RootId);
+  bool closeToRPTarget = false;
+  RP0OrPositiveCount = 0;
+
+  SchedInstruction *inst = NULL;
+  while (!IsSchedComplete_()) {
+    // incrementally calculate if there are any instructions with a neutral
+    // or positive effect on RP
+    for (InstCount I = 0; I < readyLs->getReadyListSize(); ++I) {
+      if (*readyLs->getInstReadyOnAtIndex(I) == crntCycleNum_) {
+        InstCount CandidateId = *readyLs->getInstIdAtIndex(I);
+        SchedInstruction *candidateInst = dataDepGraph_->GetInstByIndx(CandidateId);
+        HeurType candidateLUC = candidateInst->GetLastUseCnt();
+        int16_t candidateDefs = candidateInst->GetDefCnt();
+        if (candidateDefs <= candidateLUC) {
+          RP0OrPositiveCount = RP0OrPositiveCount + 1;
+        }
+      }
+    }
+
+    // there are two steps to scheduling an instruction:
+    // 1)Select the instruction(if we are not waiting on another instruction)
+    inst = NULL;
+    if (!(waitFor && waitUntil <= crntCycleNum_)) {
+      // If an instruction is ready select it
+      assert(readyLs->getReadyListSize() > 0  || waitFor != NULL); // we should always have something in the rl
+
+      InstCount closeToRPCheck = RPTarget - 2 < RPTarget * 9 / 10 ? RPTarget - 2 : RPTarget * 9 / 10;
+      closeToRPTarget = ((BBWithSpill *)rgn_)->PCPU_GetCrntSpillCost(pcpu) >= closeToRPCheck;
+      // select the instruction and get info on it
+      InstCount SelIndx = SelectInstructionC(lastInst, schedule->getTotalStalls(), rgn_, unnecessarilyStalling, closeToRPTarget, waitFor ? true: false,
+                                            readyLs, RP0OrPositiveCount, crntCycleNum_, crntSlotNum_, maxScoringInst);
+
+      if (SelIndx != -1) {
+        LastInstInfo = readyLs->removeInstructionAtIndex(SelIndx);
+        
+        InstCount InstId = LastInstInfo.InstId;
+        inst = dataDepGraph_->GetInstByIndx(InstId);
+        // potentially wait on the current instruction
+        if (LastInstInfo.ReadyOn > crntCycleNum_ || !ChkInstLglty_(inst)) {
+          waitUntil = LastInstInfo.ReadyOn;
+          // should not wait for an instruction while already
+          // waiting for another instruction
+          assert(waitFor == NULL);
+          waitFor = inst;
+          inst = NULL;
+        }
+
+        if (inst != NULL) {
+  #if USE_ACS
+          // local pheromone decay
+          pheromone_t *pheromone = &Pheromone(lastInst, inst, blockOccupancyNum);
+          *pheromone = (1 - local_decay) * *pheromone + local_decay * initialValue_;
+  #endif
+          // save the last instruction scheduled
+          lastInst = inst;
+        }
+      }
+    }
+
+    // 2)Schedule a stall if we are still waiting, Schedule the instruction we
+    // are waiting for if possible, decrement waiting time
+    if (waitFor && waitUntil <= crntCycleNum_) {
+      if (ChkInstLglty_(waitFor)) {
+        inst = waitFor;
+        waitFor = NULL;
+        lastInst = inst;
+      }
+    }
+
+    // boilerplate, mostly copied from ListScheduler, try not to touch it
+    InstCount instNum;
+    if (!inst) {
+      instNum = SCHD_STALL;
+      schedule->incrementTotalStalls();
+      if (unnecessarilyStalling)
+        schedule->incrementUnnecessaryStalls();
+    } else {
+      instNum = inst->GetNum();
+      SchdulInst_(inst, crntCycleNum_);
+      inst->Schedule(crntCycleNum_, crntSlotNum_);
+      ((BBWithSpill *)rgn_)->PCPU_SchdulInst(inst, crntCycleNum_, crntSlotNum_, false, pcpu, thread);
+      // If an ant violates the RP cost constraint, terminate further
+      // schedule construction
+      if (((BBWithSpill*)rgn_)->PCPU_GetCrntSpillCost(pcpu) > RPTarget) {
+        // end schedule construction
+        // keep track of ants terminated
+        numAntsTerminated_++;
+        readyLs->clearReadyList();
+        delete schedule;
+        return NULL;
+      }
+      DoRsrvSlots_(inst);
+      // this is annoying
+      UpdtSlotAvlblty_(inst);
+
+      // new readylist update
+      UpdateACOReadyListC(inst, IsSecondPass, readyLs, RP0OrPositiveCount, crntCycleNum_, crntSlotNum_, maxScoringInst, 0);
+    }
+    /* Logger::Info("Chose instruction %d (for some reason)", instNum); */
+    schedule->AppendInst(instNum);
+    if (MovToNxtSlot_(inst))
+      InitNewCycle_();
+  }
+  ((BBWithSpill *)rgn_)->PCPU_UpdateScheduleCost(schedule, pcpu);
+  schedule->setIsZeroPerp(((BBWithSpill *)rgn_)->PCPU_ReturnPeakSpillCost(pcpu) == 0 );
+  schedule->setOccupancy(((BBWithSpill *)rgn_)->PCPU_getOccupancy(pcpu));
+  return schedule;
 }
