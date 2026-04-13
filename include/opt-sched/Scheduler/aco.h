@@ -60,7 +60,7 @@ struct alignas(64) ParallelCPUVars {
   InstCount slilSpillCost_;
   InstCount dynamicSlilLowerBound_;
   int schduldInstCnt_;
-  int schduldEntryInstCnt_;
+  int schduldEntryInstCnt_; 
   int schduldExitInstCnt_;
 
   WeightedBitVector *liveRegs_;       // array[regTypeCnt_]
@@ -70,6 +70,38 @@ struct alignas(64) ParallelCPUVars {
   int *sumOfLiveIntervalLengths_;     // array[regTypeCnt_]
   SmallVector<unsigned, 8> regPressures_; // or just unsigned*
 };
+
+
+struct alignas(64) PCPUACOSchedVars {
+  //ACOScheduler
+  ACOReadyList *readyLs;
+  InstCount maxScoringInst;
+  int RP0OrPositiveCount;
+
+  //ConstrainedScheduler:InstSchedule
+  InstCount schduldInstCnt_; 
+  bool isCrntCycleBlkd_;
+  InstCount crntCycleNum_;
+  InstCount crntSlotNum
+  ReserveSlot *rsrvSlots_;
+
+  /*
+  void ConstrainedScheduler::SchdulInst_(SchedInstruction *inst, InstCount)
+    schduldInstCnt_
+    isCrntCycleBlkd_
+  void ConstrainedScheduler::DoRsrvSlots_(SchedInstruction *inst)
+    rsrvSlots_
+    crntCycleNum_
+    crntSlotNum_
+  */
+
+  //may need multiple khelpers as well unsure 
+}
+
+struct PCPUSchedInstVars { //maybe necessary im not super confident
+
+}
+
 
 class ACOScheduler : public ConstrainedScheduler {
 public:

@@ -2425,19 +2425,23 @@ void ACOScheduler::FreeDevicePointers(bool IsSecondPass) {
 }
 
 InstSchedule *ACOScheduler::FindManyCPUSchedule(InstCount RPTarget) {
+  Initialize_();
+
   std::vector<std::thread> PCPUThreads;
   InstSchedule **cpuScheds = new InstSchedule*[NO_CPU_THREADS]();
   ((BBWithSpill*)rgn_)->AllocParallelCPUVars(NO_CPU_THREADS);
 
   for (int i = 0; i < NO_CPU_THREADS; i++) {
     PCPUThreads.emplace_back([this, cpuScheds, i, RPTarget]() {
-      cpuScheds[i] = PCPU_FindOneSchedule(RPTarget, NULL, ((BBWithSpill*)rgn_)->GetPCPUVars(i));
+      cpuScheds[i] = PCPU_FindOneSchedule(RPTarget, i, ((BBWithSpill*)rgn_)->GetPCPUVars(i));
     });
   }
 
   for (auto &t : PCPUThreads) {
     t.join();
   }
+
+  ((BBWithSpill*)rgn_)->FreeParallelCPUVars(NO_CPU_THREADS);
 
   //logic to find best schedule
   InstSchedule *result = cpuScheds[0];
@@ -2464,7 +2468,7 @@ InstSchedule *ACOScheduler::PCPU_FindOneSchedule(InstCount RPTarget,
   HeurType MaxPriority = kHelper1->getMaxValue();
   if (MaxPriority == 0)
     MaxPriority = 1; // divide by 0 is bad
-  Initialize_(); //For InstSchedule/ConstrainedSchedule
+  //Initialize_(); //For InstSchedule/ConstrainedSchedule
 
   SchedInstruction *waitFor = NULL;
   InstCount waitUntil = 0;
