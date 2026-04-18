@@ -82,7 +82,7 @@ struct alignas(64) PCPUACOSchedVars {
   InstCount schduldInstCnt; 
   bool isCrntCycleBlkd;
   InstCount crntCycleNum;
-  InstCount crntSlotNum
+  InstCount crntSlotNum;
   int16_t rsrvSlotCnt;
   ReserveSlot *rsrvSlots;
   int16_t *avlblSlotsInCrntCycle;
@@ -99,16 +99,27 @@ struct alignas(64) PCPUACOSchedVars {
     
   void ConstrainedScheduler::UpdtSlotAvlblty_(SchedInstruction *inst)
     avlblSlotsInCrntCycle_;
+
+    isSchedComplete ??? -> requires investigation what is totInstCnt
+
   */
   //may need multiple khelpers as well unsure 
-}
+
+  /* Functions that need to be added/edited here
+  PCPU_FindOneSchedule
+  PCPU_SelectInstruction
+  PCPU_UpdateACOReadyList
+  AllocPCPUACOSchedVars
+  FreePCPUACOSchedVars
+  */
+};
 
 struct PCPUSchedInstVars { //maybe necessary im not super confident
 
   //in FindOneSchedule
   //inst->Schedule(crntCycleNum_, crntSlotNum_) 
   //highlights that we might need to create instructions for each thing
-}
+};
 
 
 class ACOScheduler : public ConstrainedScheduler {
@@ -143,15 +154,27 @@ public:
   InstSchedule *FindManyCPUSchedule(InstCount RPTarget);
   InstSchedule *PCPU_FindOneSchedule(InstCount RPTarget,
                                     int thread,
+                                    PCPUACOSchedVars &pcpu_sched_vars,
                                     ParallelCPUVars &pcpu,
                                     int kernelNum = -1);
   InstCount PCPU_SelectInstruction(SchedInstruction *lastInst, InstCount totalStalls,
                                     SchedRegion *rgn, bool &unnecessarilyStalling,
                                     bool closeToRPTarget, bool currentlyWaiting, 
+                                    int thread,
+                                    PCPUACOSchedVars &pcpu_sched_vars,
                                     int kernelNum = -1);
-  inline void PCPU_UpdateACOReadyList(SchedInstruction *inst, bool IsSecondPass, int heurChoice = 0);                                      
-                                      
-
+  inline void PCPU_UpdateACOReadyList(SchedInstruction *inst, bool IsSecondPass, 
+                                    int thread, 
+                                    PCPUACOSchedVars &pcpu_sched_vars,
+                                    int heurChoice = 0);                                      
+  PCPUACOSchedVars *AllocPCPUACOSchedVars(int numThreads);                                    
+  void FreePCPUACOSchedVars(PCPUACOSchedVars *pcpu_sched_vars, int numThreads);
+  /*
+  void PCPU_DoRsrvSlots_(SchedInstruction *inst, PCPUACOSchedVars &pcpu_sched_vars);
+  void PCPU_SchdulInst_(SchedInstruction *inst, PCPUACOSchedVars &pcpu_sched_vars);
+  void PCPU_UpdtSlotAvlblty_(SchedInstruction *inst, PCPUACOSchedVars &pcpu_sched_vars);
+  bool PCPU_IsSchedComplete_(PCPUACOSchedVars &pcpu_sched_vars);
+  */
 
   __host__ __device__
   InstSchedule *FindOneSchedule(InstCount RPTarget,
@@ -227,9 +250,6 @@ private:
   KeysHelper1 *dev_kHelper1;
   KeysHelper2 *dev_kHelper2;
   InstCount *dev_MaxScoringInst;
-
-  // ds representations for parallel CPU ACO
-  PCPUACOSchedVars *pcpu_sched_vars_;
   
   // True if pheromone_.elmnts_ alloced on device
   bool dev_pheromone_elmnts_alloced_;
