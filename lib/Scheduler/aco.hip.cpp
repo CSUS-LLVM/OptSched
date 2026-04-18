@@ -2427,6 +2427,9 @@ void ACOScheduler::FreeDevicePointers(bool IsSecondPass) {
 InstSchedule *ACOScheduler::FindManyCPUSchedule(InstCount RPTarget) {
   Initialize_();
 
+  //allocate new scheduler variables for parallel
+  PCPUACOSchedVars *pcpu_sched_vars = AllocPCPUACOSchedVars(NO_CPU_THREADS);
+
   std::vector<std::thread> PCPUThreads;
   InstSchedule **cpuScheds = new InstSchedule*[NO_CPU_THREADS]();
   ((BBWithSpill*)rgn_)->AllocParallelCPUVars(NO_CPU_THREADS);
@@ -2449,12 +2452,17 @@ InstSchedule *ACOScheduler::FindManyCPUSchedule(InstCount RPTarget) {
   for (int i = 1; i < NO_CPU_THREADS; i++) {
     delete cpuScheds[i];
   }
+  //free new scheduler variables for parallel
+  FreePCPUACOSchedVars(pcpu_sched_vars, NO_CPU_THREADS);
+  pcpu_sched_vars = nullptr;
+
   delete[] cpuScheds;
   return result;
 }
 
 InstSchedule *ACOScheduler::PCPU_FindOneSchedule(InstCount RPTarget, 
                                                 int thread,
+                                                PCPUACOSchedVars 
                                                 ParallelCPUVars &pcpu,
                                                 int kernelNum){             
   SchedInstruction *lastInst = NULL;
@@ -2781,43 +2789,52 @@ inline void ACOScheduler::PCPU_UpdateACOReadyList(SchedInstruction *inst, bool I
   }
 }
 
+//allocates memory and intializes variables
+PCPUACOSchedVars *ACOScheduler::AllocPCPUACOSchedVars(int numThreads) {
+  PCPUACOSchedVars *pcpu_sched_vars = new PCPUACOSchedVars[numThreads];
 
-void ACOScheduler::AllocPCPUACOSchedVars(int numThreads){
-  pcpu_sched_vars_ = new PCPUACOSchedVars[numThreads];
-  for (int i = 0; i < numThreads; i++){
-    pcpu_sched_vars_[i].readyLs = new ACOReadyList(dataDepGraph->GetMaxIndependentInstructions());
-    pcpu_sched_vars_[i].MaxScoringInst = 0;
-    pcpu_sched_vars_[i].RP0OrPositiveCount = 0;
+  for (int i = 0; i < numThreads; i++) {
+    pcpu_sched_vars[i].readyLs =
+        new ACOReadyList(dataDepGraph->GetMaxIndependentInstructions());
+    pcpu_sched_vars[i].MaxScoringInst = 0;
+    pcpu_sched_vars[i].RP0OrPositiveCount = 0;
 
-    pcpu_sched_vars_[i].schduldInstCnt = 0;
-    pcpu_sched_vars_[i].isCrntCycleBlkd = false;
-    pcpu_sched_vars_[i].crntCycleNum = 0;
-    pcpu_sched_vars_[i].crntSlotNum = 0;
-    pcpu_sched_vars_[i].rsrvSlotCnt = 0;
-    //i believe issuRate is safe, not looked into
-    pcpu_sched_vars_[i].rsrvSlots = new ReserveSlot[issuRate_];
-    pcpu_sched_vars_[i].avlblSlotsInCrntCycle = new int16_t[issuTypeCnt_];
+    pcpu_sched_vars[i].schduldInstCnt = 0;
+    pcpu_sched_vars[i].isCrntCycleBlkd = false;
+    pcpu_sched_vars[i].crntCycleNum = 0;
+    pcpu_sched_vars[i].crntSlotNum = 0;
+    pcpu_sched_vars[i].rsrvSlotCnt = 0;
+
+    pcpu_sched_vars[i].rsrvSlots = new ReserveSlot[issuRate_];
+    pcpu_sched_vars[i].avlblSlotsInCrntCycle = new int16_t[issuTypeCnt_];
+
+    for (int j = 0; j < issuRate_; j++) {
+      pcpu_sched_vars[i].rsrvSlots[j].strtCycle = INVALID_VALUE;
+      pcpu_sched_vars[i].rsrvSlots[j].endCycle = INVALID_VALUE;
+    }
+
+    for (int j = 0; j < issuTypeCnt_; j++) {
+      pcpu_sched_vars[i].avlblSlotsInCrntCycle[j] = slotsPerTypePerCycle_[j];
+    }
   }
+  return pcpu_sched_vars;
 }
-void ACOScheduler::FreePCPUACOSchedVars(int numThreads) {
-  if (!pcpu_sched_vars_)
+
+void ACOScheduler::FreePCPUACOSchedVars(PCPUACOSchedVars *pcpu_sched_vars,
+                                        int numThreads) {
+  if (!pcpu_sched_vars)
     return;
 
   for (int i = 0; i < numThreads; i++) {
-    // Free ACOReadyList
-    delete pcpu_sched_vars_[i].readyLs;
-    pcpu_sched_vars_[i].readyLs = nullptr;
+    delete pcpu_sched_vars[i].readyLs;
+    pcpu_sched_vars[i].readyLs = nullptr;
 
-    // Free rsrvSlots
-    delete[] pcpu_sched_vars_[i].rsrvSlots;
-    pcpu_sched_vars_[i].rsrvSlots = nullptr;
+    delete[] pcpu_sched_vars[i].rsrvSlots;
+    pcpu_sched_vars[i].rsrvSlots = nullptr;
 
-    // Free avlblSlotsInCrntCycle
-    delete[] pcpu_sched_vars_[i].avlblSlotsInCrntCycle;
-    pcpu_sched_vars_[i].avlblSlotsInCrntCycle = nullptr;
+    delete[] pcpu_sched_vars[i].avlblSlotsInCrntCycle;
+    pcpu_sched_vars[i].avlblSlotsInCrntCycle = nullptr;
   }
 
-  // Free the array of structs
-  delete[] pcpu_sched_vars_;
-  pcpu_sched_vars_ = nullptr;
+  delete[] pcpu_sched_vars;
 }
