@@ -75,15 +75,17 @@ struct alignas(64) ParallelCPUVars {
 struct alignas(64) PCPUACOSchedVars {
   //ACOScheduler
   ACOReadyList *readyLs;
-  InstCount maxScoringInst;
+  InstCount MaxScoringInst;
   int RP0OrPositiveCount;
 
   //ConstrainedScheduler:InstSchedule
-  InstCount schduldInstCnt_; 
-  bool isCrntCycleBlkd_;
-  InstCount crntCycleNum_;
+  InstCount schduldInstCnt; 
+  bool isCrntCycleBlkd;
+  InstCount crntCycleNum;
   InstCount crntSlotNum
-  ReserveSlot *rsrvSlots_;
+  int16_t rsrvSlotCnt;
+  ReserveSlot *rsrvSlots;
+  int16_t *avlblSlotsInCrntCycle;
 
   /*
   void ConstrainedScheduler::SchdulInst_(SchedInstruction *inst, InstCount)
@@ -91,15 +93,21 @@ struct alignas(64) PCPUACOSchedVars {
     isCrntCycleBlkd_
   void ConstrainedScheduler::DoRsrvSlots_(SchedInstruction *inst)
     rsrvSlots_
+    rsrvSlotCnt_
     crntCycleNum_
     crntSlotNum_
+    
+  void ConstrainedScheduler::UpdtSlotAvlblty_(SchedInstruction *inst)
+    avlblSlotsInCrntCycle_;
   */
-
   //may need multiple khelpers as well unsure 
 }
 
 struct PCPUSchedInstVars { //maybe necessary im not super confident
 
+  //in FindOneSchedule
+  //inst->Schedule(crntCycleNum_, crntSlotNum_) 
+  //highlights that we might need to create instructions for each thing
 }
 
 
@@ -219,6 +227,9 @@ private:
   KeysHelper1 *dev_kHelper1;
   KeysHelper2 *dev_kHelper2;
   InstCount *dev_MaxScoringInst;
+
+  // ds representations for parallel CPU ACO
+  PCPUACOSchedVars *pcpu_sched_vars_;
   
   // True if pheromone_.elmnts_ alloced on device
   bool dev_pheromone_elmnts_alloced_;

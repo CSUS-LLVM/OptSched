@@ -2780,3 +2780,44 @@ inline void ACOScheduler::PCPU_UpdateACOReadyList(SchedInstruction *inst, bool I
     }
   }
 }
+
+
+void ACOScheduler::AllocPCPUACOSchedVars(int numThreads){
+  pcpu_sched_vars_ = new PCPUACOSchedVars[numThreads];
+  for (int i = 0; i < numThreads; i++){
+    pcpu_sched_vars_[i].readyLs = new ACOReadyList(dataDepGraph->GetMaxIndependentInstructions());
+    pcpu_sched_vars_[i].MaxScoringInst = 0;
+    pcpu_sched_vars_[i].RP0OrPositiveCount = 0;
+
+    pcpu_sched_vars_[i].schduldInstCnt = 0;
+    pcpu_sched_vars_[i].isCrntCycleBlkd = false;
+    pcpu_sched_vars_[i].crntCycleNum = 0;
+    pcpu_sched_vars_[i].crntSlotNum = 0;
+    pcpu_sched_vars_[i].rsrvSlotCnt = 0;
+    //i believe issuRate is safe, not looked into
+    pcpu_sched_vars_[i].rsrvSlots = new ReserveSlot[issuRate_];
+    pcpu_sched_vars_[i].avlblSlotsInCrntCycle = new int16_t[issuTypeCnt_];
+  }
+}
+void ACOScheduler::FreePCPUACOSchedVars(int numThreads) {
+  if (!pcpu_sched_vars_)
+    return;
+
+  for (int i = 0; i < numThreads; i++) {
+    // Free ACOReadyList
+    delete pcpu_sched_vars_[i].readyLs;
+    pcpu_sched_vars_[i].readyLs = nullptr;
+
+    // Free rsrvSlots
+    delete[] pcpu_sched_vars_[i].rsrvSlots;
+    pcpu_sched_vars_[i].rsrvSlots = nullptr;
+
+    // Free avlblSlotsInCrntCycle
+    delete[] pcpu_sched_vars_[i].avlblSlotsInCrntCycle;
+    pcpu_sched_vars_[i].avlblSlotsInCrntCycle = nullptr;
+  }
+
+  // Free the array of structs
+  delete[] pcpu_sched_vars_;
+  pcpu_sched_vars_ = nullptr;
+}
