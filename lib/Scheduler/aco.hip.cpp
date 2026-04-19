@@ -2194,7 +2194,7 @@ inline void ACOScheduler::UpdateACOReadyList(SchedInstruction *inst, bool IsSeco
     // Make sure the scores are valid.  The scheduling of an instruction may
     // have increased another instruction's LUC Score
     PriorityEntry LUCEntry = kHelper1->getPriorityEntry(LSH_LUC);
-    RP0OrPositiveCount_ = 0;
+    RP0OrPositiveCount = 0;
     for (InstCount I = 0; I < readyLs->getReadyListSize(); ++I) {
       //we first get the heuristic without the LUC component, add the LUC
       //LUC component, and then compute the score
@@ -2206,7 +2206,7 @@ inline void ACOScheduler::UpdateACOReadyList(SchedInstruction *inst, bool IsSeco
         LUCVal <<= LUCEntry.Offset;
         Heur &= LUCVal;
       }
-      if (RP0OrPositiveCount_) {
+      if (RP0OrPositiveCount) {
         if (*dev_readyLs->getInstReadyOnAtIndex(I) > crntCycleNum_)
           continue;
 
@@ -2214,7 +2214,7 @@ inline void ACOScheduler::UpdateACOReadyList(SchedInstruction *inst, bool IsSeco
         HeurType candidateLUC = candidateInst->GetLastUseCnt();
         int16_t candidateDefs = candidateInst->GetDefCnt();
         if (candidateDefs <= candidateLUC) {
-          RP0OrPositiveCount_ = RP0OrPositiveCount_ + 1;
+          RP0OrPositiveCount = RP0OrPositiveCount + 1;
         }
       }
     }
@@ -2425,7 +2425,6 @@ void ACOScheduler::FreeDevicePointers(bool IsSecondPass) {
 }
 
 InstSchedule *ACOScheduler::FindManyCPUSchedule(InstCount RPTarget) {
-  printf("Starting FindManyCPUSchedule");
   Initialize_();
 
   //allocate new scheduler variables for parallel
@@ -2482,7 +2481,7 @@ InstSchedule *ACOScheduler::PCPU_FindOneSchedule(InstCount RPTarget,
     MaxPriority = 1; // divide by 0 is bad
   //Initialize_(); //For InstSchedule/ConstrainedSchedule
 
-  printf("Finding one schedule");
+
   SchedInstruction *waitFor = NULL;
   InstCount waitUntil = 0;
   MaxPriorityInv = 1 / (pheromone_t)MaxPriority;
@@ -2498,7 +2497,7 @@ InstSchedule *ACOScheduler::PCPU_FindOneSchedule(InstCount RPTarget,
   MaxScoringInst = 0;
   lastInst = dataDepGraph_->GetInstByIndx(RootId);
   bool closeToRPTarget = false;
-  RP0OrPositiveCount_ = 0;
+  RP0OrPositiveCount = 0;
 
   SchedInstruction *inst = NULL;
   while (!IsSchedComplete_()) {
@@ -2511,7 +2510,7 @@ InstSchedule *ACOScheduler::PCPU_FindOneSchedule(InstCount RPTarget,
         HeurType candidateLUC = candidateInst->GetLastUseCnt();
         int16_t candidateDefs = candidateInst->GetDefCnt();
         if (candidateDefs <= candidateLUC) {
-          RP0OrPositiveCount_ = RP0OrPositiveCount_ + 1;
+          RP0OrPositiveCount = RP0OrPositiveCount + 1;
         }
       }
     }
@@ -2614,9 +2613,9 @@ InstCount ACOScheduler::PCPU_SelectInstruction(SchedInstruction *lastInst, InstC
                                           int blockOccupancyNum){                      
   // if we are waiting and have no fully-ready instruction that is 
   // net 0 or benefit to RP, then return -1 to schedule a stall
-  if (currentlyWaiting && RP0OrPositiveCount_ == 0)
+  if (currentlyWaiting && RP0OrPositiveCount == 0)
     return -1;
-  printf("selectinginstruction");       
+      
   // calculate MaxScoringInst, and ScoreSum
   pheromone_t MaxScore = -1;
   InstCount MaxScoreIndx = 0;
@@ -2640,7 +2639,7 @@ InstCount ACOScheduler::PCPU_SelectInstruction(SchedInstruction *lastInst, InstC
     // compute the score
     HeurType Heur = *pcpu_sched_vars.readyLs->getInstHeuristicAtIndex(I);
     pheromone_t IScore = Score(lastInstId, *pcpu_sched_vars.readyLs->getInstIdAtIndex(I), Heur, !rgn->IsSecondPass());
-    if (RP0OrPositiveCount_ != 0 && candidateDefs > candidateLUC)
+    if (RP0OrPositiveCount != 0 && candidateDefs > candidateLUC)
       IScore = IScore * 9/10;
 
     *pcpu_sched_vars.readyLs->getInstScoreAtIndex(I) = IScore;
@@ -2659,7 +2658,7 @@ InstCount ACOScheduler::PCPU_SelectInstruction(SchedInstruction *lastInst, InstC
     // add a score penalty for instructions that are not ready yet
     // unnecessary stalls should not be considered if current RP is low, or if we already have too many stalls
     if (*pcpu_sched_vars.readyLs->getInstReadyOnAtIndex(I) > crntCycleNum_) {
-      if (RP0OrPositiveCount_ != 0) {
+      if (RP0OrPositiveCount != 0) {
         IScore = 0.0000001;
       }
       else {
@@ -2757,7 +2756,7 @@ inline void ACOScheduler::PCPU_UpdateACOReadyList(SchedInstruction *inst, bool I
                                                   PCPUACOSchedVars &pcpu_sched_vars,
                                                   int heurChoice){                
   InstCount prdcsrNum, scsrRdyCycle;
-  printf("updatingreadylist");
+
   // Notify each successor of this instruction that it has been scheduled.
   for (SchedInstruction *crntScsr = inst->GetFrstScsr(&prdcsrNum);
         crntScsr != NULL; crntScsr = inst->GetNxtScsr(&prdcsrNum)) {
@@ -2775,7 +2774,7 @@ inline void ACOScheduler::PCPU_UpdateACOReadyList(SchedInstruction *inst, bool I
   // Make sure the scores are valid.  The scheduling of an instruction may
   // have increased another instruction's LUC Score
   PriorityEntry LUCEntry = kHelper1->getPriorityEntry(LSH_LUC);
-  RP0OrPositiveCount_ = 0;
+  RP0OrPositiveCount = 0;
   for (InstCount I = 0; I < pcpu_sched_vars.readyLs->getReadyListSize(); ++I) {
     //we first get the heuristic without the LUC component, add the LUC
     //LUC component, and then compute the score
@@ -2787,7 +2786,7 @@ inline void ACOScheduler::PCPU_UpdateACOReadyList(SchedInstruction *inst, bool I
       LUCVal <<= LUCEntry.Offset;
       Heur &= LUCVal;
     }
-    if (RP0OrPositiveCount_) {
+    if (RP0OrPositiveCount) {
       if (*pcpu_sched_vars.readyLs->getInstReadyOnAtIndex(I) > crntCycleNum_)
         continue;
 
@@ -2795,7 +2794,7 @@ inline void ACOScheduler::PCPU_UpdateACOReadyList(SchedInstruction *inst, bool I
       HeurType candidateLUC = candidateInst->GetLastUseCnt();
       int16_t candidateDefs = candidateInst->GetDefCnt();
       if (candidateDefs <= candidateLUC) {
-        RP0OrPositiveCount_ = RP0OrPositiveCount_ + 1;
+        RP0OrPositiveCount = RP0OrPositiveCount + 1;
       }
     }
   }
