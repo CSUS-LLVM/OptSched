@@ -2574,7 +2574,8 @@ InstSchedule *ACOScheduler::PCPU_FindOneSchedule(InstCount RPTarget,
         schedule->incrementUnnecessaryStalls();
     } else {
       instNum = inst->GetNum();
-      SchdulInst_(inst, pcpu_sched_vars.crntCycleNum);
+      //PCPU_SchdulInst_(inst, pcpu_sched_vars);
+      SchdulInst(inst, pcpu_sched_vars.crntCycleNum)
       inst->Schedule(pcpu_sched_vars.crntCycleNum, pcpu_sched_vars.crntSlotNum);
       ((BBWithSpill *)rgn_)->PCPU_SchdulInst(inst, pcpu_sched_vars.crntCycleNum, pcpu_sched_vars.crntSlotNum, false, pcpu, thread);
       // If an ant violates the RP cost constraint, terminate further
@@ -2587,7 +2588,7 @@ InstSchedule *ACOScheduler::PCPU_FindOneSchedule(InstCount RPTarget,
         delete schedule;
         return NULL;
       }
-      DoRsrvSlots_(inst);
+      PCPU_DoRsrvSlots_(inst, pcpu_sched_vars);
       // this is annoying
       UpdtSlotAvlblty_(inst);
 
@@ -2819,6 +2820,7 @@ PCPUACOSchedVars *ACOScheduler::AllocPCPUACOSchedVars(int numThreads) {
     pcpu_sched_vars[i].rsrvSlots = new ReserveSlot[issuRate_];
     pcpu_sched_vars[i].avlblSlotsInCrntCycle = new int16_t[issuTypeCnt_];
 
+    //accounts for the ResetRsrvSlots Function
     for (int j = 0; j < issuRate_; j++) {
       pcpu_sched_vars[i].rsrvSlots[j].strtCycle = INVALID_VALUE;
       pcpu_sched_vars[i].rsrvSlots[j].endCycle = INVALID_VALUE;
@@ -2857,7 +2859,7 @@ void ACOScheduler::PCPU_DoRsrvSlots_(SchedInstruction *inst, PCPUACOSchedVars &p
 
   if (!inst->IsPipelined()) {
     if (pcpu_sched_vars.rsrvSlots == NULL)
-      AllocRsrvSlots_(); //this function also needs to be adjusted 
+      //AllocRsrvSlots_(); //not sure if this function is necessary
     pcpu_sched_vars.rsrvSlots[pcpu_sched_vars.crntSlotNum].strtCycle = pcpu_sched_vars.crntCycleNum;
     pcpu_sched_vars.rsrvSlots[pcpu_sched_vars.crntSlotNum].endCycle = pcpu_sched_vars.crntCycleNum + inst->GetMaxLtncy() - 1;
     pcpu_sched_vars.rsrvSlotCnt++;
