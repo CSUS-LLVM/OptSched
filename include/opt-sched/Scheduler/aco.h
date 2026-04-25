@@ -102,6 +102,8 @@ struct alignas(64) PCPUACOSchedVars {
 
     isSchedComplete ??? -> requires investigation what is totInstCnt
 
+  bool ConstrainedScheduler::ChkInstLglty_(SchedInstruction *inst) const 
+    isCrntCycleBlkd_
   */
   //may need multiple khelpers as well unsure 
 
@@ -169,12 +171,12 @@ public:
                                     int heurChoice = 0);                                      
   PCPUACOSchedVars *AllocPCPUACOSchedVars(int numThreads);                                    
   void FreePCPUACOSchedVars(PCPUACOSchedVars *pcpu_sched_vars, int numThreads);
-  /*
+  
   void PCPU_DoRsrvSlots_(SchedInstruction *inst, PCPUACOSchedVars &pcpu_sched_vars);
   void PCPU_SchdulInst_(SchedInstruction *inst, PCPUACOSchedVars &pcpu_sched_vars);
   void PCPU_UpdtSlotAvlblty_(SchedInstruction *inst, PCPUACOSchedVars &pcpu_sched_vars);
   bool PCPU_IsSchedComplete_(PCPUACOSchedVars &pcpu_sched_vars);
-  */
+  bool PCPU_ChkInstLglty_(SchedInstruction *inst, PCPUACOSchedVars &pcpu_sched_vars) const; 
 
   __host__ __device__
   InstSchedule *FindOneSchedule(InstCount RPTarget,
