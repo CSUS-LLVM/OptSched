@@ -115,12 +115,7 @@ struct alignas(64) PCPUACOSchedVars {
     isCrntCycleBlkd_
     avlblSlotsInCrntCycle_
   */
-
-  
-
-
   //may need multiple khelpers as well unsure 
-
 };
 
 class ACOScheduler : public ConstrainedScheduler {
@@ -163,6 +158,7 @@ public:
                                     bool closeToRPTarget, bool currentlyWaiting, 
                                     int thread,
                                     PCPUACOSchedVars &pcpu_sched_vars,
+                                    ParallelCPUVars &pcpu,
                                     int kernelNum = -1);
   inline void PCPU_UpdateACOReadyList(SchedInstruction *inst, bool IsSecondPass, 
                                     int thread, 

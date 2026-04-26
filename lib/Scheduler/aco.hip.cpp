@@ -2448,7 +2448,7 @@ InstSchedule *ACOScheduler::FindManyCPUSchedule(InstCount RPTarget) {
   }
   ((BBWithSpill*)rgn_)->FreeParallelCPUVars(NO_CPU_THREADS);
 
-  //logic to find best schedule
+  //logic to find best schedule should be added here 
   InstSchedule *result = cpuScheds[0];
 
   for (int i = 1; i < NO_CPU_THREADS; i++) {
@@ -2622,6 +2622,7 @@ InstCount ACOScheduler::PCPU_SelectInstruction(SchedInstruction *lastInst, InstC
                                           bool closeToRPTarget, bool currentlyWaiting, 
                                           int thread,
                                           PCPUACOSchedVars &pcpu_sched_vars,
+                                          ParallelCPUVars &pcpu,
                                           int blockOccupancyNum){                      
   // if we are waiting and have no fully-ready instruction that is 
   // net 0 or benefit to RP, then return -1 to schedule a stall
@@ -2688,7 +2689,7 @@ InstCount ACOScheduler::PCPU_SelectInstruction(SchedInstruction *lastInst, InstC
         for (uint16_t i = 0; i < usesCount; i++) {
           use = dataDepGraph_->getRegByTuple(&uses[i]);
           int16_t regType = use->GetType();
-          if ( ((BBWithSpill *)rgn)->IsRPHigh(regType) ) {
+          if ( ((BBWithSpill *)rgn)->PCPU_IsRPHigh(regType, pcpu) ) {
             RPIsHigh = true;
             break;
           }
@@ -2870,9 +2871,9 @@ void ACOScheduler::PCPU_DoRsrvSlots_(SchedInstruction *inst, PCPUACOSchedVars &p
     return;
 
   if (!inst->IsPipelined()) {
-    if (pcpu_sched_vars.rsrvSlots == NULL){
+    /* if (pcpu_sched_vars.rsrvSlots == NULL){
     //AllocRsrvSlots_(); //not sure if this function is necessary
-    }
+    } */
     pcpu_sched_vars.rsrvSlots[pcpu_sched_vars.crntSlotNum].strtCycle = pcpu_sched_vars.crntCycleNum;
     pcpu_sched_vars.rsrvSlots[pcpu_sched_vars.crntSlotNum].endCycle = pcpu_sched_vars.crntCycleNum + inst->GetMaxLtncy() - 1;
     pcpu_sched_vars.rsrvSlotCnt++;
