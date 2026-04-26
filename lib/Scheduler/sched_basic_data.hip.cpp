@@ -1352,3 +1352,49 @@ __host__ __device__
 bool SchedRange::IsTightnd(DIRECTION dir) const {
   return (dir == DIR_FRWRD) ? isFrwrdTightnd_ : isBkwrdTightnd_;
 }
+
+void SchedInstruction::AllocPCPUVars(int numThreads){
+  pcpu_inst_vars_ = new PCPUSchedInstVars[numThreads];
+
+  for (int i = 0; i < numThreads; ++i) {
+
+    pcpu_inst_vars_[i].crntSchedCycle = SCHD_UNSCHDULD;
+    pcpu_inst_vars_[i].crntSchedSlot = SCHD_UNSCHDULD;
+    pcpu_inst_vars_[i].lastUseCnt = 0;
+    pcpu_inst_vars_[i].ready = false;
+    pcpu_inst_vars_[i].minRdyCycle = INVALID_VALUE;
+    pcpu_inst_vars_[i].unschduldPrdcsrCnt = prdcsrCnt_;
+    pcpu_inst_vars_[i].unschduldScsrCnt = scsrCnt_;
+    pcpu_inst_vars_[i].crntRlxdCycle = SCHD_UNSCHDULD;
+
+    if (prdcsrCnt_ > 0) {
+      pcpu_inst_vars_[i].rdyCyclePerPrdcsr = new InstCount[prdcsrCnt_];
+      pcpu_inst_vars_[i].prevMinRdyCyclePerPrdcsr = new InstCount[prdcsrCnt_];
+
+      for (InstCount j = 0; j < prdcsrCnt_; ++j) {
+        pcpu_inst_vars_[i].rdyCyclePerPrdcsr[j] = INVALID_VALUE;
+        pcpu_inst_vars_[i].prevMinRdyCyclePerPrdcsr[j] = INVALID_VALUE;
+      }
+    } else {
+      pcpu_inst_vars_[i].rdyCyclePerPrdcsr = nullptr;
+      pcpu_inst_vars_[i].prevMinRdyCyclePerPrdcsr = nullptr;
+    }
+  }
+}
+
+void SchedInstruction::FreePCPUVars(int numThreads) {
+  if (!pcpu_inst_vars_)
+    return;
+
+  for (int i = 0; i < numThreads; ++i) {
+    delete[] pcpu_inst_vars_[i].rdyCyclePerPrdcsr;
+    delete[] pcpu_inst_vars_[i].prevMinRdyCyclePerPrdcsr;
+
+    pcpu_inst_vars_[i].rdyCyclePerPrdcsr = nullptr;
+    pcpu_inst_vars_[i].prevMinRdyCyclePerPrdcsr = nullptr;
+  }
+
+  delete[] pcpu_inst_vars_;
+  pcpu_inst_vars_ = nullptr;
+}
+

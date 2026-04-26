@@ -123,14 +123,6 @@ struct alignas(64) PCPUACOSchedVars {
 
 };
 
-struct PCPUSchedInstVars { //maybe necessary im not super confident
-
-  //in FindOneSchedule
-  //inst->Schedule(crntCycleNum_, crntSlotNum_) 
-  //highlights that we might need to create instructions for each thing
-};
-
-
 class ACOScheduler : public ConstrainedScheduler {
 public:
   ACOScheduler(DataDepGraph *dataDepGraph, MachineModel *machineModel,
@@ -186,7 +178,9 @@ public:
   bool PCPU_ChkInstLglty_(SchedInstruction *inst, PCPUACOSchedVars &pcpu_sched_vars) const; 
   bool PCPU_MovToNxtSlot_(SchedInstruction *inst, PCPUACOSchedVars &pcpu_sched_vars);
   void PCPU_InitNewCycle_(PCPUACOSchedVars &pcpu_sched_vars);
-
+  void PCPU_InitSchedInsts(int numThreads);
+  void PCPU_FreeSchedInsts(int numThreads);
+  
   __host__ __device__
   InstSchedule *FindOneSchedule(InstCount RPTarget,
                                 InstSchedule *dev_schedule = NULL, int kernelNum = -1);

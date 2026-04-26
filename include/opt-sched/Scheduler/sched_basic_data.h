@@ -101,6 +101,25 @@ struct RegIndxTuple {
 	  : regType_(regType), regNum_(regNum) {}
 };
 
+//New Structure for parallel cpu 
+struct alignas(64) PCPUSchedInstVars {
+  //InitForSchduling -- where to check on how to initialize variables
+  //SchedInstruction InitForSchdulng
+  InstCount crntSchedCycle;
+  int16_t lastUseCnt;
+  bool ready;
+  InstCount minRdyCycle;
+  InstCount unschduldPrdcsrCnt; 
+  InstCount unschduldScsrCnt;
+  InstCount crntRlxdCycle;
+  InstCount *rdyCyclePerPrdcsr;
+  InstCount *prevMinRdyCyclePerPrdcsr;
+
+  //not initialized in that thing for some reason
+  InstCount crntSchedSlot;
+
+};
+
 // The type of instruction signatures, used by the enumerator's history table to
 // keep track of partial schedules.
 typedef UDT_HASHKEY InstSignature;
@@ -558,6 +577,12 @@ public:
   // parallel ACO on device
   void AllocDevArraysForParallelACO(int numThreads);
 
+  
+  void AllocPCPUVars(int numThreads);
+  void InitPCPUVars(int numThreads);
+  void FreePCPUVars(int numThreds);
+
+
   friend class SchedRange;
 
   // This instruction's index in the scsrs_, latencies_, predOrder_ arrays
@@ -740,6 +765,9 @@ protected:
   // succs/preds and GraphEdge pointers as instNums instead. This allows for
   // much faster copying to the Device
   SchedInstruction *insts_;
+
+  //For parallel CPU
+  PCPUSchedInstVars *pcpu_inst_vars_;
 
   // TODO(ghassan): Document.
   __host__

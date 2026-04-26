@@ -2426,6 +2426,7 @@ void ACOScheduler::FreeDevicePointers(bool IsSecondPass) {
 
 InstSchedule *ACOScheduler::FindManyCPUSchedule(InstCount RPTarget) {
   Initialize_();
+  PCPU_InitSchedInsts(NO_CPU_THREADS);
   Logger::Info("FindManyCPUSchedule");
   //allocate new scheduler variables for parallel
   PCPUACOSchedVars *pcpu_sched_vars = AllocPCPUACOSchedVars(NO_CPU_THREADS);
@@ -2457,6 +2458,7 @@ InstSchedule *ACOScheduler::FindManyCPUSchedule(InstCount RPTarget) {
   FreePCPUACOSchedVars(pcpu_sched_vars, NO_CPU_THREADS);
   pcpu_sched_vars = nullptr;
   delete[] cpuScheds;
+  PCPU_FreeSchedInsts(NO_CPU_THREADS);
 
   //printf("Ending FindManyCPUSchedule");
   return result;
@@ -2881,7 +2883,8 @@ void ACOScheduler::PCPU_DoRsrvSlots_(SchedInstruction *inst, PCPUACOSchedVars &p
 void ACOScheduler::PCPU_SchdulInst_(SchedInstruction *inst, PCPUACOSchedVars &pcpu_sched_vars) {
   InstCount prdcsrNum, scsrRdyCycle;
 
-  // Notify each successor of this instruction that it has been scheduled.
+  // Notify each successor of this instruction that it has been scheduled.'
+  // if not running aco
   if(!IsACO) {
     for (SchedInstruction *crntScsr = inst->GetFrstScsr(&prdcsrNum);
         crntScsr != NULL; crntScsr = inst->GetNxtScsr(&prdcsrNum)) {
@@ -2974,4 +2977,18 @@ void ACOScheduler::PCPU_InitNewCycle_(PCPUACOSchedVars &pcpu_sched_vars) {
     pcpu_sched_vars.avlblSlotsInCrntCycle[i] = slotsPerTypePerCycle_[i];
   }
   pcpu_sched_vars.isCrntCycleBlkd = false;
+}
+
+void ACOScheduler::PCPU_InitSchedInsts(int numThreads){
+  for (int i = 0; i < totInstCnt_; i++){
+    SchedInstruction *inst = dataDepGraph_->GetInstByIndx(i);
+    inst->AllocPCPUVars(numThreads);
+  }
+}
+
+void ACOScheduler::PCPU_FreeSchedInsts(int numThreads){
+  for (int i = 0; i < totInstCnt_; i++){
+    SchedInstruction *inst = dataDepGraph_->GetInstByIndx(i);
+    inst->FreePCPUVars(numThreads);
+  }
 }
