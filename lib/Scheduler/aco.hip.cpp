@@ -2426,7 +2426,7 @@ void ACOScheduler::FreeDevicePointers(bool IsSecondPass) {
 
 InstSchedule *ACOScheduler::FindManyCPUSchedule(InstCount RPTarget) {
   Initialize_();
-
+  Logger::Info("FindManyCPUSchedule");
   //allocate new scheduler variables for parallel
   PCPUACOSchedVars *pcpu_sched_vars = AllocPCPUACOSchedVars(NO_CPU_THREADS);
 
@@ -2467,7 +2467,7 @@ InstSchedule *ACOScheduler::PCPU_FindOneSchedule(InstCount RPTarget,
                                                 PCPUACOSchedVars &pcpu_sched_vars,
                                                 ParallelCPUVars &pcpu,
                                                 int kernelNum){   
-
+  Logger::Info("FindOneSchedule, %d", thread);                                                
   SchedInstruction *lastInst = NULL;
   ACOReadyListEntry LastInstInfo;
   InstSchedule *schedule;
@@ -2481,13 +2481,13 @@ InstSchedule *ACOScheduler::PCPU_FindOneSchedule(InstCount RPTarget,
     MaxPriority = 1; // divide by 0 is bad
   //Initialize_(); //For InstSchedule/ConstrainedSchedule
 
-
   SchedInstruction *waitFor = NULL;
   InstCount waitUntil = 0;
   MaxPriorityInv = 1 / (pheromone_t)MaxPriority;
 
   // initialize the aco ready list so that the start instruction is ready
   // The luc component is 0 since the root inst uses no instructions
+  Logger::Info("ReadyListFunctions 1, %d", thread);
   InstCount RootId = rootInst_->GetNum();
   HeurType RootHeuristic = kHelper1->computeKey(rootInst_, true, dataDepGraph_->RegFiles);
   pheromone_t RootScore = Score(-1, RootId, RootHeuristic, !IsSecondPass);
@@ -2499,10 +2499,13 @@ InstSchedule *ACOScheduler::PCPU_FindOneSchedule(InstCount RPTarget,
   bool closeToRPTarget = false;
   pcpu_sched_vars.RP0OrPositiveCount = 0;
 
+  Logger::Info("While not PCPU_IsSchedComplete, %d", thread);
   SchedInstruction *inst = NULL;
-  while (!IsSchedComplete_()) {
+  while (!PCPU_IsSchedComplete_(pcpu_sched_vars)) {
     // incrementally calculate if there are any instructions with a neutral
     // or positive effect on RP
+
+    Logger::Info("Neut/pos on RP, %d", thread); 
     for (InstCount I = 0; I < pcpu_sched_vars.readyLs->getReadyListSize(); ++I) {
       if (*pcpu_sched_vars.readyLs->getInstReadyOnAtIndex(I) == pcpu_sched_vars.crntCycleNum) {
         InstCount CandidateId = *pcpu_sched_vars.readyLs->getInstIdAtIndex(I);
@@ -2517,6 +2520,7 @@ InstSchedule *ACOScheduler::PCPU_FindOneSchedule(InstCount RPTarget,
 
     // there are two steps to scheduling an instruction:
     // 1)Select the instruction(if we are not waiting on another instruction)
+    Logger::Info("SelectInstruction, %d", thread); 
     inst = NULL;
     if (!(waitFor && waitUntil <= pcpu_sched_vars.crntCycleNum)) {
       // If an instruction is ready select it
@@ -2534,7 +2538,7 @@ InstSchedule *ACOScheduler::PCPU_FindOneSchedule(InstCount RPTarget,
         InstCount InstId = LastInstInfo.InstId;
         inst = dataDepGraph_->GetInstByIndx(InstId);
         // potentially wait on the current instruction
-        if (LastInstInfo.ReadyOn > pcpu_sched_vars.crntCycleNum || !ChkInstLglty_(inst)) {
+        if (LastInstInfo.ReadyOn > pcpu_sched_vars.crntCycleNum || !PCPU_ChkInstLglty_(inst, pcpu_sched_vars)) {
           waitUntil = LastInstInfo.ReadyOn;
           // should not wait for an instruction while already
           // waiting for another instruction
@@ -2555,10 +2559,11 @@ InstSchedule *ACOScheduler::PCPU_FindOneSchedule(InstCount RPTarget,
       }
     }
 
+    Logger::Info("Scheduling Stalls, %d", thread); 
     // 2)Schedule a stall if we are still waiting, Schedule the instruction we
     // are waiting for if possible, decrement waiting time
     if (waitFor && waitUntil <= pcpu_sched_vars.crntCycleNum) {
-      if (ChkInstLglty_(waitFor)) {
+      if (PCPU_ChkInstLglty_(waitFor, pcpu_sched_vars)) {
         inst = waitFor;
         waitFor = NULL;
         lastInst = inst;
@@ -2566,6 +2571,7 @@ InstSchedule *ACOScheduler::PCPU_FindOneSchedule(InstCount RPTarget,
     }
 
     // boilerplate, mostly copied from ListScheduler, try not to touch it
+    Logger::Info("BoilerPlate, %d", thread); 
     InstCount instNum;
     if (!inst) {
       instNum = SCHD_STALL;
@@ -2574,8 +2580,8 @@ InstSchedule *ACOScheduler::PCPU_FindOneSchedule(InstCount RPTarget,
         schedule->incrementUnnecessaryStalls();
     } else {
       instNum = inst->GetNum();
-      //PCPU_SchdulInst_(inst, pcpu_sched_vars);
-      SchdulInst(inst, pcpu_sched_vars.crntCycleNum)
+      PCPU_SchdulInst_(inst, pcpu_sched_vars);
+      //SchdulInst(inst, pcpu_sched_vars.crntCycleNum)
       inst->Schedule(pcpu_sched_vars.crntCycleNum, pcpu_sched_vars.crntSlotNum);
       ((BBWithSpill *)rgn_)->PCPU_SchdulInst(inst, pcpu_sched_vars.crntCycleNum, pcpu_sched_vars.crntSlotNum, false, pcpu, thread);
       // If an ant violates the RP cost constraint, terminate further
@@ -2590,19 +2596,22 @@ InstSchedule *ACOScheduler::PCPU_FindOneSchedule(InstCount RPTarget,
       }
       PCPU_DoRsrvSlots_(inst, pcpu_sched_vars);
       // this is annoying
-      UpdtSlotAvlblty_(inst);
+      PCPU_UpdtSlotAvlblty_(inst, pcpu_sched_vars);
 
       // new readylist update
       PCPU_UpdateACOReadyList(inst, IsSecondPass, thread, pcpu_sched_vars, 0);
     }
     /* Logger::Info("Chose instruction %d (for some reason)", instNum); */
     schedule->AppendInst(instNum);
-    if (MovToNxtSlot_(inst))
-      InitNewCycle_();
+    if (PCPU_MovToNxtSlot_(inst, pcpu_sched_vars))
+      PCPU_InitNewCycle_(pcpu_sched_vars);
   }
+
+  Logger::Info("Updating schedule cost, %d", thread); 
   ((BBWithSpill *)rgn_)->PCPU_UpdateScheduleCost(schedule, pcpu);
   schedule->setIsZeroPerp(((BBWithSpill *)rgn_)->PCPU_ReturnPeakSpillCost(pcpu) == 0 );
   schedule->setOccupancy(((BBWithSpill *)rgn_)->PCPU_getOccupancy(pcpu));
+  Logger::Info("Done, %d", thread); 
   return schedule;
 }
 
@@ -2620,7 +2629,7 @@ InstCount ACOScheduler::PCPU_SelectInstruction(SchedInstruction *lastInst, InstC
   // calculate MaxScoringInst, and ScoreSum
   pheromone_t MaxScore = -1;
   InstCount MaxScoreIndx = 0;
-  readyLs->ScoreSum = 0;
+  pcpu_sched_vars.readyLs->ScoreSum = 0;
   int lastInstId = lastInst->GetNum();
   // this bool is to check if stalling could be avoided
   bool couldAvoidStalling = false;
@@ -2628,7 +2637,7 @@ InstCount ACOScheduler::PCPU_SelectInstruction(SchedInstruction *lastInst, InstC
   // because RP is low or we have too many stalls in the schedule
   bool RPIsHigh = false;
   bool tooManyStalls = totalStalls >= globalBestStalls_ * 5 / 10;
-  readyLs->ScoreSum = 0;
+  pcpu_sched_vars.readyLs->ScoreSum = 0;
 
   for (InstCount I = 0; I < pcpu_sched_vars.readyLs->getReadyListSize(); ++I) {
     RPIsHigh = false;
@@ -2757,7 +2766,7 @@ inline void ACOScheduler::PCPU_UpdateACOReadyList(SchedInstruction *inst, bool I
                                                   PCPUACOSchedVars &pcpu_sched_vars,
                                                   int heurChoice){                
   InstCount prdcsrNum, scsrRdyCycle;
-
+  Logger::Info("Start UpdateACOReadyList, %d", thread); 
   // Notify each successor of this instruction that it has been scheduled.
   for (SchedInstruction *crntScsr = inst->GetFrstScsr(&prdcsrNum);
         crntScsr != NULL; crntScsr = inst->GetNxtScsr(&prdcsrNum)) {
@@ -2799,6 +2808,7 @@ inline void ACOScheduler::PCPU_UpdateACOReadyList(SchedInstruction *inst, bool I
       }
     }
   }
+  Logger::Info("Finish UpdateACOReadyList, %d", thread); 
 }
 
 //allocates memory and intializes variables
@@ -2858,14 +2868,16 @@ void ACOScheduler::PCPU_DoRsrvSlots_(SchedInstruction *inst, PCPUACOSchedVars &p
     return;
 
   if (!inst->IsPipelined()) {
-    if (pcpu_sched_vars.rsrvSlots == NULL)
-      //AllocRsrvSlots_(); //not sure if this function is necessary
+    if (pcpu_sched_vars.rsrvSlots == NULL){
+    //AllocRsrvSlots_(); //not sure if this function is necessary
+    }
     pcpu_sched_vars.rsrvSlots[pcpu_sched_vars.crntSlotNum].strtCycle = pcpu_sched_vars.crntCycleNum;
     pcpu_sched_vars.rsrvSlots[pcpu_sched_vars.crntSlotNum].endCycle = pcpu_sched_vars.crntCycleNum + inst->GetMaxLtncy() - 1;
     pcpu_sched_vars.rsrvSlotCnt++;
   }
 }
 
+/*unsur if i need to make multiple frstRdyLstPerCycle*/
 void ACOScheduler::PCPU_SchdulInst_(SchedInstruction *inst, PCPUACOSchedVars &pcpu_sched_vars) {
   InstCount prdcsrNum, scsrRdyCycle;
 
@@ -2882,6 +2894,7 @@ void ACOScheduler::PCPU_SchdulInst_(SchedInstruction *inst, PCPUACOSchedVars &pc
         assert(scsrRdyCycle < schedUprBound_);
         // If the first-ready list of that cycle has not been created yet.
         if (frstRdyLstPerCycle_[scsrRdyCycle] == NULL) {
+          
           frstRdyLstPerCycle_[scsrRdyCycle] =
                   new ArrayList<InstCount>(dataDepGraph_->GetInstCnt());
         }
@@ -2912,7 +2925,7 @@ bool ACOScheduler::PCPU_IsSchedComplete_(PCPUACOSchedVars &pcpu_sched_vars) {
 }
 
 bool ACOScheduler::PCPU_ChkInstLglty_(SchedInstruction *inst,
-                                              PCPUACOSchedVars &pcpu_sched_vars) const {
+                                      PCPUACOSchedVars &pcpu_sched_vars) const {
   if (IsTriviallyLegal_(inst))
     return true;
   // Account for instructions that block the whole cycle.
@@ -2933,4 +2946,32 @@ bool ACOScheduler::PCPU_ChkInstLglty_(SchedInstruction *inst,
   assert(pcpu_sched_vars.avlblSlotsInCrntCycle[issuType] >= 0);
   // Logger::Info("avlblSlots = %d", avlblSlotsInCrntCycle_[issuType]);
   return (pcpu_sched_vars.avlblSlotsInCrntCycle[issuType] > 0);
+}
+
+
+bool ACOScheduler::PCPU_MovToNxtSlot_(SchedInstruction *inst,
+                                PCPUACOSchedVars &pcpu_sched_vars) {
+  // If we are currently in the last slot of the current cycle.
+  // I don' tthink crntRealSlotNum_ is necessary, it is never used
+  if (pcpu_sched_vars.crntSlotNum == (issuRate_ - 1)) {
+    pcpu_sched_vars.crntCycleNum++;
+    pcpu_sched_vars.crntSlotNum = 0;
+    //crntRealSlotNum_ = 0;
+    return true;
+  } else {
+    pcpu_sched_vars.crntSlotNum++;
+    if (inst && machMdl_->IsRealInst(inst->GetInstType()))
+      //crntRealSlotNum_++;
+    return false;
+  }
+}
+
+
+void ACOScheduler::PCPU_InitNewCycle_(PCPUACOSchedVars &pcpu_sched_vars) {
+  //assert(pcpu_sched_vars.crntSlotNum == 0 && crntRealSlotNum_ == 0);
+  assert(pcpu_sched_vars.crntSlotNum == 0);
+  for (int i = 0; i < issuTypeCnt_; i++) {
+    pcpu_sched_vars.avlblSlotsInCrntCycle[i] = slotsPerTypePerCycle_[i];
+  }
+  pcpu_sched_vars.isCrntCycleBlkd = false;
 }

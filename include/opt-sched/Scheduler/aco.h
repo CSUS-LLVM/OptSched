@@ -86,6 +86,7 @@ struct alignas(64) PCPUACOSchedVars {
   int16_t rsrvSlotCnt;
   ReserveSlot *rsrvSlots;
   int16_t *avlblSlotsInCrntCycle;
+  
 
   /*
   void ConstrainedScheduler::SchdulInst_(SchedInstruction *inst, InstCount)
@@ -104,16 +105,22 @@ struct alignas(64) PCPUACOSchedVars {
 
   bool ConstrainedScheduler::ChkInstLglty_(SchedInstruction *inst) const 
     isCrntCycleBlkd_
+
+  bool ConstrainedScheduler::MovToNxtSlot_(SchedInstruction *inst)
+    crntCycleNum_
+    crntSlotNum_
+    crntRealSlotNum_
+
+  void ConstrainedScheduler::InitNewCycle_() 
+    isCrntCycleBlkd_
+    avlblSlotsInCrntCycle_
   */
+
+  
+
+
   //may need multiple khelpers as well unsure 
 
-  /* Functions that need to be added/edited here
-  PCPU_FindOneSchedule
-  PCPU_SelectInstruction
-  PCPU_UpdateACOReadyList
-  AllocPCPUACOSchedVars
-  FreePCPUACOSchedVars
-  */
 };
 
 struct PCPUSchedInstVars { //maybe necessary im not super confident
@@ -177,6 +184,8 @@ public:
   void PCPU_UpdtSlotAvlblty_(SchedInstruction *inst, PCPUACOSchedVars &pcpu_sched_vars);
   bool PCPU_IsSchedComplete_(PCPUACOSchedVars &pcpu_sched_vars);
   bool PCPU_ChkInstLglty_(SchedInstruction *inst, PCPUACOSchedVars &pcpu_sched_vars) const; 
+  bool PCPU_MovToNxtSlot_(SchedInstruction *inst, PCPUACOSchedVars &pcpu_sched_vars);
+  void PCPU_InitNewCycle_(PCPUACOSchedVars &pcpu_sched_vars);
 
   __host__ __device__
   InstSchedule *FindOneSchedule(InstCount RPTarget,
