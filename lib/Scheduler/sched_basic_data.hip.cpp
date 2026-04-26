@@ -1398,3 +1398,54 @@ void SchedInstruction::FreePCPUVars(int numThreads) {
   pcpu_inst_vars_ = nullptr;
 }
 
+bool SchedInstruction::PCPU_PrdcsrSchduld(InstCount prdcsrNum, InstCount cycle,
+                                     InstCount &rdyCycle, 
+                                     int tIdx ){
+  assert(prdcsrNum < prdcsrCnt_);
+  assert(pcpu_inst_vars_[tIdx].rdyCyclePerPrdcsr != nullptr);                                   
+
+  pcpu_inst_vars_[tIdx].rdyCyclePerPrdcsr[prdcsrNum] = cycle + ltncyPerPrdcsr_[prdcsrNum];
+  pcpu_inst_vars_[tIdx].prevMinRdyCyclePerPrdcsr[prdcsrNum] = pcpu_inst_vars_[tIdx].minRdyCycle;
+
+  if (pcpu_inst_vars_[tIdx].rdyCyclePerPrdcsr[prdcsrNum] > pcpu_inst_vars_[tIdx].minRdyCycle) {
+    pcpu_inst_vars_[tIdx].minRdyCycle = pcpu_inst_vars_[tIdx].rdyCyclePerPrdcsr[prdcsrNum];
+  }
+
+  rdyCycle = pcpu_inst_vars_[tIdx].minRdyCycle;
+  pcpu_inst_vars_[tIdx].unschduldPrdcsrCnt--;
+  return (pcpu_inst_vars_[tIdx].unschduldPrdcsrCnt == 0);
+}
+
+void SchedInstruction::PCPU_Schedule(InstCount cycleNum, InstCount slotNum,
+                                    int tIdx){
+  assert(pcpu_inst_vars_[tIdx].crntSchedCycle == SCHD_UNSCHDULD);
+  pcpu_inst_vars_[tIdx].crntSchedCycle = cycleNum;
+  pcpu_inst_vars_[tIdx].crntSchedSlot = slotNum;
+}
+
+int16_t SchedInstruction::PCPU_CmputLastUseCnt(RegisterFile *RegFiles,
+                                          int tIdx,
+                                          DataDepGraph *ddg) {
+  pcpu_inst_vars_[tIdx].lastUseCnt = 0;
+
+  // if we are on device or passing in RegFiles, use those
+  // otherwise, assume we can get regFiles from SchedInstruction itself
+  RegisterFile *registerFiles;
+  if (RegFiles)
+    registerFiles = RegFiles;
+  else
+    registerFiles = RegFiles_;
+
+  for (int i = 0; i < useCnt_; i++) {
+    Register *reg = registerFiles[uses_[i].regType_].GetReg(uses_[i].regNum_);
+    assert(reg->GetCrntUseCnt() < reg->GetUseCnt());
+    if (reg->GetCrntUseCnt() + 1 == reg->GetUseCnt())
+      pcpu_inst_vars_[tIdx].lastUseCnt++;
+  }
+  return pcpu_inst_vars_[tIdx].lastUseCnt;
+}
+
+int16_t SchedInstruction::PCPU_GetLastUseCnt(int tIdx) { 
+  return pcpu_inst_vars_[tIdx].lastUseCnt;
+}
+

@@ -581,6 +581,14 @@ public:
   void AllocPCPUVars(int numThreads);
   void InitPCPUVars(int numThreads);
   void FreePCPUVars(int numThreds);
+  bool PCPU_PrdcsrSchduld(InstCount prdcsrNum, InstCount cycle,
+                          InstCount &rdyCycle, 
+                          int tIdx);
+  void PCPU_Schedule(InstCount cycleNum, InstCount slotNum, int tIdx);
+  int16_t PCPU_CmputLastUseCnt(RegisterFile *RegFiles,
+                          int tIdx,
+                          DataDepGraph *ddg = NULL);
+  int16_t PCPU_GetLastUseCnt(int tIdx);
 
 
   friend class SchedRange;

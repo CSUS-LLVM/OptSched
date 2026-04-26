@@ -55,7 +55,7 @@ double RandDouble(double min, double max) {
 //#endif
 
 #define RUN_PCPU 1
-#define NO_CPU_THREADS 2
+#define NO_CPU_THREADS 1
 
 ACOScheduler::ACOScheduler(DataDepGraph *dataDepGraph,
                            MachineModel *machineModel, InstCount upperBound,
@@ -2512,7 +2512,7 @@ InstSchedule *ACOScheduler::PCPU_FindOneSchedule(InstCount RPTarget,
       if (*pcpu_sched_vars.readyLs->getInstReadyOnAtIndex(I) == pcpu_sched_vars.crntCycleNum) {
         InstCount CandidateId = *pcpu_sched_vars.readyLs->getInstIdAtIndex(I);
         SchedInstruction *candidateInst = dataDepGraph_->GetInstByIndx(CandidateId);
-        HeurType candidateLUC = candidateInst->GetLastUseCnt();
+        HeurType candidateLUC = candidateInst->PCPU_GetLastUseCnt(thread);
         int16_t candidateDefs = candidateInst->GetDefCnt();
         if (candidateDefs <= candidateLUC) {
           pcpu_sched_vars.RP0OrPositiveCount = pcpu_sched_vars.RP0OrPositiveCount + 1;
@@ -2584,7 +2584,7 @@ InstSchedule *ACOScheduler::PCPU_FindOneSchedule(InstCount RPTarget,
       instNum = inst->GetNum();
       PCPU_SchdulInst_(inst, pcpu_sched_vars);
       //SchdulInst(inst, pcpu_sched_vars.crntCycleNum)
-      inst->Schedule(pcpu_sched_vars.crntCycleNum, pcpu_sched_vars.crntSlotNum);
+      inst->PCPU_Schedule(pcpu_sched_vars.crntCycleNum, pcpu_sched_vars.crntSlotNum, thread);
       ((BBWithSpill *)rgn_)->PCPU_SchdulInst(inst, pcpu_sched_vars.crntCycleNum, pcpu_sched_vars.crntSlotNum, false, pcpu, thread);
       // If an ant violates the RP cost constraint, terminate further
       // schedule construction
@@ -2645,7 +2645,7 @@ InstCount ACOScheduler::PCPU_SelectInstruction(SchedInstruction *lastInst, InstC
     RPIsHigh = false;
     InstCount CandidateId = *pcpu_sched_vars.readyLs->getInstIdAtIndex(I);
     SchedInstruction *candidateInst = dataDepGraph_->GetInstByIndx(CandidateId);
-    HeurType candidateLUC = candidateInst->GetLastUseCnt();
+    HeurType candidateLUC = candidateInst->PCPU_GetLastUseCnt(thread);
     int16_t candidateDefs = candidateInst->GetDefCnt();
 
     // compute the score
@@ -2773,7 +2773,7 @@ inline void ACOScheduler::PCPU_UpdateACOReadyList(SchedInstruction *inst, bool I
   for (SchedInstruction *crntScsr = inst->GetFrstScsr(&prdcsrNum);
         crntScsr != NULL; crntScsr = inst->GetNxtScsr(&prdcsrNum)) {
       bool wasLastPrdcsr =
-          crntScsr->PrdcsrSchduld(prdcsrNum, pcpu_sched_vars.crntCycleNum, scsrRdyCycle);
+          crntScsr->PCPU_PrdcsrSchduld(prdcsrNum, pcpu_sched_vars.crntCycleNum, scsrRdyCycle, thread);
 
       if (wasLastPrdcsr) {
         // If all other predecessors of this successor have been scheduled then
@@ -2794,7 +2794,7 @@ inline void ACOScheduler::PCPU_UpdateACOReadyList(SchedInstruction *inst, bool I
     InstCount CandidateId = *pcpu_sched_vars.readyLs->getInstIdAtIndex(I);
     if (LUCEntry.Width) {
       SchedInstruction *ScsrInst = dataDepGraph_->GetInstByIndx(CandidateId);
-      HeurType LUCVal = ScsrInst->CmputLastUseCnt(dataDepGraph_->RegFiles);
+      HeurType LUCVal = ScsrInst->PCPU_CmputLastUseCnt(dataDepGraph_->RegFiles, thread);
       LUCVal <<= LUCEntry.Offset;
       Heur &= LUCVal;
     }
@@ -2803,7 +2803,7 @@ inline void ACOScheduler::PCPU_UpdateACOReadyList(SchedInstruction *inst, bool I
         continue;
 
       SchedInstruction *candidateInst = dataDepGraph_->GetInstByIndx(CandidateId);
-      HeurType candidateLUC = candidateInst->GetLastUseCnt();
+      HeurType candidateLUC = candidateInst->PCPU_GetLastUseCnt(thread);
       int16_t candidateDefs = candidateInst->GetDefCnt();
       if (candidateDefs <= candidateLUC) {
         pcpu_sched_vars.RP0OrPositiveCount = pcpu_sched_vars.RP0OrPositiveCount + 1;
