@@ -2005,7 +2005,7 @@ void ACOScheduler::UpdatePheromone(InstSchedule *schedule, bool isIterationBest,
 #if !USE_ACS
   // decay pheromone
   for (int i = 0; i < count_; i++) {
-    for (int j = 0; j < count_; j++) {
+    for (int j = 0; j < count_; j++) { 
       pheromone = &Pheromone(i, j);
       *pheromone *= (1 - decay_factor);
     }
@@ -2532,7 +2532,7 @@ InstSchedule *ACOScheduler::PCPU_FindOneSchedule(InstCount RPTarget,
       closeToRPTarget = ((BBWithSpill *)rgn_)->PCPU_GetCrntSpillCost(pcpu) >= closeToRPCheck;
       // select the instruction and get info on it
       InstCount SelIndx = PCPU_SelectInstruction(lastInst, schedule->getTotalStalls(), rgn_, unnecessarilyStalling, closeToRPTarget, waitFor ? true: false,
-                                                thread, pcpu_sched_vars);
+                                                thread, pcpu_sched_vars, pcpu);
 
       if (SelIndx != -1) {
         LastInstInfo = pcpu_sched_vars.readyLs->removeInstructionAtIndex(SelIndx);
@@ -2761,6 +2761,7 @@ InstCount ACOScheduler::PCPU_SelectInstruction(SchedInstruction *lastInst, InstC
     else
       unnecessarilyStalling = false;
   
+  Logger::Info("Instruction Index, %d", indx);
   return indx;
 }
 
@@ -2912,6 +2913,7 @@ void ACOScheduler::PCPU_SchdulInst_(SchedInstruction *inst, PCPUACOSchedVars &pc
     pcpu_sched_vars.isCrntCycleBlkd = true;
   }
   pcpu_sched_vars.schduldInstCnt++;
+  Logger::Info("SchduldInstCnt Incremented, %d", pcpu_sched_vars.schduldInstCnt);
 }
 
 void ACOScheduler::PCPU_UpdtSlotAvlblty_(SchedInstruction *inst, PCPUACOSchedVars &pcpu_sched_vars) {
@@ -2925,6 +2927,7 @@ void ACOScheduler::PCPU_UpdtSlotAvlblty_(SchedInstruction *inst, PCPUACOSchedVar
 }
 
 bool ACOScheduler::PCPU_IsSchedComplete_(PCPUACOSchedVars &pcpu_sched_vars) {
+  Logger::Info("Checking if sched complete if %d == %d", pcpu_sched_vars.schduldInstCnt, totInstCnt_);
   return pcpu_sched_vars.schduldInstCnt == totInstCnt_;
 }
 
