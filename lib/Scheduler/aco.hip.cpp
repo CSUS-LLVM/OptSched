@@ -2595,7 +2595,7 @@ InstSchedule *ACOScheduler::PCPU_FindOneSchedule(InstCount RPTarget,
       if (((BBWithSpill*)rgn_)->PCPU_GetCrntSpillCost(pcpu) > RPTarget) {
         // end schedule construction
         // keep track of ants terminated
-        numAntsTerminated_++;
+        //numAntsTerminated_++;
         pcpu_sched_vars.readyLs->clearReadyList();
         delete schedule;
         Logger::Info("Thread %d, returned early", thread);
