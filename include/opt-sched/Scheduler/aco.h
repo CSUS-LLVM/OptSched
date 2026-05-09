@@ -87,6 +87,7 @@ struct alignas(64) PCPUACOSchedVars {
   ReserveSlot *rsrvSlots;
   int16_t *avlblSlotsInCrntCycle;
   
+  pheromone_t MaxPriorityInv;
 
   /*
   void ConstrainedScheduler::SchdulInst_(SchedInstruction *inst, InstCount)
