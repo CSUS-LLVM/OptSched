@@ -55,7 +55,7 @@ double RandDouble(double min, double max) {
 //#endif
 
 #define RUN_PCPU 1
-#define NO_CPU_THREADS 2
+#define NO_CPU_THREADS 1
 
 ACOScheduler::ACOScheduler(DataDepGraph *dataDepGraph,
                            MachineModel *machineModel, InstCount upperBound,
@@ -2482,7 +2482,7 @@ InstSchedule *ACOScheduler::PCPU_FindOneSchedule(InstCount RPTarget,
   bool unnecessarilyStalling = false;
   // The MaxPriority that we are getting from the ready list represents the maximum possible heuristic/key value that we can have
   // I want to move all the heuristic computation stuff to another class for code tidiness reasons.
-  HeurType MaxPriority = kHelper1->getMaxValue();
+  HeurType MaxPriority = pcpu_sched_vars.kHelper1->getMaxValue();
   if (MaxPriority == 0)
     MaxPriority = 1; // divide by 0 is bad
   //Initialize_(); //For InstSchedule/ConstrainedSchedule
@@ -2495,8 +2495,8 @@ InstSchedule *ACOScheduler::PCPU_FindOneSchedule(InstCount RPTarget,
   // The luc component is 0 since the root inst uses no instructions
   Logger::Info("ReadyListFunctions 1, %d", thread);
   InstCount RootId = rootInst_->GetNum();
-  HeurType RootHeuristic = kHelper1->computeKey(rootInst_, true, dataDepGraph_->RegFiles);
-  pheromone_t RootScore = Score(-1, RootId, RootHeuristic, !IsSecondPass);
+  HeurType RootHeuristic = pcpu_sched_vars.kHelper1->computeKey(rootInst_, true, dataDepGraph_->RegFiles);
+  pheromone_t RootScore = PCPU_Score(-1, RootId, RootHeuristic, !IsSecondPass, pcpu_sched_vars);
   ACOReadyListEntry InitialRoot{RootId, 0, RootHeuristic, RootScore};
   pcpu_sched_vars.readyLs->addInstructionToReadyList(InitialRoot);
   pcpu_sched_vars.readyLs->ScoreSum = RootScore;
@@ -2656,7 +2656,7 @@ InstCount ACOScheduler::PCPU_SelectInstruction(SchedInstruction *lastInst, InstC
 
     // compute the score
     HeurType Heur = *pcpu_sched_vars.readyLs->getInstHeuristicAtIndex(I);
-    pheromone_t IScore = Score(lastInstId, *pcpu_sched_vars.readyLs->getInstIdAtIndex(I), Heur, !rgn->IsSecondPass());
+    pheromone_t IScore = PCPU_Score(lastInstId, *pcpu_sched_vars.readyLs->getInstIdAtIndex(I), Heur, !rgn->IsSecondPass(), pcpu_sched_vars);
     if (pcpu_sched_vars.RP0OrPositiveCount != 0 && candidateDefs > candidateLUC)
       IScore = IScore * 9/10;
 
@@ -2786,14 +2786,14 @@ inline void ACOScheduler::PCPU_UpdateACOReadyList(SchedInstruction *inst, bool I
       if (wasLastPrdcsr) {
         // If all other predecessors of this successor have been scheduled then
         // we now know in which cycle this successor will become ready.
-        HeurType HeurWOLuc = kHelper1->computeKey(crntScsr, false, dataDepGraph_->RegFiles);
+        HeurType HeurWOLuc = pcpu_sched_vars.kHelper1->computeKey(crntScsr, false, dataDepGraph_->RegFiles);
         pcpu_sched_vars.readyLs->addInstructionToReadyList(ACOReadyListEntry{crntScsr->GetNum(), scsrRdyCycle, HeurWOLuc, 0});
       }
   }
 
   // Make sure the scores are valid.  The scheduling of an instruction may
   // have increased another instruction's LUC Score
-  PriorityEntry LUCEntry = kHelper1->getPriorityEntry(LSH_LUC);
+  PriorityEntry LUCEntry = pcpu_sched_vars.kHelper1->getPriorityEntry(LSH_LUC);
   pcpu_sched_vars.RP0OrPositiveCount = 0;
   for (InstCount I = 0; I < pcpu_sched_vars.readyLs->getReadyListSize(); ++I) {
     //we first get the heuristic without the LUC component, add the LUC
@@ -2839,6 +2839,8 @@ PCPUACOSchedVars *ACOScheduler::AllocPCPUACOSchedVars(int numThreads) {
 
     //new stuff
     pcpu_sched_vars[i].MaxPriorityInv = 0;
+    pcpu_sched_vars[i].kHelper1 = new KeysHelper1(priorities1_);
+    pcpu_sched_vars[i].kHelper1->initForRegion(dataDepGraph_);
 
     pcpu_sched_vars[i].rsrvSlots = new ReserveSlot[issuRate_];
     pcpu_sched_vars[i].avlblSlotsInCrntCycle = new int16_t[issuTypeCnt_];
@@ -2864,6 +2866,9 @@ void ACOScheduler::FreePCPUACOSchedVars(PCPUACOSchedVars *pcpu_sched_vars,
   for (int i = 0; i < numThreads; i++) {
     delete pcpu_sched_vars[i].readyLs;
     pcpu_sched_vars[i].readyLs = nullptr;
+
+    delete pcpu_sched_vars[i].kHelper1;
+    pcpu_sched_vars[i].kHelper1 = nullptr;
 
     delete[] pcpu_sched_vars[i].rsrvSlots;
     pcpu_sched_vars[i].rsrvSlots = nullptr;
@@ -3004,4 +3009,14 @@ void ACOScheduler::PCPU_FreeSchedInsts(int numThreads){
     SchedInstruction *inst = dataDepGraph_->GetInstByIndx(i);
     inst->FreePCPUVars(numThreads);
   }
+}
+
+
+pheromone_t ACOScheduler::PCPU_Score(InstCount FromId, InstCount ToId, HeurType ToHeuristic, bool IsFirstPass, PCPUACOSchedVars &pcpu_sched_vars, int blockOccupancyNum) {
+  // tuneable heuristic importance is temporarily disabled
+  // double Hf = pow(ToHeuristic, heuristicImportance_);
+  pheromone_t HeurScore;
+  HeurScore = ToHeuristic * pcpu_sched_vars.MaxPriorityInv + 1;
+  pheromone_t Hf = heuristicImportance_ ? HeurScore : 1.0;
+  return Pheromone(FromId, ToId, blockOccupancyNum) * Hf;
 }

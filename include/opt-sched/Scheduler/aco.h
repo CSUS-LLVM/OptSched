@@ -88,6 +88,7 @@ struct alignas(64) PCPUACOSchedVars {
   int16_t *avlblSlotsInCrntCycle;
   
   pheromone_t MaxPriorityInv;
+  KeysHelper1 *kHelper1;
 
   /*
   void ConstrainedScheduler::SchdulInst_(SchedInstruction *inst, InstCount)
@@ -230,6 +231,9 @@ private:
   pheromone_t &Pheromone(InstCount from, InstCount to, int kernelNum = 0);
   __host__ __device__
   pheromone_t Score(InstCount FromId, InstCount ToId, HeurType ToHeuristic, bool IsFirstPass, int kernelNum = 0);
+
+  pheromone_t PCPU_Score(InstCount FromId, InstCount ToId, HeurType ToHeuristic, bool IsFirstPass, PCPUACOSchedVars &pcpu_sched_vars, int kernelNum = 0);
+
   DCF_OPT ParseDCFOpt(const std::string &opt);
   __host__ __device__
   InstCount SelectInstruction(SchedInstruction *lastInst, InstCount totalStalls, 
