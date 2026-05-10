@@ -7,7 +7,7 @@
 
 using namespace llvm::opt_sched;
 
-static const std::recursive_mutex m;
+static std::recursive_mutex m;
 
 // Magic numbers used in the generator formula.
 static const uint32_t A = 0x2faf071d; // 8 * (10 ** 8 - 29) + 5
