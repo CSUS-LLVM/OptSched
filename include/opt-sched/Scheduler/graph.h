@@ -159,15 +159,23 @@ public:
   __host__
   void AddRcrsvNghbr(GraphNode *nghbr, DIRECTION dir);
   // Returns a pointer to the first successor of the node and writes the label
-  // of the edge between them to the label argument (default 0). Sets the successor
+  // of the edge between them to the label argument. Sets the successor
   // iterator.
   __host__
   GraphNode *GetFrstScsr(UDT_GLABEL &label);
   // Returns a pointer to the next successor of the node and writes the label
-  // of the edge between them to the label argument (default 0). Must be called after
+  // of the edge between them to the label argument. Must be called after
   // GetFrstScsr() which starts the successor iterator.
   __host__
   GraphNode *GetNxtScsr(UDT_GLABEL &label);
+  // Returns a pointer to the first successor of the node. Sets the successor
+  // iterator.
+  __host__
+  GraphNode *GetFrstScsr();
+  // Returns a pointer to the next successor of the node. Must be called after
+  // GetFrstScsr() which starts the successor iterator.
+  __host__
+  GraphNode *GetNxtScsr();
   // Checks if a given node is successor-equivalent to this node. Two nodes
   // are successor-equivalent if they have identical successor lists.
   __host__
@@ -583,7 +591,7 @@ __host__ __device__
 inline UDT_GNODES GraphNode::GetNum() const { return num_; }
 
 __host__
-inline GraphNode *GraphNode::GetFrstScsr(UDT_GLABEL &label = 0) {
+inline GraphNode *GraphNode::GetFrstScsr(UDT_GLABEL &label) {
   GraphEdge *edge = scsrLst_->GetFrstElmnt();
   if (edge == NULL)
     return NULL;
@@ -592,7 +600,7 @@ inline GraphNode *GraphNode::GetFrstScsr(UDT_GLABEL &label = 0) {
 }
 
 __host__
-inline GraphNode *GraphNode::GetNxtScsr(UDT_GLABEL &label = 0) {
+inline GraphNode *GraphNode::GetNxtScsr(UDT_GLABEL &label) {
   GraphEdge *edge = scsrLst_->GetNxtElmnt();
   if (edge == NULL)
     return NULL;
@@ -616,6 +624,18 @@ inline GraphNode *GraphNode::GetNxtPrdcsr(UDT_GLABEL &label) {
     return NULL;
   label = edge->label;
   return nodes_[edge->to];
+}
+
+__host__
+inline GraphNode *GraphNode::GetFrstScsr() {
+  UDT_GLABEL label{};
+  return GetFrstScsr(label);
+}
+
+__host__
+inline GraphNode *GraphNode::GetNxtScsr() {
+  UDT_GLABEL label{};
+  return GetNxtScsr(label);
 }
 
 __host__ __device__
