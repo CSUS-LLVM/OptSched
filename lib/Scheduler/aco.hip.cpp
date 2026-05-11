@@ -55,7 +55,7 @@ double RandDouble(double min, double max) {
 //#endif
 
 #define RUN_PCPU 1
-#define NO_CPU_THREADS 1
+#define NO_CPU_THREADS 2
 
 ACOScheduler::ACOScheduler(DataDepGraph *dataDepGraph,
                            MachineModel *machineModel, InstCount upperBound,
