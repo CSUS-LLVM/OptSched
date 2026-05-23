@@ -1,8 +1,9 @@
+#include <hip/hip_runtime.h>
+#include <algorithm>
+
 #include "opt-sched/Scheduler/relaxed_sched.h"
 #include "opt-sched/Scheduler/logger.h"
 #include "opt-sched/Scheduler/utilities.h"
-#include <algorithm>
-#include <hip/hip_runtime.h>
 
 using namespace llvm::opt_sched;
 

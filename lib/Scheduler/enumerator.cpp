@@ -1,3 +1,9 @@
+#include <hip/hip_runtime.h>
+#include <algorithm>
+#include <iterator>
+#include <memory>
+#include <sstream>
+
 #include "opt-sched/Scheduler/enumerator.h"
 #include "opt-sched/Scheduler/bb_spill.h"
 #include "opt-sched/Scheduler/hist_table.h"
@@ -5,11 +11,6 @@
 #include "opt-sched/Scheduler/random.h"
 #include "opt-sched/Scheduler/stats.h"
 #include "opt-sched/Scheduler/utilities.h"
-#include <algorithm>
-#include <iterator>
-#include <memory>
-#include <sstream>
-#include <hip/hip_runtime.h>
 
 using namespace llvm::opt_sched;
 

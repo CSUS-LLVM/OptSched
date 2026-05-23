@@ -15,6 +15,8 @@ Last Update:  Jan. 2020
 #include "opt-sched/Scheduler/device_vector.h"
 #include "llvm/ADT/ArrayRef.h"
 #include <memory>
+#include <utility>
+#include <vector>
 #include <hip/hip_runtime.h>
 
 namespace llvm {
@@ -294,6 +296,10 @@ private:
 
   SchedPriorities priorities1_;
   SchedPriorities priorities2_;
+
+  // Pre-built per-instruction successor list (successor ptr + prdcsrNum).
+  // Populated before PCPU threads launch to avoid cursor race on scsrLst_.
+  std::vector<std::vector<std::pair<SchedInstruction *, InstCount>>> instScsrs_;
 
 };
 

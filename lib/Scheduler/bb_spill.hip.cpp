@@ -1,3 +1,5 @@
+#include <hip/hip_runtime.h>
+
 #include "opt-sched/Scheduler/bb_spill.h"
 #include "opt-sched/Scheduler/config.h"
 #include "opt-sched/Scheduler/data_dep.h"
@@ -20,7 +22,6 @@
 #include <set>
 #include <sstream>
 #include <utility>
-#include <hip/hip_runtime.h>
 
 // #define IS_DEBUG_REG_PRESSURE 1
 extern bool OPTSCHED_gPrintSpills; 

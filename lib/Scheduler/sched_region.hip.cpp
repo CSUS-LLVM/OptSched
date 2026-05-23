@@ -1,4 +1,6 @@
-#include "hip/hip_runtime.h"
+#include <hip/hip_runtime.h>
+#include <hiprand/hiprand_kernel.h>
+#include <hip/hip_profile.h>
 #include <algorithm>
 #include <cstdio>
 #include <memory>
@@ -18,11 +20,9 @@
 #include "opt-sched/Scheduler/stats.h"
 #include "opt-sched/Scheduler/utilities.h"
 #include "opt-sched/Scheduler/dev_defines.h"
-#include <hip/hip_profile.h>
 #include "llvm/ADT/SmallString.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/FileSystem.h"
-#include <hiprand/hiprand_kernel.h>
 
 extern bool OPTSCHED_gPrintSpills;
 
@@ -254,21 +254,25 @@ FUNC_RESULT SchedRegion::FindOptimalSchedule(
   Config &schedIni = SchedulerOptions::getInstance();
   bool HeuristicSchedulerEnabled = schedIni.GetBool("HEUR_ENABLED");
   bool AcoSchedulerEnabled = schedIni.GetBool("ACO_ENABLED");
-  multipleOccupancies = schedIni.GetBool("MO_ENABLED");
-  printf("multipleOccupancies is %d",multipleOccupancies);
+  multipleOccupancies = schedIni.GetBool("MO_ENABLED", false);
+  printf("multipleOccupancies is %d", multipleOccupancies);
   bool BbSchedulerEnabled = isBbEnabled(schedIni, rgnTimeout);
-  unsigned long randSeed = (unsigned long) schedIni.GetInt("RANDOM_SEED");
-  bool devACOEnabled = schedIni.GetBool("DEV_ACO");
+  unsigned long randSeed = (unsigned long) schedIni.GetInt("RANDOM_SEED", 0);
+  bool devACOEnabled = schedIni.GetBool("DEV_ACO", false);
   int numBlocks;
-  if (devACOEnabled && dataDepGraph_->GetInstCnt() >= REGION_MIN_SIZE)
-    numBlocks = schedIni.GetBool("ACO_MANY_ANTS_ENABLED") && dataDepGraph_->GetInstCnt() > MANY_ANT_MIN_SIZE ?
-                schedIni.GetInt("ACO_MANY_ANTS_PER_ITERATION_BLOCKS") : schedIni.GetInt("ACO_DEVICE_ANT_PER_ITERATION_BLOCKS");
-  else
-    numBlocks = schedIni.GetInt("HOST_ANTS");
+  if (devACOEnabled && dataDepGraph_->GetInstCnt() >= REGION_MIN_SIZE) {
+    bool manyAntsEnabled = schedIni.GetBool("ACO_MANY_ANTS_ENABLED", false);
+    int manyAntBlocks = static_cast<int>(schedIni.GetInt("ACO_MANY_ANTS_PER_ITERATION_BLOCKS", 1));
+    int deviceAntBlocks = static_cast<int>(schedIni.GetInt("ACO_DEVICE_ANT_PER_ITERATION_BLOCKS", 1));
+    numBlocks = manyAntsEnabled && dataDepGraph_->GetInstCnt() > MANY_ANT_MIN_SIZE ?
+                manyAntBlocks : deviceAntBlocks;
+  } else {
+    numBlocks = static_cast<int>(schedIni.GetInt("HOST_ANTS", 2));
+  }
 
   if (AcoSchedulerEnabled) {
-    AcoBeforeEnum = schedIni.GetBool("ACO_BEFORE_ENUM");
-    AcoAfterEnum = schedIni.GetBool("ACO_AFTER_ENUM");
+    AcoBeforeEnum = schedIni.GetBool("ACO_BEFORE_ENUM", false);
+    AcoAfterEnum = schedIni.GetBool("ACO_AFTER_ENUM", false);
   }
 
   if (!HeuristicSchedulerEnabled && !AcoBeforeEnum) {
@@ -388,7 +392,7 @@ FUNC_RESULT SchedRegion::FindOptimalSchedule(
     CmputNormCost_(lstSched, CCM_DYNMC, hurstcExecCost, true);
     hurstcCost_ = lstSched->GetCost();
     InstCount maxIndependentInstructions = 0;
-    std::string readyListUB = schedIni.GetString("ACO_READY_LIST_UB");
+    std::string readyListUB = schedIni.GetString("ACO_READY_LIST_UB", "NO");
     if (readyListUB == "NO" || readyListUB == "MIN_DEGREE") {
       for (int i = 0; i < dataDepGraph_->GetInstCnt(); i++) {
         int independentInstructions = dataDepGraph_->GetInstCnt() - dataDepGraph_->GetInstByIndx(i)->GetRcrsvPrdcsrCnt() - dataDepGraph_->GetInstByIndx(i)->GetRcrsvScsrCnt();
@@ -1143,6 +1147,18 @@ FUNC_RESULT SchedRegion::runACO(InstSchedule *ReturnSched,
   // to fit in device memory
   Logger::Info("This DDG has %d edges", dataDepGraph_->GetEdgeCnt());
   Logger::Info("CP Distance: %d", dataDepGraph_->GetRootInst()->GetCrntLwrBound(DIR_BKWRD) + 1);
+  if (devACOEnabled) {
+    int hipDeviceCount = 0;
+    hipError_t hipErr = hipGetDeviceCount(&hipDeviceCount);
+    if (hipErr != hipSuccess || hipDeviceCount == 0) {
+      Logger::Info("DEV_ACO disabled in runACO: no HIP devices found (%s)",
+                   hipGetErrorString(hipErr));
+      devACOEnabled = false;
+    } else {
+      gpuErrchk(hipSetDevice(0));
+    }
+  }
+
   if (devACOEnabled && dataDepGraph_->GetInstCnt() >= REGION_MIN_SIZE) {
     // Allocate and Copy data to device for parallel ACO
     size_t memSize;

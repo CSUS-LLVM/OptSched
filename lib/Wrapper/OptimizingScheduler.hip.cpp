@@ -43,6 +43,7 @@
 #include <algorithm>
 #include <chrono>
 #include <string>
+#include <cstdlib>
 
 #define DEBUG_TYPE "optsched"
 
@@ -283,27 +284,77 @@ void ScheduleDAGOptSched::initSchedulers() {
 }
 
 void ScheduleEvaluator::recordSchedule(int schedIndex) {
-  schedCount++;
-  if (schedIndex >= storedSchedules.size())
-    storedSchedules.resize(schedIndex + 1);
+  if (schedIndex < 0)
+    return;
+
+  if (!DAG.BB || DAG.RegionBegin == DAG.RegionEnd)
+    return;
+
+  dbgs() << "[OPTSCHED_DEBUG] recordSchedule idx=" << schedIndex
+         << " this=" << (const void *)this
+         << " DAG=" << (const void *)&DAG
+         << " DAG.BB=" << (const void *)DAG.BB
+         << " RegionBegin==RegionEnd=" << (DAG.RegionBegin == DAG.RegionEnd)
+         << " storedSchedules.size()=" << storedSchedules.size() << "\n";
+
+  if ((size_t)schedIndex >= storedSchedules.size())
+    storedSchedules.resize((size_t)schedIndex + 1);
+
+  dbgs() << "[OPTSCHED_DEBUG] recordSchedule idx=" << schedIndex
+         << " DAG.BB=" << (void *)DAG.BB
+         << " RegionBegin==RegionEnd=" << (DAG.RegionBegin == DAG.RegionEnd)
+         << " storedSchedules.size()=" << storedSchedules.size() << "\n";
 
   storedSchedules[schedIndex].clear();
-  storedSchedules[schedIndex].reserve(DAG.NumRegionInstrs);
+  schedCount++;
 
-  for (auto &MI : DAG)
-    storedSchedules[schedIndex].push_back(&MI);
+  const char *dbgEnv = std::getenv("OPTSCHED_DEBUG");
+  const bool doDebug = dbgEnv && std::atoi(dbgEnv) != 0;
+  if (doDebug) {
+    dbgs() << "[OPTSCHED_DEBUG] recordSchedule idx=" << schedIndex
+           << " DAG.BB=" << (void *)DAG.BB
+           << " RegionBegin==RegionEnd=" << (DAG.RegionBegin == DAG.RegionEnd)
+           << " storedSchedules.size()=" << storedSchedules.size() << "\n";
+  }
+
+  // Safely iterate over scheduled instructions in the region
+  if (!DAG.BB || DAG.RegionBegin == DAG.RegionEnd)
+    return;
+
+  for (auto I = DAG.RegionBegin; I != DAG.RegionEnd; ++I) {
+    if (!I->isDebugInstr()) {
+      storedSchedules[schedIndex].push_back(&*I);
+    }
+  }
+
+  if (doDebug) {
+    dbgs() << "[OPTSCHED_DEBUG] storedSchedules[" << schedIndex << "] size="
+           << storedSchedules[schedIndex].size() << "\n";
+    int __mi_i = 0;
+    for (MachineInstr *MI : storedSchedules[schedIndex]) {
+      dbgs() << "  [" << __mi_i++ << "] ";
+      MI->print(dbgs());
+      dbgs() << '\n';
+    }
+  }
 }
 
 // revert to a previous schedule
 // schedIndex 0 is the previous schedule, 1 is the schedule at highest occupancy
 void ScheduleEvaluator::revertScheduling(int schedIndex) {
+  if (schedIndex < 0 || schedCount == 0 || storedSchedules.empty())
+    return;
+
+  if (schedIndex >= schedCount)
+    schedIndex = schedCount - 1;
+
+  if ((size_t)schedIndex >= storedSchedules.size() || storedSchedules[schedIndex].empty())
+    return;
+
   DAG.RegionEnd = DAG.RegionBegin;
   int SkippedDebugInstr = 0;
 
   // Logger::Info("Reverting Scheduling Number of Scheds: %d, index: %d, size is %d", schedCount, schedIndex, storedSchedules.size());
-  if (schedIndex >= schedCount) {
-    schedIndex = schedCount - 1;
-  }
 
   for (MachineInstr *MI : storedSchedules[schedIndex]) {
     if (MI->isDebugInstr()) {
@@ -382,28 +433,33 @@ void ScheduleEvaluator::calculateRPAfter(int schedIndex) {
 
 unsigned ScheduleEvaluator::getOccAtIndex(int schedIndex) const {
   const GCNSubtarget &ST = DAG.MF.getSubtarget<GCNSubtarget>();
-  // printf("storedSchedules.size() = %d | ",storedSchedules.size());
-  if (schedIndex >= storedSchedules.size()) {
-    // printf("schedIndex: %d schedIndex too high\n", schedIndex);
+  if (schedIndex < 0 || (size_t)schedIndex >= storedSchedules.size()) {
+    if (SchedRP.empty())
+      return 0;
     return SchedRP.back().getOccupancy(ST);
   }
-  // printf("schedIndex: %d\n", schedIndex);
   return SchedRP[schedIndex].getOccupancy(ST);
 }
 
 int ScheduleEvaluator::getSchedLength(int schedIndex) {
+  if (schedIndex < 0 || (size_t)schedIndex >= storedSchedules.size())
+    return 0;
   return storedSchedules[schedIndex].size();
 }
 
 int64_t ScheduleEvaluator::getILPAtIndex(int schedIndex) const {
-  if (schedIndex >= storedSchedules.size()) {
+  if (schedIndex < 0 || (size_t)schedIndex >= storedSchedules.size()) {
+    if (SchedILP.empty())
+      return 0;
     return SchedILP.back();
   }
   return SchedILP[schedIndex];
 }
 
 int64_t ScheduleEvaluator::getWeightedILPAtIndex(int schedIndex) const {
-  if (schedIndex >= storedSchedules.size()) {
+  if (schedIndex < 0 || (size_t)schedIndex >= storedSchedules.size()) {
+    if (SchedILP.empty())
+      return 0;
     return SchedILP.back() * Frequency;
   }
   return SchedILP[schedIndex] * Frequency;
@@ -556,11 +612,19 @@ void ScheduleDAGOptSched::schedule() {
                                  std::string(":") +
                                  std::to_string(RegionNumber);
 
+  // Ensure we have a ScheduleEvaluator for this region.
+  LLVM_DEBUG(dbgs() << "[OPTSCHED_DEBUG] schedule entry this=" << (const void *)this
+                    << " RegionNumber=" << RegionNumber
+                    << " BB=" << (const void *)BB
+                    << " RegionBegin==RegionEnd=" << (RegionBegin == RegionEnd)
+                    << " SchedEvals.size=" << SchedEvals.size() << "\n");
+  while ((size_t)RegionNumber >= SchedEvals.size())
+    SchedEvals.emplace_back(*this);
+
   // If two pass scheduling is enabled then
   // first just record the scheduling region.
   if (OptSchedEnabled && TwoPassEnabled && !TwoPassSchedulingStarted) {
     Regions.push_back(std::make_pair(RegionBegin, RegionEnd));
-    SchedEvals.emplace_back(*this);
     LLVM_DEBUG(
         dbgs() << "Recording scheduling region before scheduling with two pass "
                   "scheduler...\n");
@@ -680,6 +744,12 @@ void ScheduleDAGOptSched::schedule() {
   // Revord MachineInstr order in the first pass for a possible revert if
   // scheduling makes things worse.
   if (!SecondPass) {
+    LLVM_DEBUG(dbgs() << "[OPTSCHED_DEBUG] before first recordSchedule this="
+                      << (const void *)this
+                      << " RegionNumber=" << RegionNumber
+                      << " BB=" << (const void *)BB
+                      << " RegionBegin==RegionEnd=" << (RegionBegin == RegionEnd)
+                      << "\n");
     SchedEval.recordSchedule(0);
     SchedEval.calculateRPBefore();
     SchedEval.calcualteILPBefore();
@@ -713,16 +783,25 @@ void ScheduleDAGOptSched::schedule() {
   // Prepare for device scheduling by increasing heap size and copying machMdl
   bool dev_ACOEnabled = schedIni.GetBool("DEV_ACO");
   if (dev_ACOEnabled && dev_MM == NULL && NumRegionInstrs + 2 >= REGION_MIN_SIZE) {
-    // Copy MachineModel to device for use during DevListSched.
-    // Allocate device memory
-    gpuErrchk(hipMallocManaged((void**)&dev_MM, sizeof(MachineModel)));
-    // Copy machMdl_ to device
-    gpuErrchk(hipMemcpy(dev_MM, MM.get(), sizeof(MachineModel),
-                         hipMemcpyHostToDevice));
-    // Copy over all pointers to device
-    MM.get()->CopyPointersToDevice(dev_MM);
-    // make sure mallocmanaged mem is copied to device before kernel start
-    gpuErrchk(hipMemPrefetchAsync(dev_MM, sizeof(MachineModel), 0));
+    int hipDeviceCount = 0;
+    hipError_t hipErr = hipGetDeviceCount(&hipDeviceCount);
+    if (hipErr != hipSuccess || hipDeviceCount == 0) {
+      LLVM_DEBUG(dbgs() << "[OPTSCHED_DEBUG] DEV_ACO disabled: no HIP devices found ("
+                        << hipGetErrorString(hipErr) << ")\n");
+      dev_ACOEnabled = false;
+    } else {
+      gpuErrchk(hipSetDevice(0));
+      // Copy MachineModel to device for use during DevListSched.
+      // Allocate device memory
+      gpuErrchk(hipMallocManaged((void**)&dev_MM, sizeof(MachineModel)));
+      // Copy machMdl_ to device
+      gpuErrchk(hipMemcpy(dev_MM, MM.get(), sizeof(MachineModel),
+                           hipMemcpyHostToDevice));
+      // Copy over all pointers to device
+      MM.get()->CopyPointersToDevice(dev_MM);
+      // make sure mallocmanaged mem is copied to device before kernel start
+      gpuErrchk(hipMemPrefetchAsync(dev_MM, sizeof(MachineModel), 0));
+    }
   }
   
   // create region
@@ -843,6 +922,11 @@ void ScheduleDAGOptSched::schedule() {
         }
       }
       placeDebugValues();
+      LLVM_DEBUG(dbgs() << "[OPTSCHED_DEBUG] before recordSchedule idx=" << schedIndex
+                        << " this=" << (const void *)this
+                        << " BB=" << (const void *)BB
+                        << " RegionBegin==RegionEnd=" << (RegionBegin == RegionEnd)
+                        << "\n");
       SchedEval.recordSchedule(schedIndex);
       SchedEval.calculateRPAfter(schedIndex);
       SchedEval.calculateILPAfter(schedIndex);
@@ -988,7 +1072,8 @@ void ScheduleDAGOptSched::loadOptSchedConfig() {
   EnumStalls = schedIni.GetBool("ENUMERATE_STALLS");
   SCW = schedIni.GetInt("SPILL_COST_WEIGHT");
   LowerBoundAlgorithm = parseLowerBoundAlgorithm();
-  HeuristicPriorities = parseHeuristic(schedIni.GetString("LIST_HEURISTIC"));
+  HeuristicPriorities = parseHeuristic(
+      schedIni.GetString("LIST_HEURISTIC", schedIni.GetString("HEURISTIC", "LLVM")));
   EnumPriorities = parseHeuristic(schedIni.GetString("ENUM_HEURISTIC"));
   SecondPassEnumPriorities =
       parseHeuristic(schedIni.GetString("SECOND_PASS_ENUM_HEURISTIC"));
@@ -1014,12 +1099,13 @@ void ScheduleDAGOptSched::loadOptSchedConfig() {
   RandomGen::SetSeed(randomSeed);
   HeurSchedType = parseListSchedType();
 
-  OccupancyLimit = schedIni.GetInt("OCCUPANCY_LIMIT");
-  ShouldLimitOccupancy = schedIni.GetBool("SHOULD_LIMIT_OCCUPANCY");
+  OccupancyLimit = schedIni.GetInt("OCCUPANCY_LIMIT", 0);
+  ShouldLimitOccupancy = schedIni.GetBool("SHOULD_LIMIT_OCCUPANCY", false);
 
   OccupancyLimitSource = OCC_LIMIT_TYPE::OLT_NONE;
   if (ShouldLimitOccupancy)
-    OccupancyLimitSource = parseOccLimit(schedIni.GetString("OCCUPANCY_LIMIT_SOURCE"));
+    OccupancyLimitSource =
+        parseOccLimit(schedIni.GetString("OCCUPANCY_LIMIT_SOURCE", "NONE"));
 
   DeviceACOEnabled = schedIni.GetBool("DEV_ACO");
 }

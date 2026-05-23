@@ -47,7 +47,7 @@ static uint32_t y[] = {
 static uint32_t randNum;
 
 void GenerateNextNumber() {
-  std::scoped_lock{m};
+  std::scoped_lock lock(m);
   randNum = y[j] + y[k];
   y[k] = randNum;
   if (--j < 0)
@@ -58,7 +58,7 @@ void GenerateNextNumber() {
 }
 
 void RandomGen::SetSeed(int32_t iseed) {
-  std::scoped_lock{m};
+  std::scoped_lock lock(m);
   j = 23;
   k = 54;
 
@@ -75,19 +75,19 @@ void RandomGen::SetSeed(int32_t iseed) {
 }
 
 uint32_t RandomGen::GetRand32WithinRange(uint32_t min, uint32_t max) {
-  std::scoped_lock{m};
+  std::scoped_lock lock(m);
   GenerateNextNumber();
   return randNum % (max - min + 1) + min;
 }
 
 uint32_t RandomGen::GetRand32() {
-  std::scoped_lock{m};
+  std::scoped_lock lock(m);
   GenerateNextNumber();
   return randNum;
 }
 
 uint64_t RandomGen::GetRand64() {
-  std::scoped_lock{m};
+  std::scoped_lock lock(m);
   uint64_t rand64;
 
   GenerateNextNumber();
@@ -101,7 +101,7 @@ uint64_t RandomGen::GetRand64() {
 }
 
 void RandomGen::GetRandBits(uint16_t bitCnt, unsigned char *dest) {
-  std::scoped_lock{m};
+  std::scoped_lock lock(m);
   uint16_t bytesNeeded = (bitCnt + 7) / 8;
   uint16_t index = 0;
 

@@ -1,3 +1,4 @@
+#include <hip/hip_runtime.h>
 #include <algorithm>
 #include <cstdio>
 #include <cstdlib>
@@ -16,7 +17,6 @@
 #include "opt-sched/Scheduler/config.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/Debug.h"
-#include <hip/hip_runtime.h>
 
 // only print pressure if enabled by sched.ini
 extern bool OPTSCHED_gPrintSpills;
