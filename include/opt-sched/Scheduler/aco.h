@@ -15,6 +15,7 @@ Last Update:  Jan. 2020
 #include "opt-sched/Scheduler/device_vector.h"
 #include "llvm/ADT/ArrayRef.h"
 #include <memory>
+#include <random>
 #include <utility>
 #include <vector>
 #include <hip/hip_runtime.h>
@@ -91,6 +92,7 @@ struct alignas(64) PCPUACOSchedVars {
   
   pheromone_t MaxPriorityInv;
   KeysHelper1 *kHelper1;
+  std::mt19937 rng;
 
   /*
   void ConstrainedScheduler::SchdulInst_(SchedInstruction *inst, InstCount)
@@ -156,6 +158,7 @@ public:
                                     int thread,
                                     PCPUACOSchedVars &pcpu_sched_vars,
                                     ParallelCPUVars &pcpu,
+                                    std::atomic<int> &antsTerminated,
                                     int kernelNum = -1);
   InstCount PCPU_SelectInstruction(SchedInstruction *lastInst, InstCount totalStalls,
                                     SchedRegion *rgn, bool &unnecessarilyStalling,

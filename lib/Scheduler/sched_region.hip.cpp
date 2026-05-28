@@ -254,25 +254,24 @@ FUNC_RESULT SchedRegion::FindOptimalSchedule(
   Config &schedIni = SchedulerOptions::getInstance();
   bool HeuristicSchedulerEnabled = schedIni.GetBool("HEUR_ENABLED");
   bool AcoSchedulerEnabled = schedIni.GetBool("ACO_ENABLED");
-  multipleOccupancies = schedIni.GetBool("MO_ENABLED", false);
-  printf("multipleOccupancies is %d", multipleOccupancies);
+  multipleOccupancies = schedIni.GetBool("MO_ENABLED");
   bool BbSchedulerEnabled = isBbEnabled(schedIni, rgnTimeout);
-  unsigned long randSeed = (unsigned long) schedIni.GetInt("RANDOM_SEED", 0);
-  bool devACOEnabled = schedIni.GetBool("DEV_ACO", false);
+  unsigned long randSeed = (unsigned long) schedIni.GetInt("RANDOM_SEED");
+  bool devACOEnabled = schedIni.GetBool("DEV_ACO");
   int numBlocks;
   if (devACOEnabled && dataDepGraph_->GetInstCnt() >= REGION_MIN_SIZE) {
-    bool manyAntsEnabled = schedIni.GetBool("ACO_MANY_ANTS_ENABLED", false);
-    int manyAntBlocks = static_cast<int>(schedIni.GetInt("ACO_MANY_ANTS_PER_ITERATION_BLOCKS", 1));
-    int deviceAntBlocks = static_cast<int>(schedIni.GetInt("ACO_DEVICE_ANT_PER_ITERATION_BLOCKS", 1));
+    bool manyAntsEnabled = schedIni.GetBool("ACO_MANY_ANTS_ENABLED");
+    int manyAntBlocks = static_cast<int>(schedIni.GetInt("ACO_MANY_ANTS_PER_ITERATION_BLOCKS"));
+    int deviceAntBlocks = static_cast<int>(schedIni.GetInt("ACO_DEVICE_ANT_PER_ITERATION_BLOCKS"));
     numBlocks = manyAntsEnabled && dataDepGraph_->GetInstCnt() > MANY_ANT_MIN_SIZE ?
                 manyAntBlocks : deviceAntBlocks;
   } else {
-    numBlocks = static_cast<int>(schedIni.GetInt("HOST_ANTS", 2));
+    numBlocks = static_cast<int>(schedIni.GetInt("HOST_ANTS"));
   }
 
   if (AcoSchedulerEnabled) {
-    AcoBeforeEnum = schedIni.GetBool("ACO_BEFORE_ENUM", false);
-    AcoAfterEnum = schedIni.GetBool("ACO_AFTER_ENUM", false);
+    AcoBeforeEnum = schedIni.GetBool("ACO_BEFORE_ENUM");
+    AcoAfterEnum = schedIni.GetBool("ACO_AFTER_ENUM");
   }
 
   if (!HeuristicSchedulerEnabled && !AcoBeforeEnum) {
@@ -392,7 +391,7 @@ FUNC_RESULT SchedRegion::FindOptimalSchedule(
     CmputNormCost_(lstSched, CCM_DYNMC, hurstcExecCost, true);
     hurstcCost_ = lstSched->GetCost();
     InstCount maxIndependentInstructions = 0;
-    std::string readyListUB = schedIni.GetString("ACO_READY_LIST_UB", "NO");
+    std::string readyListUB = schedIni.GetString("ACO_READY_LIST_UB");
     if (readyListUB == "NO" || readyListUB == "MIN_DEGREE") {
       for (int i = 0; i < dataDepGraph_->GetInstCnt(); i++) {
         int independentInstructions = dataDepGraph_->GetInstCnt() - dataDepGraph_->GetInstByIndx(i)->GetRcrsvPrdcsrCnt() - dataDepGraph_->GetInstByIndx(i)->GetRcrsvScsrCnt();

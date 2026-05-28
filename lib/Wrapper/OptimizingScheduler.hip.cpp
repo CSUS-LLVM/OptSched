@@ -290,32 +290,14 @@ void ScheduleEvaluator::recordSchedule(int schedIndex) {
   if (!DAG.BB || DAG.RegionBegin == DAG.RegionEnd)
     return;
 
-  dbgs() << "[OPTSCHED_DEBUG] recordSchedule idx=" << schedIndex
-         << " this=" << (const void *)this
-         << " DAG=" << (const void *)&DAG
-         << " DAG.BB=" << (const void *)DAG.BB
-         << " RegionBegin==RegionEnd=" << (DAG.RegionBegin == DAG.RegionEnd)
-         << " storedSchedules.size()=" << storedSchedules.size() << "\n";
-
   if ((size_t)schedIndex >= storedSchedules.size())
     storedSchedules.resize((size_t)schedIndex + 1);
-
-  dbgs() << "[OPTSCHED_DEBUG] recordSchedule idx=" << schedIndex
-         << " DAG.BB=" << (void *)DAG.BB
-         << " RegionBegin==RegionEnd=" << (DAG.RegionBegin == DAG.RegionEnd)
-         << " storedSchedules.size()=" << storedSchedules.size() << "\n";
 
   storedSchedules[schedIndex].clear();
   schedCount++;
 
   const char *dbgEnv = std::getenv("OPTSCHED_DEBUG");
   const bool doDebug = dbgEnv && std::atoi(dbgEnv) != 0;
-  if (doDebug) {
-    dbgs() << "[OPTSCHED_DEBUG] recordSchedule idx=" << schedIndex
-           << " DAG.BB=" << (void *)DAG.BB
-           << " RegionBegin==RegionEnd=" << (DAG.RegionBegin == DAG.RegionEnd)
-           << " storedSchedules.size()=" << storedSchedules.size() << "\n";
-  }
 
   // Safely iterate over scheduled instructions in the region
   if (!DAG.BB || DAG.RegionBegin == DAG.RegionEnd)
@@ -324,17 +306,6 @@ void ScheduleEvaluator::recordSchedule(int schedIndex) {
   for (auto I = DAG.RegionBegin; I != DAG.RegionEnd; ++I) {
     if (!I->isDebugInstr()) {
       storedSchedules[schedIndex].push_back(&*I);
-    }
-  }
-
-  if (doDebug) {
-    dbgs() << "[OPTSCHED_DEBUG] storedSchedules[" << schedIndex << "] size="
-           << storedSchedules[schedIndex].size() << "\n";
-    int __mi_i = 0;
-    for (MachineInstr *MI : storedSchedules[schedIndex]) {
-      dbgs() << "  [" << __mi_i++ << "] ";
-      MI->print(dbgs());
-      dbgs() << '\n';
     }
   }
 }
@@ -744,12 +715,6 @@ void ScheduleDAGOptSched::schedule() {
   // Revord MachineInstr order in the first pass for a possible revert if
   // scheduling makes things worse.
   if (!SecondPass) {
-    LLVM_DEBUG(dbgs() << "[OPTSCHED_DEBUG] before first recordSchedule this="
-                      << (const void *)this
-                      << " RegionNumber=" << RegionNumber
-                      << " BB=" << (const void *)BB
-                      << " RegionBegin==RegionEnd=" << (RegionBegin == RegionEnd)
-                      << "\n");
     SchedEval.recordSchedule(0);
     SchedEval.calculateRPBefore();
     SchedEval.calcualteILPBefore();
@@ -783,25 +748,16 @@ void ScheduleDAGOptSched::schedule() {
   // Prepare for device scheduling by increasing heap size and copying machMdl
   bool dev_ACOEnabled = schedIni.GetBool("DEV_ACO");
   if (dev_ACOEnabled && dev_MM == NULL && NumRegionInstrs + 2 >= REGION_MIN_SIZE) {
-    int hipDeviceCount = 0;
-    hipError_t hipErr = hipGetDeviceCount(&hipDeviceCount);
-    if (hipErr != hipSuccess || hipDeviceCount == 0) {
-      LLVM_DEBUG(dbgs() << "[OPTSCHED_DEBUG] DEV_ACO disabled: no HIP devices found ("
-                        << hipGetErrorString(hipErr) << ")\n");
-      dev_ACOEnabled = false;
-    } else {
-      gpuErrchk(hipSetDevice(0));
-      // Copy MachineModel to device for use during DevListSched.
-      // Allocate device memory
-      gpuErrchk(hipMallocManaged((void**)&dev_MM, sizeof(MachineModel)));
-      // Copy machMdl_ to device
-      gpuErrchk(hipMemcpy(dev_MM, MM.get(), sizeof(MachineModel),
-                           hipMemcpyHostToDevice));
-      // Copy over all pointers to device
-      MM.get()->CopyPointersToDevice(dev_MM);
-      // make sure mallocmanaged mem is copied to device before kernel start
-      gpuErrchk(hipMemPrefetchAsync(dev_MM, sizeof(MachineModel), 0));
-    }
+    // Copy MachineModel to device for use during DevListSched.
+    // Allocate device memory
+    gpuErrchk(hipMallocManaged((void**)&dev_MM, sizeof(MachineModel)));
+    // Copy machMdl_ to device
+    gpuErrchk(hipMemcpy(dev_MM, MM.get(), sizeof(MachineModel),
+                         hipMemcpyHostToDevice));
+    // Copy over all pointers to device
+    MM.get()->CopyPointersToDevice(dev_MM);
+    // make sure mallocmanaged mem is copied to device before kernel start
+    gpuErrchk(hipMemPrefetchAsync(dev_MM, sizeof(MachineModel), 0));
   }
   
   // create region
@@ -1073,7 +1029,7 @@ void ScheduleDAGOptSched::loadOptSchedConfig() {
   SCW = schedIni.GetInt("SPILL_COST_WEIGHT");
   LowerBoundAlgorithm = parseLowerBoundAlgorithm();
   HeuristicPriorities = parseHeuristic(
-      schedIni.GetString("LIST_HEURISTIC", schedIni.GetString("HEURISTIC", "LLVM")));
+      schedIni.GetString("LIST_HEURISTIC"));
   EnumPriorities = parseHeuristic(schedIni.GetString("ENUM_HEURISTIC"));
   SecondPassEnumPriorities =
       parseHeuristic(schedIni.GetString("SECOND_PASS_ENUM_HEURISTIC"));
@@ -1099,13 +1055,13 @@ void ScheduleDAGOptSched::loadOptSchedConfig() {
   RandomGen::SetSeed(randomSeed);
   HeurSchedType = parseListSchedType();
 
-  OccupancyLimit = schedIni.GetInt("OCCUPANCY_LIMIT", 0);
-  ShouldLimitOccupancy = schedIni.GetBool("SHOULD_LIMIT_OCCUPANCY", false);
+  OccupancyLimit = schedIni.GetInt("OCCUPANCY_LIMIT");
+  ShouldLimitOccupancy = schedIni.GetBool("SHOULD_LIMIT_OCCUPANCY");
 
   OccupancyLimitSource = OCC_LIMIT_TYPE::OLT_NONE;
   if (ShouldLimitOccupancy)
     OccupancyLimitSource =
-        parseOccLimit(schedIni.GetString("OCCUPANCY_LIMIT_SOURCE", "NONE"));
+        parseOccLimit(schedIni.GetString("OCCUPANCY_LIMIT_SOURCE"));
 
   DeviceACOEnabled = schedIni.GetBool("DEV_ACO");
 }

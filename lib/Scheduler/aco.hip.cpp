@@ -17,6 +17,8 @@
 #include <unordered_map>
 #include <sstream>
 
+#include <atomic>
+#include <random>
 #include <thread>
 #include <vector>
 
@@ -85,7 +87,7 @@ ACOScheduler::ACOScheduler(DataDepGraph *dataDepGraph,
 
   use_dev_ACO = schedIni.GetBool("DEV_ACO") && dev_rgn_ != nullptr && dev_DDG_ != nullptr;
   if (!use_dev_ACO || count_ < REGION_MIN_SIZE) {
-    numThreads_ = schedIni.GetInt("HOST_ANTS", 2);
+    numThreads_ = schedIni.GetInt("HOST_ANTS");
   } else {
     dev_rgn_->SetNumThreads(numThreads_);
     dev_DDG_->SetNumThreads(numThreads_);
@@ -97,7 +99,7 @@ ACOScheduler::ACOScheduler(DataDepGraph *dataDepGraph,
   local_decay = schedIni.GetFloat("ACO_LOCAL_DECAY");
   print_aco_trace = schedIni.GetBool("ACO_TRACE");
   IsTwoPassEn = schedIni.GetBool("USE_TWO_PASS");
-  weightedSecondPass = schedIni.GetBool("USE_WEIGHTED_SECOND_PASS", false);
+  weightedSecondPass = schedIni.GetBool("USE_WEIGHTED_SECOND_PASS");
 
   /*
   std::cerr << "useOldAlg===="<<useOldAlg<<"\n\n";
@@ -1386,16 +1388,16 @@ FUNC_RESULT ACOScheduler::FindSchedule(InstSchedule *schedule_out,
   printf("target: %d\n",targetOccupancy_);
   if (count_ < 50)
     noImprovementMax = schedIni.GetInt(IsFirst ? "ACO_STOP_ITERATIONS_RANGE1"
-                                             : "ACO2P_STOP_ITERATIONS_RANGE1", 10);
+                                             : "ACO2P_STOP_ITERATIONS_RANGE1");
   else if (count_ < 100)
     noImprovementMax = schedIni.GetInt(IsFirst ? "ACO_STOP_ITERATIONS_RANGE2"
-                                             : "ACO2P_STOP_ITERATIONS_RANGE2", 20);
+                                             : "ACO2P_STOP_ITERATIONS_RANGE2");
   else if (count_ < 1000)
     noImprovementMax = schedIni.GetInt(IsFirst ? "ACO_STOP_ITERATIONS_RANGE3"
-                                             : "ACO2P_STOP_ITERATIONS_RANGE3", 50);
+                                             : "ACO2P_STOP_ITERATIONS_RANGE3");
   else
     noImprovementMax = schedIni.GetInt(IsFirst ? "ACO_STOP_ITERATIONS_RANGE4"
-                                             : "ACO2P_STOP_ITERATIONS_RANGE4", 100);
+                                             : "ACO2P_STOP_ITERATIONS_RANGE4");
   if (dev_AcoSchdulr)
     dev_AcoSchdulr->noImprovementMax = noImprovementMax;
 
@@ -1427,13 +1429,13 @@ FUNC_RESULT ACOScheduler::FindSchedule(InstSchedule *schedule_out,
 #else
   initialValue_ = (double)numThreads_ / heuristicCost;
 #endif
-  #ifdef MULTIPLE_PHEROMONE_TABLES
+#ifdef MULTIPLE_PHEROMONE_TABLES
   for (int i = 0; i < pheromone_size * numDiffOccupancies_; i++)
     pheromone_[i] = initialValue_;
-  #else
+#else
   for (int i = 0; i < pheromone_size; i++)
     pheromone_[i] = initialValue_;
-  #endif
+#endif
   InstSchedule *bestSchedule = InitialSchedule;
 
   // check if heuristic schedule is better than the initial
@@ -2020,12 +2022,10 @@ void ACOScheduler::UpdatePheromone(InstSchedule *schedule, bool isIterationBest,
 
 #if !USE_ACS
   // decay pheromone (only if count_ is sane)
-  if (count_ > 0) {
-    for (int i = 0; i < count_; i++) {
-      for (int j = 0; j < count_; j++) {
-        pheromone = &Pheromone(i, j);
-        *pheromone *= (1 - decay_factor);
-      }
+  for (int i = 0; i < count_; i++) {
+    for (int j = 0; j < count_; j++) {
+      pheromone = &Pheromone(i, j);
+      *pheromone *= (1 - decay_factor);
     }
   }
 #endif
@@ -2467,18 +2467,21 @@ InstSchedule *ACOScheduler::FindManyCPUSchedule(InstCount RPTarget) {
   std::vector<std::thread> PCPUThreads;
   InstSchedule **cpuScheds = new InstSchedule*[NO_CPU_THREADS]();
   ((BBWithSpill*)rgn_)->AllocParallelCPUVars(NO_CPU_THREADS);
+  std::atomic<int> localAntsTerminated{0};
 
   for (int i = 0; i < NO_CPU_THREADS; i++) {
-    PCPUThreads.emplace_back([this, cpuScheds, i, RPTarget, pcpu_sched_vars]() {
-      cpuScheds[i] = PCPU_FindOneSchedule(RPTarget, i, 
+    PCPUThreads.emplace_back([this, cpuScheds, i, RPTarget, pcpu_sched_vars, &localAntsTerminated]() {
+      cpuScheds[i] = PCPU_FindOneSchedule(RPTarget, i,
                                           pcpu_sched_vars[i],
-                                          ((BBWithSpill*)rgn_)->GetPCPUVars(i));
+                                          ((BBWithSpill*)rgn_)->GetPCPUVars(i),
+                                          localAntsTerminated);
     });
   }
 
   for (auto &t : PCPUThreads) {
     t.join();
   }
+  numAntsTerminated_ += localAntsTerminated.load();
   ((BBWithSpill*)rgn_)->FreeParallelCPUVars(NO_CPU_THREADS);
 
   // Choose the best schedule from the CPU threads.
@@ -2509,11 +2512,12 @@ InstSchedule *ACOScheduler::FindManyCPUSchedule(InstCount RPTarget) {
   return result;
 }
 
-InstSchedule *ACOScheduler::PCPU_FindOneSchedule(InstCount RPTarget, 
+InstSchedule *ACOScheduler::PCPU_FindOneSchedule(InstCount RPTarget,
                                                 int thread,
                                                 PCPUACOSchedVars &pcpu_sched_vars,
                                                 ParallelCPUVars &pcpu,
-                                                int kernelNum){   
+                                                std::atomic<int> &antsTerminated,
+                                                int kernelNum){
   Logger::Info("FindOneSchedule, %d", thread);                                                
   SchedInstruction *lastInst = NULL;
   ACOReadyListEntry LastInstInfo;
@@ -2635,7 +2639,7 @@ InstSchedule *ACOScheduler::PCPU_FindOneSchedule(InstCount RPTarget,
       // schedule construction
       if (((BBWithSpill*)rgn_)->PCPU_GetCrntSpillCost(pcpu) > RPTarget) {
         // end schedule construction
-        numAntsTerminated_++;
+        antsTerminated.fetch_add(1, std::memory_order_relaxed);
         pcpu_sched_vars.readyLs->clearReadyList();
         delete schedule;
         Logger::Info("Thread %d, returned early", thread);
@@ -2801,10 +2805,10 @@ InstCount ACOScheduler::PCPU_SelectInstruction(SchedInstruction *lastInst, InstC
   //we are going to use the fixed bias or if we are going to use
   //fitness proportional selection.  Generate the number used for
   //the fitness proportional selection point
-  double rand ;
-  pheromone_t point;
-  rand = RandDouble(0, 1);
-  point = RandDouble(0, pcpu_sched_vars.readyLs->ScoreSum);
+  std::uniform_real_distribution<double> dist01(0.0, 1.0);
+  double rand = dist01(pcpu_sched_vars.rng);
+  pheromone_t point = std::uniform_real_distribution<pheromone_t>(
+      0.0, pcpu_sched_vars.readyLs->ScoreSum)(pcpu_sched_vars.rng);
 
   //here we compute the chance that we will use fp selection or auto pick the best
   double choose_best_chance;
@@ -2917,6 +2921,7 @@ PCPUACOSchedVars *ACOScheduler::AllocPCPUACOSchedVars(int numThreads) {
     pcpu_sched_vars[i].MaxPriorityInv = 0;
     pcpu_sched_vars[i].kHelper1 = new KeysHelper1(priorities1_);
     pcpu_sched_vars[i].kHelper1->initForRegion(dataDepGraph_);
+    pcpu_sched_vars[i].rng.seed(random_seed_ ^ (uint64_t(i + 1) * 6364136223846793005ULL));
 
     pcpu_sched_vars[i].rsrvSlots = new ReserveSlot[issuRate_];
     pcpu_sched_vars[i].avlblSlotsInCrntCycle = new int16_t[issuTypeCnt_];
