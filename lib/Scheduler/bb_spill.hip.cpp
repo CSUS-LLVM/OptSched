@@ -2029,6 +2029,38 @@ void BBWithSpill::AllocParallelCPUVars(int numThreads){
   }
 }
 
+void BBWithSpill::ResetParallelCPUVars(int numThreads) {
+  for (int i = 0; i < numThreads; i++) {
+    pcpu_vars_[i].crntCycleNum_ = 0;
+    pcpu_vars_[i].crntSlotNum_ = 0;
+    pcpu_vars_[i].crntSpillCost_ = 0;
+    pcpu_vars_[i].crntStepNum_ = -1;
+    pcpu_vars_[i].peakSpillCost_ = 0;
+    pcpu_vars_[i].totSpillCost_ = 0;
+    pcpu_vars_[i].slilSpillCost_ = 0;
+    pcpu_vars_[i].dynamicSlilLowerBound_ = staticSlilLowerBound_;
+    pcpu_vars_[i].schduldInstCnt_ = 0;
+    pcpu_vars_[i].schduldEntryInstCnt_ = 0;
+    pcpu_vars_[i].schduldExitInstCnt_ = 0;
+    for (int j = 0; j < regTypeCnt_; j++) {
+      pcpu_vars_[i].liveRegs_[j].Reset();
+      pcpu_vars_[i].livePhysRegs_[j].Reset();
+      pcpu_vars_[i].peakRegPressures_[j] = 0;
+      pcpu_vars_[i].regPressures_[j] = 0;
+      pcpu_vars_[i].sumOfLiveIntervalLengths_[j] = 0;
+    }
+    std::fill(pcpu_vars_[i].spillCosts_,
+              pcpu_vars_[i].spillCosts_ + dataDepGraph_->GetInstCnt(), 0);
+  }
+  for (int i = 0; i < regTypeCnt_; i++)
+    for (int j = 0; j < regFiles_[i].GetRegCnt(); j++)
+      regFiles_[i].GetReg(j)->ResetParallelCPURegs(numThreads);
+  // Reset the shared crntUseCnt_ that IsLive() reads. This mirrors what
+  // Initialize_() -> InitForCostCmputtn_() did in the old per-batch code.
+  for (int i = 0; i < regTypeCnt_; i++)
+    regFiles_[i].ResetCrntUseCnts();
+}
+
 void BBWithSpill::FreeParallelCPUVars(int numThreads){
   for (int i = 0; i < numThreads; i++) {
     delete[] pcpu_vars_[i].liveRegs_;

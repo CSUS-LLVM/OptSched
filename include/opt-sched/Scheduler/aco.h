@@ -14,11 +14,18 @@ Last Update:  Jan. 2020
 #include "opt-sched/Scheduler/ready_list.h"
 #include "opt-sched/Scheduler/device_vector.h"
 #include "llvm/ADT/ArrayRef.h"
+#include <atomic>
+#include <condition_variable>
+#include <functional>
 #include <memory>
+#include <mutex>
 #include <random>
+#include <thread>
 #include <utility>
 #include <vector>
 #include <hip/hip_runtime.h>
+
+struct CPUThreadPool;
 
 namespace llvm {
 namespace opt_sched {
@@ -182,6 +189,7 @@ public:
   bool PCPU_MovToNxtSlot_(SchedInstruction *inst, PCPUACOSchedVars &pcpu_sched_vars);
   void PCPU_InitNewCycle_(PCPUACOSchedVars &pcpu_sched_vars);
   void PCPU_InitSchedInsts(int numThreads);
+  void PCPU_ResetSchedInsts(int numThreads);
   void PCPU_FreeSchedInsts(int numThreads);
   
   __host__ __device__
@@ -304,6 +312,7 @@ private:
   // Populated before PCPU threads launch to avoid cursor race on scsrLst_.
   std::vector<std::vector<std::pair<SchedInstruction *, InstCount>>> instScsrs_;
 
+  std::unique_ptr<CPUThreadPool> cpuPool_;
 };
 
 } // namespace opt_sched

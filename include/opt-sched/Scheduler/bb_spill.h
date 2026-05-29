@@ -272,6 +272,7 @@ public:
   // }
 
   void AllocParallelCPUVars(int numThreads);
+  void ResetParallelCPUVars(int numThreads);
   void FreeParallelCPUVars(int numThreads);
 
   void PCPU_CmputCrntSpillCost_(ParallelCPUVars &pcpu);

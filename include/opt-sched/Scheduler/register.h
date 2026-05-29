@@ -136,6 +136,7 @@ public:
   void PCPU_ResetCrntUseCnt(int threadIdx);
   bool PCPU_IsLive(int threadIdx) const;
   void AllocParallelCPURegs(int numThreads);
+  void ResetParallelCPURegs(int numThreads);
   void FreeParallelCPURegs();
 
 

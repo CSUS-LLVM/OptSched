@@ -1382,6 +1382,27 @@ void SchedInstruction::AllocPCPUVars(int numThreads){
   }
 }
 
+void SchedInstruction::InitPCPUVars(int numThreads) {
+  if (!pcpu_inst_vars_)
+    return;
+  for (int i = 0; i < numThreads; ++i) {
+    pcpu_inst_vars_[i].crntSchedCycle = SCHD_UNSCHDULD;
+    pcpu_inst_vars_[i].crntSchedSlot = SCHD_UNSCHDULD;
+    pcpu_inst_vars_[i].lastUseCnt = 0;
+    pcpu_inst_vars_[i].ready = false;
+    pcpu_inst_vars_[i].minRdyCycle = INVALID_VALUE;
+    pcpu_inst_vars_[i].unschduldPrdcsrCnt = prdcsrCnt_;
+    pcpu_inst_vars_[i].unschduldScsrCnt = scsrCnt_;
+    pcpu_inst_vars_[i].crntRlxdCycle = SCHD_UNSCHDULD;
+    for (InstCount j = 0; j < prdcsrCnt_; ++j) {
+      if (pcpu_inst_vars_[i].rdyCyclePerPrdcsr)
+        pcpu_inst_vars_[i].rdyCyclePerPrdcsr[j] = INVALID_VALUE;
+      if (pcpu_inst_vars_[i].prevMinRdyCyclePerPrdcsr)
+        pcpu_inst_vars_[i].prevMinRdyCyclePerPrdcsr[j] = INVALID_VALUE;
+    }
+  }
+}
+
 void SchedInstruction::FreePCPUVars(int numThreads) {
   if (!pcpu_inst_vars_)
     return;

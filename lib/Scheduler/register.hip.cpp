@@ -217,6 +217,11 @@ void Register::AllocParallelCPURegs(int numThreads){
     pcpu_crntUseCnt_[i].value = 0;
   }
 }
+void Register::ResetParallelCPURegs(int numThreads) {
+  for (int i = 0; i < numThreads; i++)
+    pcpu_crntUseCnt_[i].value = 0;
+}
+
 void Register::FreeParallelCPURegs(){
   delete[] pcpu_crntUseCnt_;
   pcpu_crntUseCnt_ = nullptr;

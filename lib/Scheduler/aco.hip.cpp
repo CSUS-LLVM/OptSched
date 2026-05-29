@@ -25,6 +25,73 @@
 using namespace llvm::opt_sched;
 namespace cg = cooperative_groups;
 
+// Persistent thread pool: threads are created once and reused across ACO
+// iterations, eliminating per-iteration spawn/join overhead.
+struct CPUThreadPool {
+  void start(int n) {
+    shutdown_ = false;
+    generation_ = 0;
+    pending_ = 0;
+    for (int i = 0; i < n; i++)
+      workers_.emplace_back([this, i] { workerLoop(i); });
+  }
+
+  // Fan out fn(threadIdx) to all workers and block until all finish.
+  void runAll(std::function<void(int)> fn) {
+    {
+      std::unique_lock<std::mutex> lock(mtx_);
+      task_ = std::move(fn);
+      pending_ = static_cast<int>(workers_.size());
+      ++generation_;
+    }
+    startCv_.notify_all();
+    std::unique_lock<std::mutex> lock(mtx_);
+    doneCv_.wait(lock, [this] { return pending_ == 0; });
+  }
+
+  void stop() {
+    {
+      std::unique_lock<std::mutex> lock(mtx_);
+      shutdown_ = true;
+      ++generation_;
+    }
+    startCv_.notify_all();
+    for (auto &t : workers_)
+      t.join();
+    workers_.clear();
+  }
+
+private:
+  void workerLoop(int idx) {
+    int seenGen = 0;
+    for (;;) {
+      std::function<void(int)> fn;
+      {
+        std::unique_lock<std::mutex> lock(mtx_);
+        startCv_.wait(lock,
+                      [this, &seenGen] { return generation_ != seenGen || shutdown_; });
+        if (shutdown_)
+          return;
+        seenGen = generation_;
+        fn = task_;
+      }
+      fn(idx);
+      std::unique_lock<std::mutex> lock(mtx_);
+      if (--pending_ == 0)
+        doneCv_.notify_one();
+    }
+  }
+
+  std::vector<std::thread> workers_;
+  std::function<void(int)> task_;
+  std::mutex mtx_;
+  std::condition_variable startCv_;
+  std::condition_variable doneCv_;
+  int generation_{0};
+  int pending_{0};
+  bool shutdown_{false};
+};
+
 #ifndef NDEBUG
 static void PrintInstruction(SchedInstruction *inst);
 #endif
@@ -1802,53 +1869,112 @@ FUNC_RESULT ACOScheduler::FindSchedule(InstSchedule *schedule_out,
         std::unordered_map<string, int> schedMap;
         int diffSchedCount = 0;
       #endif
-      
-      while (noImprovement < noImprovementMax) {  
+
+      // One-time setup per occupancy iteration: allocate per-thread state and
+      // build the successor cache so threads never race on cursor state.
+      PCPU_InitSchedInsts(numThreads_);
+      PCPUACOSchedVars *pcpu_sched_vars = AllocPCPUACOSchedVars(numThreads_);
+      instScsrs_.assign(count_, {});
+      for (int si = 0; si < count_; si++) {
+        SchedInstruction *sInst = dataDepGraph_->GetInstByIndx(si);
+        if (!sInst) continue;
+        InstCount prdcsrNum;
+        for (SchedInstruction *scsr = sInst->GetFrstScsr(&prdcsrNum);
+             scsr != NULL; scsr = sInst->GetNxtScsr(&prdcsrNum))
+          instScsrs_[si].emplace_back(scsr, prdcsrNum);
+      }
+      InstSchedule **cpuScheds = new InstSchedule *[numThreads_]();
+      ((BBWithSpill *)rgn_)->AllocParallelCPUVars(numThreads_);
+      std::atomic<int> localAntsTerminated{0};
+      cpuPool_ = std::make_unique<CPUThreadPool>();
+      cpuPool_->start(numThreads_);
+
+      while (noImprovement < noImprovementMax) {
         iterations++;
         iterationBest = nullptr;
-        for (int i = 0; i < numThreads_; i++) {
-          InstSchedule *schedule;
-          if (!RUN_PCPU) {
-            schedule = FindOneSchedule(RPTarget, NULL);
-          } else {
-            schedule = FindManyCPUSchedule(RPTarget);
-            Logger::Info("Done Find Many Schedule");
-            i+=(NO_CPU_THREADS-1);
-          }
 
-
-          #ifdef CHECK_DIFFERENT_SCHEDULES
-            // check if schedule is in Map
-            InstCount instNum, cycleNum, slotNum;
-            // get first instruction in string
-            instNum = schedule->GetFrstInst(cycleNum, slotNum);
-            std::string schedString = std::to_string(instNum);
-            // prepare next instruction in comma separated list
-            instNum = schedule->GetNxtInst(cycleNum, slotNum);
-            while (instNum != INVALID_VALUE) {
-              schedString.append(",");
-              schedString.append(std::to_string(instNum));
-              instNum = schedule->GetNxtInst(cycleNum, slotNum);
-            }
-            schedule->ResetInstIter();
-            if (schedMap.find(schedString) == schedMap.end()) {
-              schedMap[schedString] = 1;
-              diffSchedCount++;
-            }
-            else {
-              schedMap[schedString] = schedMap[schedString] + 1;
-            }
-          #endif
-
-          if (print_aco_trace)
-            PrintSchedule(schedule);
-          if (shouldReplaceSchedule(iterationBest, schedule, false, RPTarget, targetOccupancy_ - j)) {
-            if (iterationBest)
-              delete iterationBest;          
-            iterationBest = schedule;
-          } else {
+        if (!RUN_PCPU) {
+          // Sequential fallback path.
+          for (int i = 0; i < numThreads_; i++) {
+            InstSchedule *schedule = FindOneSchedule(RPTarget, NULL);
+            if (print_aco_trace)
+              PrintSchedule(schedule);
+            if (shouldReplaceSchedule(iterationBest, schedule, false, RPTarget, targetOccupancy_ - j)) {
+              if (iterationBest)
+                delete iterationBest;
+              iterationBest = schedule;
+            } else {
               if (schedule)
                 delete schedule;
+            }
+          }
+        } else {
+          // Parallel path: dispatch all ants at once via persistent pool.
+          // Reset all per-iteration state that was previously zeroed by the
+          // Free+Alloc cycle inside FindManyCPUSchedule.
+          PCPU_ResetSchedInsts(numThreads_);
+          ((BBWithSpill *)rgn_)->ResetParallelCPUVars(numThreads_);
+          for (int i = 0; i < numThreads_; i++) {
+            pcpu_sched_vars[i].schduldInstCnt = 0;
+            pcpu_sched_vars[i].isCrntCycleBlkd = false;
+            pcpu_sched_vars[i].crntCycleNum = 0;
+            pcpu_sched_vars[i].crntSlotNum = 0;
+            pcpu_sched_vars[i].rsrvSlotCnt = 0;
+            pcpu_sched_vars[i].RP0OrPositiveCount = 0;
+            pcpu_sched_vars[i].MaxScoringInst = 0;
+            pcpu_sched_vars[i].readyLs->clearReadyList();
+            for (int j = 0; j < issuRate_; j++) {
+              pcpu_sched_vars[i].rsrvSlots[j].strtCycle = INVALID_VALUE;
+              pcpu_sched_vars[i].rsrvSlots[j].endCycle = INVALID_VALUE;
+            }
+            for (int j = 0; j < issuTypeCnt_; j++)
+              pcpu_sched_vars[i].avlblSlotsInCrntCycle[j] = slotsPerTypePerCycle_[j];
+          }
+
+          std::fill(cpuScheds, cpuScheds + numThreads_, nullptr);
+          cpuPool_->runAll([&](int i) {
+            cpuScheds[i] = PCPU_FindOneSchedule(RPTarget, i,
+                                                pcpu_sched_vars[i],
+                                                ((BBWithSpill *)rgn_)->GetPCPUVars(i),
+                                                localAntsTerminated);
+          });
+
+          for (int i = 0; i < numThreads_; i++) {
+            InstSchedule *schedule = cpuScheds[i];
+            if (!schedule)
+              continue;
+            cpuScheds[i] = nullptr;
+
+            #ifdef CHECK_DIFFERENT_SCHEDULES
+              InstCount instNum, cycleNum, slotNum;
+              instNum = schedule->GetFrstInst(cycleNum, slotNum);
+              std::string schedString = std::to_string(instNum);
+              instNum = schedule->GetNxtInst(cycleNum, slotNum);
+              while (instNum != INVALID_VALUE) {
+                schedString.append(",");
+                schedString.append(std::to_string(instNum));
+                instNum = schedule->GetNxtInst(cycleNum, slotNum);
+              }
+              schedule->ResetInstIter();
+              if (schedMap.find(schedString) == schedMap.end()) {
+                schedMap[schedString] = 1;
+                diffSchedCount++;
+              } else {
+                schedMap[schedString] = schedMap[schedString] + 1;
+              }
+            #endif
+
+            if (print_aco_trace)
+              PrintSchedule(schedule);
+            if (shouldReplaceSchedule(iterationBest, schedule, false, RPTarget, targetOccupancy_ - j)) {
+              if (iterationBest)
+                delete iterationBest;
+              iterationBest = schedule;
+              MaxPriorityInv = pcpu_sched_vars[i].MaxPriorityInv;
+            } else {
+                if (schedule)
+                  delete schedule;
+            }
           }
         }
   #if !USE_ACS
@@ -1895,6 +2021,17 @@ FUNC_RESULT ACOScheduler::FindSchedule(InstSchedule *schedule_out,
   #endif
 
       }
+
+      // Teardown per-occupancy-iteration parallel state.
+      cpuPool_->stop();
+      cpuPool_.reset();
+      numAntsTerminated_ += localAntsTerminated.load();
+      ((BBWithSpill *)rgn_)->FreeParallelCPUVars(numThreads_);
+      FreePCPUACOSchedVars(pcpu_sched_vars, numThreads_);
+      pcpu_sched_vars = nullptr;
+      delete[] cpuScheds;
+      PCPU_FreeSchedInsts(numThreads_);
+
       Logger::Info("%d ants terminated early", numAntsTerminated_);
       #ifdef CHECK_DIFFERENT_SCHEDULES
       Logger::Info("%d different schedules for %d total ants", diffSchedCount, (iterations + 1) * numThreads_ - numAntsTerminated_);
@@ -3083,6 +3220,11 @@ void ACOScheduler::PCPU_InitSchedInsts(int numThreads){
     SchedInstruction *inst = dataDepGraph_->GetInstByIndx(i);
     inst->AllocPCPUVars(numThreads);
   }
+}
+
+void ACOScheduler::PCPU_ResetSchedInsts(int numThreads) {
+  for (int i = 0; i < totInstCnt_; i++)
+    dataDepGraph_->GetInstByIndx(i)->InitPCPUVars(numThreads);
 }
 
 void ACOScheduler::PCPU_FreeSchedInsts(int numThreads){
