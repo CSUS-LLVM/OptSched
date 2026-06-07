@@ -1,0 +1,101 @@
+OptSched GPU-ACO artifact — verification transcript
+Captured: 2026-06-07 20:54 UTC
+Host GPU: AMD Instinct MI100 (gfx908), ROCm 5.4.2 base image
+Image: optsched-artifact:latest (built from this repo's Dockerfile, no GPU needed to build)
+Command: docker run --rm --device=/dev/kfd --device=/dev/dri --group-add video --group-add render --security-opt seccomp=unconfined optsched-artifact /opt/artifact/verify.sh
+==================================================================
+
+
+========== 1. GPU visibility ==========
+  Name:                    gfx908                             
+  Marketing Name:          AMD Instinct MI100                 
+      Name:                    amdgcn-amd-amdhsa--gfx908:sramecc+:xnack-
+  Board name:					 AMD Instinct MI100
+  Name:						 gfx908:sramecc+:xnack-
+
+========== 2. Built compiler ==========
+clang version 15.0.0 (https://github.com/CSUS-LLVM/llvm-project.git a9f4c7f0cbfeab934ca6ca1f1782a4414adbba06)
+Target: x86_64-unknown-linux-gnu
+
+========== 3. HIP smoke test (vector add) on the GPU ==========
+Final occupancy for function __cxa_pure_virtual:10
+Final occupancy for function __cxa_deleted_virtual:10
+Final occupancy for function __assert_fail:10
+Final occupancy for function __assertfail:10
+Final occupancy for function _Z4vaddPKfS0_Pfi:5
+Final occupancy for function _ZNK17__HIP_CoordinatesI14__HIP_BlockIdxE3__XcvjEv:10
+Final occupancy for function _ZNK17__HIP_CoordinatesI14__HIP_BlockDimE3__XcvjEv:10
+Final occupancy for function _ZNK17__HIP_CoordinatesI15__HIP_ThreadIdxE3__XcvjEv:10
+Final occupancy for function _ZNK14__HIP_BlockIdxclEj:10
+Final occupancy for function _ZNK14__HIP_BlockDimclEj:10
+Final occupancy for function _ZNK15__HIP_ThreadIdxclEj:10
+Final occupancy for function __ockl_get_local_id:10
+Final occupancy for function __ockl_fprintf_stderr_begin:10
+Final occupancy for function __ockl_hostcall_preview:10
+Final occupancy for function __ockl_hostcall_internal:10
+Final occupancy for function :10
+Final occupancy for function :10
+Final occupancy for function :10
+Final occupancy for function :10
+Final occupancy for function :10
+Final occupancy for function :10
+Final occupancy for function :10
+Final occupancy for function :10
+Final occupancy for function __ockl_hsa_signal_add:10
+Final occupancy for function __ockl_fprintf_append_args:10
+Final occupancy for function __ockl_fprintf_append_string_n:10
+Final occupancy for function __ockl_get_local_size:10
+Final occupancy for function __ockl_get_group_id:10
+Running on device: AMD Instinct MI100 (gcnArch gfx908:sramecc+:xnack-)
+PASSED: vector add correct
+
+========== 4. Build aco_demo WITH OptSched GPU ACO scheduler ==========
+TuningParameters
+RP_WEIGHT = 100
+ILP_WEIGHT = 1
+OCC_WEIGHT = 800
+LD_FACTOR = 15
+COST_THRESHOLD = 599046543
+END
+multipleOccupancies is 0multipleOccupancies is 0multipleOccupancies is 0Occupancy difference between AMD and inital: 1
+target: 10
+Initial schedule is better
+bestStallsValue is: 2, initial sched is: 3
+TID:0 New best sched found by thread 9
+TID:0 ACO found schedule cost:100, rp cost:0, occ: 10, exec cost: 100, and iteration:15 (sched length: 13, abs rp cost: 0, rplb: 0) stalls: 1, unnecessary stalls: 0
+TID:0 New best sched found by thread 0
+TID:0 ACO found schedule cost:0, rp cost:0, occ: 10, exec cost: 0, and iteration:44 (sched length: 12, abs rp cost: 0, rplb: 0) stalls: 0, unnecessary stalls: 0
+ACO finished after 44 iterations
+0 ants terminated early
+Best schedule0: Absolute RP Cost: 0, Length: 12, Cost: 0: 10 1 4 2 3 5 0 6 7 8 9 11 
+Occ: 10, 10
+ILP: 13, 10
+multipleOccupancies is 0Occupancy difference between AMD and inital: 1
+target: 10
+Initial schedule is better
+bestStallsValue is: 97, initial sched is: 76
+TID:0 New best sched found by thread 12
+TID:0 ACO found schedule cost:0, rp cost:0, occ: 10, exec cost: 0, and iteration:23 (sched length: 116, abs rp cost: 0, rplb: 0) stalls: 74, unnecessary stalls: 0
+ACO finished after 23 iterations
+0 ants terminated early
+Best schedule0: Absolute RP Cost: 0, Length: 116, Cost: 0: 40 0 1 2 7 8 4 3 5 6 37 11 9 10 38 14 15 12 13 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31 32 33 34 35 36 39 41 
+Occ: 10, 10
+ILP: 116, 114
+Region Num: 0 Choice 0, occ cost: 10, ilp: 13, ILP weight: 1
+Region Num: 0 Choice 1, occ cost: 10, ilp: 10, ILP weight: 1
+Region Num: 1 Choice 0, occ cost: 10, ilp: 116, ILP weight: 1
+Region Num: 1 Choice 1, occ cost: 10, ilp: 114, ILP weight: 1
+Choice 0, Weighted Cost: 209, occ: 10, occ cost: 80, ilp cost: 129, margin: 10
+Choice 1, Weighted Cost: 206, occ: 10, occ cost: 80, ilp cost: 124, margin: 11
+OptSched on-GPU ACO kernel launches during compilation: 2
+INFO: Launching Dev_ACO with 4 blocks of 64 threads (Time = 38 ms)
+INFO: Post Kernel Error: no error (Time = 81 ms)
+INFO: Launching Dev_ACO with 4 blocks of 64 threads (Time = 39 ms)
+INFO: Post Kernel Error: no error (Time = 133 ms)
+
+========== 5. Run the OptSched-scheduled program on the GPU ==========
+Device: AMD Instinct MI100 (gfx908:sramecc+:xnack-)
+PASSED: OptSched-scheduled kernel correct
+
+========== RESULT ==========
+OK: compiler built, HIP runs on gfx908, and OptSched's GPU ACO scheduler executed.
