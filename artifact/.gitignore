@@ -1,0 +1,5 @@
+# Prebuilt image tarball — too large for git; distribute via Docker Hub / Zenodo.
+*.tar.gz
+# Build logs
+docker-build.log
+*.swp
